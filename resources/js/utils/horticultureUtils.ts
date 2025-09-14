@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { router } from '@inertiajs/react';
+import { findPipeZoneImproved } from './horticultureProjectStats';
 
 export interface Coordinate {
     lat: number;
@@ -305,17 +306,30 @@ export interface SprinklerConfig {
     updatedAt: string;
 }
 // Zone color constants for display
+// 🎨 ระบบสีโซนใหม่ที่รองรับ 20 โซน และไม่ซ้ำกับสีพื้นที่อื่น
+// หลีกเลี่ยงสี: #22C55E (พื้นที่หลัก), #F59E0B, #EF4444, #3B82F6, #6B7280, #8B5CF6 (พื้นที่หลีกเลี่ยง)
+// 🌈 5 โซนแรกใช้สีที่แตกต่างกันมากที่สุด
 export const ZONE_COLORS = [
-    '#FF69B4',
-    '#00CED1',
-    '#32CD32',
-    '#FFD700',
-    '#FF6347',
-    '#9370DB',
-    '#20B2AA',
-    '#FF1493',
-    '#00FA9A',
-    '#FFA500',
+    '#FF6B6B', // สีแดงสด - โซน 1
+    '#9B59B6', // สีม่วงเข้ม - โซน 2 (เปลี่ยนจากเขียวฟ้า)
+    '#F39C12', // สีส้มทอง - โซน 3 (เปลี่ยนจากฟ้าอ่อน)
+    '#1ABC9C', // สีเขียวเทอร์ควอยซ์ - โซน 4 (เปลี่ยนจากเขียวมิ้นต์)
+    '#3498DB', // สีฟ้าสด - โซน 5 (เปลี่ยนจากเหลืองอ่อน)
+    '#DDA0DD', // สีม่วงอ่อน - โซน 6
+    '#98D8C8', // สีเขียวอ่อน - โซน 7
+    '#F7DC6F', // สีเหลืองทอง - โซน 8
+    '#BB8FCE', // สีม่วงลาเวนเดอร์ - โซน 9
+    '#85C1E9', // สีฟ้าใส - โซน 10
+    '#F8C471', // สีส้มอ่อน - โซน 11
+    '#82E0AA', // สีเขียวใส - โซน 12
+    '#F1948A', // สีแดงโรส - โซน 13
+    '#AED6F1', // สีฟ้าเบบี้ - โซน 14
+    '#D2B4DE', // สีม่วงพาสเทล - โซน 15
+    '#F9E79F', // สีเหลืองครีม - โซน 16
+    '#A9DFBF', // สีเขียวพาสเทล - โซน 17
+    '#FAD7A0', // สีส้มครีม - โซน 18
+    '#D5A6BD', // สีชมพูเก่า - โซน 19
+    '#B2DFDB', // สีเขียวทะเล - โซน 20
 ];
 
 // Exclusion area color constants
@@ -685,27 +699,28 @@ export const calculateProjectSummary = (
 
             // แยกท่อตามโซน irrigationZones - ใช้การหาท่อจริงๆ ในโซน
             
-            // Import findPipeEndZone function (assume it's available or create a simplified version)
-            const findPipeEndZoneLocal = (pipe: any, zones: any[], irrigationZones: any[]) => {
-                if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
-                
-                const endPoint = pipe.coordinates[pipe.coordinates.length - 1];
-                
-                // Check irrigationZones first
-                for (const zone of irrigationZones) {
-                    if (zone.coordinates && zone.coordinates.length > 0) {
-                        const isInside = isPointInPolygon(endPoint, zone.coordinates);
-                        if (isInside) return zone.id;
-                    }
-                }
-                
-                return null;
-            };
+            // Import findPipeEndZone function (assume it's available or create a simplified version) - ไม่ใช้แล้ว
+            // const findPipeEndZoneLocal = (pipe: any, zones: any[], irrigationZones: any[]) => {
+            //     if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
+            //     
+            //     const endPoint = pipe.coordinates[pipe.coordinates.length - 1];
+            //     
+            //     // Check irrigationZones first
+            //     for (const zone of irrigationZones) {
+            //         if (zone.coordinates && zone.coordinates.length > 0) {
+            //             const isInside = isPointInPolygon(endPoint, zone.coordinates);
+            //             if (isInside) return zone.id;
+            //         }
+            //     }
+            //     
+            //     return null;
+            // };
             
             // ท่อเมน: หาท่อจริงๆ ที่อยู่ในโซนนี้
             const allMainPipes = projectData.mainPipes || [];
             const zoneMainPipes = allMainPipes.filter(mainPipe => {
-                const mainZoneId = findPipeEndZoneLocal(mainPipe, projectData.zones || [], projectData.irrigationZones || []);
+                // 🔧 ใช้ findPipeZoneImproved แทน findPipeEndZoneLocal เพื่อความแม่นยำ
+                const mainZoneId = findPipeZoneImproved(mainPipe, projectData.zones || [], projectData.irrigationZones || []);
                 return mainZoneId === irrZone.id;
             });
             const mainPipeLengthInZone = zoneMainPipes.reduce((sum, pipe) => sum + pipe.length, 0);
@@ -713,7 +728,8 @@ export const calculateProjectSummary = (
             // ท่อเมนรอง: หาท่อจริงๆ ที่อยู่ในโซนนี้
             const allSubMainPipes = projectData.subMainPipes || [];
             const zoneSubMainPipes = allSubMainPipes.filter(subMainPipe => {
-                const subMainZoneId = findPipeEndZoneLocal(subMainPipe, projectData.zones || [], projectData.irrigationZones || []);
+                // 🔧 ใช้ findPipeZoneImproved แทน findPipeEndZoneLocal เพื่อความแม่นยำ
+                const subMainZoneId = findPipeZoneImproved(subMainPipe, projectData.zones || [], projectData.irrigationZones || []);
                 return subMainZoneId === irrZone.id;
             });
             const subMainPipeLengthInZone = zoneSubMainPipes.reduce((sum, pipe) => sum + pipe.length, 0);

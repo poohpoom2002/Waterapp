@@ -12,6 +12,7 @@ import {
 
 interface PipeSystemSummaryProps {
     horticultureSystemData?: any;
+    gardenSystemData?: any; // เพิ่มสำหรับ garden mode
     activeZoneId?: string;
     selectedPipes?: {
         branch?: any;
@@ -25,6 +26,7 @@ interface PipeSystemSummaryProps {
 
 const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
     horticultureSystemData,
+    gardenSystemData,
     activeZoneId,
     selectedPipes,
     sprinklerPressure,
@@ -32,18 +34,19 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
 }) => {
     const { t } = useLanguage();
 
-    // Only show for horticulture mode
-    if (projectMode !== 'horticulture') {
+    // Only show for horticulture and garden modes
+    if (projectMode !== 'horticulture' && projectMode !== 'garden') {
         return null;
     }
 
     // Don't show if no data
-    if (!sprinklerPressure || !horticultureSystemData || !activeZoneId) {
+    const systemData = projectMode === 'garden' ? gardenSystemData : horticultureSystemData;
+    if (!sprinklerPressure || !systemData || !activeZoneId) {
         return null;
     }
 
     const calculationData = useMemo(() => {
-        const zone = horticultureSystemData.zones?.find((z: any) => z.id === activeZoneId);
+        const zone = systemData.zones?.find((z: any) => z.id === activeZoneId);
         if (!zone?.bestPipes) return null;
 
         // คำนวณ head loss สำหรับแต่ละประเภทท่อ
@@ -85,7 +88,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
 
         // คำนวณ emitter pipe แบบพิเศษ (ใช้ Q หัวฉีด และจำนวนทางออก = 1)
         let emitterCalc: PipeCalculationResult | null = null;
-        if (selectedPipes?.emitter && horticultureSystemData?.sprinklerConfig) {
+        if (selectedPipes?.emitter && systemData?.sprinklerConfig) {
             // หา lateral pipe ที่ยาวที่สุดจาก localStorage
             const currentProject = localStorage.getItem('horticultureIrrigationData');
             let longestEmitterLength = 10; // default
@@ -119,7 +122,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                 id: 'emitter-pipe',
                 length: longestEmitterLength,
                 count: 1, // จำนวนทางออก = 1
-                waterFlowRate: horticultureSystemData.sprinklerConfig.flowRatePerPlant, // ใช้ Q หัวฉีด
+                waterFlowRate: systemData.sprinklerConfig.flowRatePerPlant, // ใช้ Q หัวฉีด
                 details: { type: 'emitter' },
             };
 
@@ -144,7 +147,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
             branchSubMainCombined,
             head20Percent,
         };
-    }, [horticultureSystemData, activeZoneId, selectedPipes, sprinklerPressure]);
+    }, [systemData, activeZoneId, selectedPipes, sprinklerPressure]);
 
     if (!calculationData) {
         return null;

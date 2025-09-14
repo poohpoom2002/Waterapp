@@ -16,6 +16,7 @@ interface SprinklerSelectorProps {
     activeZone?: Zone;
     allZoneSprinklers: { [zoneId: string]: any };
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
+    gardenStats?: any; // เพิ่มสำหรับ garden mode
 }
 
 const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
@@ -25,6 +26,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     activeZone,
     allZoneSprinklers,
     projectMode = 'horticulture',
+    gardenStats,
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
@@ -48,53 +50,100 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         return parseFloat(String(value)) || 0;
     };
 
-    // Helper function to calculate total score for sprinkler selection (lower is better)
-    const calculateSprinklerScore = useCallback((sprinkler: any): number => {
-        const flowRate = getAverageValue(sprinkler.waterVolumeLitersPerMinute);
-        const pressure = getAverageValue(sprinkler.pressureBar);
-        const radius = getAverageValue(sprinkler.radiusMeters);
-        
-        // Normalize values to same scale (0-100) and return sum (lower = better)
-        const normalizedFlow = Math.min(flowRate / 50 * 100, 100); // assume max 50 LPM
-        const normalizedPressure = Math.min(pressure / 10 * 100, 100); // assume max 10 bar
-        const normalizedRadius = Math.min(radius / 20 * 100, 100); // assume max 20 meters
-        
-        return normalizedFlow + normalizedPressure + normalizedRadius;
-    }, []);
+    // Helper function to get maximum value from range or single value
+    const getMaxValue = (value: any): number => {
+        if (Array.isArray(value)) {
+            return Math.max(value[0], value[1]);
+        }
+        return parseFloat(String(value)) || 0;
+    };
 
-    // Auto-select sprinkler for horticulture mode based on system requirements
+    // Helper function to check if value is within range
+    const isValueInRange = (value: any, target: number): boolean => {
+        if (Array.isArray(value)) {
+            return target >= value[0] && target <= value[1];
+        }
+        return Math.abs(value - target) < 0.01; // Allow small floating point differences
+    };
+
+    // Auto-select sprinkler for horticulture and garden modes based on system requirements
     useEffect(() => {
-        if (projectMode === 'horticulture' && !selectedSprinkler && analyzedSprinklers.length > 0) {
-            // โหลดข้อมูลระบบหัวฉีดจาก loadSprinklerConfig()
-            const sprinklerConfig = loadSprinklerConfig();
+        if ((projectMode === 'horticulture' || projectMode === 'garden') && analyzedSprinklers.length > 0) {
+            let sprinklerConfig: any = null;
+            
+            if (projectMode === 'horticulture') {
+                // โหลดข้อมูลระบบหัวฉีดจาก loadSprinklerConfig()
+                sprinklerConfig = loadSprinklerConfig();
+            } else if (projectMode === 'garden') {
+                // ใช้ข้อมูลจาก garden zone หรือค่า default
+                if (gardenStats && activeZone) {
+                    const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                    if (currentZone) {
+                        sprinklerConfig = {
+                            flowRatePerMinute: currentZone.sprinklerFlowRate || 6.0,
+                            pressureBar: currentZone.sprinklerPressure || 2.5,
+                            radiusMeters: currentZone.sprinklerRadius || 8.0,
+                        };
+                    } else {
+                        // fallback ค่า default
+                        sprinklerConfig = {
+                            flowRatePerMinute: 6.0,
+                            pressureBar: 2.5,
+                            radiusMeters: 8.0,
+                        };
+                    }
+                } else {
+                    // fallback ค่า default
+                    sprinklerConfig = {
+                        flowRatePerMinute: 6.0,
+                        pressureBar: 2.5,
+                        radiusMeters: 8.0,
+                    };
+                }
+            }
             
             if (sprinklerConfig) {
                 const { flowRatePerMinute, pressureBar, radiusMeters } = sprinklerConfig;
                 
-                // กรองสปริงเกอร์ที่มีคุณสมบัติสูงกว่าข้อกำหนดระบบ
+                // กรองสปริงเกอร์ตามเงื่อนไขใหม่
                 const compatibleSprinklers = analyzedSprinklers.filter((sprinkler: any) => {
-                    const sprinklerFlowMin = getMinValue(sprinkler.waterVolumeLitersPerMinute);
-                    const sprinklerPressureMin = getMinValue(sprinkler.pressureBar);
-                    const sprinklerRadiusMin = getMinValue(sprinkler.radiusMeters);
+                    // Flow ต้องอยู่ในช่วง range ของสปริงเกอร์
+                    const flowMatch = isValueInRange(sprinkler.waterVolumeLitersPerMinute, flowRatePerMinute);
                     
-                    // ต้องมีค่าสูงกว่าระบบที่กำหนดทั้ง 3 ค่า
-                    const flowMatch = sprinklerFlowMin > flowRatePerMinute;
-                    const pressureMatch = sprinklerPressureMin > pressureBar;
-                    const radiusMatch = sprinklerRadiusMin > radiusMeters;
+                    // Pressure ต้องอยู่ในช่วง range ของสปริงเกอร์
+                    const pressureMatch = isValueInRange(sprinkler.pressureBar, pressureBar);
+                    
+                    // Radius ต้องอยู่ในช่วง range ของสปริงเกอร์
+                    const radiusMatch = isValueInRange(sprinkler.radiusMeters, radiusMeters);
                     
                     return flowMatch && pressureMatch && radiusMatch;
                 });
                 
-                // เลือกสปริงเกอร์ที่มีค่าทั้ง 3 ค่าน้อยที่สุด (ประหยัดพลังงาน)
+                // เลือกสปริงเกอร์ที่ราคาถูกที่สุดเป็น default สำหรับทุกโซน
                 if (compatibleSprinklers.length > 0) {
                     const bestSprinkler = compatibleSprinklers.sort((a: any, b: any) => {
-                        return calculateSprinklerScore(a) - calculateSprinklerScore(b);
+                        return a.price - b.price;
                     })[0];
-                    onSprinklerChange(bestSprinkler);
+                    
+                    // ตรวจสอบว่ามี global default sprinkler หรือไม่
+                    const globalDefaultSprinkler = localStorage.getItem(`${projectMode}_defaultSprinkler`);
+                    
+                    if (!globalDefaultSprinkler) {
+                        // ถ้าไม่มี global default ให้เซ็ตเป็น default
+                        localStorage.setItem(`${projectMode}_defaultSprinkler`, JSON.stringify(bestSprinkler));
+                    }
+                    
+                    // ถ้าโซนปัจจุบันยังไม่มีสปริงเกอร์ ให้ใช้ global default
+                    if (!selectedSprinkler) {
+                        const defaultSprinkler = globalDefaultSprinkler 
+                            ? JSON.parse(globalDefaultSprinkler)
+                            : bestSprinkler;
+                        onSprinklerChange(defaultSprinkler);
+                    }
                 }
             }
         }
-    }, [projectMode, selectedSprinkler, analyzedSprinklers, onSprinklerChange, calculateSprinklerScore]);
+    }, [projectMode, selectedSprinkler, analyzedSprinklers, onSprinklerChange, gardenStats, activeZone]);
     
     const openImageModal = (src: string, alt: string) => {
         setModalImage({ src, alt });
@@ -106,39 +155,68 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         setModalImage({ src: '', alt: '' });
     };
     
-    // กรองสปริงเกอร์สำหรับ horticulture mode
+    // กรองสปริงเกอร์สำหรับ horticulture และ garden modes
     const getFilteredSprinklers = () => {
-        if (projectMode !== 'horticulture') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
             return analyzedSprinklers.sort((a, b) => a.price - b.price);
         }
         
-        // สำหรับ horticulture mode - กรองเฉพาะสปริงเกอร์ที่เข้ากันได้
-        const sprinklerConfig = loadSprinklerConfig();
+        // สำหรับ horticulture และ garden modes - กรองเฉพาะสปริงเกอร์ที่เข้ากันได้
+        let sprinklerConfig: any = null;
+        
+        if (projectMode === 'horticulture') {
+            sprinklerConfig = loadSprinklerConfig();
+        } else if (projectMode === 'garden') {
+            // ใช้ข้อมูลจาก garden zone หรือค่า default
+            if (gardenStats && activeZone) {
+                const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                if (currentZone) {
+                    sprinklerConfig = {
+                        flowRatePerMinute: currentZone.sprinklerFlowRate || 6.0,
+                        pressureBar: currentZone.sprinklerPressure || 2.5,
+                        radiusMeters: currentZone.sprinklerRadius || 8.0,
+                    };
+                } else {
+                    // fallback ค่า default
+                    sprinklerConfig = {
+                        flowRatePerMinute: 6.0,
+                        pressureBar: 2.5,
+                        radiusMeters: 8.0,
+                    };
+                }
+            } else {
+                // fallback ค่า default
+                sprinklerConfig = {
+                    flowRatePerMinute: 6.0,
+                    pressureBar: 2.5,
+                    radiusMeters: 8.0,
+                };
+            }
+        }
+        
         if (!sprinklerConfig) {
             return analyzedSprinklers.sort((a, b) => a.price - b.price);
         }
         
         const { flowRatePerMinute, pressureBar, radiusMeters } = sprinklerConfig;
         
-        // กรองสปริงเกอร์ที่มีคุณสมบัติสูงกว่าข้อกำหนดระบบ
+        // กรองสปริงเกอร์ตามเงื่อนไขใหม่
         const compatibleSprinklers = analyzedSprinklers.filter((sprinkler: any) => {
-            const sprinklerFlowMin = getMinValue(sprinkler.waterVolumeLitersPerMinute);
-            const sprinklerPressureMin = getMinValue(sprinkler.pressureBar);
-            const sprinklerRadiusMin = getMinValue(sprinkler.radiusMeters);
+            // Flow ต้องอยู่ในช่วง range ของสปริงเกอร์
+            const flowMatch = isValueInRange(sprinkler.waterVolumeLitersPerMinute, flowRatePerMinute);
             
-            // ต้องมีค่าสูงกว่าระบบที่กำหนดทั้ง 3 ค่า
-            const flowMatch = sprinklerFlowMin > flowRatePerMinute;
-            const pressureMatch = sprinklerPressureMin > pressureBar;
-            const radiusMatch = sprinklerRadiusMin > radiusMeters;
+            // Pressure ต้องอยู่ในช่วง range ของสปริงเกอร์
+            const pressureMatch = isValueInRange(sprinkler.pressureBar, pressureBar);
+            
+            // Radius ต้องอยู่ในช่วง range ของสปริงเกอร์
+            const radiusMatch = isValueInRange(sprinkler.radiusMeters, radiusMeters);
             
             return flowMatch && pressureMatch && radiusMatch;
         });
         
-        // เรียงตามคะแนนรวม (ค่าน้อยที่สุดก่อน) แล้วตามราคา
+        // เรียงตามราคา (ถูกที่สุดก่อน)
         return compatibleSprinklers.sort((a: any, b: any) => {
-            const scoreDiff = calculateSprinklerScore(a) - calculateSprinklerScore(b);
-            if (Math.abs(scoreDiff) > 0.1) return scoreDiff; // Use score as primary criteria
-            return a.price - b.price; // Use price as secondary criteria
+            return a.price - b.price;
         });
     };
     
@@ -202,9 +280,39 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 )}
             </h3>
 
-            {/* แสดงข้อมูลระบบหัวฉีดสำหรับ Horticulture Mode */}
-            {projectMode === 'horticulture' && (() => {
-                const sprinklerConfig = loadSprinklerConfig();
+            {/* แสดงข้อมูลระบบหัวฉีดสำหรับ Horticulture และ Garden Mode */}
+            {(projectMode === 'horticulture' || projectMode === 'garden') && (() => {
+                let sprinklerConfig: any = null;
+                
+                if (projectMode === 'horticulture') {
+                    sprinklerConfig = loadSprinklerConfig();
+                } else if (projectMode === 'garden') {
+                    // ใช้ข้อมูลจาก garden zone หรือค่า default
+                    if (gardenStats && activeZone) {
+                        const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                        if (currentZone) {
+                            sprinklerConfig = {
+                                flowRatePerMinute: currentZone.sprinklerFlowRate || 6.0,
+                                pressureBar: currentZone.sprinklerPressure || 2.5,
+                                radiusMeters: currentZone.sprinklerRadius || 8.0,
+                            };
+                        } else {
+                            // fallback ค่า default
+                            sprinklerConfig = {
+                                flowRatePerMinute: 6.0,
+                                pressureBar: 2.5,
+                                radiusMeters: 8.0,
+                            };
+                        }
+                    } else {
+                        // fallback ค่า default
+                        sprinklerConfig = {
+                            flowRatePerMinute: 6.0,
+                            pressureBar: 2.5,
+                            radiusMeters: 8.0,
+                        };
+                    }
+                }
                 return sprinklerConfig ? (
                     <div className="mb-4 rounded border border-blue-700/50 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 p-4">
                         <div className="flex flex-row flex-wrap items-center gap-6">
@@ -264,6 +372,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     const selected = analyzedSprinklers.find(
                         (s) => s.id === parseInt(value.toString())
                     );
+                    
+                    // อัปเดต global default sprinkler เมื่อมีการเลือกด้วยตนเอง
+                    if (selected && (projectMode === 'horticulture' || projectMode === 'garden')) {
+                        localStorage.setItem(`${projectMode}_defaultSprinkler`, JSON.stringify(selected));
+                    }
+                    
                     onSprinklerChange(selected);
                 }}
                 options={[

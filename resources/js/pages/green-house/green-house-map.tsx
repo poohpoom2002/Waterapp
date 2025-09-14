@@ -1,7 +1,7 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import axios from 'axios';
 import Navbar from '../../components/Navbar';
-import Footer from '../../components/Footer';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 // Types
@@ -12,13 +12,14 @@ interface Point {
 
 interface Shape {
     id: string;
-    type: 'greenhouse' | 'plot' | 'walkway' | 'water-source' | 'measurement';
+    type: 'greenhouse' | 'plot' | 'walkway' | 'water-source' | 'measurement' | 'fertilizer-area' | 'fertilizer-machine';
     points: Point[];
     color: string;
     fillColor: string;
     name: string;
     measurement?: { distance: number; unit: string };
     cropType?: string;
+    connections?: string[]; // Array of connected element IDs
 }
 
 interface IrrigationElement {
@@ -30,13 +31,24 @@ interface IrrigationElement {
         | 'solenoid-valve'
         | 'ball-valve'
         | 'sprinkler'
-        | 'drip-line';
+        | 'drip-line'
+        | 'water-tank'
+        | 'fertilizer-machine';
     points: Point[];
     color: string;
     width?: number;
     radius?: number;
     angle?: number;
     spacing?: number;
+    capacityLiters?: number;
+    overlap?: number; // 0.0 - 0.5 (0% - 50%)
+    connections?: string[]; // Array of connected element IDs
+}
+
+// History state interface
+interface HistoryState {
+    shapes: Shape[];
+    irrigationElements: IrrigationElement[];
 }
 
 interface Tool {
@@ -56,59 +68,78 @@ interface Crop {
     description: string;
 }
 
-// Tools configuration
-const tools: Tool[] = [
-    {
-        id: 'select',
-        name: 'Select',
-        icon: '↖️',
-        description: 'Select and edit components',
-        category: 'select',
-    },
-    { id: 'main-pipe', name: 'Main Pipe', icon: '🔵', description: 'Draw main pipe', category: 'pipe' },
-    { id: 'sub-pipe', name: 'Sub Pipe', icon: '🟢', description: 'Draw sub pipe', category: 'pipe' },
-    { id: 'pump', name: 'Pump', icon: '⚙️', description: 'Place water pump', category: 'component' },
-    {
-        id: 'solenoid-valve',
-        name: 'Solenoid Valve',
-        icon: '🔧',
-        description: 'Place solenoid valve',
-        category: 'component',
-    },
-    {
-        id: 'ball-valve',
-        name: 'Ball Valve',
-        icon: '🟡',
-        description: 'Place ball valve',
-        category: 'component',
-    },
-    {
-        id: 'sprinkler',
-        name: 'Mini Sprinkler',
-        icon: '💦',
-        description: 'Place mini sprinkler',
-        category: 'irrigation',
-    },
-    {
-        id: 'drip-line',
-        name: 'Drip Line',
-        icon: '💧',
-        description: 'Place drip line',
-        category: 'irrigation',
-    },
-];
-
-// Irrigation methods
-const irrigationMethods = {
-    'mini-sprinkler': { name: 'Mini Sprinkler', radius: 30, spacing: 50 },
-    drip: { name: 'Drip Irrigation', radius: 0, spacing: 20 },
-};
-
-const GRID_SIZE = 25;
-const CANVAS_SIZE = { width: 2400, height: 1600 };
-
 export default function GreenhouseMap() {
     const { t } = useLanguage();
+    
+    // Tools configuration
+    const tools: Tool[] = [
+        {
+            id: 'select',
+            name: t('เลือก'),
+            icon: '↖️',
+            description: t('เลือกและแก้ไขอุปกรณ์'),
+            category: 'select',
+        },
+        { id: 'main-pipe', name: t('ท่อเมน'), icon: '🔴', description: t('วาดท่อเมน'), category: 'pipe' },
+        { id: 'sub-pipe', name: t('ท่อย่อย'), icon: '🟣', description: t('วาดท่อย่อย'), category: 'pipe' },
+        { id: 'pump', name: t('ปั๊ม'), icon: '⚙️', description: t('วางปั๊มน้ำ'), category: 'component' },
+        {
+            id: 'solenoid-valve',
+            name: t('โซลินอยด์วาล์ว'),
+            icon: '🔧',
+            description: t('วางโซลินอยด์วาล์ว'),
+            category: 'component',
+        },
+        {
+            id: 'ball-valve',
+            name: t('บอลวาล์ว'),
+            icon: '🟡',
+            description: t('วางบอลวาล์ว'),
+            category: 'component',
+        },
+        {
+            id: 'water-tank',
+            name: t('ถังเก็บน้ำ'),
+            icon: '🗂️',
+            description: t('วางถังเก็บน้ำ'),
+            category: 'component',
+        },
+        {
+            id: 'fertilizer-machine',
+            name: t('เครื่องให้ปุ๋ย'),
+            icon: '🧪',
+            description: t('วางเครื่องให้ปุ๋ย'),
+            category: 'component',
+        },
+        {
+            id: 'sprinkler',
+            name: t('มินิสปริงเกลอร์'),
+            icon: '💦',
+            description: t('วางมินิสปริงเกลอร์'),
+            category: 'irrigation',
+        },
+        {
+            id: 'drip-line',
+            name: t('สายน้ำหยด'),
+            icon: '💧',
+            description: t('วางสายน้ำหยด'),
+            category: 'irrigation',
+        },
+    ];
+
+    // Irrigation methods
+    const irrigationMethods = {
+        'mini-sprinkler': { name: t('มินิสปริงเกลอร์'), radius: 30, spacing: 50 },
+        drip: { name: t('น้ำหยด'), radius: 0, spacing: 20 },
+    };
+
+    const GRID_SIZE = 25;
+    const CANVAS_SIZE = { width: 2400, height: 1600 };
+    // Grid scale constants (1 m = 20 px)
+    const PX_PER_METER = 20;
+    const MINOR_GRID_STEP = PX_PER_METER * 0.5; // 0.5 m
+    const MAJOR_GRID_STEP = PX_PER_METER * 1;   // 1 m
+
     // Canvas and interaction states
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedTool, setSelectedTool] = useState('select');
@@ -142,10 +173,180 @@ export default function GreenhouseMap() {
 
     // Radius and spacing adjustment states
     const [globalRadius, setGlobalRadius] = useState(1.5);
-    const [globalDripSpacing, setGlobalDripSpacing] = useState(0.3);
+    const [globalDripSpacing, setGlobalDripSpacing] = useState(20); // Default to 20cm
+    const [globalSprinklerOverlap, setGlobalSprinklerOverlap] = useState(0);
+    
+    // Flow rate and pressure settings
+    const [sprinklerFlowRate, setSprinklerFlowRate] = useState(10); // L/min
+    const [sprinklerPressure, setSprinklerPressure] = useState(2.5); // bar
+    const [dripFlowRate, setDripFlowRate] = useState(0.24); // L/min (fixed)
+    const [dripPressure, setDripPressure] = useState(1.0); // bar
+    
+    // Drip spacing options in cm
+    const dripSpacingOptions = [10, 15, 20, 30];
 
     // Image cache for component icons
     const [componentImages, setComponentImages] = useState<{ [key: string]: HTMLImageElement }>({});
+
+    // Undo/Redo states
+    const [history, setHistory] = useState<HistoryState[]>([{ shapes: [], irrigationElements: [] }]);
+    const [historyIndex, setHistoryIndex] = useState(0);
+
+    // Collapsible panel states
+    const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+    const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
+
+    // Connection states
+    const [isConnecting, setIsConnecting] = useState(false);
+    const [connectionStart, setConnectionStart] = useState<{ elementId: string; pointIndex: number } | null>(null);
+    const [snapTarget, setSnapTarget] = useState<{ elementId: string; point: Point } | null>(null);
+
+    // Add to history function
+    const addToHistory = useCallback(
+        (newShapes: Shape[], newIrrigationElements: IrrigationElement[]) => {
+            const newHistory = history.slice(0, historyIndex + 1);
+            newHistory.push({
+                shapes: [...newShapes],
+                irrigationElements: [...newIrrigationElements]
+            });
+            setHistory(newHistory);
+            setHistoryIndex(newHistory.length - 1);
+        },
+        [history, historyIndex]
+    );
+
+    // Connection utility functions
+    const createConnection = useCallback((fromElementId: string, toElementId: string) => {
+        // Update irrigation elements (pipes)
+        setIrrigationElements(prevElements => 
+            prevElements.map(element => {
+                if (element.id === fromElementId) {
+                    const connections = element.connections || [];
+                    if (!connections.includes(toElementId)) {
+                        return { ...element, connections: [...connections, toElementId] };
+                    }
+                }
+                return element;
+            })
+        );
+
+        // Update shapes (fertilizer machines) - add connections property if needed
+        setShapes(prevShapes =>
+            prevShapes.map(shape => {
+                if (shape.id === toElementId && shape.type === 'fertilizer-machine') {
+                    const connections = shape.connections || [];
+                    if (!connections.includes(fromElementId)) {
+                        return { ...shape, connections: [...connections, fromElementId] };
+                    }
+                }
+                return shape;
+            })
+        );
+    }, []);
+
+    // Finish drawing function - moved before useEffect that uses it
+    const finishDrawing = useCallback(() => {
+        if (currentPath.length < 2) {
+            setIsDrawing(false);
+            setCurrentPath([]);
+            return;
+        }
+
+        const elementTypes = {
+            'main-pipe': { color: '#EF4444', width: 6 },
+            'sub-pipe': { color: '#8B5CF6', width: 4 },
+            'drip-line': { color: '#06B6D4', width: 2 },
+        };
+
+        // Handle fertilizer area shape creation
+        if (selectedTool === 'fertilizer-area') {
+            const newShape: Shape = {
+                id: `fertilizer-area-${Date.now()}`,
+                type: 'fertilizer-area',
+                points: [...currentPath],
+                color: '#22C55E',
+                fillColor: '#22C55E40',
+                name: `${t('พื้นที่ให้ปุ๋ย')} ${shapes.filter(s => s.type === 'fertilizer-area').length + 1}`,
+            };
+
+            const newShapes = [...shapes, newShape];
+            setShapes(newShapes);
+            addToHistory(newShapes, irrigationElements);
+            setIsDrawing(false);
+            setCurrentPath([]);
+            return;
+        }
+
+        // Handle fertilizer machine as drawn shape
+        if (selectedTool === 'fertilizer-machine') {
+            const newShape: Shape = {
+                id: `fertilizer-machine-${Date.now()}`,
+                type: 'fertilizer-machine',
+                points: [...currentPath],
+                color: '#84CC16',
+                fillColor: '#84CC1640',
+                name: `${t('เครื่องให้ปุ๋ย')} ${shapes.filter(s => s.type === 'fertilizer-machine').length + 1}`,
+            };
+
+            const newShapes = [...shapes, newShape];
+            setShapes(newShapes);
+            addToHistory(newShapes, irrigationElements);
+            setIsDrawing(false);
+            setCurrentPath([]);
+            return;
+        }
+
+        const config = elementTypes[selectedTool as keyof typeof elementTypes];
+        if (!config) return;
+
+        const newElement: IrrigationElement = {
+            id: `${selectedTool}-${Date.now()}`,
+            type: selectedTool as IrrigationElement['type'],
+            points: [...currentPath],
+            color: config.color,
+            width: config.width,
+            spacing: selectedTool === 'drip-line' ? globalDripSpacing : undefined,
+            connections: snapTarget ? [snapTarget.elementId] : [],
+        };
+
+        const newIrrigationElements = [...irrigationElements, newElement];
+        setIrrigationElements(newIrrigationElements);
+        
+        // Create connection if there's a snap target
+        if (snapTarget) {
+            createConnection(newElement.id, snapTarget.elementId);
+        }
+        
+        addToHistory(shapes, newIrrigationElements);
+        
+        setIsDrawing(false);
+        setCurrentPath([]);
+        setSnapTarget(null);
+    }, [currentPath, selectedTool, globalDripSpacing, irrigationElements, shapes, addToHistory, t, snapTarget, createConnection]);
+
+    // Undo function
+    const undo = useCallback(() => {
+        if (historyIndex > 0) {
+            const newIndex = historyIndex - 1;
+            setHistoryIndex(newIndex);
+            const previousState = history[newIndex];
+            setShapes([...previousState.shapes]);
+            setIrrigationElements([...previousState.irrigationElements]);
+            setSelectedElement(null);
+        }
+    }, [history, historyIndex]);
+
+    // Redo function
+    const redo = useCallback(() => {
+        if (historyIndex < history.length - 1) {
+            const newIndex = historyIndex + 1;
+            setHistoryIndex(newIndex);
+            const nextState = history[newIndex];
+            setShapes([...nextState.shapes]);
+            setIrrigationElements([...nextState.irrigationElements]);
+            setSelectedElement(null);
+        }
+    }, [history, historyIndex]);
 
     // Load component images
     useEffect(() => {
@@ -153,6 +354,8 @@ export default function GreenhouseMap() {
             pump: '/generateTree/wtpump.png',
             'solenoid-valve': '/generateTree/solv.png',
             'ball-valve': '/generateTree/ballv.png',
+            'water-tank': '/generateTree/silo.png',
+            'fertilizer-machine': '/generateTree/silo.png', // Using same image for now
         };
 
         const loadImages = async () => {
@@ -180,7 +383,7 @@ export default function GreenhouseMap() {
         const cropsParam = urlParams.get('crops');
         const shapesParam = urlParams.get('shapes');
         const irrigationParam = urlParams.get('irrigation');
-        const loadIrrigationParam = urlParams.get('loadIrrigation'); // Added this
+        const loadIrrigationParam = urlParams.get('loadIrrigation');
 
         console.log('Map received:', {
             crops: cropsParam,
@@ -205,14 +408,16 @@ export default function GreenhouseMap() {
                 const parsedShapes = JSON.parse(decodeURIComponent(shapesParam));
                 console.log('Map: Loaded', parsedShapes.length, 'shapes');
                 setShapes(parsedShapes);
+                
+                setHistory([{ shapes: [], irrigationElements: [] }, { shapes: parsedShapes, irrigationElements: [] }]);
+                setHistoryIndex(1);
             } catch (error) {
                 console.error('Error parsing shapes:', error);
             }
         }
 
-        // Load irrigation elements from localStorage or database
+        // Load irrigation elements from localStorage only when loadIrrigation=true is sent
         if (loadIrrigationParam === 'true') {
-            // Load from localStorage when coming from summary page
             const savedData = localStorage.getItem('greenhousePlanningData');
             if (savedData) {
                 try {
@@ -223,86 +428,144 @@ export default function GreenhouseMap() {
                             parsedData.irrigationElements
                         );
                         setIrrigationElements(parsedData.irrigationElements);
+                        
+                        const currentShapes = shapesParam ? JSON.parse(decodeURIComponent(shapesParam)) : [];
+                        setHistory([
+                            { shapes: [], irrigationElements: [] }, 
+                            { shapes: currentShapes, irrigationElements: parsedData.irrigationElements }
+                        ]);
+                        setHistoryIndex(1);
                     }
                 } catch (error) {
                     console.error('Error loading irrigation data:', error);
                 }
             }
         } else {
-            // Check if we're editing an existing field and load irrigation elements from database
-            const currentFieldId = localStorage.getItem('currentFieldId');
-            if (currentFieldId && !currentFieldId.startsWith('mock-')) {
-                // Load irrigation elements from database for existing field
-                const loadIrrigationFromDatabase = async () => {
-                    try {
-                        console.log('🔄 Loading irrigation elements from database for field:', currentFieldId);
-                        const response = await axios.get(`/api/fields/${currentFieldId}`);
-                        
-                        if (response.data.success && response.data.field) {
-                            const field = response.data.field;
-                            const greenhouseData = field.greenhouse_data;
-                            
-                            if (greenhouseData && greenhouseData.irrigationElements) {
-                                console.log('✅ Loaded irrigation elements from database:', greenhouseData.irrigationElements.length);
-                                setIrrigationElements(greenhouseData.irrigationElements);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('❌ Error loading irrigation elements from database:', error);
-                    }
-                };
-                
-                loadIrrigationFromDatabase();
-            } else {
-                // Don't load irrigation elements if not coming from summary or editing
-                // To start fresh every time entering this page normally
-                setIrrigationElements([]);
-            }
+            setIrrigationElements([]);
         }
     }, []);
+
+    // Initialize history when no shapes are loaded from URL
+    useEffect(() => {
+        if (history.length === 1 && history[0].shapes.length === 0 && history[0].irrigationElements.length === 0) {
+            if (shapes.length > 0 || irrigationElements.length > 0) {
+                setHistory([
+                    { shapes: [], irrigationElements: [] },
+                    { shapes: [...shapes], irrigationElements: [...irrigationElements] }
+                ]);
+                setHistoryIndex(1);
+            }
+        }
+    }, [shapes, irrigationElements, history]);
+
+    // Keyboard shortcuts for undo/redo
+    useEffect(() => {
+        const handleKeyPress = (e: KeyboardEvent) => {
+            // Prevent handling if user is typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
+                return;
+            }
+
+            switch (e.key) {
+                case 'Enter':
+                    if (isDrawing) {
+                        e.preventDefault();
+                        finishDrawing();
+                    }
+                    break;
+                case 'Escape':
+                    e.preventDefault();
+                    setIsDrawing(false);
+                    setCurrentPath([]);
+                    setIsPanning(false);
+                    setLastPanPoint(null);
+                    setIsDragging(false);
+                    setDragOffset({ x: 0, y: 0 });
+                    setSelectedElement(null);
+                    setShowCropSelector(false);
+                    break;
+                case ' ':
+                    if (!isDrawing) {
+                        e.preventDefault();
+                        setZoom(1);
+                        setPan({ x: 0, y: 0 });
+                    }
+                    break;
+                case 'Delete':
+                    if (selectedElement && selectedTool === 'select') {
+                        e.preventDefault();
+                        deleteElement();
+                    }
+                    break;
+                // Undo with Ctrl+Z
+                case 'z':
+                    if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
+                        e.preventDefault();
+                        undo();
+                    }
+                    break;
+                // Redo with Ctrl+Y or Ctrl+Shift+Z
+                case 'y':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        redo();
+                    }
+                    break;
+            }
+
+            // Handle Ctrl+Shift+Z for redo
+            if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
+                e.preventDefault();
+                redo();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [isDrawing, selectedElement, selectedTool, finishDrawing, undo, redo]);
 
     // Memoized crop lookup function
     const getCropByValue = useCallback((value: string): Crop | undefined => {
         const basicCrops: Record<string, Crop> = {
             tomato: {
                 value: 'tomato',
-                name: 'Tomato',
+                name: t('มะเขือเทศ'),
                 nameEn: 'Tomato',
                 icon: '🍅',
                 category: 'vegetables',
-                description: 'Tomato',
+                description: t('มะเขือเทศ'),
             },
             'bell-pepper': {
                 value: 'bell-pepper',
-                name: 'Bell Pepper',
+                name: t('พริกหวาน'),
                 nameEn: 'Bell Pepper',
                 icon: '🫑',
                 category: 'vegetables',
-                description: 'Bell Pepper',
+                description: t('พริกหวาน'),
             },
             cucumber: {
                 value: 'cucumber',
-                name: 'Cucumber',
+                name: t('แตงกวา'),
                 nameEn: 'Cucumber',
                 icon: '🥒',
                 category: 'vegetables',
-                description: 'Cucumber',
+                description: t('แตงกวา'),
             },
             lettuce: {
                 value: 'lettuce',
-                name: 'Lettuce',
+                name: t('ผักกาดหอม'),
                 nameEn: 'Lettuce',
                 icon: '🥬',
                 category: 'vegetables',
-                description: 'Lettuce',
+                description: t('ผักกาดหอม'),
             },
             strawberry: {
                 value: 'strawberry',
-                name: 'Strawberry',
+                name: t('สตรอเบอร์รี่'),
                 nameEn: 'Strawberry',
                 icon: '🍓',
                 category: 'fruits',
-                description: 'Strawberry',
+                description: t('สตรอเบอร์รี่'),
             },
         };
 
@@ -316,7 +579,7 @@ export default function GreenhouseMap() {
                 description: value,
             }
         );
-    }, []);
+    }, [t]);
 
     // Check if prerequisites are met for auto generation
     const canAutoGenerate = useMemo(() => {
@@ -337,8 +600,8 @@ export default function GreenhouseMap() {
     // Canvas utility functions
     const snapToGrid = useCallback(
         (point: Point): Point => ({
-            x: Math.round(point.x / GRID_SIZE) * GRID_SIZE,
-            y: Math.round(point.y / GRID_SIZE) * GRID_SIZE,
+            x: Math.round(point.x / (MINOR_GRID_STEP)) * (MINOR_GRID_STEP),
+            y: Math.round(point.y / (MINOR_GRID_STEP)) * (MINOR_GRID_STEP),
         }),
         []
     );
@@ -484,6 +747,107 @@ export default function GreenhouseMap() {
         [shapes, irrigationElements, isPointInShape]
     );
 
+    // Connection utility functions
+    const getConnectionPoints = useCallback((element: IrrigationElement | Shape): Point[] => {
+        if (element.type === 'water-tank' || element.type === 'fertilizer-machine') {
+            // For equipment, return the center point
+            return element.points.length > 0 ? [element.points[0]] : [];
+        }
+        // For pipes, return start and end points
+        if (element.points.length >= 2) {
+            return [element.points[0], element.points[element.points.length - 1]];
+        }
+        return element.points;
+    }, []);
+
+    const findNearestConnectionPoint = useCallback(
+        (point: Point, excludeElementId?: string): { elementId: string; connectionPoint: Point; distance: number } | null => {
+            const SNAP_DISTANCE = 30; // pixels
+            let nearest: { elementId: string; connectionPoint: Point; distance: number } | null = null;
+
+            // Check irrigation elements (water tanks)
+            irrigationElements.forEach(element => {
+                if (element.id === excludeElementId) return;
+                
+                // Only allow connections to water tanks
+                if (element.type !== 'water-tank') return;
+
+                const connectionPoints = getConnectionPoints(element);
+                connectionPoints.forEach(connectionPoint => {
+                    const distance = Math.sqrt(
+                        Math.pow(point.x - connectionPoint.x, 2) + 
+                        Math.pow(point.y - connectionPoint.y, 2)
+                    );
+                    
+                    if (distance <= SNAP_DISTANCE && (!nearest || distance < nearest.distance)) {
+                        nearest = {
+                            elementId: element.id,
+                            connectionPoint,
+                            distance
+                        };
+                    }
+                });
+            });
+
+            // Check shapes (fertilizer machines)
+            shapes.forEach(shape => {
+                if (shape.id === excludeElementId) return;
+                
+                // Only allow connections to fertilizer machines
+                if (shape.type !== 'fertilizer-machine') return;
+
+                const connectionPoints = getConnectionPoints(shape);
+                connectionPoints.forEach(connectionPoint => {
+                    const distance = Math.sqrt(
+                        Math.pow(point.x - connectionPoint.x, 2) + 
+                        Math.pow(point.y - connectionPoint.y, 2)
+                    );
+                    
+                    if (distance <= SNAP_DISTANCE && (!nearest || distance < nearest.distance)) {
+                        nearest = {
+                            elementId: shape.id,
+                            connectionPoint,
+                            distance
+                        };
+                    }
+                });
+            });
+
+            return nearest;
+        },
+        [irrigationElements, shapes, getConnectionPoints]
+    );
+
+    const findPipeEndpointAtPoint = useCallback((point: Point): { elementId: string; pointIndex: number } | null => {
+        const ENDPOINT_RADIUS = 10;
+        
+        for (const element of irrigationElements) {
+            if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
+                if (element.points.length >= 2) {
+                    // Check start point
+                    const startDistance = Math.sqrt(
+                        Math.pow(point.x - element.points[0].x, 2) + 
+                        Math.pow(point.y - element.points[0].y, 2)
+                    );
+                    if (startDistance <= ENDPOINT_RADIUS) {
+                        return { elementId: element.id, pointIndex: 0 };
+                    }
+                    
+                    // Check end point
+                    const endDistance = Math.sqrt(
+                        Math.pow(point.x - element.points[element.points.length - 1].x, 2) + 
+                        Math.pow(point.y - element.points[element.points.length - 1].y, 2)
+                    );
+                    if (endDistance <= ENDPOINT_RADIUS) {
+                        return { elementId: element.id, pointIndex: element.points.length - 1 };
+                    }
+                }
+            }
+        }
+        
+        return null;
+    }, [irrigationElements]);
+
     // Helper function to draw component shapes
     const drawComponentShape = useCallback(
         (
@@ -504,6 +868,12 @@ export default function GreenhouseMap() {
                 if (type === 'pump') {
                     imgSize = isSelected ? 28 : 22;
                     containerSize = isSelected ? 36 : 30;
+                } else if (type === 'water-tank') {
+                    imgSize = isSelected ? 84 : 72;
+                    containerSize = isSelected ? 64 : 56;
+                } else if (type === 'fertilizer-machine') {
+                    imgSize = isSelected ? 30 : 26;
+                    containerSize = isSelected ? 38 : 34;
                 } else {
                     // valves
                     imgSize = isSelected ? 20 : 16;
@@ -512,17 +882,21 @@ export default function GreenhouseMap() {
 
                 ctx.save();
 
-                // Draw circular container background
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                ctx.strokeStyle = isSelected ? '#FFD700' : '#666666';
-                ctx.lineWidth = isSelected ? 3 : 2;
-                ctx.beginPath();
-                ctx.arc(point.x, point.y, containerSize / 2, 0, 2 * Math.PI);
-                ctx.fill();
-                ctx.stroke();
+                // Draw circular container background for all except water-tank (silo)
+                if (type !== 'water-tank') {
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                    ctx.strokeStyle = isSelected ? '#FFD700' : '#666666';
+                    ctx.lineWidth = isSelected ? 3 : 2;
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, containerSize / 2, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                }
 
                 // Draw the component image
                 ctx.drawImage(img, point.x - imgSize / 2, point.y - imgSize / 2, imgSize, imgSize);
+
+                // Capacity text is drawn in drawIrrigationElements for reliability
                 ctx.restore();
                 return;
             }
@@ -583,6 +957,41 @@ export default function GreenhouseMap() {
                     ctx.lineTo(point.x + size * 0.7, point.y);
                     ctx.stroke();
                     break;
+
+                case 'water-tank':
+                    // Draw water tank as cylinder
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Draw water level indicator
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < 3; i++) {
+                        const y = point.y - size + (i * size * 0.6);
+                        ctx.beginPath();
+                        ctx.moveTo(point.x - size * 0.6, y);
+                        ctx.lineTo(point.x + size * 0.6, y);
+                        ctx.stroke();
+                    }
+                    break;
+
+                case 'fertilizer-machine':
+                    // Draw fertilizer machine as rounded rect
+                    ctx.fillRect(point.x - size, point.y - size, size * 2, size * 2);
+                    ctx.strokeRect(point.x - size, point.y - size, size * 2, size * 2);
+
+                    // Draw fertilizer symbol
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(point.x - size * 0.5, point.y - size * 0.5);
+                    ctx.lineTo(point.x + size * 0.5, point.y + size * 0.5);
+                    ctx.moveTo(point.x + size * 0.5, point.y - size * 0.5);
+                    ctx.lineTo(point.x - size * 0.5, point.y + size * 0.5);
+                    ctx.stroke();
+                    break;
             }
         },
         [componentImages]
@@ -605,7 +1014,7 @@ export default function GreenhouseMap() {
         (ctx: CanvasRenderingContext2D, element: IrrigationElement) => {
             if (element.points.length < 2) return;
 
-            const spacing = (element.spacing || globalDripSpacing) * 20;
+            const spacing = (element.spacing || globalDripSpacing / 100) * 20;
 
             for (let i = 0; i < element.points.length - 1; i++) {
                 const p1 = element.points[i];
@@ -623,9 +1032,16 @@ export default function GreenhouseMap() {
                         y: p1.y + direction.y * currentDistance,
                     };
 
+                    // Draw white border for better visibility
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.beginPath();
+                    ctx.arc(dripPoint.x, dripPoint.y, 2.5, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    // Draw main drip point
                     ctx.fillStyle = '#06B6D4';
                     ctx.beginPath();
-                    ctx.arc(dripPoint.x, dripPoint.y, 2, 0, 2 * Math.PI);
+                    ctx.arc(dripPoint.x, dripPoint.y, 1.5, 0, 2 * Math.PI);
                     ctx.fill();
 
                     currentDistance += spacing;
@@ -640,40 +1056,45 @@ export default function GreenhouseMap() {
         (ctx: CanvasRenderingContext2D) => {
             if (!showGrid) return;
 
-            ctx.strokeStyle = '#374151';
+            // Define scale: 1 meter = 20px (used elsewhere in app)
+            const minorStep = MINOR_GRID_STEP;
+            const majorStep = MAJOR_GRID_STEP;
+
+            // Draw minor grid (lighter)
+            ctx.save();
+            ctx.strokeStyle = 'rgba(75,85,99,0.25)'; // gray-600 at 25% alpha
             ctx.lineWidth = 0.5;
-
-            for (let x = 0; x <= CANVAS_SIZE.width; x += GRID_SIZE) {
+            for (let x = 0; x <= CANVAS_SIZE.width; x += minorStep) {
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, CANVAS_SIZE.height);
                 ctx.stroke();
             }
-
-            for (let y = 0; y <= CANVAS_SIZE.height; y += GRID_SIZE) {
+            for (let y = 0; y <= CANVAS_SIZE.height; y += minorStep) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(CANVAS_SIZE.width, y);
                 ctx.stroke();
             }
+            ctx.restore();
 
-            // Major grid lines every 100px
-            ctx.strokeStyle = '#4B5563';
+            // Draw major grid (darker, thicker)
+            ctx.save();
+            ctx.strokeStyle = '#4B5563'; // gray-600
             ctx.lineWidth = 1;
-
-            for (let x = 0; x <= CANVAS_SIZE.width; x += GRID_SIZE * 4) {
+            for (let x = 0; x <= CANVAS_SIZE.width; x += majorStep) {
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
                 ctx.lineTo(x, CANVAS_SIZE.height);
                 ctx.stroke();
             }
-
-            for (let y = 0; y <= CANVAS_SIZE.height; y += GRID_SIZE * 4) {
+            for (let y = 0; y <= CANVAS_SIZE.height; y += majorStep) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(CANVAS_SIZE.width, y);
                 ctx.stroke();
             }
+            ctx.restore();
         },
         [showGrid]
     );
@@ -807,6 +1228,32 @@ export default function GreenhouseMap() {
                         ctx.font = '10px sans-serif';
                         ctx.fillText(crop.name, centerX, centerY + 25);
                     }
+                } else if (shape.type === 'fertilizer-area' && shape.points.length > 0) {
+                    const centerX =
+                        shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
+                    const centerY =
+                        shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = '20px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🧪', centerX, centerY + 8);
+
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText(shape.name || t('พื้นที่ให้ปุ๋ย'), centerX, centerY + 25);
+                } else if (shape.type === 'fertilizer-machine' && shape.points.length > 0) {
+                    const centerX =
+                        shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
+                    const centerY =
+                        shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
+
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = '20px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('⚙️', centerX, centerY + 8);
+
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText(shape.name || t('เครื่องให้ปุ๋ย'), centerX, centerY + 25);
                 } else if (shape.points.length > 0) {
                     const centerX =
                         shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
@@ -829,7 +1276,7 @@ export default function GreenhouseMap() {
                 }
             });
         },
-        [shapes, selectedElement, hoveredElement, selectedTool, getCropByValue]
+        [shapes, selectedElement, hoveredElement, selectedTool, getCropByValue, t]
     );
 
     const drawIrrigationElements = useCallback(
@@ -897,6 +1344,12 @@ export default function GreenhouseMap() {
                     if (element.points.length >= 1) {
                         const point = element.points[0];
                         drawComponentShape(ctx, element.type, point, element.color, isSelected);
+                        if (element.type === 'water-tank' && typeof element.capacityLiters === 'number') {
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.font = '12px sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.fillText(`${element.capacityLiters}L`, point.x, point.y + 48);
+                        }
                     }
                 }
 
@@ -926,8 +1379,22 @@ export default function GreenhouseMap() {
         (ctx: CanvasRenderingContext2D) => {
             if (currentPath.length < 1) return;
 
-            ctx.strokeStyle = '#3B82F6';
-            ctx.lineWidth = selectedTool === 'main-pipe' ? 6 : selectedTool === 'sub-pipe' ? 4 : 2;
+            let strokeColor = '#EF4444';
+            let lineWidth = 2;
+
+            if (selectedTool === 'main-pipe') {
+                lineWidth = 6;
+                strokeColor = '#EF4444';
+            } else if (selectedTool === 'sub-pipe') {
+                lineWidth = 4;
+                strokeColor = '#8B5CF6';
+            } else if (selectedTool === 'fertilizer-area') {
+                strokeColor = '#22C55E';
+                lineWidth = 3;
+            }
+
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = lineWidth;
             ctx.setLineDash([5, 5]);
 
             ctx.beginPath();
@@ -944,7 +1411,7 @@ export default function GreenhouseMap() {
             ctx.stroke();
             ctx.setLineDash([]);
 
-            ctx.fillStyle = '#3B82F6';
+            ctx.fillStyle = strokeColor;
             currentPath.forEach((point) => {
                 ctx.beginPath();
                 ctx.arc(point.x, point.y, 4, 0, 2 * Math.PI);
@@ -955,6 +1422,88 @@ export default function GreenhouseMap() {
     );
 
     // Main draw function with better performance
+    const drawConnectionPoints = useCallback((ctx: CanvasRenderingContext2D) => {
+        // Draw connection points for water tanks
+        irrigationElements.forEach(element => {
+            if (element.type === 'water-tank') {
+                const connectionPoints = getConnectionPoints(element);
+                connectionPoints.forEach(point => {
+                    ctx.save();
+                    ctx.fillStyle = '#00FF00';
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                });
+            }
+        });
+
+        // Draw connection points for fertilizer machines (shapes)
+        shapes.forEach(shape => {
+            if (shape.type === 'fertilizer-machine') {
+                const connectionPoints = getConnectionPoints(shape);
+                connectionPoints.forEach(point => {
+                    ctx.save();
+                    ctx.fillStyle = '#00FF00';
+                    ctx.strokeStyle = '#FFFFFF';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+                });
+            }
+        });
+
+        // Draw pipe endpoints when select tool is active
+        if (selectedTool === 'select') {
+            irrigationElements.forEach(element => {
+                if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
+                    if (element.points.length >= 2) {
+                        // Draw start point
+                        ctx.save();
+                        ctx.fillStyle = '#FF6B6B';
+                        ctx.strokeStyle = '#FFFFFF';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(element.points[0].x, element.points[0].y, 5, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+
+                        // Draw end point
+                        ctx.save();
+                        ctx.fillStyle = '#FF6B6B';
+                        ctx.strokeStyle = '#FFFFFF';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(element.points[element.points.length - 1].x, element.points[element.points.length - 1].y, 5, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+            });
+        }
+
+        // Draw snap target indicator
+        if (snapTarget) {
+            ctx.save();
+            ctx.fillStyle = '#FFD700';
+            ctx.strokeStyle = '#FFA500';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(snapTarget.point.x, snapTarget.point.y, 8, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+    }, [irrigationElements, shapes, getConnectionPoints, snapTarget, selectedTool]);
+
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -977,22 +1526,17 @@ export default function GreenhouseMap() {
             drawShapes(ctx);
             drawIrrigationElements(ctx);
             drawCurrentPath(ctx);
+            drawConnectionPoints(ctx);
         } catch (error) {
             console.error('Drawing error:', error);
         }
 
         ctx.restore();
-    }, [drawGrid, drawShapes, drawIrrigationElements, drawCurrentPath, zoom, pan]);
+    }, [drawGrid, drawShapes, drawIrrigationElements, drawCurrentPath, drawConnectionPoints, zoom, pan]);
 
     // Effect for drawing with throttling
     useEffect(() => {
-        let animationId: number;
-
-        const throttledDraw = () => {
-            draw();
-        };
-
-        animationId = requestAnimationFrame(throttledDraw);
+        const animationId: number = requestAnimationFrame(draw);
 
         return () => {
             if (animationId) {
@@ -1015,13 +1559,21 @@ export default function GreenhouseMap() {
             }
 
             if (selectedTool === 'select') {
+                // First check for pipe endpoint dragging
+                const pipeEndpoint = findPipeEndpointAtPoint(point);
+                if (pipeEndpoint) {
+                    setConnectionStart(pipeEndpoint);
+                    setIsConnecting(true);
+                    return;
+                }
+
                 const clickedElement = findElementAtPoint(point);
 
                 if (clickedElement && !e.ctrlKey) {
                     // Select and start dragging (only when not holding Ctrl)
                     if (clickedElement.type === 'shape' && clickedElement.element.type === 'plot') {
                         if (selectedCrops.length === 0) {
-                            alert('No crops selected. Please go back to select crops first.');
+                            alert(t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก'));
                             return;
                         }
                         setSelectedPlot(clickedElement.element.id);
@@ -1053,18 +1605,34 @@ export default function GreenhouseMap() {
             // Only handle left mouse button for drawing
             if (e.button === 0) {
                 // For line drawing tools, handle directly here to avoid conflicts
-                if (['main-pipe', 'sub-pipe', 'drip-line'].includes(selectedTool)) {
+                if (['main-pipe', 'sub-pipe', 'drip-line', 'fertilizer-area', 'fertilizer-machine'].includes(selectedTool)) {
                     if (!isDrawing) {
+                        // Check for snap target when starting pipe drawing
+                        const snapTarget = findNearestConnectionPoint(point);
+                        if (snapTarget) {
+                            setSnapTarget({ elementId: snapTarget.elementId, point: snapTarget.connectionPoint });
+                            setCurrentPath([snapTarget.connectionPoint]);
+                        } else {
+                            setSnapTarget(null);
+                            setCurrentPath([point]);
+                        }
                         setIsDrawing(true);
-                        setCurrentPath([point]);
                     } else {
-                        setCurrentPath((prev) => [...prev, point]);
+                        // Check for snap target when adding points
+                        const snapTarget = findNearestConnectionPoint(point);
+                        if (snapTarget) {
+                            setSnapTarget({ elementId: snapTarget.elementId, point: snapTarget.connectionPoint });
+                            setCurrentPath((prev) => [...prev, snapTarget.connectionPoint]);
+                        } else {
+                            setSnapTarget(null);
+                            setCurrentPath((prev) => [...prev, point]);
+                        }
                     }
                     return;
                 }
 
                 // For single-point tools
-                if (['pump', 'solenoid-valve', 'ball-valve', 'sprinkler'].includes(selectedTool)) {
+                if (['pump', 'solenoid-valve', 'ball-valve', 'sprinkler', 'water-tank'].includes(selectedTool)) {
                     const elementTypes: Record<
                         string,
                         { color: string; width: number; radius?: number }
@@ -1072,6 +1640,7 @@ export default function GreenhouseMap() {
                         pump: { color: '#8B5CF6', width: 1 },
                         'solenoid-valve': { color: '#F59E0B', width: 1 },
                         'ball-valve': { color: '#EAB308', width: 1 },
+                        'water-tank': { color: '#0EA5E9', width: 1 },
                         sprinkler: {
                             color: '#3B82F6',
                             width: 1,
@@ -1081,16 +1650,28 @@ export default function GreenhouseMap() {
 
                     const config = elementTypes[selectedTool as keyof typeof elementTypes];
                     if (config) {
+                        let capacityLiters: number | undefined = undefined;
+                        if (selectedTool === 'water-tank') {
+                            const input = prompt(t('ขนาดถัง (ลิตร) เช่น 2000')) || '';
+                            const parsed = parseInt(input.replace(/[^0-9]/g, ''), 10);
+                            if (!isNaN(parsed) && parsed > 0) {
+                                capacityLiters = parsed;
+                            }
+                        }
                         const newElement: IrrigationElement = {
                             id: `${selectedTool}-${Date.now()}`,
-                            type: selectedTool as any,
+                            type: selectedTool as IrrigationElement['type'],
                             points: [point],
                             color: config.color,
                             width: config.width,
                             radius: config.radius,
+                            capacityLiters,
                         };
 
-                        setIrrigationElements((prev) => [...prev, newElement]);
+                        const newIrrigationElements = [...irrigationElements, newElement];
+                        setIrrigationElements(newIrrigationElements);
+                        
+                        addToHistory(shapes, newIrrigationElements);
                     }
                     return;
                 }
@@ -1104,6 +1685,10 @@ export default function GreenhouseMap() {
             getRawMousePos,
             isDrawing,
             globalRadius,
+            t,
+            irrigationElements,
+            shapes,
+            addToHistory,
         ]
     );
 
@@ -1115,7 +1700,30 @@ export default function GreenhouseMap() {
             setIsPanning(false);
             setLastPanPoint(null);
         }
-    }, [isPanning]);
+
+        // Handle pipe connection completion
+        if (isConnecting && connectionStart && snapTarget) {
+            // Update the pipe endpoint to the snap target
+            setIrrigationElements(prevElements =>
+                prevElements.map(element => {
+                    if (element.id === connectionStart.elementId) {
+                        const newPoints = [...element.points];
+                        newPoints[connectionStart.pointIndex] = snapTarget.point;
+                        return { ...element, points: newPoints };
+                    }
+                    return element;
+                })
+            );
+
+            // Create connection between pipe and equipment
+            createConnection(connectionStart.elementId, snapTarget.elementId);
+        }
+
+        // Reset connection state
+        setIsConnecting(false);
+        setConnectionStart(null);
+        setSnapTarget(null);
+    }, [isPanning, isConnecting, connectionStart, snapTarget, createConnection]);
 
     const handleMouseMove = useCallback(
         (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1150,7 +1758,7 @@ export default function GreenhouseMap() {
 
                     if (
                         'type' in element &&
-                        ['greenhouse', 'plot', 'walkway', 'water-source', 'measurement'].includes(
+                        ['greenhouse', 'plot', 'walkway', 'water-source', 'measurement', 'fertilizer-area'].includes(
                             element.type
                         )
                     ) {
@@ -1184,8 +1792,26 @@ export default function GreenhouseMap() {
                     }
                 }
             } else if (selectedTool === 'select') {
-                const hoveredElementObj = findElementAtPoint(point);
-                setHoveredElement(hoveredElementObj ? hoveredElementObj.element.id : null);
+                if (isConnecting && connectionStart) {
+                    // Handle pipe endpoint dragging
+                    const snapTarget = findNearestConnectionPoint(point, connectionStart.elementId);
+                    if (snapTarget) {
+                        setSnapTarget({ elementId: snapTarget.elementId, point: snapTarget.connectionPoint });
+                    } else {
+                        setSnapTarget(null);
+                    }
+                } else {
+                    const hoveredElementObj = findElementAtPoint(point);
+                    setHoveredElement(hoveredElementObj ? hoveredElementObj.element.id : null);
+                }
+            } else if (['main-pipe', 'sub-pipe'].includes(selectedTool) && isDrawing) {
+                // Check for snap targets during pipe drawing
+                const snapTarget = findNearestConnectionPoint(point);
+                if (snapTarget) {
+                    setSnapTarget({ elementId: snapTarget.elementId, point: snapTarget.connectionPoint });
+                } else {
+                    setSnapTarget(null);
+                }
             }
         },
         [
@@ -1201,6 +1827,10 @@ export default function GreenhouseMap() {
             snapToGrid,
             selectedTool,
             findElementAtPoint,
+            isDrawing,
+            findNearestConnectionPoint,
+            isConnecting,
+            connectionStart,
         ]
     );
 
@@ -1224,7 +1854,7 @@ export default function GreenhouseMap() {
             const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
 
             setZoom((prevZoom) => {
-                const newZoom = Math.max(0.1, Math.min(5, prevZoom * zoomFactor));
+                const newZoom = Math.max(0.1, Math.min(10, prevZoom * zoomFactor));
 
                 setPan((prevPan) => {
                     const zoomRatio = newZoom / prevZoom;
@@ -1258,88 +1888,79 @@ export default function GreenhouseMap() {
         }
     }, [isPanning, isDragging]);
 
-    // Finish drawing
-    const finishDrawing = useCallback(() => {
-        if (currentPath.length < 2) {
-            setIsDrawing(false);
-            setCurrentPath([]);
-            return;
-        }
-
-        const elementTypes = {
-            'main-pipe': { color: '#3B82F6', width: 6 },
-            'sub-pipe': { color: '#10B981', width: 4 },
-            'drip-line': { color: '#06B6D4', width: 2 },
-        };
-
-        const config = elementTypes[selectedTool as keyof typeof elementTypes];
-        if (!config) return;
-
-        const newElement: IrrigationElement = {
-            id: `${selectedTool}-${Date.now()}`,
-            type: selectedTool as any,
-            points: [...currentPath],
-            color: config.color,
-            width: config.width,
-            spacing: selectedTool === 'drip-line' ? globalDripSpacing : undefined,
-        };
-
-        setIrrigationElements((prev) => [...prev, newElement]);
-        setIsDrawing(false);
-        setCurrentPath([]);
-    }, [currentPath, selectedTool, globalDripSpacing]);
-
-    // Fixed key handlers
-    useEffect(() => {
-        const handleKeyPress = (e: KeyboardEvent) => {
-            // Prevent handling if user is typing in an input
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
-                return;
-            }
-
-            switch (e.key) {
-                case 'Enter':
-                    if (isDrawing) {
-                        e.preventDefault();
-                        finishDrawing();
-                    }
-                    break;
-                case 'Escape':
-                    e.preventDefault();
-                    setIsDrawing(false);
-                    setCurrentPath([]);
-                    setIsPanning(false);
-                    setLastPanPoint(null);
-                    setIsDragging(false);
-                    setDragOffset({ x: 0, y: 0 });
-                    setSelectedElement(null);
-                    setShowCropSelector(false);
-                    break;
-                case ' ':
-                    if (!isDrawing) {
-                        e.preventDefault();
-                        setZoom(1);
-                        setPan({ x: 0, y: 0 });
-                    }
-                    break;
-                case 'Delete':
-                    if (selectedElement && selectedTool === 'select') {
-                        e.preventDefault();
-                        deleteElement();
-                    }
-                    break;
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyPress);
-        return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isDrawing, selectedElement, selectedTool, finishDrawing]);
-
     // Utility functions
+    const getSprinklersNearPipe = useCallback((pipe: IrrigationElement): IrrigationElement[] => {
+        const related: IrrigationElement[] = [];
+        if (!pipe || pipe.type !== 'sub-pipe') return related;
+
+        const sprinklers = irrigationElements.filter((el) => el.type === 'sprinkler');
+        sprinklers.forEach((sprinkler) => {
+            const sprinklerPoint = sprinkler.points[0];
+            for (let i = 0; i < pipe.points.length - 1; i++) {
+                const p1 = pipe.points[i];
+                const p2 = pipe.points[i + 1];
+                const A = sprinklerPoint.x - p1.x;
+                const B = sprinklerPoint.y - p1.y;
+                const C = p2.x - p1.x;
+                const D = p2.y - p1.y;
+                const dot = A * C + B * D;
+                const lenSq = C * C + D * D;
+                let param = -1;
+                if (lenSq !== 0) param = dot / lenSq;
+                let xx, yy;
+                if (param < 0) {
+                    xx = p1.x;
+                    yy = p1.y;
+                } else if (param > 1) {
+                    xx = p2.x;
+                    yy = p2.y;
+                } else {
+                    xx = p1.x + param * C;
+                    yy = p1.y + param * D;
+                }
+                const distanceToLine = Math.sqrt(
+                    Math.pow(sprinklerPoint.x - xx, 2) + Math.pow(sprinklerPoint.y - yy, 2)
+                );
+                if (distanceToLine < 2) {
+                    related.push(sprinkler);
+                    break;
+                }
+            }
+        });
+        return related;
+    }, [irrigationElements]);
+
+    const updateSelectedSubPipeSprinklerRadius = useCallback((newRadiusMeters: number) => {
+        if (!selectedElement) return;
+        const pipe = irrigationElements.find((el) => el.id === selectedElement && el.type === 'sub-pipe');
+        if (!pipe) return;
+        const related = getSprinklersNearPipe(pipe);
+        if (related.length === 0) return;
+        const newRadiusPx = newRadiusMeters * 20;
+        const relatedIds = new Set(related.map((s) => s.id));
+        const updated = irrigationElements.map((el) =>
+            relatedIds.has(el.id) ? { ...el, radius: newRadiusPx } : el
+        );
+        setIrrigationElements(updated);
+        addToHistory(shapes, updated);
+    }, [selectedElement, irrigationElements, getSprinklersNearPipe, addToHistory, shapes]);
+
+    const getSelectedSubPipeSprinklerRadiusMeters = useCallback((): number => {
+        if (!selectedElement) return globalRadius;
+        const pipe = irrigationElements.find((el) => el.id === selectedElement && el.type === 'sub-pipe');
+        if (!pipe) return globalRadius;
+        const related = getSprinklersNearPipe(pipe);
+        if (related.length === 0) return globalRadius;
+        const avgPx = related.reduce((sum, s) => sum + (s.radius || 30), 0) / related.length;
+        return parseFloat((avgPx / 20).toFixed(1));
+    }, [selectedElement, irrigationElements, getSprinklersNearPipe, globalRadius]);
     const deleteElement = useCallback(() => {
         if (selectedElement) {
             // Find the element to delete
             const elementToDelete = irrigationElements.find((el) => el.id === selectedElement);
+
+            let newShapes = shapes;
+            let newIrrigationElements = irrigationElements;
 
             // หากเป็นท่อย่อย ให้หาและลบสปริงเกลอร์ที่เกี่ยวข้องด้วย
             if (elementToDelete && elementToDelete.type === 'sub-pipe') {
@@ -1392,99 +2013,58 @@ export default function GreenhouseMap() {
                         }
                     });
 
-                // ลบท่อย่อยและสปริงเกลอร์ที่เกี่ยวข้อง
-                setIrrigationElements((prev) =>
-                    prev.filter(
-                        (el) => el.id !== selectedElement && !relatedSprinklers.includes(el.id)
-                    )
+                // ลบท่อย่อยและสปริงเกลอร์ที่เกี่ยวข้องเรียบร้อยแล้ว
+                newIrrigationElements = irrigationElements.filter(
+                    (el) => el.id !== selectedElement && !relatedSprinklers.includes(el.id)
                 );
 
                 // แสดงข้อความแจ้งเตือน
                 if (relatedSprinklers.length > 0) {
                     alert(
-                        `ลบท่อย่อยและสปริงเกลอร์ ${relatedSprinklers.length} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว`
+                        t('ลบท่อย่อยและสปริงเกลอร์ {count} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว').replace('{count}', relatedSprinklers.length.toString())
                     );
                 }
             } else if (elementToDelete && elementToDelete.type === 'drip-line') {
                 // If it's a drip line, delete only the drip line
-                setIrrigationElements((prev) => prev.filter((el) => el.id !== selectedElement));
+                newIrrigationElements = irrigationElements.filter((el) => el.id !== selectedElement);
             } else {
                 // For other elements, delete normally
-                setShapes((prev) => prev.filter((s) => s.id !== selectedElement));
-                setIrrigationElements((prev) => prev.filter((el) => el.id !== selectedElement));
+                newShapes = shapes.filter((s) => s.id !== selectedElement);
+                newIrrigationElements = irrigationElements.filter((el) => el.id !== selectedElement);
             }
 
+            setShapes(newShapes);
+            setIrrigationElements(newIrrigationElements);
+            addToHistory(newShapes, newIrrigationElements);
             setSelectedElement(null);
         }
-    }, [selectedElement, irrigationElements]);
+    }, [selectedElement, irrigationElements, t, shapes, addToHistory]);
 
     const autoGenerateSprinklers = useCallback(() => {
         if (!canAutoGenerate) {
-            alert('Please draw main pipe and sub-pipe before auto generation');
+            alert(t('กรุณาวาดท่อเมนและท่อย่อยก่อนการสร้างอัตโนมัติ'));
             return;
         }
 
         if (selectedIrrigationMethod !== 'mini-sprinkler') {
-            alert('This function is only available for mini sprinkler system');
+            alert(t('ฟังก์ชันนี้ใช้ได้เฉพาะระบบสปริงเกลอร์เท่านั้น'));
             return;
         }
 
         const subPipes = irrigationElements.filter((el) => el.type === 'sub-pipe');
+        // Remove all existing sprinklers before regeneration to reflect new overlap
         const existingSprinklers = irrigationElements.filter((el) => el.type === 'sprinkler');
+        const baseElements = irrigationElements.filter((el) => el.type !== 'sprinkler');
         const newSprinklers: IrrigationElement[] = [];
-        const spacing = 50;
-        const radius = globalRadius * 20;
-
-        // Function to check if sub-pipe already has sprinklers
-        const pipeHasSprinklers = (pipe: IrrigationElement): boolean => {
-            return existingSprinklers.some((sprinkler) => {
-                const sprinklerPoint = sprinkler.points[0];
-                // Check if sprinkler is close to the sub-pipe (distance less than 30 pixels)
-                for (let i = 0; i < pipe.points.length - 1; i++) {
-                    const p1 = pipe.points[i];
-                    const p2 = pipe.points[i + 1];
-
-                    // Calculate distance from sprinkler point to pipe segment
-                    const A = sprinklerPoint.x - p1.x;
-                    const B = sprinklerPoint.y - p1.y;
-                    const C = p2.x - p1.x;
-                    const D = p2.y - p1.y;
-
-                    const dot = A * C + B * D;
-                    const lenSq = C * C + D * D;
-                    let param = -1;
-                    if (lenSq !== 0) param = dot / lenSq;
-
-                    let xx, yy;
-                    if (param < 0) {
-                        xx = p1.x;
-                        yy = p1.y;
-                    } else if (param > 1) {
-                        xx = p2.x;
-                        yy = p2.y;
-                    } else {
-                        xx = p1.x + param * C;
-                        yy = p1.y + param * D;
-                    }
-
-                    const distanceToLine = Math.sqrt(
-                        Math.pow(sprinklerPoint.x - xx, 2) + Math.pow(sprinklerPoint.y - yy, 2)
-                    );
-
-                    if (distanceToLine < 30) {
-                        return true;
-                    }
-                }
-                return false;
-            });
-        };
+        // Overlap handling: use globalSprinklerOverlap (0..0.5)
+        const baseRadiusPx = globalRadius * 20;
+        const spacing = 2 * baseRadiusPx * (1 - globalSprinklerOverlap); // pixel spacing along pipe
+        const radius = baseRadiusPx;
 
         subPipes.forEach((pipe, pipeIndex) => {
-            // Skip pipes that already have sprinklers
-            if (pipeHasSprinklers(pipe)) {
-                return;
-            }
-
+            // Use global overlap for all sub-pipes
+            const radiusPx = baseRadiusPx;
+            const pipeSpacing = 2 * radiusPx * (1 - globalSprinklerOverlap);
             for (let i = 0; i < pipe.points.length - 1; i++) {
                 const p1 = pipe.points[i];
                 const p2 = pipe.points[i + 1];
@@ -1492,25 +2072,20 @@ export default function GreenhouseMap() {
                 const distance = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
                 const direction = { x: (p2.x - p1.x) / distance, y: (p2.y - p1.y) / distance };
 
-                // Calculate number of sprinklers that can fit in this segment
-                const sprinklerCount = Math.floor(distance / spacing);
-
-                // Divide length into equal segments
-                const actualSpacing =
-                    sprinklerCount > 0 ? distance / (sprinklerCount + 1) : spacing;
-
-                for (let j = 1; j <= sprinklerCount; j++) {
+                // Place sprinklers at fixed center distance = pipeSpacing, starting at half spacing
+                let placedIndex = 0;
+                for (let s = pipeSpacing / 2; s < distance; s += pipeSpacing) {
                     const point = {
-                        x: p1.x + direction.x * (actualSpacing * j),
-                        y: p1.y + direction.y * (actualSpacing * j),
+                        x: p1.x + direction.x * s,
+                        y: p1.y + direction.y * s,
                     };
 
                     const sprinkler: IrrigationElement = {
-                        id: `sprinkler-${Date.now()}-${Math.random()}-${j}`,
+                        id: `sprinkler-${Date.now()}-${Math.random()}-${placedIndex++}`,
                         type: 'sprinkler',
                         points: [point],
                         color: '#3B82F6',
-                        radius: radius,
+                        radius: radiusPx,
                     };
                     newSprinklers.push(sprinkler);
                 }
@@ -1518,21 +2093,25 @@ export default function GreenhouseMap() {
         });
 
         if (newSprinklers.length > 0) {
-            setIrrigationElements((prev) => [...prev, ...newSprinklers]);
-            alert(`Created ${newSprinklers.length} mini sprinklers along new sub-pipes successfully`);
+            const newIrrigationElements = [...baseElements, ...newSprinklers];
+            setIrrigationElements(newIrrigationElements);
+            
+            addToHistory(shapes, newIrrigationElements);
+            
+            alert(t('สร้างมินิสปริงเกลอร์ {count} ตัวตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace('{count}', newSprinklers.length.toString()));
         } else {
-            alert('All sub-pipes already have mini sprinklers');
+            alert(t('ท่อย่อยทั้งหมดมีมินิสปริงเกลอร์อยู่แล้ว'));
         }
-    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalRadius]);
+    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalRadius, globalSprinklerOverlap, t, shapes, addToHistory]);
 
     const autoGenerateDripLines = useCallback(() => {
         if (!canAutoGenerate) {
-            alert('Please draw main pipe and sub-pipe before auto generation');
+            alert(t('กรุณาวาดท่อเมนและท่อย่อยก่อนการสร้างอัตโนมัติ'));
             return;
         }
 
         if (selectedIrrigationMethod !== 'drip') {
-            alert('This function is only available for drip irrigation system');
+            alert(t('ฟังก์ชันนี้ใช้ได้เฉพาะระบบน้ำหยดเท่านั้น'));
             return;
         }
 
@@ -1576,95 +2155,112 @@ export default function GreenhouseMap() {
                     points: [...pipe.points],
                     color: '#06B6D4',
                     width: 2,
-                    spacing: globalDripSpacing,
+                    spacing: globalDripSpacing / 100, // Convert cm to meters
                 };
                 newDripLines.push(dripLine);
             }
         });
 
         if (newDripLines.length > 0) {
-            setIrrigationElements((prev) => [...prev, ...newDripLines]);
-            alert(`Created ${newDripLines.length} drip lines along new sub-pipes successfully`);
+            const newIrrigationElements = [...irrigationElements, ...newDripLines];
+            setIrrigationElements(newIrrigationElements);
+            
+            addToHistory(shapes, newIrrigationElements);
+            
+            alert(t('สร้างสายน้ำหยด {count} เส้นตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace('{count}', newDripLines.length.toString()));
         } else {
-            alert('All sub-pipes already have drip lines');
+            alert(t('ท่อย่อยทั้งหมดมีสายน้ำหยดอยู่แล้ว'));
         }
-    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalDripSpacing]);
+    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalDripSpacing, t, shapes, addToHistory]);
 
     const assignCropToPlot = useCallback(
         (cropValue: string) => {
             if (selectedPlot) {
-                setShapes((prev) =>
-                    prev.map((shape) => {
-                        if (shape.id === selectedPlot) {
-                            return { ...shape, cropType: cropValue };
-                        }
-                        return shape;
-                    })
-                );
+                const newShapes = shapes.map((shape) => {
+                    if (shape.id === selectedPlot) {
+                        return { ...shape, cropType: cropValue };
+                    }
+                    return shape;
+                });
+                
+                setShapes(newShapes);
+                
+                addToHistory(newShapes, irrigationElements);
+                
                 setShowCropSelector(false);
                 setSelectedPlot(null);
             }
         },
-        [selectedPlot]
+        [selectedPlot, shapes, irrigationElements, addToHistory]
     );
 
     // Radius adjustment functions
     const updateAllSprinklerRadius = useCallback((newRadius: number) => {
         const radiusInPixels = newRadius * 20;
-        setIrrigationElements((prev) =>
-            prev.map((el) => {
-                if (el.type === 'sprinkler') {
-                    return { ...el, radius: radiusInPixels };
-                }
-                return el;
-            })
-        );
+        const newIrrigationElements = irrigationElements.map((el) => {
+            if (el.type === 'sprinkler') {
+                return { ...el, radius: radiusInPixels };
+            }
+            return el;
+        });
+        
+        setIrrigationElements(newIrrigationElements);
         setGlobalRadius(newRadius);
-    }, []);
+        
+        addToHistory(shapes, newIrrigationElements);
+    }, [irrigationElements, shapes, addToHistory]);
 
     const updateSelectedSprinklerRadius = useCallback(
         (newRadius: number) => {
             if (selectedElement) {
                 const radiusInPixels = newRadius * 20;
-                setIrrigationElements((prev) =>
-                    prev.map((el) => {
-                        if (el.id === selectedElement && el.type === 'sprinkler') {
-                            return { ...el, radius: radiusInPixels };
-                        }
-                        return el;
-                    })
-                );
+                const newIrrigationElements = irrigationElements.map((el) => {
+                    if (el.id === selectedElement && el.type === 'sprinkler') {
+                        return { ...el, radius: radiusInPixels };
+                    }
+                    return el;
+                });
+                
+                setIrrigationElements(newIrrigationElements);
+                
+                addToHistory(shapes, newIrrigationElements);
             }
         },
-        [selectedElement]
+        [selectedElement, irrigationElements, shapes, addToHistory]
     );
 
     const updateGlobalDripSpacing = useCallback((newSpacing: number) => {
-        setIrrigationElements((prev) =>
-            prev.map((el) => {
-                if (el.type === 'drip-line') {
-                    return { ...el, spacing: newSpacing };
-                }
-                return el;
-            })
-        );
+        const spacingInMeters = newSpacing / 100; // Convert cm to meters
+        const newIrrigationElements = irrigationElements.map((el) => {
+            if (el.type === 'drip-line') {
+                return { ...el, spacing: spacingInMeters };
+            }
+            return el;
+        });
+        
+        setIrrigationElements(newIrrigationElements);
         setGlobalDripSpacing(newSpacing);
-    }, []);
+        
+        addToHistory(shapes, newIrrigationElements);
+    }, [irrigationElements, shapes, addToHistory]);
 
     const updateSelectedDripSpacing = useCallback(
         (newSpacing: number) => {
             if (selectedElement) {
-                setIrrigationElements((prev) =>
-                    prev.map((el) => {
-                        if (el.id === selectedElement && el.type === 'drip-line') {
-                            return { ...el, spacing: newSpacing };
-                        }
-                        return el;
-                    })
-                );
+                const spacingInMeters = newSpacing / 100; // Convert cm to meters
+                const newIrrigationElements = irrigationElements.map((el) => {
+                    if (el.id === selectedElement && el.type === 'drip-line') {
+                        return { ...el, spacing: spacingInMeters };
+                    }
+                    return el;
+                });
+                
+                setIrrigationElements(newIrrigationElements);
+                
+                addToHistory(shapes, newIrrigationElements);
             }
         },
-        [selectedElement]
+        [selectedElement, irrigationElements, shapes, addToHistory]
     );
 
     // Statistics
@@ -1714,250 +2310,333 @@ export default function GreenhouseMap() {
             valveCount: irrigationElements.filter(
                 (el) => el.type === 'solenoid-valve' || el.type === 'ball-valve'
             ).length,
+            waterTankCount: irrigationElements.filter((el) => el.type === 'water-tank').length,
+            fertilizerMachineCount: irrigationElements.filter((el) => el.type === 'fertilizer-machine').length,
+            fertilizerAreaCount: shapes.filter((s) => s.type === 'fertilizer-area').length,
         };
-    }, [irrigationElements]);
+    }, [irrigationElements, shapes]);
 
     return (
-        <div className="min-h-screen flex flex-col bg-gray-900 text-white">
-            <Navbar />
-            <div className="flex flex-1 flex-col overflow-hidden">
-                {/* Header */}
-                <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-bold">💧 Greenhouse Irrigation System Design (Large)</h1>
-                        <p className="text-sm text-gray-400">
-                            Irrigation system design:{' '}
-                            {
-                                irrigationMethods[
-                                    selectedIrrigationMethod as keyof typeof irrigationMethods
-                                ]?.name
-                            }{' '}
-                            - Area 2400x1600 pixels
-                        </p>
-                    </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-400">
-                        <span className="text-green-400">✓ Select Crops</span>
-                        <span>→</span>
-                        <span className="text-green-400">✓ Planning</span>
-                        <span>→</span>
-                        <span className="text-green-400">✓ Design Area</span>
-                        <span>→</span>
-                        <span className="text-green-400">✓ Choose Irrigation</span>
-                        <span>→</span>
-                        <span className="font-medium text-blue-400">Design Irrigation System</span>
-                    </div>
-                </div>
+        <div className="h-screen bg-gray-900 text-white overflow-hidden">
+            {/* Fixed Navbar */}
+            <div className="fixed top-0 left-0 right-0 z-50">
+                <Navbar />
             </div>
 
-            {/* Main Content */}
-            <div className="flex flex-1 overflow-hidden">
-                {/* Toolbar */}
-                <div className="flex w-80 flex-col border-r border-gray-700 bg-gray-800">
-                    <div className="flex-1 overflow-y-auto p-4">
-                        {/* Selected Crops */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">Selected Crops</h3>
-                            <div className="flex flex-wrap gap-1">
-                                {selectedCrops.map((cropValue, index) => {
-                                    const crop = getCropByValue(cropValue);
-                                    return (
-                                        <span
-                                            key={index}
-                                            className="flex items-center rounded bg-green-600 px-2 py-1 text-xs text-white"
-                                        >
-                                            {crop?.icon} {crop?.name || cropValue}
-                                        </span>
-                                    );
-                                })}
+            {/* Main Content with top padding to account for fixed navbar */}
+            <div className="pt-16 h-full flex flex-col">
+                {/* Header */}
+                {!isHeaderCollapsed ? (
+                    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3 relative">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h1 className="text-xl font-bold">💧 {t('ออกแบบระบบน้ำในโรงเรือน (ขนาดใหญ่)')}</h1>
+                                <p className="text-sm text-gray-400">
+                                    {t('ออกแบบระบบการให้น้ำแบบ')}:{' '}
+                                    {
+                                        irrigationMethods[
+                                            selectedIrrigationMethod as keyof typeof irrigationMethods
+                                        ]?.name
+                                    }{' '}
+                                    - {t('พื้นที่')} 2400x1600 pixels
+                                </p>
+                            </div>
+                            <div className="flex items-center space-x-2 text-sm text-gray-400">
+                                <span className="text-green-400">✓ {t('เลือกพืช')}</span>
+                                <span>→</span>
+                                <span className="text-green-400">✓ {t('วางแผน')}</span>
+                                <span>→</span>
+                                <span className="text-green-400">✓ {t('ออกแบบพื้นที่')}</span>
+                                <span>→</span>
+                                <span className="text-green-400">✓ {t('เลือกระบบน้ำ')}</span>
+                                <span>→</span>
+                                <span className="font-medium text-blue-400">{t('ออกแบบระบบน้ำ')}</span>
                             </div>
                         </div>
 
-                        {/* Irrigation Method */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Selected Irrigation Method
-                            </h3>
-                            <div className="rounded border border-blue-500 bg-blue-600 px-3 py-2 text-sm text-white">
-                                {
-                                    irrigationMethods[
-                                        selectedIrrigationMethod as keyof typeof irrigationMethods
-                                    ]?.name
-                                }
-                            </div>
-                        </div>
+                        <button
+                            onClick={() => setIsHeaderCollapsed(true)}
+                            className="absolute right-2 top-2 rounded bg-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-600"
+                            title={t('ซ่อนแถบหัวข้อ')}
+                        >
+                            ▲
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-1 flex items-center justify-between">
+                        <span className="text-xs text-gray-400">{t('แถบหัวข้อถูกซ่อน')}</span>
+                        <button
+                            onClick={() => setIsHeaderCollapsed(false)}
+                            className="rounded bg-gray-700 px-2 py-1 text-xs text-gray-200 hover:bg-gray-600"
+                            title={t('แสดงแถบหัวข้อ')}
+                        >
+                            ▼ {t('แสดง')}
+                        </button>
+                    </div>
+                )}
 
-                        {/* Tools */}
-                        <div className="mb-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">Tools</h3>
-                            <div className="space-y-1">
-                                {tools.map((tool) => (
-                                    <button
-                                        key={tool.id}
-                                        onClick={() => setSelectedTool(tool.id)}
-                                        className={`w-full rounded p-2 text-left transition-colors ${
-                                            selectedTool === tool.id
-                                                ? 'bg-blue-600 text-white'
-                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                        title={tool.description}
-                                    >
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-sm">{tool.icon}</span>
-                                            <span className="text-xs">{tool.name}</span>
-                                        </div>
-                                        {tool.id === 'select' && (
-                                            <div className="mt-1 text-xs text-gray-400">
-                                                Ctrl+Click = Pan view
-                                            </div>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Prerequisites Check */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Prerequisites
-                            </h3>
-                            <div className="space-y-1 text-xs">
-                                <div
-                                    className={`flex items-center space-x-2 ${
-                                        irrigationElements.some((el) => el.type === 'main-pipe')
-                                            ? 'text-green-400'
-                                            : 'text-red-400'
-                                    }`}
-                                >
-                                    <span>
-                                        {irrigationElements.some((el) => el.type === 'main-pipe')
-                                            ? '✓'
-                                            : '✗'}
-                                    </span>
-                                    <span>Main Pipe</span>
-                                </div>
-                                <div
-                                    className={`flex items-center space-x-2 ${
-                                        irrigationElements.some((el) => el.type === 'sub-pipe')
-                                            ? 'text-green-400'
-                                            : 'text-red-400'
-                                    }`}
-                                >
-                                    <span>
-                                        {irrigationElements.some((el) => el.type === 'sub-pipe')
-                                            ? '✓'
-                                            : '✗'}
-                                    </span>
-                                    <span>Sub Pipe</span>
+                {/* Main Content */}
+                <div className="flex flex-1 overflow-hidden">
+                    {/* Toolbar */}
+                    <div className="flex w-80 flex-col border-r border-gray-700 bg-gray-800">
+                        <div className="flex-1 overflow-y-auto p-4">
+                            {/* Selected Crops */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('พืชที่เลือก')}</h3>
+                                <div className="flex flex-wrap gap-1">
+                                    {selectedCrops.map((cropValue, index) => {
+                                        const crop = getCropByValue(cropValue);
+                                        return (
+                                            <span
+                                                key={index}
+                                                className="flex items-center rounded bg-green-600 px-2 py-1 text-xs text-white"
+                                            >
+                                                {crop?.icon} {crop?.name || cropValue}
+                                            </span>
+                                        );
+                                    })}
                                 </div>
                             </div>
-                        </div>
 
-                        {/* Crop Assignment Status */}
-                        {shapes.filter((s) => s.type === 'plot').length > 0 && (
+                            {/* Irrigation Method */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Crop Assignment Status
+                                    {t('วิธีการให้น้ำที่เลือก')}
+                                </h3>
+                                <div className="rounded border border-blue-500 bg-blue-600 px-3 py-2 text-sm text-white">
+                                    {
+                                        irrigationMethods[
+                                            selectedIrrigationMethod as keyof typeof irrigationMethods
+                                        ]?.name
+                                    }
+                                </div>
+                            </div>
+
+                            {/* Tools */}
+                            <div className="mb-4">
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">{t('เครื่องมือ')}</h3>
+                                <div className="space-y-1">
+                                    {tools.map((tool) => (
+                                        <button
+                                            key={tool.id}
+                                            onClick={() => setSelectedTool(tool.id)}
+                                            className={`w-full rounded p-2 text-left transition-colors ${
+                                                selectedTool === tool.id
+                                                    ? 'bg-blue-600 text-white'
+                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                            }`}
+                                            title={tool.description}
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <span className="text-sm">{tool.icon}</span>
+                                                <span className="text-xs">{tool.name}</span>
+                                            </div>
+                                            {tool.id === 'select' && (
+                                                <div className="mt-1 text-xs text-gray-400">
+                                                    {t('คลิกเลือก + Ctrl = แพนมุมมอง')}
+                                                </div>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Prerequisites Check */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    {t('ข้อกำหนดเบื้องต้น')}
                                 </h3>
                                 <div className="space-y-1 text-xs">
                                     <div
                                         className={`flex items-center space-x-2 ${
-                                            plotsWithoutCrops.length === 0
+                                            irrigationElements.some((el) => el.type === 'main-pipe')
                                                 ? 'text-green-400'
-                                                : 'text-yellow-400'
+                                                : 'text-red-400'
                                         }`}
                                     >
-                                        <span>{plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}</span>
                                         <span>
-                                            เลือกพืชครบทุกแปลง (
-                                            {
-                                                shapes.filter(
-                                                    (s) => s.type === 'plot' && s.cropType
-                                                ).length
-                                            }
-                                            /{shapes.filter((s) => s.type === 'plot').length})
+                                            {irrigationElements.some((el) => el.type === 'main-pipe')
+                                                ? '✓'
+                                                : '✗'}
                                         </span>
+                                        <span>{t('ท่อเมนแมพ')}</span>
                                     </div>
                                     <div
                                         className={`flex items-center space-x-2 ${
-                                            canGoToSummary ? 'text-green-400' : 'text-red-400'
+                                            irrigationElements.some((el) => el.type === 'sub-pipe')
+                                                ? 'text-green-400'
+                                                : 'text-red-400'
                                         }`}
                                     >
-                                        <span>{canGoToSummary ? '✓' : '✗'}</span>
-                                        <span>Ready for summary</span>
+                                        <span>
+                                            {irrigationElements.some((el) => el.type === 'sub-pipe')
+                                                ? '✓'
+                                                : '✗'}
+                                        </span>
+                                        <span>{t('ท่อเมนย่อยแมพ')}</span>
                                     </div>
                                 </div>
-                                {plotsWithoutCrops.length > 0 && (
-                                    <div className="mt-2 text-xs text-yellow-400">
-                                        แปลงที่ยังไม่เลือก:{' '}
-                                        {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
-                                    </div>
-                                )}
                             </div>
-                        )}
 
-                        {/* Canvas Info */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Canvas Info
-                            </h3>
-                            <div className="space-y-1 text-xs text-gray-400">
-                                <p>
-                                    📏 Size: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
-                                </p>
-                                <p>📐 Grid: {GRID_SIZE} px</p>
-                                <p>🔍 Zoom: {(zoom * 100).toFixed(0)}%</p>
-                                <p>
-                                    📍 Pan: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Irrigation Settings */}
-                        {selectedIrrigationMethod === 'mini-sprinkler' && (
-                            <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Mini Sprinkler Settings
-                                </h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="mb-1 block text-xs text-gray-400">
-                                            Global Radius:
-                                        </label>
-                                        <div className="flex items-center space-x-2">
-                                            <input
-                                                type="range"
-                                                min="0.5"
-                                                max="3"
-                                                step="0.1"
-                                                value={globalRadius}
-                                                onChange={(e) =>
-                                                    updateAllSprinklerRadius(
-                                                        parseFloat(e.target.value)
-                                                    )
-                                                }
-                                                className="flex-1"
-                                            />
-                                            <span className="min-w-[2rem] text-xs text-white">
-                                                {globalRadius}m
+                            {/* Crop Assignment Status */}
+                            {shapes.filter((s) => s.type === 'plot').length > 0 && (
+                                <div className="mb-4">
+                                    <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                        {t('สถานะการเลือกพืช')}
+                                    </h3>
+                                    <div className="space-y-1 text-xs">
+                                        <div
+                                            className={`flex items-center space-x-2 ${
+                                                plotsWithoutCrops.length === 0
+                                                    ? 'text-green-400'
+                                                    : 'text-yellow-400'
+                                            }`}
+                                        >
+                                            <span>{plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}</span>
+                                            <span>
+                                                {t('เลือกพืชครบทุกแปลง ({assigned}/{total})')
+                                                    .replace('{assigned}', shapes.filter((s) => s.type === 'plot' && s.cropType).length.toString())
+                                                    .replace('{total}', shapes.filter((s) => s.type === 'plot').length.toString())}
                                             </span>
                                         </div>
+                                        <div
+                                            className={`flex items-center space-x-2 ${
+                                                canGoToSummary ? 'text-green-400' : 'text-red-400'
+                                            }`}
+                                        >
+                                            <span>{canGoToSummary ? '✓' : '✗'}</span>
+                                            <span>{t('พร้อมไปดูสรุป')}</span>
+                                        </div>
                                     </div>
+                                    {plotsWithoutCrops.length > 0 && (
+                                        <div className="mt-2 text-xs text-yellow-400">
+                                            {t('แปลงที่ยังไม่เลือก')}:{' '}
+                                            {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
-                                    {selectedElement &&
-                                        irrigationElements.find(
-                                            (el) =>
-                                                el.id === selectedElement && el.type === 'sprinkler'
-                                        ) && (
-                                            <div className="mt-3 rounded bg-gray-700 p-2">
-                                                <div className="mb-2 text-xs text-yellow-300">
-                                                    Adjust Selected:
-                                                </div>
+                            {/* Canvas Info */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    {t('ข้อมูล Canvas')}
+                                </h3>
+                                <div className="space-y-1 text-xs text-gray-400">
+                                    <p>
+                                        📏 {t('ขนาด')}: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
+                                    </p>
+                                    <p>📏 {t('กริด')}: {GRID_SIZE} px</p>
+                                    <p>📏 {t('ซูม')}: {(zoom * 100).toFixed(0)}%</p>
+                                    <p>
+                                        📏 {t('แพน')}: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
+                                    </p>
+                                </div>
+                            </div>
 
-                                                <div className="space-y-2">
+                            {/* Irrigation Settings */}
+                            {selectedIrrigationMethod === 'mini-sprinkler' && (
+                                <div className="mb-4">
+                                    <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                        {t('ตั้งค่ามินิสปริงเกลอร์')}
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                {t('รัศมีทั้งหมด')}:
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="range"
+                                                    min="0.5"
+                                                    max="3"
+                                                    step="0.1"
+                                                    value={globalRadius}
+                                                    onChange={(e) =>
+                                                        updateAllSprinklerRadius(
+                                                            parseFloat(e.target.value)
+                                                        )
+                                                    }
+                                                    className="flex-1"
+                                                />
+                                                <span className="min-w-[2rem] text-xs text-white">
+                                                    {globalRadius}m
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                {t('อัตราการไหล')} (L/min):
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="number"
+                                                    min="5"
+                                                    max="30"
+                                                    step="1"
+                                                    value={sprinklerFlowRate}
+                                                    onChange={(e) => setSprinklerFlowRate(parseFloat(e.target.value) || 10)}
+                                                    className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                {t('แรงดัน')} (bar):
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="number"
+                                                    min="1.5"
+                                                    max="4.0"
+                                                    step="0.1"
+                                                    value={sprinklerPressure}
+                                                    onChange={(e) => setSprinklerPressure(parseFloat(e.target.value) || 2.5)}
+                                                    className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                {t('Overlap ทั้งหมด (0-50%)')}:
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="range"
+                                                    min="0"
+                                                    max="0.5"
+                                                    step="0.05"
+                                                    value={globalSprinklerOverlap}
+                                                    onChange={(e) =>
+                                                        setGlobalSprinklerOverlap(
+                                                            Math.min(0.5, Math.max(0, parseFloat(e.target.value)))
+                                                        )
+                                                    }
+                                                    className="flex-1"
+                                                />
+                                                <span className="min-w-[3rem] text-xs text-white">
+                                                    {Math.round(globalSprinklerOverlap * 100)}%
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-[10px] text-gray-400">
+                                                {t('50% หมายถึงระยะห่างจุดศูนย์กลางเท่ากับ 1R')}
+                                            </p>
+                                        </div>
+
+                                        {selectedElement &&
+                                            irrigationElements.find(
+                                                (el) => el.id === selectedElement && el.type === 'sub-pipe'
+                                            ) && (
+                                                <div className="mt-3 rounded bg-gray-700 p-2">
+                                                    <div className="mb-2 text-xs text-yellow-300">
+                                                        {t('ปรับตามท่อย่อยที่เลือก')}:
+                                                    </div>
                                                     <div>
                                                         <label className="mb-1 block text-xs text-gray-400">
-                                                            Radius:
+                                                            {t('รัศมีของสปริงเกลอร์ตามท่อย่อย')}:
                                                         </label>
                                                         <div className="flex items-center space-x-2">
                                                             <input
@@ -1965,731 +2644,774 @@ export default function GreenhouseMap() {
                                                                 min="0.5"
                                                                 max="3"
                                                                 step="0.1"
-                                                                value={
-                                                                    (irrigationElements.find(
-                                                                        (el) =>
-                                                                            el.id ===
-                                                                            selectedElement
-                                                                    )?.radius || 30) / 20
-                                                                }
+                                                                value={getSelectedSubPipeSprinklerRadiusMeters()}
                                                                 onChange={(e) =>
-                                                                    updateSelectedSprinklerRadius(
+                                                                    updateSelectedSubPipeSprinklerRadius(
                                                                         parseFloat(e.target.value)
                                                                     )
                                                                 }
                                                                 className="flex-1"
                                                             />
                                                             <span className="min-w-[2rem] text-xs text-white">
-                                                                {(
-                                                                    (irrigationElements.find(
-                                                                        (el) =>
-                                                                            el.id ===
-                                                                            selectedElement
-                                                                    )?.radius || 30) / 20
-                                                                ).toFixed(1)}
-                                                                m
+                                                                {getSelectedSubPipeSprinklerRadiusMeters()}m
                                                             </span>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        )}
-                                </div>
-                            </div>
-                        )}
+                                            )}
+                                        {selectedElement &&
+                                            irrigationElements.find(
+                                                (el) =>
+                                                    el.id === selectedElement && el.type === 'sprinkler'
+                                            ) && (
+                                                <div className="mt-3 rounded bg-gray-700 p-2">
+                                                    <div className="mb-2 text-xs text-yellow-300">
+                                                        {t('ปรับตัวที่เลือก')}:
+                                                    </div>
 
-                        {/* Drip Irrigation Settings */}
-                        {selectedIrrigationMethod === 'drip' && (
+                                                    <div className="space-y-2">
+                                                        <div>
+                                                            <label className="mb-1 block text-xs text-gray-400">
+                                                                {t('รัศมี')}:
+                                                            </label>
+                                                            <div className="flex items-center space-x-2">
+                                                                <input
+                                                                    type="range"
+                                                                    min="0.5"
+                                                                    max="3"
+                                                                    step="0.1"
+                                                                    value={
+                                                                        (irrigationElements.find(
+                                                                            (el) =>
+                                                                                el.id ===
+                                                                                selectedElement
+                                                                        )?.radius || 30) / 20
+                                                                    }
+                                                                    onChange={(e) =>
+                                                                        updateSelectedSprinklerRadius(
+                                                                            parseFloat(e.target.value)
+                                                                        )
+                                                                    }
+                                                                    className="flex-1"
+                                                                />
+                                                                <span className="min-w-[2rem] text-xs text-white">
+                                                                    {(
+                                                                        (irrigationElements.find(
+                                                                            (el) =>
+                                                                                el.id ===
+                                                                                selectedElement
+                                                                        )?.radius || 30) / 20
+                                                                    ).toFixed(1)}
+                                                                    m
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Drip Irrigation Settings */}
+                            {selectedIrrigationMethod === 'drip' && (
+                                <div className="mb-4">
+                                    <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                        {t('ตั้งค่าน้ำหยด')}
+                                    </h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                {t('ระยะห่างจุดน้ำหยดทั้งหมด')}:
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <select
+                                                    value={globalDripSpacing}
+                                                    onChange={(e) =>
+                                                        updateGlobalDripSpacing(
+                                                            parseInt(e.target.value)
+                                                        )
+                                                    }
+                                                    className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
+                                                >
+                                                    {dripSpacingOptions.map((spacing) => (
+                                                        <option key={spacing} value={spacing}>
+                                                            {spacing} ซม
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                {t('อัตราการไหล')} (L/min):
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="number"
+                                                    min="0.24"
+                                                    max="0.24"
+                                                    step="0.01"
+                                                    value={dripFlowRate}
+                                                    readOnly
+                                                    className="flex-1 rounded bg-gray-700 px-2 py-1 text-xs text-white"
+                                                />
+                                                <span className="text-xs text-gray-400">
+                                                    {t('คงที่')}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label className="mb-1 block text-xs text-gray-400">
+                                                {t('แรงดัน')} (bar):
+                                            </label>
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="number"
+                                                    min="0.5"
+                                                    max="2.0"
+                                                    step="0.1"
+                                                    value={dripPressure}
+                                                    onChange={(e) => setDripPressure(parseFloat(e.target.value) || 1.0)}
+                                                    className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {selectedElement &&
+                                            irrigationElements.find(
+                                                (el) =>
+                                                    el.id === selectedElement && el.type === 'drip-line'
+                                            ) && (
+                                                <div className="mt-2 rounded bg-gray-700 p-2">
+                                                    <div className="mb-1 text-xs text-yellow-300">
+                                                        {t('ปรับเส้นที่เลือก')}:
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <select
+                                                            value={
+                                                                Math.round(
+                                                                    (irrigationElements.find(
+                                                                        (el) => el.id === selectedElement
+                                                                    )?.spacing || globalDripSpacing / 100) * 100
+                                                                )
+                                                            }
+                                                            onChange={(e) =>
+                                                                updateSelectedDripSpacing(
+                                                                    parseInt(e.target.value)
+                                                                )
+                                                            }
+                                                            className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
+                                                        >
+                                                            {dripSpacingOptions.map((spacing) => (
+                                                                <option key={spacing} value={spacing}>
+                                                                    {spacing} ซม
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Auto Generation */}
                             <div className="mb-4">
                                 <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                    Drip Irrigation Settings
+                                    {t('สร้างอัตโนมัติ')}
                                 </h3>
-                                <div className="space-y-3">
-                                    <div>
-                                        <label className="mb-1 block text-xs text-gray-400">
-                                            Global Drip Point Spacing:
-                                        </label>
-                                        <div className="flex items-center space-x-2">
-                                            <input
-                                                type="range"
-                                                min="0.1"
-                                                max="1"
-                                                step="0.05"
-                                                value={globalDripSpacing}
-                                                onChange={(e) =>
-                                                    updateGlobalDripSpacing(
-                                                        parseFloat(e.target.value)
-                                                    )
-                                                }
-                                                className="flex-1"
-                                            />
-                                            <span className="min-w-[2rem] text-xs text-white">
-                                                {globalDripSpacing}m
-                                            </span>
+                                <div className="space-y-2">
+                                    {selectedIrrigationMethod === 'mini-sprinkler' && (
+                                        <div className="space-y-2">
+                                            <button
+                                                onClick={autoGenerateSprinklers}
+                                                disabled={!canAutoGenerate}
+                                                className={`w-full rounded px-3 py-2 text-xs transition-colors ${
+                                                    canAutoGenerate
+                                                        ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                        : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                                }`}
+                                            >
+                                                💦 {t('สร้างมินิสปริงเกลอร์ (แถวตรง)')}
+                                            </button>
                                         </div>
-                                    </div>
+                                    )}
 
-                                    {selectedElement &&
-                                        irrigationElements.find(
-                                            (el) =>
-                                                el.id === selectedElement && el.type === 'drip-line'
-                                        ) && (
-                                            <div className="mt-2 rounded bg-gray-700 p-2">
-                                                <div className="mb-1 text-xs text-yellow-300">
-                                                    Adjust Selected Line:
-                                                </div>
-                                                <div className="flex items-center space-x-2">
-                                                    <input
-                                                        type="range"
-                                                        min="0.1"
-                                                        max="1"
-                                                        step="0.05"
-                                                        value={
-                                                            irrigationElements.find(
-                                                                (el) => el.id === selectedElement
-                                                            )?.spacing || globalDripSpacing
-                                                        }
-                                                        onChange={(e) =>
-                                                            updateSelectedDripSpacing(
-                                                                parseFloat(e.target.value)
-                                                            )
-                                                        }
-                                                        className="flex-1"
-                                                    />
-                                                    <span className="min-w-[2rem] text-xs text-white">
-                                                        {(
-                                                            irrigationElements.find(
-                                                                (el) => el.id === selectedElement
-                                                            )?.spacing || globalDripSpacing
-                                                        ).toFixed(2)}
-                                                        m
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Auto Generation */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Auto Generate
-                            </h3>
-                            <div className="space-y-2">
-                                {selectedIrrigationMethod === 'mini-sprinkler' && (
-                                    <div className="space-y-2">
+                                    {selectedIrrigationMethod === 'drip' && (
                                         <button
-                                            onClick={autoGenerateSprinklers}
+                                            onClick={autoGenerateDripLines}
                                             disabled={!canAutoGenerate}
                                             className={`w-full rounded px-3 py-2 text-xs transition-colors ${
                                                 canAutoGenerate
-                                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                                    ? 'bg-cyan-600 text-white hover:bg-cyan-700'
                                                     : 'cursor-not-allowed bg-gray-600 text-gray-400'
                                             }`}
                                         >
-                                            💦 Generate Mini Sprinklers (Straight Line)
+                                            💧 {t('สร้างสายน้ำหยด')}
                                         </button>
-                                    </div>
-                                )}
+                                    )}
 
-                                {selectedIrrigationMethod === 'drip' && (
+                                    {!canAutoGenerate && (
+                                        <div className="mt-1 text-xs text-yellow-400">
+                                            ⚠️ {t('ต้องมีท่อเมนและท่อย่อยก่อนสร้าง')}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* View Controls */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('การแสดงผล')}</h3>
+                                <div className="space-y-2">
                                     <button
-                                        onClick={autoGenerateDripLines}
-                                        disabled={!canAutoGenerate}
+                                        onClick={() => setShowGrid(!showGrid)}
                                         className={`w-full rounded px-3 py-2 text-xs transition-colors ${
-                                            canAutoGenerate
-                                                ? 'bg-cyan-600 text-white hover:bg-cyan-700'
-                                                : 'cursor-not-allowed bg-gray-600 text-gray-400'
+                                            showGrid
+                                                ? 'bg-blue-600 text-white'
+                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                         }`}
                                     >
-                                        💧 Generate Drip Lines
+                                        📏 {t('แสดงกริด')} ({GRID_SIZE}px)
                                     </button>
-                                )}
+                                    <button
+                                        onClick={() => {
+                                            setZoom(1);
+                                            setPan({ x: 0, y: 0 });
+                                        }}
+                                        className="w-full rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
+                                    >
+                                        🔄 {t('รีเซ็ตมุมมอง')}
+                                    </button>
+                                </div>
+                            </div>
 
-                                {!canAutoGenerate && (
-                                    <div className="mt-1 text-xs text-yellow-400">
-                                        ⚠️ Main pipe and sub-pipe required first
+                            {/* Statistics */}
+                            <div className="mb-4">
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    {t('สถิติโครงสร้าง')}
+                                </h3>
+                                <div className="mb-3 space-y-1 text-xs text-gray-400">
+                                    <div className="flex justify-between">
+                                        <span>🏠 {t('โรงเรือน')}:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'greenhouse').length}
+                                        </span>
                                     </div>
-                                )}
-                            </div>
-                        </div>
+                                    <div className="flex justify-between">
+                                        <span>🌱 {t('แปลงปลูก')}:</span>
+                                        <span>{shapes.filter((s) => s.type === 'plot').length}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>🚶 {t('ทางเดิน')}:</span>
+                                        <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>💧 {t('แหล่งน้ำ')}:</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'water-source').length}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>🌿 {t('พื้นที่ให้ปุ๋ย')}:</span>
+                                        <span>{calculateStats.fertilizerAreaCount}</span>
+                                    </div>
+                                </div>
 
-                        {/* View Controls */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">View Controls</h3>
-                            <div className="space-y-2">
-                                <button
-                                    onClick={() => setShowGrid(!showGrid)}
-                                    className={`w-full rounded px-3 py-2 text-xs transition-colors ${
-                                        showGrid
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                                >
-                                    📐 Show Grid ({GRID_SIZE}px)
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setZoom(1);
-                                        setPan({ x: 0, y: 0 });
-                                    }}
-                                    className="w-full rounded bg-gray-700 px-3 py-2 text-xs text-gray-300 transition-colors hover:bg-gray-600"
-                                >
-                                    🔄 Reset View
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Statistics */}
-                        <div className="mb-4">
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">
-                                Structure Statistics
-                            </h3>
-                            <div className="mb-3 space-y-1 text-xs text-gray-400">
-                                <div className="flex justify-between">
-                                    <span>🏠 Greenhouses:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'greenhouse').length}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>🌱 Plots:</span>
-                                    <span>{shapes.filter((s) => s.type === 'plot').length}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>🚶 Walkways:</span>
-                                    <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>💧 Water Sources:</span>
-                                    <span>
-                                        {shapes.filter((s) => s.type === 'water-source').length}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <h3 className="mb-2 text-sm font-medium text-gray-300">Irrigation Statistics</h3>
-                            <div className="space-y-1 text-xs text-gray-400">
-                                <div className="flex justify-between">
-                                    <span>Main Pipe:</span>
-                                    <span>{calculateStats.mainPipeLength} px</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Sub Pipe:</span>
-                                    <span>{calculateStats.subPipeLength} px</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Drip Lines:</span>
-                                    <span>{calculateStats.dripLineLength} px</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Mini Sprinklers:</span>
-                                    <span>{calculateStats.sprinklerCount} units</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Pumps:</span>
-                                    <span>{calculateStats.pumpCount} units</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Valves:</span>
-                                    <span>{calculateStats.valveCount} units</span>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('สถิติระบบน้ำ')}</h3>
+                                <div className="space-y-1 text-xs text-gray-400">
+                                    <div className="flex justify-between">
+                                        <span>{t('ท่อเมนแมพ')}:</span>
+                                        <span>{calculateStats.mainPipeLength} px</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>{t('ท่อเมนย่อยแมพ')}:</span>
+                                        <span>{calculateStats.subPipeLength} px</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>{t('สายน้ำหยด')}:</span>
+                                        <span>{calculateStats.dripLineLength} px</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>{t('มินิสปริงเกลอร์')}:</span>
+                                        <span>{calculateStats.sprinklerCount} {t('หน่วย')}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>{t('ปั๊ม')}:</span>
+                                        <span>{calculateStats.pumpCount} {t('หน่วย')}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>{t('วาล์ว')}:</span>
+                                        <span>{calculateStats.valveCount} {t('หน่วย')}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>{t('ถังน้ำ')}:</span>
+                                        <span>{calculateStats.waterTankCount} {t('หน่วย')}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>{t('เครื่องให้ปุ๋ย')}:</span>
+                                        <span>{calculateStats.fertilizerMachineCount} {t('หน่วย')}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Canvas Area */}
-                <div className="relative flex-1 overflow-hidden">
-                    <canvas
-                        ref={canvasRef}
-                        width={CANVAS_SIZE.width}
-                        height={CANVAS_SIZE.height}
-                        onMouseDown={handleMouseDown}
-                        onMouseUp={handleMouseUp}
-                        onMouseMove={handleMouseMove}
-                        onMouseEnter={handleMouseEnter}
-                        onMouseLeave={handleMouseLeave}
-                        onDoubleClick={finishDrawing}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className="block select-none bg-gray-900"
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            cursor: isDragging
-                                ? 'grabbing'
-                                : isPanning
-                                  ? 'grabbing'
-                                  : selectedTool === 'select' && hoveredElement
-                                    ? 'grab'
-                                    : selectedTool === 'select'
-                                      ? 'default'
-                                      : 'crosshair',
-                        }}
-                    />
-
-                    {/* Coordinates Display */}
-                    <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
-                        X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | Zoom:{' '}
-                        {(zoom * 100).toFixed(0)}%
-                    </div>
-
-                    {/* Status Messages */}
-                    {isDrawing && (
-                        <div className="absolute left-4 top-4 rounded bg-blue-600 px-3 py-1 text-sm text-white">
-                            Drawing {selectedTool}... (Press Enter to finish, Escape to cancel)
-                        </div>
-                    )}
-
-                    {isDragging && (
-                        <div className="absolute left-4 top-4 rounded bg-yellow-600 px-3 py-1 text-sm text-white">
-                            🤏 Moving element... (Not holding Ctrl)
-                        </div>
-                    )}
-
-                    {isPanning && (
-                        <div className="absolute left-4 top-4 rounded bg-purple-600 px-3 py-1 text-sm text-white">
-                            🤏 Panning view... (Ctrl+Drag or click empty space)
-                        </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="absolute right-4 top-4 flex space-x-2">
-                        {selectedElement && selectedTool === 'select' && (
-                            <button
-                                onClick={deleteElement}
-                                className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
-                            >
-                                🗑️ Delete Element
-                            </button>
-                        )}
-
-                        <button
-                            onClick={() => {
-                                setIrrigationElements([]);
-                                setSelectedElement(null);
+                    {/* Canvas Area */}
+                    <div className="relative flex-1 overflow-hidden">
+                        <canvas
+                            ref={canvasRef}
+                            width={CANVAS_SIZE.width}
+                            height={CANVAS_SIZE.height}
+                            onMouseDown={handleMouseDown}
+                            onMouseUp={handleMouseUp}
+                            onMouseMove={handleMouseMove}
+                            onMouseEnter={handleMouseEnter}
+                            onMouseLeave={handleMouseLeave}
+                            onDoubleClick={finishDrawing}
+                            onContextMenu={(e) => e.preventDefault()}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        button: 0,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLCanvasElement>;
+                                    handleMouseDown(syntheticEvent);
+                                }
                             }}
-                            className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
-                        >
-                            🧹 Clear Irrigation System
-                        </button>
+                            onTouchMove={(e) => {
+                                e.preventDefault();
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0];
+                                    const syntheticEvent = {
+                                        clientX: touch.clientX,
+                                        clientY: touch.clientY,
+                                        preventDefault: () => {},
+                                    } as React.MouseEvent<HTMLCanvasElement>;
+                                    handleMouseMove(syntheticEvent);
+                                }
+                            }}
+                            onTouchEnd={(e) => {
+                                e.preventDefault();
+                                handleMouseUp();
+                            }}
+                            onTouchCancel={(e) => {
+                                e.preventDefault();
+                                handleMouseUp();
+                            }}
+                            className="block select-none bg-gray-900"
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                cursor: isDragging
+                                    ? 'grabbing'
+                                    : isPanning
+                                      ? 'grabbing'
+                                      : selectedTool === 'select' && hoveredElement
+                                        ? 'grab'
+                                        : selectedTool === 'select'
+                                          ? 'default'
+                                          : 'crosshair',
+                            }}
+                        />
+
+                        {/* Coordinates Display */}
+                        <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
+                            X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | {t('ซูม')}:{' '}
+                            {(zoom * 100).toFixed(0)}%
+                        </div>
+
+                        {/* Undo/Redo Controls - top left */}
+                        <div className="absolute left-4 top-4 flex space-x-2">
+                            <button
+                                onClick={undo}
+                                disabled={historyIndex <= 0}
+                                className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
+                                    historyIndex <= 0
+                                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                }`}
+                                title={t('เลิกทำ: Ctrl+Z')}
+                            >
+                                ↶ {t('เลิกทำ')}
+                            </button>
+                            <button
+                                onClick={redo}
+                                disabled={historyIndex >= history.length - 1}
+                                className={`rounded px-3 py-2 text-sm shadow-lg transition-colors ${
+                                    historyIndex >= history.length - 1
+                                        ? 'cursor-not-allowed bg-gray-800 text-gray-500'
+                                        : 'bg-gray-700 text-white hover:bg-gray-600'
+                                }`}
+                                title={t('ทำซ้ำ: Ctrl+Y')}
+                            >
+                                ↷ {t('ทำซ้ำ')}
+                            </button>
+                        </div>                 
+
+                        {/* Action Buttons */}
+                        <div className="absolute right-4 top-4 flex space-x-2">
+                            {selectedElement && selectedTool === 'select' && (
+                                <button
+                                    onClick={deleteElement}
+                                    className="rounded bg-red-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-red-700"
+                                >
+                                    🗑️ {t('ลบองค์ประกอบ')}
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    const newIrrigationElements: IrrigationElement[] = [];
+                                    setIrrigationElements(newIrrigationElements);
+                                    setSelectedElement(null);
+                                    
+                                    addToHistory(shapes, newIrrigationElements);
+                                }}
+                                className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
+                            >
+                                🧹 {t('ล้างระบบน้ำ')}
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                {/* Properties Panel */}
-                <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800">
-                    <div className="flex-1 overflow-y-auto p-4">
-                        <h3 className="mb-3 text-sm font-medium text-gray-300">
-                            Greenhouse Structure
-                        </h3>
+                    {/* Properties Panel */}
+                    {!isRightPanelCollapsed && (
+                        <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800 relative">
+                            <button
+                                onClick={() => setIsRightPanelCollapsed(true)}
+                                className="absolute -left-3 top-2 rounded bg-gray-700 px-1 py-0.5 text-xs text-gray-200 shadow hover:bg-gray-600"
+                                title={t('ซ่อนแผงข้อมูล')}
+                            >
+                                ▶
+                            </button>
+                            <div className="flex-1 overflow-y-auto p-4">
+                            <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                {t('โครงสร้างโรงเรือน')}
+                            </h3>
 
-                        {shapes.length === 0 ? (
-                            <p className="text-sm text-gray-500">No structures</p>
-                        ) : (
-                            <div className="mb-4 space-y-3">
-                                {shapes.filter((s) => s.type === 'plot').length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-xs font-medium text-green-400">
-                                            🌱 Plots
-                                        </h4>
-                                        <div className="space-y-1">
-                                            {shapes
-                                                .filter((s) => s.type === 'plot')
-                                                .map((plot) => {
-                                                    const crop = plot.cropType
-                                                        ? getCropByValue(plot.cropType)
-                                                        : null;
-                                                    return (
-                                                        <div
-                                                            key={plot.id}
-                                                            onClick={() => {
-                                                                if (selectedCrops.length === 0) {
-                                                                    alert(
-                                                                        'No crops selected. Please go back to select crops first.'
-                                                                    );
-                                                                    return;
+                            {shapes.length === 0 ? (
+                                <p className="text-sm text-gray-500">{t('ไม่มีโครงสร้าง')}</p>
+                            ) : (
+                                <div className="mb-4 space-y-3">
+                                    {shapes.filter((s) => s.type === 'plot').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-green-400">
+                                                🌱 {t('แปลงปลูก')}
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'plot')
+                                                    .map((plot) => {
+                                                        const crop = plot.cropType
+                                                            ? getCropByValue(plot.cropType)
+                                                            : null;
+                                                        return (
+                                                            <div
+                                                                key={plot.id}
+                                                                onClick={() => {
+                                                                    if (selectedCrops.length === 0) {
+                                                                        alert(
+                                                                            t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก')
+                                                                        );
+                                                                        return;
+                                                                    }
+                                                                    setSelectedPlot(plot.id);
+                                                                    setShowCropSelector(true);
+                                                                }}
+                                                                className={`cursor-pointer rounded p-2 text-sm transition-colors ${
+                                                                    selectedCrops.length === 0
+                                                                        ? 'cursor-not-allowed bg-gray-700 text-gray-500'
+                                                                        : plot.cropType
+                                                                          ? 'bg-green-700 text-gray-300 hover:bg-green-600'
+                                                                          : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
+                                                                }`}
+                                                                title={
+                                                                    selectedCrops.length === 0
+                                                                        ? t('กรุณาเลือกพืชก่อน')
+                                                                        : plot.cropType
+                                                                          ? t('คลิกเพื่อเปลี่ยนพืช')
+                                                                          : t('คลิกเพื่อเลือกพืช (จำเป็น)')
                                                                 }
-                                                                setSelectedPlot(plot.id);
-                                                                setShowCropSelector(true);
-                                                            }}
-                                                            className={`cursor-pointer rounded p-2 text-sm transition-colors ${
-                                                                selectedCrops.length === 0
-                                                                    ? 'cursor-not-allowed bg-gray-700 text-gray-500'
-                                                                    : plot.cropType
-                                                                      ? 'bg-green-700 text-gray-300 hover:bg-green-600'
-                                                                      : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
-                                                            }`}
-                                                            title={
-                                                                selectedCrops.length === 0
-                                                                    ? 'Please select crops first'
-                                                                    : plot.cropType
-                                                                      ? 'คลิกเพื่อเปลี่ยนพืช'
-                                                                      : 'คลิกเพื่อเลือกพืช (จำเป็น)'
-                                                            }
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="truncate">
+                                                                        {plot.name}
+                                                                        {!plot.cropType && (
+                                                                            <span className="ml-1 text-yellow-400">
+                                                                                ⚠️
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        {crop ? (
+                                                                            <span className="text-lg">
+                                                                                {crop.icon}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-xs text-yellow-400">
+                                                                                {selectedCrops.length ===
+                                                                                0
+                                                                                    ? t('ไม่มีพืชให้เลือก')
+                                                                                    : t('ยังไม่เลือกพืช')}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                {crop && (
+                                                                    <div className="mt-1 text-xs text-gray-400">
+                                                                        {crop.name}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {shapes.filter((s) => s.type === 'greenhouse').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-green-400">
+                                                🏠 {t('โรงเรือน')}
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'greenhouse')
+                                                    .map((greenhouse) => (
+                                                        <div
+                                                            key={greenhouse.id}
+                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
                                                         >
                                                             <div className="flex items-center justify-between">
                                                                 <span className="truncate">
-                                                                    {plot.name}
-                                                                    {!plot.cropType && (
-                                                                        <span className="ml-1 text-yellow-400">
-                                                                            ⚠️
-                                                                        </span>
-                                                                    )}
+                                                                    {greenhouse.name}
                                                                 </span>
-                                                                <div className="flex items-center space-x-2">
-                                                                    {crop ? (
-                                                                        <span className="text-lg">
-                                                                            {crop.icon}
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="text-xs text-yellow-400">
-                                                                            {selectedCrops.length ===
-                                                                            0
-                                                                                ? 'No crops available'
-                                                                                : 'Not selected'}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
+                                                                <span className="text-xs text-gray-400">
+                                                                    {greenhouse.points.length} {t('จุด')}
+                                                                </span>
                                                             </div>
-                                                            {crop && (
-                                                                <div className="mt-1 text-xs text-gray-400">
-                                                                    {crop.name}
-                                                                </div>
-                                                            )}
                                                         </div>
-                                                    );
-                                                })}
+                                                    ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {shapes.filter((s) => s.type === 'greenhouse').length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-xs font-medium text-green-400">
-                                            🏠 Greenhouses
-                                        </h4>
-                                        <div className="space-y-1">
-                                            {shapes
-                                                .filter((s) => s.type === 'greenhouse')
-                                                .map((greenhouse) => (
-                                                    <div
-                                                        key={greenhouse.id}
-                                                        className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="truncate">
-                                                                {greenhouse.name}
-                                                            </span>
-                                                            <span className="text-xs text-gray-400">
-                                                                {greenhouse.points.length} points
-                                                            </span>
+                                    {shapes.filter((s) => s.type === 'walkway').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-gray-400">
+                                                🚶 {t('ทางเดิน')}
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'walkway')
+                                                    .map((walkway) => (
+                                                        <div
+                                                            key={walkway.id}
+                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="truncate">
+                                                                    {walkway.name}
+                                                                </span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    {walkway.points.length} {t('จุด')}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {shapes.filter((s) => s.type === 'walkway').length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-xs font-medium text-gray-400">
-                                            🚶 Walkways
-                                        </h4>
-                                        <div className="space-y-1">
-                                            {shapes
-                                                .filter((s) => s.type === 'walkway')
-                                                .map((walkway) => (
-                                                    <div
-                                                        key={walkway.id}
-                                                        className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="truncate">
-                                                                {walkway.name}
-                                                            </span>
-                                                            <span className="text-xs text-gray-400">
-                                                                {walkway.points.length} points
-                                                            </span>
+                                    {shapes.filter((s) => s.type === 'water-source').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-blue-400">
+                                                💧 {t('แหล่งน้ำ')}
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'water-source')
+                                                    .map((water) => (
+                                                        <div
+                                                            key={water.id}
+                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="truncate">
+                                                                    {water.name}
+                                                                </span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    {water.points.length === 1
+                                                                        ? t('จุดเดียว')
+                                                                        : `${water.points.length} ${t('จุด')}`}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {shapes.filter((s) => s.type === 'water-source').length > 0 && (
-                                    <div>
-                                        <h4 className="mb-2 text-xs font-medium text-blue-400">
-                                            💧 Water Sources
-                                        </h4>
-                                        <div className="space-y-1">
-                                            {shapes
-                                                .filter((s) => s.type === 'water-source')
-                                                .map((water) => (
-                                                    <div
-                                                        key={water.id}
-                                                        className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="truncate">
-                                                                {water.name}
-                                                            </span>
-                                                            <span className="text-xs text-gray-400">
-                                                                {water.points.length === 1
-                                                                    ? 'Single point'
-                                                                    : `${water.points.length} points`}
-                                                            </span>
+                                    {shapes.filter((s) => s.type === 'fertilizer-area').length > 0 && (
+                                        <div>
+                                            <h4 className="mb-2 text-xs font-medium text-green-400">
+                                                🌿 {t('พื้นที่ให้ปุ๋ย')}
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {shapes
+                                                    .filter((s) => s.type === 'fertilizer-area')
+                                                    .map((area) => (
+                                                        <div
+                                                            key={area.id}
+                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="truncate">
+                                                                    {area.name}
+                                                                </span>
+                                                                <span className="text-xs text-gray-400">
+                                                                    {area.points.length} {t('จุด')}
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    ))}
+                                            </div>
                                         </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Irrigation Elements List */}
+                            <div className="border-t border-gray-700 pt-4">
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                    {t('องค์ประกอบระบบน้ำ')}
+                                </h3>
+
+                                {irrigationElements.length === 0 ? (
+                                    <p className="text-sm text-gray-500">{t('ยังไม่มีองค์ประกอบ')}</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {irrigationElements.map((element) => {
+                                            const typeNames = {
+                                                'main-pipe': '🔵 ' + t('ท่อเมนแมพ'),
+                                                'sub-pipe': '🟢 ' + t('ท่อเมนย่อยแมพ'),
+                                                pump: '⚙️ ' + t('ปั๊ม'),
+                                                'solenoid-valve': '🔧 ' + t('โซลินอยด์วาล์ว'),
+                                                'ball-valve': '🟡 ' + t('บอลวาล์ว'),
+                                                'water-tank': '🗂️ ' + t('ถังเก็บน้ำ'),
+                                                'fertilizer-machine': '🧪 ' + t('เครื่องให้ปุ๋ย'),
+                                                sprinkler: '💦 ' + t('มินิสปริงเกลอร์'),
+                                                'drip-line': '💧 ' + t('สายน้ำหยด'),
+                                            };
+
+                                            return (
+                                                <div
+                                                    key={element.id}
+                                                    onClick={() => setSelectedElement(element.id)}
+                                                    className={`cursor-pointer rounded p-2 text-sm transition-colors ${
+                                                        selectedElement === element.id
+                                                            ? 'bg-yellow-600 text-white'
+                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="truncate">
+                                                            {typeNames[element.type] || element.type}
+                                                        </span>
+                                                        {selectedElement === element.id && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    deleteElement();
+                                                                }}
+                                                                className="text-red-400 transition-colors hover:text-red-300"
+                                                                title={t('ลบอุปกรณ์')}
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-1 text-xs text-gray-400">
+                                                        {element.points.length} {t('จุด')}
+                                                        {element.radius &&
+                                                            ` | ${t('รัศมี')}: ${(element.radius / 20).toFixed(1)}m`}
+                                                        {element.spacing &&
+                                                            ` | ${t('ระยะห่าง')}: ${element.spacing.toFixed(2)}m`}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>
-                        )}
-
-                        {/* Irrigation Elements List */}
-                        <div className="border-t border-gray-700 pt-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">
-                                Irrigation Components
-                            </h3>
-
-                            {irrigationElements.length === 0 ? (
-                                <p className="text-sm text-gray-500">No components yet</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {irrigationElements.map((element) => {
-                                        const typeNames = {
-                                            'main-pipe': '🔵 Main Pipe',
-                                            'sub-pipe': '🟢 Sub Pipe',
-                                            pump: '⚙️ Pump',
-                                            'solenoid-valve': '🔧 Solenoid Valve',
-                                            'ball-valve': '🟡 Ball Valve',
-                                            sprinkler: '💦 Mini Sprinkler',
-                                            'drip-line': '💧 Drip Line',
-                                        };
-
-                                        return (
-                                            <div
-                                                key={element.id}
-                                                onClick={() => setSelectedElement(element.id)}
-                                                className={`cursor-pointer rounded p-2 text-sm transition-colors ${
-                                                    selectedElement === element.id
-                                                        ? 'bg-yellow-600 text-white'
-                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <span className="truncate">
-                                                        {typeNames[element.type] || element.type}
-                                                    </span>
-                                                    {selectedElement === element.id && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                deleteElement();
-                                                            }}
-                                                            className="text-red-400 transition-colors hover:text-red-300"
-                                                            title="Delete component"
-                                                        >
-                                                            🗑️
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="mt-1 text-xs text-gray-400">
-                                                    {element.points.length} points
-                                                    {element.radius &&
-                                                        ` | Radius: ${(element.radius / 20).toFixed(1)}m`}
-                                                    {element.spacing &&
-                                                        ` | Spacing: ${element.spacing.toFixed(2)}m`}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
                         </div>
                     </div>
+                    )}
+                    {isRightPanelCollapsed && (
+                        <div className="flex w-6 flex-col items-center justify-center border-l border-gray-700 bg-gray-800">
+                            <button
+                                onClick={() => setIsRightPanelCollapsed(false)}
+                                className="text-gray-300 transition-colors hover:text-white"
+                                title={t('แสดงแผงข้อมูล')}
+                            >
+                                ◀
+                            </button>
+                        </div>
+                    )}
                 </div>
-            </div>
 
-            {/* Bottom Bar */}
-            <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
-                {/* Warning Message */}
-                {plotsWithoutCrops.length > 0 && (
-                    <div className="mb-3 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
-                        <div className="text-sm text-yellow-300">
-                            ⚠️ Please select crops for all plots before viewing summary
+                {/* Bottom Bar */}
+                <div className="flex-shrink-0 border-t border-gray-700 bg-gray-800 px-6 py-3">
+                    {/* Warning Message */}
+                    {plotsWithoutCrops.length > 0 && (
+                        <div className="mb-3 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
+                            <div className="text-sm text-yellow-300">
+                                ⚠️ {t('กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อนไปดูสรุป')}
+                            </div>
+                            <div className="mt-1 text-xs text-yellow-400">
+                                {t('แปลงที่ยังไม่เลือก')}:{' '}
+                                {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
+                            </div>
                         </div>
-                        <div className="mt-1 text-xs text-yellow-400">
-                            แปลงที่ยังไม่เลือกพืช:{' '}
-                            {plotsWithoutCrops.map((plot) => plot.name).join(', ')}
-                        </div>
-                    </div>
-                )}
+                    )}
 
-                <div className="flex justify-between">
-                    <button
-                        onClick={() => {
-                            // Save irrigation system data
-                            const summaryData = {
-                                selectedCrops: selectedCrops,
-                                planningMethod: 'draw',
-                                shapes: shapes,
-                                irrigationElements: irrigationElements, // Added this line
-                                irrigationMethod: selectedIrrigationMethod,
-                                updatedAt: new Date().toISOString(),
-                            };
-
-                            const queryParams = new URLSearchParams();
-                            if (selectedCrops && selectedCrops.length > 0) {
-                                queryParams.set('crops', selectedCrops.join(','));
-                            }
-                            if (shapes && shapes.length > 0) {
-                                queryParams.set(
-                                    'shapes',
-                                    encodeURIComponent(JSON.stringify(shapes))
-                                );
-                            }
-                            if (selectedIrrigationMethod) {
-                                queryParams.set('irrigation', selectedIrrigationMethod); // Added this line
-                            }
-
-                            window.location.href = `/choose-irrigation?${queryParams.toString()}`;
-                        }}
-                        className="flex items-center rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
-                    >
-                        <svg
-                            className="mr-2 h-4 w-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                            />
-                        </svg>
-                        Back
-                    </button>
-
-                    <div className="flex space-x-3">
+                    <div className="flex justify-between">
                         <button
-                            onClick={async () => {
-                                try {
-                                    // Save irrigation system data as draft
-                                    const summaryData = {
-                                        selectedCrops: selectedCrops,
-                                        planningMethod: 'draw',
-                                        shapes: shapes,
-                                        irrigationElements: irrigationElements,
-                                        irrigationMethod: selectedIrrigationMethod,
-                                        updatedAt: new Date().toISOString(),
-                                    };
+                            onClick={() => {
+                                // Save irrigation system data
+                                const summaryData = {
+                                    selectedCrops: selectedCrops,
+                                    planningMethod: 'draw',
+                                    shapes: shapes,
+                                    irrigationElements: irrigationElements, // Added this line
+                                    irrigationMethod: selectedIrrigationMethod,
+                                    updatedAt: new Date().toISOString(),
+                                };
 
-                                    // Save to localStorage for draft
-                                    localStorage.setItem('greenhousePlanningData', JSON.stringify(summaryData));
-
-                                    // Check if we're editing an existing field
-                                    const currentFieldId = localStorage.getItem('currentFieldId');
-                                    const isEditing = currentFieldId && !currentFieldId.startsWith('mock-');
-
-                                    // Save to database as draft
-                                    const fieldData = isEditing ? {
-                                        // For updating existing field - use updateFieldData structure
-                                        status: 'unfinished',
-                                        is_completed: false,
-                                        greenhouse_data: {
-                                            ...summaryData,
-                                            lastSavedPage: 'irrigation-design' // Track which page this draft was saved from
-                                        },
-                                        project_mode: 'greenhouse',
-                                        last_saved: new Date().toISOString(),
-                                    } : {
-                                        // For creating new field - use full structure
-                                        name: `${t('โรงเรือน')} - ${t('ร่าง')} - ${new Date().toLocaleDateString('th-TH')}`,
-                                        customer_name: 'Customer',
-                                        category: 'greenhouse',
-                                        area_coordinates: (() => {
-                                            // Ensure we have valid coordinates
-                                            if (shapes && shapes.length > 0) {
-                                                const greenhouseShapes = shapes.filter((s) => s.type === 'greenhouse');
-                                                if (greenhouseShapes.length > 0) {
-                                                    return greenhouseShapes
-                                                        .map((shape) => shape.points.map((p) => ({ lat: p.y / 1000, lng: p.x / 1000 })))
-                                                        .flat();
-                                                }
-                                            }
-                                            // Default coordinates if no greenhouse shapes found
-                                            return [{ lat: 13.7563, lng: 100.5018 }];
-                                        })(),
-                                        plant_type_id: 21, // Default plant type
-                                        total_plants: shapes ? shapes.filter((s) => s.type === 'plot').length : 0,
-                                        total_area: 0.1, // Default small area for draft
-                                        total_water_need: 0,
-                                        area_type: 'polygon',
-                                        status: 'unfinished',
-                                        is_completed: false,
-                                        // Required JSON fields with default values
-                                        zone_inputs: [],
-                                        selected_pipes: [],
-                                        selected_pump: null,
-                                        zone_sprinklers: [],
-                                        zone_operation_mode: 'sequential',
-                                        zone_operation_groups: [],
-                                        project_data: null,
-                                        project_stats: null,
-                                        effective_equipment: null,
-                                        zone_calculation_data: [],
-                                        project_mode: 'greenhouse',
-                                        active_zone_id: null,
-                                        show_pump_option: false,
-                                        quotation_data: null,
-                                        quotation_data_customer: null,
-                                        garden_data: null,
-                                        garden_stats: null,
-                                        field_crop_data: null,
-                                        greenhouse_data: {
-                                            ...summaryData,
-                                            lastSavedPage: 'irrigation-design' // Track which page this draft was saved from
-                                        },
-                                        last_saved: new Date().toISOString(),
-                                        project_image: null,
-                                        project_image_type: null,
-                                    };
-                                    
-                                    const url = isEditing ? `/api/fields/${currentFieldId}/data` : '/api/fields';
-                                    const method = isEditing ? 'PUT' : 'POST';
-                                    
-                                    const response = await fetch(url, {
-                                        method: method,
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
-                                        },
-                                        body: JSON.stringify(fieldData),
-                                    });
-
-                                    if (response.ok) {
-                                        const result = await response.json();
-                                        if (result.success) {
-                                            alert(t('บันทึกร่างเรียบร้อยแล้ว! สามารถแก้ไขต่อได้ในภายหลัง'));
-                                            window.location.href = '/';
-                                        } else {
-                                            throw new Error(result.message || 'Failed to save draft');
-                                        }
-                                    } else {
-                                        throw new Error('Failed to save draft');
-                                    }
-                                } catch (error) {
-                                    console.error('Error saving draft:', error);
-                                    alert(t('เกิดข้อผิดพลาดในการบันทึกร่าง'));
+                                const queryParams = new URLSearchParams();
+                                if (selectedCrops && selectedCrops.length > 0) {
+                                    queryParams.set('crops', selectedCrops.join(','));
                                 }
+                                if (shapes && shapes.length > 0) {
+                                    queryParams.set(
+                                        'shapes',
+                                        encodeURIComponent(JSON.stringify(shapes))
+                                    );
+                                }
+                                if (selectedIrrigationMethod) {
+                                    queryParams.set('irrigation', selectedIrrigationMethod); // Added this line
+                                }
+
+                                window.location.href = `/choose-irrigation?${queryParams.toString()}`;
                             }}
-                            className="flex items-center rounded bg-yellow-600 px-4 py-2 text-white transition-colors hover:bg-yellow-700"
+                            className="flex items-center rounded bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
                         >
                             <svg
                                 className="mr-2 h-4 w-4"
@@ -2701,16 +3423,16 @@ export default function GreenhouseMap() {
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                     strokeWidth={2}
-                                    d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"
+                                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
                                 />
                             </svg>
-                            {t('บันทึกร่าง')}
+                            {t('กลับ')}
                         </button>
 
                         <button
                             onClick={() => {
                                 if (!canGoToSummary) {
-                                    alert('Please select crops for all plots before viewing summary');
+                                    alert(t('กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อนไปดูสรุป'));
                                     return;
                                 }
 
@@ -2720,6 +3442,8 @@ export default function GreenhouseMap() {
                                     shapes: shapes,
                                     irrigationElements: irrigationElements,
                                     irrigationMethod: selectedIrrigationMethod,
+                                    sprinklerFlowRate: sprinklerFlowRate,
+                                    dripEmitterFlowRate: dripFlowRate,
                                     createdAt: new Date().toISOString(),
                                     updatedAt: new Date().toISOString(),
                                 };
@@ -2737,9 +3461,9 @@ export default function GreenhouseMap() {
                                     ? 'bg-blue-600 text-white hover:bg-blue-700'
                                     : 'cursor-not-allowed bg-gray-600 text-gray-400'
                             }`}
-                            title={!canGoToSummary ? 'Please select crops for all plots first' : ''}
+                            title={!canGoToSummary ? t('กรุณาเลือกพืชให้ครบทุกแปลงปลูกก่อน') : ''}
                         >
-                            📊 View Summary
+                            📊 {t('ดูสรุป')}
                             <svg
                                 className="ml-2 h-4 w-4"
                                 fill="none"
@@ -2756,88 +3480,88 @@ export default function GreenhouseMap() {
                         </button>
                     </div>
                 </div>
-            </div>
 
-            {/* Crop Selector Modal */}
-            {showCropSelector && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="mx-4 w-full max-w-md rounded-lg border border-gray-600 bg-gray-800 p-6">
-                        <div className="mb-4 flex items-center justify-between">
-                            <h3 className="text-lg font-medium text-white">
-                                Select Crop for This Plot
-                            </h3>
-                            <button
-                                onClick={() => {
-                                    setShowCropSelector(false);
-                                    setSelectedPlot(null);
-                                }}
-                                className="text-gray-400 hover:text-white"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        {selectedCrops.length === 0 && (
-                            <div className="mb-4 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
-                                <div className="text-sm text-yellow-300">
-                                    ⚠️ No crops selected. Please go back to select crops first.
-                                </div>
+                {/* Crop Selector Modal */}
+                {showCropSelector && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                        <div className="mx-4 w-full max-w-md rounded-lg border border-gray-600 bg-gray-800 p-6">
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="text-lg font-medium text-white">
+                                    {t('เลือกพืชสำหรับแปลงนี้')}
+                                </h3>
+                                <button
+                                    onClick={() => {
+                                        setShowCropSelector(false);
+                                        setSelectedPlot(null);
+                                    }}
+                                    className="text-gray-400 hover:text-white"
+                                >
+                                    ✕
+                                </button>
                             </div>
-                        )}
 
-                        <div className="grid max-h-64 grid-cols-2 gap-3 overflow-y-auto">
-                            {selectedCrops.length === 0 ? (
-                                <div className="col-span-2 py-4 text-center text-gray-400">
-                                    No crops selected
+                            {selectedCrops.length === 0 && (
+                                <div className="mb-4 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
+                                    <div className="text-sm text-yellow-300">
+                                        ⚠️ {t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก')}
+                                    </div>
                                 </div>
-                            ) : (
-                                selectedCrops.map((cropValue) => {
-                                    const crop = getCropByValue(cropValue);
-                                    if (!crop) return null;
-                                    return (
-                                        <button
-                                            key={crop.value}
-                                            onClick={() => assignCropToPlot(crop.value)}
-                                            className="rounded-lg border border-gray-600 bg-gray-700 p-3 text-center transition-colors hover:bg-gray-600"
-                                        >
-                                            <div className="mb-1 text-2xl">{crop.icon}</div>
-                                            <div className="text-sm text-white">{crop.name}</div>
-                                            <div className="text-xs text-gray-400">
-                                                {crop.nameEn}
-                                            </div>
-                                        </button>
-                                    );
-                                })
                             )}
-                        </div>
 
-                        <div className="mt-4 border-t border-gray-600 pt-4">
-                            <button
-                                onClick={() => {
-                                    if (selectedPlot) {
-                                        setShapes((prev) =>
-                                            prev.map((shape) => {
+                            <div className="grid max-h-64 grid-cols-2 gap-3 overflow-y-auto">
+                                {selectedCrops.length === 0 ? (
+                                    <div className="col-span-2 py-4 text-center text-gray-400">
+                                        {t('ไม่มีพืชที่เลือกไว้')}
+                                    </div>
+                                ) : (
+                                    selectedCrops.map((cropValue) => {
+                                        const crop = getCropByValue(cropValue);
+                                        if (!crop) return null;
+                                        return (
+                                            <button
+                                                key={crop.value}
+                                                onClick={() => assignCropToPlot(crop.value)}
+                                                className="rounded-lg border border-gray-600 bg-gray-700 p-3 text-center transition-colors hover:bg-gray-600"
+                                            >
+                                                <div className="mb-1 text-2xl">{crop.icon}</div>
+                                                <div className="text-sm text-white">{crop.name}</div>
+                                                <div className="text-xs text-gray-400">
+                                                    {crop.nameEn}
+                                                </div>
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            <div className="mt-4 border-t border-gray-600 pt-4">
+                                <button
+                                    onClick={() => {
+                                        if (selectedPlot) {
+                                            const newShapes = shapes.map((shape) => {
                                                 if (shape.id === selectedPlot) {
                                                     const { cropType, ...shapeWithoutCrop } = shape;
                                                     return shapeWithoutCrop;
                                                 }
                                                 return shape;
-                                            })
-                                        );
-                                    }
-                                    setShowCropSelector(false);
-                                    setSelectedPlot(null);
-                                }}
-                                className="w-full rounded bg-red-600 py-2 text-sm text-white transition-colors hover:bg-red-700"
-                            >
-                                Remove Crop from Plot
-                            </button>
+                                            });
+                                            
+                                            setShapes(newShapes);
+                                            
+                                            addToHistory(newShapes, irrigationElements);
+                                        }
+                                        setShowCropSelector(false);
+                                        setSelectedPlot(null);
+                                    }}
+                                    className="w-full rounded bg-red-600 py-2 text-sm text-white transition-colors hover:bg-red-700"
+                                >
+                                    {t('ลบพืชออกจากแปลง')}
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
             </div>
-            <Footer />
         </div>
     );
 }

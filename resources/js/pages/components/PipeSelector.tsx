@@ -27,6 +27,7 @@ interface PipeSelectorProps {
     selectedPipe?: any;
     onPipeChange: (pipe: any) => void;
     horticultureSystemData?: any;
+    gardenSystemData?: any; // เพิ่มสำหรับ garden mode
     activeZoneId?: string;
     selectedSprinkler?: any;
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
@@ -40,6 +41,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     selectedPipe,
     onPipeChange,
     horticultureSystemData,
+    gardenSystemData,
     activeZoneId,
     selectedSprinkler,
     projectMode = 'horticulture',
@@ -54,9 +56,42 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     const [sprinklerPressure, setSprinklerPressure] = useState<SprinklerPressureInfo | null>(null);
     const [warnings, setWarnings] = useState<string[]>([]);
     const [isManuallySelected, setIsManuallySelected] = useState<boolean>(false); // Track if user manually selected a pipe
+    const [gardenZoneStats, setGardenZoneStats] = useState<any>(null);
 
     // Get current zone's best pipe info
     const currentZoneBestPipe = useMemo(() => {
+        // สำหรับ garden mode ใช้ gardenSystemData
+        if (projectMode === 'garden' && gardenSystemData && activeZoneId) {
+            const currentZone = gardenSystemData.zones?.find(
+                (zone: any) => zone.id === activeZoneId
+            );
+            if (!currentZone?.bestPipes) return null;
+
+            switch (pipeType) {
+                case 'branch':
+                    return currentZone.bestPipes.branch;
+                case 'secondary':
+                    return currentZone.bestPipes.subMain;
+                case 'main':
+                    return currentZone.bestPipes.main;
+                case 'emitter':
+                    // สำหรับ garden mode ใช้ข้อมูลจาก gardenSystemData
+                    if (gardenSystemData?.sprinklerConfig) {
+                        return {
+                            id: 'emitter-pipe',
+                            length: 10, // default emitter length สำหรับ garden
+                            count: 1, // จำนวนทางออก = 1
+                            waterFlowRate: gardenSystemData.sprinklerConfig.flowRatePerPlant,
+                            details: { type: 'emitter' },
+                        };
+                    }
+                    return currentZone.bestPipes.branch; // fallback
+                default:
+                    return null;
+            }
+        }
+
+        // สำหรับ horticulture mode ใช้ horticultureSystemData (เดิม)
         if (!horticultureSystemData || !activeZoneId) return null;
 
         const currentZone = horticultureSystemData.zones?.find(
@@ -116,12 +151,32 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             default:
                 return null;
         }
-    }, [horticultureSystemData, activeZoneId, pipeType]);
+    }, [projectMode, horticultureSystemData, gardenSystemData, activeZoneId, pipeType]);
 
     // Calculate sprinkler pressure info
     useEffect(() => {
-        // ใช้ข้อมูลจาก horticultureSystemData.sprinklerConfig.pressureBar แทน selectedSprinkler
-        if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+        // สำหรับ garden mode ใช้ gardenSystemData
+        if (projectMode === 'garden') {
+            if (gardenSystemData?.sprinklerConfig?.pressureBar) {
+                const pressureBar = gardenSystemData.sprinklerConfig.pressureBar;
+                const pressureInfo = {
+                    pressureBar: pressureBar,
+                    headM: pressureBar * 10, // แปลงจากบาร์เป็นเมตร (1 บาร์ = 10 ม.)
+                    head20PercentM: pressureBar * 10 * 0.2, // 20% ของ head
+                };
+                setSprinklerPressure(pressureInfo);
+            } else {
+                // ใช้ค่า default สำหรับ garden mode
+                const pressureInfo = {
+                    pressureBar: 2.5,
+                    headM: 25,
+                    head20PercentM: 5,
+                };
+                setSprinklerPressure(pressureInfo);
+            }
+        }
+        // สำหรับ horticulture mode ใช้ horticultureSystemData (เดิม)
+        else if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
             const pressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
             const pressureInfo = {
                 pressureBar: pressureBar,
@@ -130,11 +185,30 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             };
             setSprinklerPressure(pressureInfo);
         } else if (selectedSprinkler) {
-            // fallback ถ้าไม่มี horticultureSystemData
+            // fallback ถ้าไม่มี systemData
             const pressureInfo = calculateSprinklerPressure(selectedSprinkler);
             setSprinklerPressure(pressureInfo);
         }
-    }, [horticultureSystemData, selectedSprinkler]);
+    }, [projectMode, horticultureSystemData, gardenSystemData, selectedSprinkler]);
+
+    // Garden mode: ดึงข้อมูล zone statistics
+    useEffect(() => {
+        if (projectMode === 'garden' && activeZoneId) {
+            try {
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                if (gardenStatsStr) {
+                    const gardenStats = JSON.parse(gardenStatsStr);
+                    if (gardenStats.zones) {
+                        const currentZoneStats = gardenStats.zones.find((zone: any) => zone.zoneId === activeZoneId);
+                        setGardenZoneStats(currentZoneStats);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading garden zone statistics:', error);
+                setGardenZoneStats(null);
+            }
+        }
+    }, [projectMode, activeZoneId]);
 
     // Get pipe type name function
     const getPipeTypeName = useCallback((pipeType: PipeType) => {
@@ -385,14 +459,14 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 }
             };
             
-            // ใช้ฟังก์ชันใหม่เพื่อเลือกท่อที่มี Head Loss ใกล้เคียง 1.9 ม. ที่สุด
+            // ใช้ฟังก์ชันใหม่เพื่อเลือกท่อตามเกณฑ์ head20Percent
             const bestPipe = selectBestPipeByHeadLoss(
                 pipesToSelect,
                 pipeType,
                 currentZoneBestPipe,
                 selectedPipeType,
                 selectedPipeSizes,
-                1.9 // เป้าหมาย Head Loss 1.9 เมตร
+                sprinklerPressure.head20PercentM // ใช้ 20% Head จากแรงดันหัวฉีด
             );
 
             // 🚨 CRITICAL: Cross-Component Hierarchy Validation ก่อนเลือก
@@ -413,7 +487,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             currentZoneBestPipe,
                             selectedPipeType,
                             selectedPipeSizes,
-                            1.9
+                            sprinklerPressure.head20PercentM
                         );
                         if (alternativeBest && (!selectedPipe || selectedPipe.id !== alternativeBest.id)) {
                             onPipeChange(alternativeBest);
@@ -455,6 +529,25 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
             setCalculation(calc);
 
+            // เก็บข้อมูล calculation สำหรับ garden mode
+            if (projectMode === 'garden' && calc) {
+                try {
+                    const existingCalcStr = localStorage.getItem('garden_pipe_calculations');
+                    const existingCalc = existingCalcStr ? JSON.parse(existingCalcStr) : {};
+                    
+                    existingCalc[pipeType] = {
+                        headLoss: calc.headLoss,
+                        pipeLength: calc.pipeLength,
+                        flowRate: calc.flowRate,
+                        calculatedAt: new Date().toISOString()
+                    };
+                    
+                    localStorage.setItem('garden_pipe_calculations', JSON.stringify(existingCalc));
+                } catch (error) {
+                    console.error('Error saving garden pipe calculations:', error);
+                }
+            }
+
             // Check for warnings
             const newWarnings: string[] = [];
             if (calc && sprinklerPressure) {
@@ -467,7 +560,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             }
             setWarnings(newWarnings);
         }
-    }, [selectedPipe, currentZoneBestPipe, selectedPipeType, pipeType, sprinklerPressure]);
+    }, [selectedPipe, currentZoneBestPipe, selectedPipeType, pipeType, sprinklerPressure, projectMode]);
 
     const pipeTypeOptions = [
         { value: 'PE', label: 'PE' },
@@ -609,13 +702,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             return a.diffFrom19 - b.diffFrom19;
         });
 
-    // Only show for horticulture mode
-    if (projectMode !== 'horticulture') {
+    // Only show for horticulture and garden modes
+    if (projectMode !== 'horticulture' && projectMode !== 'garden') {
         return (
             <div className="flex items-center justify-center rounded-lg bg-gray-800 p-8">
                 <div className="text-center text-gray-500">
                     <div className="mb-2 text-4xl">🚧</div>
-                    <p>ระบบใหม่สำหรับ Horticulture เท่านั้น</p>
+                    <p>ระบบใหม่สำหรับ Horticulture และ Garden เท่านั้น</p>
                 </div>
             </div>
         );
@@ -661,15 +754,24 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         <span className="flex items-center gap-2 text-sm">
                             <span className="text-orange-200">ยาว:</span>
                             <span className="font-bold text-white">
-                                {currentZoneBestPipe.length.toFixed(1)} ม.
+                                {projectMode === 'garden' && gardenZoneStats 
+                                    ? `${gardenZoneStats.totalPipeLength.toFixed(1)} ม.`
+                                    : `${currentZoneBestPipe.length.toFixed(1)} ม.`
+                                }
                             </span>
                             <span className="text-orange-200">| ทางออก:</span>
                             <span className="font-bold text-white">
-                                {currentZoneBestPipe.count}
+                                {projectMode === 'garden' && gardenZoneStats
+                                    ? gardenZoneStats.sprinklerCount
+                                    : currentZoneBestPipe.count
+                                }
                             </span>
                             <span className="text-orange-200">| ใช้น้ำ:</span>
                             <span className="font-bold text-white">
-                                {currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min
+                                {projectMode === 'garden' && gardenZoneStats
+                                    ? `${(gardenZoneStats.sprinklerFlowRate * gardenZoneStats.sprinklerCount).toFixed(1)} L/min`
+                                    : `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`
+                                }
                             </span>
                         </span>
                     </h4>
@@ -817,7 +919,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                                 currentZoneBestPipe,
                                                 selectedPipeType,
                                                 selectedPipeSizes,
-                                                1.9
+                                                sprinklerPressure.head20PercentM
                                             );
                                             if (bestPipe) {
                                                 onPipeChange(bestPipe);
@@ -1140,14 +1242,14 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                                         }
                                                     });
                                                     
-                                                    if (hierarchyFilteredPipes.length > 0) {
+                                                    if (hierarchyFilteredPipes.length > 0 && sprinklerPressure) {
                                                         const bestPipe = selectBestPipeByHeadLoss(
                                                             hierarchyFilteredPipes,
                                                             pipeType,
                                                             currentZoneBestPipe,
                                                             selectedPipeType,
                                                             selectedPipeSizes,
-                                                            1.9
+                                                            sprinklerPressure.head20PercentM
                                                         );
                                                         
                                                         if (bestPipe && bestPipe.id !== selectedPipe?.id) {

@@ -175,7 +175,8 @@ export const useZoneEditor = ({
             const updatedControlPoints = updateZoneControlPoints(
                 editState.controlPoints,
                 updateResult.updatedCoordinates,
-                editState.draggedPointIndex!
+                editState.draggedPointIndex!,
+                // editState.editingZone
             );
             
             setEditState(prevState => ({

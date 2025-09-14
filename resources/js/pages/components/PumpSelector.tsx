@@ -44,14 +44,93 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
     const { t } = useLanguage();
     
-    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture mode
+    // ประกาศตัวแปรที่จำเป็นก่อน
+    const requiredFlow = results.flows.main;
+    const requiredHead = results.pumpHeadRequired;
+    
+    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture และ garden mode
     const getHorticultureRequirements = () => {
-        if (projectMode !== 'horticulture') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
             return {
                 requiredFlowLPM: requiredFlow,
                 minRequiredHead: requiredHead,
                 qHeadSpray: 0
             };
+        }
+
+        // สำหรับ garden mode ใช้ข้อมูลจาก garden statistics
+        if (projectMode === 'garden') {
+            // ดึงข้อมูลจาก localStorage หรือ props
+            const gardenDataStr = localStorage.getItem('garden_planner_data');
+            if (!gardenDataStr) {
+                return {
+                    requiredFlowLPM: requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: 0
+                };
+            }
+
+            try {
+                const gardenData = JSON.parse(gardenDataStr);
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                if (!gardenStatsStr) {
+                    return {
+                        requiredFlowLPM: requiredFlow,
+                        minRequiredHead: requiredHead,
+                        qHeadSpray: 0
+                    };
+                }
+
+                const gardenStats = JSON.parse(gardenStatsStr);
+                
+                // คำนวณความต้องการน้ำรวมจากทุกโซน
+                let totalWaterRequirement = 0;
+                if (gardenStats.zones && gardenStats.zones.length > 0) {
+                    // ดึงข้อมูลรูปแบบการเปิดโซนจาก garden_planner_data
+                    const gardenPlannerDataStr = localStorage.getItem('garden_planner_data');
+                    let simultaneousZones = gardenStats.zones.length; // default: เปิดทุกโซนพร้อมกัน
+                    
+                    if (gardenPlannerDataStr) {
+                        try {
+                            const gardenPlannerData = JSON.parse(gardenPlannerDataStr);
+                            if (gardenPlannerData.zoneOperationMode === 'sequential') {
+                                simultaneousZones = 1; // เปิดทีละโซน
+                            } else if (gardenPlannerData.zoneOperationMode === 'group') {
+                                simultaneousZones = gardenPlannerData.simultaneousZones || 1;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing garden planner data:', e);
+                        }
+                    }
+                    
+                    // คำนวณความต้องการน้ำตามรูปแบบการเปิดโซน
+                    if (simultaneousZones >= gardenStats.zones.length) {
+                        // เปิดทุกโซนพร้อมกัน
+                        totalWaterRequirement = gardenStats.zones.reduce((total: number, zone: any) => {
+                            return total + (zone.sprinklerFlowRate * zone.sprinklerCount);
+                        }, 0);
+                    } else {
+                        // หาโซนที่ใช้น้ำมากที่สุด
+                        const maxZoneRequirement = Math.max(...gardenStats.zones.map((zone: any) => 
+                            zone.sprinklerFlowRate * zone.sprinklerCount
+                        ));
+                        totalWaterRequirement = maxZoneRequirement * simultaneousZones;
+                    }
+                }
+
+                return {
+                    requiredFlowLPM: totalWaterRequirement || requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: gardenStats.zones?.[0]?.sprinklerFlowRate || 0
+                };
+            } catch (error) {
+                console.error('Error parsing garden data:', error);
+                return {
+                    requiredFlowLPM: requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: 0
+                };
+            }
         }
 
         const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
@@ -112,6 +191,204 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     const horticultureReq = getHorticultureRequirements();
     
+    // Garden mode: ดึงข้อมูล flow requirement และ pump head
+    // คำนวณ maxPumpHeadM แบบคงที่ (ไม่เปลี่ยนตามโซน)
+    const [cachedMaxPumpHead, setCachedMaxPumpHead] = React.useState<number | null>(null);
+    
+    // Reset cachedMaxPumpHead เมื่อโหลดหน้าใหม่
+    React.useEffect(() => {
+        // รีเซ็ตค่าเมื่อโหลดครั้งแรก
+        setCachedMaxPumpHead(null);
+    }, []); // รันครั้งเดียวเมื่อ component mount
+    
+    // คำนวณ pump head ใหม่เมื่อมีข้อมูลครบหรือเปลี่ยนแปลง
+    React.useEffect(() => {
+        if (projectMode !== 'garden') {
+            return;
+        }
+        
+        const calculateMaxPumpHead = () => {
+            try {
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+                
+                if (!gardenStatsStr) {
+                    return;
+                }
+                
+                const gardenStats = JSON.parse(gardenStatsStr);
+                
+                if (!gardenStats.zones || gardenStats.zones.length === 0) {
+                    return;
+                }
+                
+                
+                const allZoneHeadLoss: number[] = [];
+                
+                if (pipeCalculationsStr) {
+                    try {
+                        const pipeCalculations = JSON.parse(pipeCalculationsStr);
+                        
+                        // คำนวณ Head Loss รวมของทุกโซน
+                        gardenStats.zones.forEach((zone: any, index: number) => {
+                            // Head Loss ท่อ (เดียวกันทุกโซน)
+                            const pipeHeadLoss = (pipeCalculations.branch?.headLoss || 0) +
+                                               (pipeCalculations.secondary?.headLoss || 0) +
+                                               (pipeCalculations.main?.headLoss || 0) +
+                                               (pipeCalculations.emitter?.headLoss || 0);
+                            
+                            // Head Loss หัวฉีดของโซนนี้
+                            const sprinklerHeadLoss = (zone.sprinklerPressure || 2.5) * 10;
+                            
+                            // Head Loss รวมของโซนนี้
+                            const totalZoneHeadLoss = pipeHeadLoss + sprinklerHeadLoss;
+                            allZoneHeadLoss.push(totalZoneHeadLoss);
+                            
+                        });
+                        
+                        // เลือกค่าสูงสุดมาเป็น Pump Head
+                        const maxHead = Math.max(...allZoneHeadLoss);
+                        
+                        // อัปเดตเฉพาะเมื่อค่าใหม่สูงกว่าค่าเดิม (keep max value)
+                        if (cachedMaxPumpHead === null || maxHead > cachedMaxPumpHead) {
+                            setCachedMaxPumpHead(maxHead);
+                        }
+                        
+                    } catch (error) {
+                        console.error('Error parsing garden pipe calculations:', error);
+                        setCachedMaxPumpHead(null);
+                    }
+                } else {
+                    // ถ้าไม่มี pipe calculations ให้ใช้ sprinkler pressure ของโซนที่สูงที่สุด
+                    const maxZonePressure = Math.max(...gardenStats.zones.map((zone: any) => 
+                        zone.sprinklerPressure || 2.5
+                    ));
+                    const fallbackHead = maxZonePressure * 10;
+                    
+                    // อัปเดตเฉพาะเมื่อค่าใหม่สูงกว่าค่าเดิม (keep max value)
+                    if (cachedMaxPumpHead === null || fallbackHead > cachedMaxPumpHead) {
+                        setCachedMaxPumpHead(fallbackHead);
+                    }
+                }
+            } catch (error) {
+                console.error('Error calculating cached pump head:', error);
+                setCachedMaxPumpHead(null);
+            }
+        };
+        
+        // คำนวณทันที
+        calculateMaxPumpHead();
+        
+        // ฟังการเปลี่ยนแปลงของ localStorage
+        const handleStorageChange = () => {
+            calculateMaxPumpHead();
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Polling เพื่อตรวจสอบการเปลี่ยนแปลงของ localStorage (สำหรับ same-tab updates)
+        let pollCount = 0;
+        const maxPollCount = 10; // ตรวจสอบสูงสุด 10 ครั้ง (20 วินาที)
+        
+        const pollInterval = setInterval(() => {
+            pollCount++;
+            const currentPipeCalc = localStorage.getItem('garden_pipe_calculations');
+            
+            if (currentPipeCalc) {
+                try {
+                    const pipeCalc = JSON.parse(currentPipeCalc);
+                    const hasPipeData = pipeCalc.branch || pipeCalc.secondary || pipeCalc.main || pipeCalc.emitter;
+                    
+                    if (hasPipeData) {
+                        calculateMaxPumpHead();
+                    }
+                } catch (error) {
+                    console.error('Error parsing pipe calculations during polling:', error);
+                }
+            }
+            
+            // หยุด polling หลังจาก 10 ครั้ง
+            if (pollCount >= maxPollCount) {
+                clearInterval(pollInterval);
+            }
+        }, 2000); // Check every 2 seconds
+        
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            clearInterval(pollInterval);
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projectMode]); // Note: cachedMaxPumpHead ใช้ใน comparison แต่ไม่ใส่ใน deps เพื่อหลีกเลี่ยง infinite loop
+    
+    const getGardenRequirements = () => {
+        // Calculate fallback pump head locally to avoid hoisting issues  
+        const fallbackPumpHead = (() => {
+            if (allZoneResults && allZoneResults.length > 1) {
+                // คำนวณ Pump Head สำหรับแต่ละโซน แล้วหาค่าสูงสุด
+                return Math.max(...allZoneResults.map((zone: any) => {
+                    const zoneHeadLoss = zone.headLoss?.total || 0;
+                    const zoneSprinklerFlow = zone.waterPerSprinklerLPM || 6.0;
+                    const zoneSprinklerHeadLoss = zoneSprinklerFlow * 10;
+                    return zoneHeadLoss + zoneSprinklerHeadLoss;
+                }));
+            } else {
+                // โซนเดียว ใช้การคำนวณปกติ
+                return (results.headLoss?.total || 0) + (results.pressureFromSprinkler || 0);
+            }
+        })();
+        
+        if (projectMode !== 'garden') {
+            return {
+                requiredFlowLPM: horticultureReq.requiredFlowLPM,
+                pumpHeadM: fallbackPumpHead
+            };
+        }
+        
+        try {
+            const gardenStatsStr = localStorage.getItem('garden_statistics');
+            
+            if (!gardenStatsStr) {
+                return {
+                    requiredFlowLPM: horticultureReq.requiredFlowLPM,
+                    pumpHeadM: cachedMaxPumpHead || fallbackPumpHead
+                };
+            }
+            
+            const gardenStats = JSON.parse(gardenStatsStr);
+            let requiredFlowLPM = 0;
+            
+            if (gardenStats.zones && gardenStats.zones.length > 0) {
+                // คำนวณ flow requirement
+                if (results.projectSummary?.operationMode === 'sequential' || results.projectSummary?.operationMode === 'single') {
+                    // เปิดทีละโซน - ใช้ค่าของโซนที่มากที่สุด
+                    requiredFlowLPM = Math.max(...gardenStats.zones.map((zone: any) => 
+                        zone.sprinklerFlowRate * zone.sprinklerCount
+                    ));
+                } else {
+                    // เปิดพร้อมกันทุกโซน - รวมทุกโซน
+                    requiredFlowLPM = gardenStats.zones.reduce((total: number, zone: any) => {
+                        return total + (zone.sprinklerFlowRate * zone.sprinklerCount);
+                    }, 0);
+                }
+            }
+            
+        const finalPumpHead = cachedMaxPumpHead || fallbackPumpHead;
+            
+            return {
+                requiredFlowLPM: requiredFlowLPM || horticultureReq.requiredFlowLPM,
+                pumpHeadM: finalPumpHead
+            };
+        } catch (error) {
+            console.error('Error loading garden requirements:', error);
+            return {
+                requiredFlowLPM: horticultureReq.requiredFlowLPM,
+                pumpHeadM: cachedMaxPumpHead || fallbackPumpHead
+            };
+        }
+    };
+    
+    const gardenReq = getGardenRequirements();
+    
     // ประเมินความเพียงพอของปั๊มตามเงื่อนไขใหม่
     const evaluatePumpAdequacy = (pump: any) => {
         if (!pump || projectMode !== 'horticulture') {
@@ -149,9 +426,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         setShowImageModal(false);
         setModalImage({ src: '', alt: '' });
     };
-
-    const requiredFlow = results.flows.main;
-    const requiredHead = results.pumpHeadRequired;
 
     const calculateSimultaneousFlow = () => {
         if (results.projectSummary) {
@@ -229,25 +503,88 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
         const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
         const totalPipeHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
-        // คำนวณ Head Loss หัวฉีด (Q หัวฉีด * 10)
-        const sprinklerFlowLPM = results.waterPerSprinklerLPM || 6.0;
-        const sprinklerHeadLoss = sprinklerFlowLPM * 10;
+        // คำนวณ Head Loss หัวฉีด (แรงดัน(บาร์) * 10)
+        let sprinklerPressureBar = 2.5; // default
+        
+        if (projectMode === 'horticulture') {
+            // สำหรับ horticulture mode ใช้ข้อมูลจาก horticultureSystemData
+            try {
+                const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                if (horticultureSystemDataStr) {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                        sprinklerPressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture system data:', error);
+            }
+        } else if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก gardenStats
+            try {
+                const gardenStatsStr = localStorage.getItem('garden_statistics');
+                if (gardenStatsStr) {
+                    const gardenStats = JSON.parse(gardenStatsStr);
+                    if (gardenStats.zones && gardenStats.zones.length > 0) {
+                        // ใช้แรงดันจากโซนแรก หรือค่าเฉลี่ย
+                        sprinklerPressureBar = gardenStats.zones[0].sprinklerPressure || 2.5;
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing garden stats:', error);
+            }
+        } else {
+            // สำหรับ mode อื่นๆ ใช้ข้อมูลจาก results
+            if (results.analyzedSprinklers && results.analyzedSprinklers.length > 0) {
+                const firstSprinkler = results.analyzedSprinklers[0];
+                if (firstSprinkler.pressureBar) {
+                    sprinklerPressureBar = Array.isArray(firstSprinkler.pressureBar) 
+                        ? (firstSprinkler.pressureBar[0] + firstSprinkler.pressureBar[1]) / 2
+                        : parseFloat(String(firstSprinkler.pressureBar));
+                }
+            }
+        }
+        
+        const sprinklerHeadLoss = sprinklerPressureBar * 10;
 
         return totalPipeHeadLoss + sprinklerHeadLoss;
     };
 
     // สำหรับกรณีหลายโซน ให้หาค่าสูงสุด
     const getMaxPumpHeadFromAllZones = () => {
-        if (allZoneResults && allZoneResults.length > 1) {
-            // คำนวณ Pump Head สำหรับแต่ละโซน แล้วหาค่าสูงสุด
+        if (allZoneResults && allZoneResults.length > 0) {
+            // คำนวณ Pump Head สำหรับแต่ละโซน แล้วหาค่าสูงสุด (ใช้ค่าสูงสุดเสมอ)
             return Math.max(...allZoneResults.map((zone: any) => {
                 const zoneHeadLoss = zone.headLoss?.total || 0;
-                const zoneSprinklerFlow = zone.waterPerSprinklerLPM || 6.0;
-                const zoneSprinklerHeadLoss = zoneSprinklerFlow * 10;
+                
+                // หา sprinkler pressure ที่ถูกต้องของโซนนี้
+                let zoneSprinklerPressure = 2.5; // default pressure (bar)
+                
+                if (projectMode === 'horticulture') {
+                    // ใช้ข้อมูลจาก horticultureSystemData
+                    try {
+                        const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                        if (horticultureSystemDataStr) {
+                            const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                            if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                                zoneSprinklerPressure = horticultureSystemData.sprinklerConfig.pressureBar;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error parsing horticulture system data:', error);
+                    }
+                } else {
+                    // สำหรับ mode อื่นๆ ใช้ค่า default หรือจาก zone data
+                    if (zone.sprinklerPressure) {
+                        zoneSprinklerPressure = zone.sprinklerPressure;
+                    }
+                }
+                
+                const zoneSprinklerHeadLoss = zoneSprinklerPressure * 10; // pressure (bar) × 10 = head loss (m)
                 return zoneHeadLoss + zoneSprinklerHeadLoss;
             }));
         } else {
-            // โซนเดียว ใช้การคำนวณปกติ
+            // ไม่มี allZoneResults ใช้การคำนวณปกติ
             return calculatePumpHead();
         }
     };
@@ -257,11 +594,53 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     // กรองปั๊มสำหรับ horticulture mode
     const getFilteredPumps = () => {
-        if (projectMode !== 'horticulture') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
             return analyzedPumps.sort((a, b) => a.price - b.price);
         }
 
-        // สำหรับ horticulture mode - กรองตามเงื่อนไขเฉพาะ
+        // สำหรับ horticulture และ garden mode - กรองตามเงื่อนไขเฉพาะ
+        if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก garden statistics
+            const gardenStatsStr = localStorage.getItem('garden_statistics');
+            if (!gardenStatsStr) {
+                return analyzedPumps.sort((a, b) => a.price - b.price);
+            }
+
+            try {
+                const gardenStats = JSON.parse(gardenStatsStr);
+                
+                // คำนวณความต้องการน้ำรวมจากทุกโซน
+                let requiredFlowLPM = 0;
+                if (gardenStats.zones && gardenStats.zones.length > 0) {
+                    // สำหรับ garden mode ปกติจะเปิดทุกโซนพร้อมกัน
+                    requiredFlowLPM = gardenStats.zones.reduce((total: number, zone: any) => {
+                        return total + (zone.sprinklerFlowRate * zone.sprinklerCount);
+                    }, 0);
+                }
+
+                // ใช้ค่า actualPumpHead ที่คำนวณแล้ว
+                const maxPumpHeadFromZones = actualPumpHead;
+                
+                // กรองปั๊มที่เข้าเงื่อนไข
+                const compatiblePumps = analyzedPumps.filter((pump: any) => {
+                    const maxFlow = pump.max_flow_rate_lpm || pump.maxFlowLPM || 0;
+                    const flowCheck = maxFlow >= requiredFlowLPM;
+                    
+                    const maxHead = pump.max_head_m || pump.maxHead || 0;
+                    const headCheck = maxHead >= maxPumpHeadFromZones;
+                    
+                    return flowCheck && headCheck;
+                });
+
+                return compatiblePumps.length > 0 
+                    ? compatiblePumps.sort((a, b) => a.price - b.price)
+                    : analyzedPumps.sort((a, b) => a.price - b.price);
+            } catch (error) {
+                console.error('Error parsing garden stats:', error);
+                return analyzedPumps.sort((a, b) => a.price - b.price);
+            }
+        }
+
         const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
         if (!horticultureSystemDataStr) {
             return analyzedPumps.sort((a, b) => a.price - b.price);
@@ -433,14 +812,27 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     <span>
                         {t('อัตราการไหล:')}{' '}
                         <span className="font-bold text-blue-300">
-                            {Number(horticultureReq.requiredFlowLPM.toFixed(2)).toLocaleString()} {t('LPM')}
+                            {Number((projectMode === 'garden' ? gardenReq.requiredFlowLPM : horticultureReq.requiredFlowLPM).toFixed(2)).toLocaleString()} {t('LPM')}
                         </span>
+                        {projectMode === 'garden' && (
+                            <span className="ml-2 text-xs text-green-400">
+                                (จาก garden input)
+                            </span>
+                        )}
                     </span>
                     <span>
                         {t('Pump Head:')}{' '}
                         <span className="font-bold text-orange-300">
-                            {Number(actualPumpHead.toFixed(2)).toLocaleString()} {t('เมตร')}
+                            {(() => {
+                                const displayValue = projectMode === 'garden' ? gardenReq.pumpHeadM : actualPumpHead;
+                                return Number(displayValue.toFixed(2)).toLocaleString();
+                            })()} {t('เมตร')}
                         </span>
+                        {projectMode === 'garden' && (
+                            <span className="ml-2 text-xs text-green-400">
+                                (จาก Head Loss รวม)
+                            </span>
+                        )}
                     </span>
                 </div>
             </div>

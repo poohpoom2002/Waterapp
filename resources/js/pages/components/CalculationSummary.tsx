@@ -31,6 +31,7 @@ interface CalculationSummaryProps {
     getZoneName?: (zoneId: string) => string;
     fieldCropData?: any;
     greenhouseData?: any;
+    gardenStats?: any; // เพิ่มสำหรับ garden mode
 }
 
 const CalculationSummary: React.FC<CalculationSummaryProps> = ({
@@ -47,6 +48,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     getZoneName = (id) => id,
     fieldCropData,
     greenhouseData,
+    gardenStats,
 }) => {
     const { t } = useLanguage();
     const actualPump = results.autoSelectedPump;
@@ -57,20 +59,64 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     // ฟังก์ชันสำหรับดึงค่า Head Loss จากท่อแต่ละชนิด
     const getActualPipeHeadLoss = () => {
-        const branchHeadLoss = actualBranchPipe?.headLoss || 0;
-        const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
-        const mainHeadLoss = actualMainPipe?.headLoss || 0;
-        const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
+        if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก PipeSelector calculations ที่เก็บใน localStorage
+            try {
+                const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+                if (pipeCalculationsStr) {
+                    const pipeCalculations = JSON.parse(pipeCalculationsStr);
+                    
+                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
 
-        const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
-        return {
-            branch: branchHeadLoss,
-            secondary: secondaryHeadLoss,
-            main: mainHeadLoss,
-            emitter: emitterHeadLoss,
-            total: totalHeadLoss,
-        };
+                    return {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss,
+                    };
+                }
+            } catch (error) {
+                console.error('Error loading garden pipe calculations:', error);
+            }
+            
+            // Fallback: ใช้ข้อมูลจาก auto-selected pipes
+            const branchHeadLoss = actualBranchPipe?.headLoss || 0;
+            const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
+            const mainHeadLoss = actualMainPipe?.headLoss || 0;
+            const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
+
+            const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+            return {
+                branch: branchHeadLoss,
+                secondary: secondaryHeadLoss,
+                main: mainHeadLoss,
+                emitter: emitterHeadLoss,
+                total: totalHeadLoss,
+            };
+        } else {
+            // สำหรับ mode อื่นๆ ใช้ค่าจาก results.headLoss
+            const branchHeadLoss = results.headLoss?.branch?.total || 0;
+            const secondaryHeadLoss = results.headLoss?.secondary?.total || 0;
+            const mainHeadLoss = results.headLoss?.main?.total || 0;
+            const emitterHeadLoss = results.headLoss?.emitter?.total || 0;
+
+            const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+            return {
+                branch: branchHeadLoss,
+                secondary: secondaryHeadLoss,
+                main: mainHeadLoss,
+                emitter: emitterHeadLoss,
+                total: totalHeadLoss,
+            };
+        }
     };
 
     const actualHeadLoss = getActualPipeHeadLoss();
@@ -124,11 +170,74 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     const pressureInfo = getSprinklerPressureInfo();
 
-    // คำนวณ Head Loss หัวฉีด จาก Q หัวฉีด * 10
+    // คำนวณ Head Loss หัวฉีด จาก แรงดัน(บาร์) * 10
     const calculateSprinklerHeadLoss = () => {
-        // Q หัวฉีด คือ flow rate ต่อหัว
-        const sprinklerFlowLPM = results.waterPerSprinklerLPM || input.waterPerTreeLiters;
-        return sprinklerFlowLPM * 10; // Q * 10
+        let sprinklerPressureBar = 0;
+        
+        if (projectMode === 'horticulture') {
+            // สำหรับ horticulture mode ใช้ข้อมูลจาก horticultureSystemData
+            try {
+                const horticultureSystemDataStr = localStorage.getItem('horticultureSystemData');
+                if (horticultureSystemDataStr) {
+                    const horticultureSystemData = JSON.parse(horticultureSystemDataStr);
+                    if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
+                        sprinklerPressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
+                    } else {
+                        // fallback ใช้ค่าจาก selectedSprinkler
+                        if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                            if (Array.isArray(selectedSprinkler.pressureBar)) {
+                                sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                            } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                                const parts = selectedSprinkler.pressureBar.split('-');
+                                sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                            } else {
+                                sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                            }
+                        } else {
+                            sprinklerPressureBar = 2.5; // default
+                        }
+                    }
+                } else {
+                    // fallback ใช้ค่าจาก selectedSprinkler
+                    if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                        if (Array.isArray(selectedSprinkler.pressureBar)) {
+                            sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
+                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                            const parts = selectedSprinkler.pressureBar.split('-');
+                            sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                        } else {
+                            sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                        }
+                    } else {
+                        sprinklerPressureBar = 2.5; // default
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing horticulture system data:', error);
+                sprinklerPressureBar = 2.5; // default
+            }
+        } else if (projectMode === 'garden') {
+            // สำหรับ garden mode ใช้ข้อมูลจาก zone
+            if (gardenStats && activeZone) {
+                const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                if (currentZone) {
+                    sprinklerPressureBar = currentZone.sprinklerPressure || 2.5;
+                } else {
+                    sprinklerPressureBar = 2.5; // default
+                }
+            } else {
+                sprinklerPressureBar = 2.5; // default
+            }
+        } else {
+            // สำหรับ mode อื่นๆ
+            if (selectedSprinkler && selectedSprinkler.pressureBar) {
+                sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+            } else {
+                sprinklerPressureBar = 2.5; // default
+            }
+        }
+        
+        return sprinklerPressureBar * 10; // แรงดัน(บาร์) * 10
     };
 
     const sprinklerHeadLoss = calculateSprinklerHeadLoss();
@@ -459,7 +568,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     <div className="text-center">
                         <p className="text-blue-200">{t('ความต้องการน้ำ')}</p>
                         <p className="text-xl font-bold">
-                            {(results.totalWaterRequiredLPM || 0).toFixed(1)} {t('LPM')}
+                            {(() => {
+                                if (projectMode === 'garden') {
+                                    // สำหรับ garden mode ใช้ข้อมูลจาก input ต้องการน้ำ (คำนวณอัตโนมัติจาก garden statistics)
+                                    return input.waterPerTreeLiters.toFixed(1);
+                                } else {
+                                    return (results.totalWaterRequiredLPM || 0).toFixed(1);
+                                }
+                            })()} {t('LPM')}
                         </p>
                         {currentZoneData && (
                             <p className="text-xs text-blue-100">({currentZoneData.name})</p>
@@ -486,7 +602,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {sprinklerHeadLoss.toFixed(1)} m
                         </p>
                         <p className="text-xs text-yellow-100">
-                            {t('จากสูตร: Q หัวฉีด × 10')}
+                            {t('จากสูตร: แรงดัน(บาร์) × 10')}
                         </p>
                     </div>
                     {showPump && (
@@ -562,12 +678,25 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             💦 {t('น้ำต่อหัว')}{getEquipmentName()}
                         </h3>
                         <p className="text-lg font-bold">
-                            {results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
+                            {(() => {
+                                if (projectMode === 'garden' && gardenStats && activeZone) {
+                                    const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                                    if (currentZone) {
+                                        return `${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                    }
+                                }
+                                return `${results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                            })()}
                         </p>
                         <div className="text-sm text-gray-300 space-y-1 mt-2">
                             
                             <p className="text-xs text-blue-300">
-                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
+                                {projectMode === 'garden' && gardenStats && activeZone ? (() => {
+                                    const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                                    return currentZone ? 
+                                        `${t('ค่าจาก garden zone:')} ${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}` :
+                                        `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                })() : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
                             </p>
                         </div>
                         {selectedSprinkler && (

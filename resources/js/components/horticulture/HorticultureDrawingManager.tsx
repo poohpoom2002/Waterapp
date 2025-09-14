@@ -417,7 +417,7 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
             return {
                 polylineOptions: {
                     strokeColor: '#FF0000',
-                    strokeWeight: 6,
+                    strokeWeight: 2,
                     strokeOpacity: 0.9,
                     editable: true,
                     draggable: true,
@@ -427,7 +427,7 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
             return {
                 polylineOptions: {
                     strokeColor: '#8B5CF6',
-                    strokeWeight: 5,
+                    strokeWeight: 3,
                     strokeOpacity: 0.9,
                     editable: true,
                     draggable: true,
@@ -437,7 +437,7 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
             return {
                 polylineOptions: {
                     strokeColor: '#FFD700',
-                    strokeWeight: 4,
+                    strokeWeight: 2,
                     strokeOpacity: 0.9,
                     editable: true,
                     draggable: true,
@@ -767,7 +767,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             geodesic: true,
                             strokeColor: '#FF0000',
                             strokeOpacity: 0.9,
-                            strokeWeight: 8,
+                            strokeWeight: 2,
                             map: map,
                             clickable: true,
                             zIndex: 998
@@ -784,7 +784,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         mainPipePolyline.addListener('mouseout', () => {
                             mainPipePolyline.setOptions({
                                 strokeColor: '#FF0000',
-                                strokeWeight: 8
+                                strokeWeight: 2
                             });
                         });
 
@@ -806,7 +806,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                                 setTimeout(() => {
                                     mainPipePolyline.setOptions({
                                         strokeColor: '#FF0000',
-                                        strokeWeight: 8
+                                        strokeWeight: 3
                                     });
                                 }, 500);
                             }
@@ -830,7 +830,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                             geodesic: true,
                             strokeColor: '#8B5CF6',
                             strokeOpacity: 0.9,
-                            strokeWeight: 6,
+                            strokeWeight: 3,
                             map: map,
                             clickable: true,
                             zIndex: 998
@@ -840,14 +840,14 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         subMainPipePolyline.addListener('mouseover', () => {
                             subMainPipePolyline.setOptions({
                                 strokeColor: '#A78BFA',
-                                strokeWeight: 8
+                                strokeWeight: 3
                             });
                         });
 
                         subMainPipePolyline.addListener('mouseout', () => {
                             subMainPipePolyline.setOptions({
                                 strokeColor: '#8B5CF6',
-                                strokeWeight: 6
+                                strokeWeight: 3
                             });
                         });
 
@@ -869,7 +869,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                                 setTimeout(() => {
                                     subMainPipePolyline.setOptions({
                                         strokeColor: '#8B5CF6',
-                                        strokeWeight: 6
+                                        strokeWeight: 3
                                     });
                                 }, 500);
                             }
@@ -1033,7 +1033,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     onPipeComplete={handleCurvedPipeComplete}
                     onCancel={handleCancelCurvedDrawing}
                     strokeColor={strokeColor}
-                    strokeWeight={4}
+                    strokeWeight={3}
                     showGuides={showGuides}
                     onAnchorPointsChange={setAnchorPointsCount}
                 />

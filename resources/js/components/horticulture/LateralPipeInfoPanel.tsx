@@ -40,6 +40,10 @@ interface LateralPipeInfoPanelProps {
     currentPoint: Coordinate | null;
     snappedStartPoint?: Coordinate | null; // เพิ่มสำหรับคำนวณความยาวท่อสีเขียว
     alignedCurrentPoint?: Coordinate | null; // เพิ่มสำหรับคำนวณความยาวท่อสีเขียว
+    // 🚀 เพิ่มสำหรับ multi-segment
+    waypoints?: Coordinate[];
+    isMultiSegmentMode?: boolean;
+    segmentCount?: number;
     onCancel: () => void;
     onConfirm: () => void;
     t: (key: string) => string;
@@ -55,6 +59,10 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     currentPoint,
     snappedStartPoint,
     alignedCurrentPoint,
+    // 🚀 เพิ่มสำหรับ multi-segment
+    waypoints = [],
+    isMultiSegmentMode = false,
+    segmentCount = 1,
     onCancel,
     onConfirm,
     t
@@ -62,21 +70,86 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
     if (!isVisible) return null;
 
     const calculateLength = (): number => {
-        // ใช้เส้นสีเขียว (snap/aligned) สำหรับคำนวณความยาว
-        const effectiveStartPoint = snappedStartPoint || startPoint;
-        const effectiveEndPoint = alignedCurrentPoint || currentPoint;
-        
-        if (!effectiveStartPoint || !effectiveEndPoint) return 0;
-        
-        const R = 6371000; // Earth's radius in meters
-        const dLat = (effectiveEndPoint.lat - effectiveStartPoint.lat) * Math.PI / 180;
-        const dLng = (effectiveEndPoint.lng - effectiveStartPoint.lng) * Math.PI / 180;
-        const a = 
-            Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(effectiveStartPoint.lat * Math.PI / 180) * Math.cos(effectiveEndPoint.lat * Math.PI / 180) * 
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
+        // 🚀 รองรับ multi-segment calculation - เพิ่ม safety checks
+        if (isMultiSegmentMode && Array.isArray(waypoints) && waypoints.length > 0) {
+            // Multi-segment: คำนวณความยาวรวมทุกส่วน
+            const effectiveStartPoint = snappedStartPoint || startPoint;
+            const effectiveEndPoint = alignedCurrentPoint || currentPoint;
+            
+            if (!effectiveStartPoint || !effectiveEndPoint) return 0;
+            
+            const allPoints = [effectiveStartPoint, ...waypoints, effectiveEndPoint];
+            let totalLength = 0;
+            
+            for (let i = 0; i < allPoints.length - 1; i++) {
+                const segmentStart = allPoints[i];
+                const segmentEnd = allPoints[i + 1];
+                
+                // ตรวจสอบ validity ของ segment points
+                if (!segmentStart || !segmentEnd || 
+                    typeof segmentStart.lat !== 'number' || typeof segmentStart.lng !== 'number' ||
+                    typeof segmentEnd.lat !== 'number' || typeof segmentEnd.lng !== 'number' ||
+                    !isFinite(segmentStart.lat) || !isFinite(segmentStart.lng) ||
+                    !isFinite(segmentEnd.lat) || !isFinite(segmentEnd.lng)) {
+                    continue; // ข้าม segment ที่ไม่ valid
+                }
+                
+                // ใช้ haversine formula แบบ safe
+                try {
+                    const R = 6371000; // รัศมีโลกเป็นเมตร
+                    const dLat = (segmentEnd.lat - segmentStart.lat) * Math.PI / 180;
+                    const dLng = (segmentEnd.lng - segmentStart.lng) * Math.PI / 180;
+                    const lat1Rad = segmentStart.lat * Math.PI / 180;
+                    const lat2Rad = segmentEnd.lat * Math.PI / 180;
+                    
+                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                            Math.cos(lat1Rad) * Math.cos(lat2Rad) * 
+                            Math.sin(dLng/2) * Math.sin(dLng/2);
+                    const c = 2 * Math.atan2(Math.sqrt(Math.max(0, a)), Math.sqrt(Math.max(0, 1-a)));
+                    
+                    const segmentLength = R * c;
+                    if (isFinite(segmentLength) && segmentLength >= 0 && segmentLength < 100000) { // จำกัด max 100km
+                        totalLength += segmentLength;
+                    }
+                } catch (error) {
+                    console.warn('Error calculating segment length:', error);
+                    continue; // ข้าม segment ที่คำนวณไม่ได้
+                }
+            }
+            
+            return Math.max(0, totalLength);
+        } else {
+            // Single-segment (เดิม) - เพิ่ม safety checks
+            const effectiveStartPoint = snappedStartPoint || startPoint;
+            const effectiveEndPoint = alignedCurrentPoint || currentPoint;
+            
+            if (!effectiveStartPoint || !effectiveEndPoint) return 0;
+            
+            // ตรวจสอบ validity ของพิกัด
+            if (!isFinite(effectiveStartPoint.lat) || !isFinite(effectiveStartPoint.lng) ||
+                !isFinite(effectiveEndPoint.lat) || !isFinite(effectiveEndPoint.lng)) {
+                return 0;
+            }
+            
+            try {
+                const R = 6371000; // Earth's radius in meters
+                const dLat = (effectiveEndPoint.lat - effectiveStartPoint.lat) * Math.PI / 180;
+                const dLng = (effectiveEndPoint.lng - effectiveStartPoint.lng) * Math.PI / 180;
+                const lat1Rad = effectiveStartPoint.lat * Math.PI / 180;
+                const lat2Rad = effectiveEndPoint.lat * Math.PI / 180;
+                
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                         Math.cos(lat1Rad) * Math.cos(lat2Rad) * 
+                         Math.sin(dLng/2) * Math.sin(dLng/2);
+                const c = 2 * Math.atan2(Math.sqrt(Math.max(0, a)), Math.sqrt(Math.max(0, 1-a)));
+                
+                const distance = R * c;
+                return isFinite(distance) && distance >= 0 && distance < 100000 ? distance : 0;
+            } catch (error) {
+                console.warn('Error calculating single-segment length:', error);
+                return 0;
+            }
+        }
     };
 
     const length = calculateLength();
@@ -121,8 +194,30 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                     {placementMode === 'between_plants' && (
                         <span>🌱 {t('วางระหว่างแนวต้นไม้') || 'วางระหว่างแนวต้นไม้'}</span>
                     )}
+                    {!placementMode && (
+                        <span className="text-gray-500">⚙️ {t('รอการเลือกโหมด') || 'รอการเลือกโหมด'}</span>
+                    )}
                 </div>
             </div>
+
+            {/* 🚀 Multi-segment Info */}
+            {isMultiSegmentMode && waypoints.length > 0 && (
+                <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-md">
+                    <div className="flex items-center gap-2 text-orange-700 mb-2">
+                        <span className="text-lg">🔄</span>
+                        <span className="text-sm font-medium">
+                            {t('ท่อแบบหักเลี้ยว') || 'ท่อแบบหักเลี้ยว'}
+                        </span>
+                    </div>
+                    <div className="text-sm text-orange-600 space-y-1">
+                        <div>📍 {t('จุดหักเลี้ยว') || 'จุดหักเลี้ยว'}: {waypoints.length} {t('จุด') || 'จุด'}</div>
+                        <div>📏 {t('ส่วนท่อ') || 'ส่วนท่อ'}: {waypoints.length + 1} {t('ส่วน') || 'ส่วน'}</div>
+                        <div className="text-xs text-orange-500 mt-2 p-2 bg-orange-100 rounded">
+                            💡 {t('คลิกขวาเพื่อเพิ่มจุดหักเลี้ยว, คลิกซ้ายเพื่อจบการวาด') || 'คลิกขวาเพื่อเพิ่มจุดหักเลี้ยว, คลิกซ้ายเพื่อจบการวาด'}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Real-time Statistics */}
             <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-lg p-4 border border-gray-200 mb-4">
@@ -158,19 +253,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                         </div>
                     </div>
                     
-                    {/* ปริมาณน้ำรวม (เดิม) */}
-                    <div className="flex items-center justify-between p-3 bg-teal-50 border border-teal-200 rounded-md">
-                        <div className="flex items-center gap-2 text-teal-700">
-                            <FaTint size={16} />
-                            <span className="text-sm font-medium">
-                                {t('น้ำต้องการ') || 'น้ำต้องการ'}
-                            </span>
-                        </div>
-                        <div className="text-lg font-bold text-teal-800">
-                            {totalWaterNeed.toFixed(1)} L
-                        </div>
-                    </div>
-
                     {/* ความต้องการน้ำ/นาที */}
                     <div className="flex items-center justify-between p-3 bg-cyan-50 border border-cyan-200 rounded-md">
                         <div className="flex items-center gap-2 text-cyan-700">
@@ -181,19 +263,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                         </div>
                         <div className="text-lg font-bold text-cyan-800">
                             {totalFlowRatePerMinute.toLocaleString()} L/M
-                        </div>
-                    </div>
-
-                    {/* ความต้องการน้ำ/ชั่วโมง */}
-                    <div className="flex items-center justify-between p-3 bg-purple-50 border border-purple-200 rounded-md">
-                        <div className="flex items-center gap-2 text-purple-700">
-                            <FaClock size={16} />
-                            <span className="text-sm font-medium">
-                                {t('Q รวม/ชั่วโมง') || 'Q รวม/ชั่วโมง'}
-                            </span>
-                        </div>
-                        <div className="text-lg font-bold text-purple-800">
-                            {totalFlowRatePerHour.toLocaleString()} L/H
                         </div>
                     </div>
 
