@@ -11,7 +11,16 @@ import {
     FaPhone,
     FaGlobe,
     FaDirections,
+    FaCrosshairs,
 } from 'react-icons/fa';
+import {
+    universalSearch,
+    detectCoordinatePattern,
+    formatCoordinatesDisplay,
+    createMapsUrlFromCoordinates,
+    SearchResult as PlacesSearchResult,
+    SearchError
+} from '../../utils/placesApiUtils';
 
 interface SearchResult {
     place_id: string;
@@ -68,7 +77,7 @@ const DEFAULT_CATEGORIES: SearchCategory[] = [
 
 const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchControlProps> = ({
     onPlaceSelect,
-    placeholder = 'ค้นหาสถานที่ในพื้นที่...',
+    placeholder = 'ค้นหาสถานที่หรือใส่พิกัด เช่น 13.7563,100.5018',
     defaultCategories = DEFAULT_CATEGORIES,
 }) => {
     const inputRef = useRef<HTMLInputElement>(null);
@@ -90,6 +99,8 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     const [recentSearches, setRecentSearches] = useState<RecentSearch[]>([]);
     const [activeCategory, setActiveCategory] = useState<string | null>(null);
     const [showCategories, setShowCategories] = useState(false);
+    const [isCoordinateSearch, setIsCoordinateSearch] = useState(false);
+    const [lastSearchType, setLastSearchType] = useState<'text' | 'coordinate'>('text');
 
     useEffect(() => {
         const stored = localStorage.getItem('recentMapSearches');
@@ -451,16 +462,97 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 setAutocompletePredictions([]);
                 setShowResults(false);
                 setActiveCategory(null);
+                setIsCoordinateSearch(false);
                 return;
             }
 
-            searchWithPredictions(value);
+            // ตรวจสอบว่าเป็นพิกัดหรือไม่
+            const isCoordinate = detectCoordinatePattern(value);
+            setIsCoordinateSearch(isCoordinate);
 
-            searchTimeoutRef.current = setTimeout(() => {
-                performTextSearch(value);
-            }, 500);
+            if (isCoordinate) {
+                // ถ้าเป็นพิกัด ไม่ต้องทำ autocomplete
+                setAutocompletePredictions([]);
+                
+                searchTimeoutRef.current = setTimeout(async () => {
+                    setIsLoading(true);
+                    try {
+                        const result = await universalSearch(value);
+                        setLastSearchType(result.searchType);
+                        
+                        if (result.error) {
+                            setError(result.error.message);
+                            setSearchResults([]);
+                        } else {
+                            // แปลง PlacesSearchResult เป็น SearchResult interface ของ component
+                            const convertedResults: SearchResult[] = result.results.map(
+                                (place: PlacesSearchResult) => ({
+                                    place_id: place.place_id,
+                                    name: place.name,
+                                    formatted_address: place.formatted_address,
+                                    geometry: place.geometry,
+                                    types: place.types,
+                                    rating: place.rating,
+                                    photos: place.photos,
+                                    vicinity: place.vicinity,
+                                    business_status: place.business_status,
+                                })
+                            );
+                            
+                            setSearchResults(convertedResults);
+                            setShowResults(true);
+                        }
+                    } catch (err) {
+                        console.error('Search error:', err);
+                        setError('เกิดข้อผิดพลาดในการค้นหา');
+                        setSearchResults([]);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                }, 300);
+            } else {
+                // ถ้าเป็นข้อความธรรมดา ให้ทำ autocomplete และค้นหาแบบเดิม
+                searchWithPredictions(value);
+
+                searchTimeoutRef.current = setTimeout(async () => {
+                    setIsLoading(true);
+                    try {
+                        const result = await universalSearch(value);
+                        setLastSearchType(result.searchType);
+                        
+                        if (result.error) {
+                            setError(result.error.message);
+                            setSearchResults([]);
+                        } else {
+                            // แปลง PlacesSearchResult เป็น SearchResult interface ของ component
+                            const convertedResults: SearchResult[] = result.results.map(
+                                (place: PlacesSearchResult) => ({
+                                    place_id: place.place_id,
+                                    name: place.name,
+                                    formatted_address: place.formatted_address,
+                                    geometry: place.geometry,
+                                    types: place.types,
+                                    rating: place.rating,
+                                    photos: place.photos,
+                                    vicinity: place.vicinity,
+                                    business_status: place.business_status,
+                                })
+                            );
+                            
+                            setSearchResults(convertedResults);
+                            setShowResults(true);
+                        }
+                    } catch (err) {
+                        console.error('Search error:', err);
+                        setError('เกิดข้อผิดพลาดในการค้นหา');
+                        setSearchResults([]);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                }, 500);
+            }
         },
-        [searchWithPredictions, performTextSearch]
+        [searchWithPredictions]
     );
 
     const handlePredictionSelect = useCallback(
@@ -545,6 +637,8 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         setError(null);
         setSelectedIndex(-1);
         setActiveCategory(null);
+        setIsCoordinateSearch(false);
+        setLastSearchType('text');
         inputRef.current?.focus();
     }, []);
 
@@ -711,7 +805,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                         )}
 
                         {/* Autocomplete Predictions */}
-                        {autocompletePredictions.length > 0 && (
+                        {autocompletePredictions.length > 0 && !isCoordinateSearch && (
                             <div className="border-b border-gray-200">
                                 {autocompletePredictions.map((prediction, index) => (
                                     <div
@@ -737,6 +831,26 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Coordinate Search Info */}
+                        {isCoordinateSearch && searchQuery && (
+                            <div className="border-b border-gray-200 bg-blue-50 p-3">
+                                <div className="flex items-center gap-2">
+                                    <FaCrosshairs className="text-blue-500" />
+                                    <div className="flex-1">
+                                        <div className="font-medium text-blue-900">
+                                            ค้นหาด้วยพิกัด
+                                        </div>
+                                        <div className="text-sm text-blue-700">
+                                            {searchQuery}
+                                        </div>
+                                        <div className="text-xs text-blue-600 mt-1">
+                                            รูปแบบที่รองรับ: 13.7563,100.5018 • lat:13.7563,lng:100.5018 • (13.7563,100.5018)
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
@@ -895,9 +1009,34 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             searchResults.length === 0 &&
                             autocompletePredictions.length === 0 && (
                                 <div className="p-8 text-center">
-                                    <p className="text-gray-500">
-                                        ไม่พบผลการค้นหาสำหรับ "{searchQuery}"
-                                    </p>
+                                    {isCoordinateSearch ? (
+                                        <div>
+                                            <FaCrosshairs className="mx-auto mb-3 text-3xl text-gray-400" />
+                                            <p className="text-gray-500 mb-2">
+                                                ไม่พบข้อมูลสถานที่สำหรับพิกัด
+                                            </p>
+                                            <p className="text-sm text-gray-400 mb-4">"{searchQuery}"</p>
+                                            <div className="text-xs text-gray-500">
+                                                <p className="mb-1">รูปแบบพิกัดที่รองรับ:</p>
+                                                <div className="space-y-1">
+                                                    <div>• 13.7563,100.5018</div>
+                                                    <div>• lat:13.7563, lng:100.5018</div>
+                                                    <div>• (13.7563, 100.5018)</div>
+                                                    <div>• 13°45'22.68"N, 100°30'6.48"E</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <FaSearch className="mx-auto mb-3 text-3xl text-gray-400" />
+                                            <p className="text-gray-500">
+                                                ไม่พบผลการค้นหาสำหรับ "{searchQuery}"
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-2">
+                                                ลองใช้คำค้นหาอื่น หรือใส่พิกัดแทน เช่น 13.7563,100.5018
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                     </div>

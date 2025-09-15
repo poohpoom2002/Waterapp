@@ -98,6 +98,118 @@ export const findLateralSubMainIntersection = (
     return null;
 };
 
+// ฟังก์ชันใหม่: หาจุดตัดระหว่างท่อย่อยกับท่อเมนรอง (เมื่อท่อย่อยลากผ่านท่อเมนรอง)
+export const findLateralToSubMainIntersections = (
+    lateralPipes: any[],
+    subMainPipes: any[],
+    zones?: any[],
+    irrigationZones?: any[],
+    snapThreshold: number = 10
+): {
+    lateralPipeId: string;
+    subMainPipeId: string;
+    intersectionPoint: Coordinate;
+    segmentIndex: number;
+}[] => {
+    const intersections: {
+        lateralPipeId: string;
+        subMainPipeId: string;
+        intersectionPoint: Coordinate;
+        segmentIndex: number;
+    }[] = [];
+    
+    // Helper function สำหรับหาโซนของท่อ
+    const findPipeZone = (pipe: any): string | null => {
+        if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
+        
+        const endPoint = pipe.coordinates[pipe.coordinates.length - 1];
+        
+        // ตรวจสอบใน irrigationZones ก่อน
+        if (irrigationZones) {
+            for (const zone of irrigationZones) {
+                if (isPointInPolygon(endPoint, zone.coordinates)) {
+                    return zone.id;
+                }
+            }
+        }
+        
+        // ตรวจสอบใน zones รอง
+        if (zones) {
+            for (const zone of zones) {
+                if (isPointInPolygon(endPoint, zone.coordinates)) {
+                    return zone.id;
+                }
+            }
+        }
+        
+        return null;
+    };
+
+    for (const lateralPipe of lateralPipes) {
+        if (!lateralPipe.coordinates || lateralPipe.coordinates.length < 2) {
+            continue;
+        }
+
+        const lateralZone = findPipeZone(lateralPipe);
+
+        for (const subMainPipe of subMainPipes) {
+            if (!subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
+                continue;
+            }
+
+            const subMainZone = findPipeZone(subMainPipe);
+            
+            // เชื่อมต่อเฉพาะท่อที่อยู่ในโซนเดียวกัน
+            if (lateralZone && subMainZone && lateralZone !== subMainZone) {
+                continue;
+            }
+
+            // หาจุดตัดระหว่างท่อย่อยกับท่อเมนรอง
+            for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+                const segmentStart = subMainPipe.coordinates[i];
+                const segmentEnd = subMainPipe.coordinates[i + 1];
+
+                const intersection = findLineIntersection(
+                    lateralPipe.coordinates[0],
+                    lateralPipe.coordinates[lateralPipe.coordinates.length - 1],
+                    segmentStart,
+                    segmentEnd
+                );
+
+                if (intersection) {
+                    // ตรวจสอบว่าระยะห่างไม่เกิน threshold
+                    const distanceToStart = calculateDistanceBetweenPoints(intersection, lateralPipe.coordinates[0]);
+                    const distanceToEnd = calculateDistanceBetweenPoints(intersection, lateralPipe.coordinates[lateralPipe.coordinates.length - 1]);
+                    const lateralLength = calculateDistanceBetweenPoints(lateralPipe.coordinates[0], lateralPipe.coordinates[lateralPipe.coordinates.length - 1]);
+                    
+                    // 🔥 แก้ไขเงื่อนไข: ตรวจสอบว่าจุดตัดอยู่ "ระหว่าง" จุดเริ่มต้นและจุดสิ้นสุด
+                    // ไม่ใช่ที่จุดเริ่มต้นหรือจุดสิ้นสุด (ซึ่งควรเป็น connection ไม่ใช่ intersection)
+                    const isAtStart = distanceToStart < 5; // ใกล้จุดเริ่มต้นมาก (5 เมตร)
+                    const isAtEnd = distanceToEnd < 5; // ใกล้จุดสิ้นสุดมาก (5 เมตร)
+                    const isInMiddle = distanceToStart > 5 && distanceToEnd > 5 && 
+                                     distanceToStart < lateralLength - 5 && 
+                                     distanceToEnd < lateralLength - 5;
+                    
+                    // เฉพาะจุดที่อยู่ตรงกลางท่อย่อยเท่านั้นที่ถือเป็น intersection
+                    if (isInMiddle) {
+                        intersections.push({
+                            lateralPipeId: lateralPipe.id,
+                            subMainPipeId: subMainPipe.id,
+                            intersectionPoint: {
+                                lat: parseFloat(intersection.lat.toFixed(8)),
+                                lng: parseFloat(intersection.lng.toFixed(8))
+                            },
+                            segmentIndex: i
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    return intersections;
+};
+
 // ฟังก์ชันคำนวณสถิติแยกส่วนของท่อย่อย
 export const calculateLateralPipeSegmentStats = (
     lateralStart: Coordinate,
@@ -221,49 +333,31 @@ export const findMainToSubMainConnections = (
     const checkMainPipePassesThroughMultipleZones = (mainPipe: any): boolean => {
         if (!mainPipe.coordinates || mainPipe.coordinates.length < 2) return false;
         
-        const startPoint = mainPipe.coordinates[0];
-        const endPoint = mainPipe.coordinates[mainPipe.coordinates.length - 1];
+        const zonesFound = new Set<string>();
         
-        let startZone: string | null = null;
-        let endZone: string | null = null;
-        
-        // หาโซนของจุดเริ่มต้น
-        if (irrigationZones) {
-            for (const zone of irrigationZones) {
-                if (isPointInPolygon(startPoint, zone.coordinates)) {
-                    startZone = zone.id;
-                    break;
+        // ตรวจสอบทุกจุดในท่อเมน
+        for (const point of mainPipe.coordinates) {
+            // หาโซนของจุดนี้
+            if (irrigationZones) {
+                for (const zone of irrigationZones) {
+                    if (isPointInPolygon(point, zone.coordinates)) {
+                        zonesFound.add(zone.id);
+                        break;
+                    }
                 }
             }
-        }
-        if (!startZone && zones) {
-            for (const zone of zones) {
-                if (isPointInPolygon(startPoint, zone.coordinates)) {
-                    startZone = zone.id;
-                    break;
-                }
-            }
-        }
-        
-        // หาโซนของจุดสิ้นสุด
-        if (irrigationZones) {
-            for (const zone of irrigationZones) {
-                if (isPointInPolygon(endPoint, zone.coordinates)) {
-                    endZone = zone.id;
-                    break;
-                }
-            }
-        }
-        if (!endZone && zones) {
-            for (const zone of zones) {
-                if (isPointInPolygon(endPoint, zone.coordinates)) {
-                    endZone = zone.id;
-                    break;
+            if (zonesFound.size === 0 && zones) {
+                for (const zone of zones) {
+                    if (isPointInPolygon(point, zone.coordinates)) {
+                        zonesFound.add(zone.id);
+                        break;
+                    }
                 }
             }
         }
         
-        return startZone !== null && endZone !== null && startZone !== endZone;
+        // ถ้าพบมากกว่า 1 โซน แสดงว่าท่อเมนผ่านหลายโซน
+        return zonesFound.size > 1;
     };
 
     for (const mainPipe of mainPipes) {
@@ -297,30 +391,24 @@ export const findMainToSubMainConnections = (
             }
             
             if (distance <= snapThreshold) {
-                // หาจุดที่ใกล้ที่สุดบนท่อเมนรองสำหรับการเชื่อมต่อ
+                // หาจุดตัดจริงระหว่างท่อเมนกับท่อเมนรอง
                 let connectionPoint: Coordinate;
+                let actualIntersection: Coordinate | null = null;
                 
-                // ตรวจสอบว่าเป็นการเชื่อมต่อแบบ end-to-end หรือ intersection
-                if (distance <= 10) { // ถ้าใกล้มาก = end-to-end connection
-                    connectionPoint = {
-                        lat: (mainEnd.lat + subMainStart.lat) / 2,
-                        lng: (mainEnd.lng + subMainStart.lng) / 2
-                    };
-                } else {
-                    // หาจุดตัดจริงระหว่างท่อเมนกับท่อเมนรอง
-                    let actualIntersection: Coordinate | null = null;
+                // ตรวจสอบการตัดกันระหว่างทุก segment ของท่อเมนกับท่อเมนรอง
+                for (let i = 0; i < mainPipe.coordinates.length - 1; i++) {
+                    const mainSegStart = mainPipe.coordinates[i];
+                    const mainSegEnd = mainPipe.coordinates[i + 1];
                     
-                    // ตรวจสอบการตัดกันระหว่างแต่ละ segment ของท่อเมน
-                    for (let i = 0; i < mainPipe.coordinates.length - 1; i++) {
-                        const mainSegStart = mainPipe.coordinates[i];
-                        const mainSegEnd = mainPipe.coordinates[i + 1];
+                    for (let j = 0; j < subMainPipe.coordinates.length - 1; j++) {
+                        const subMainSegStart = subMainPipe.coordinates[j];
+                        const subMainSegEnd = subMainPipe.coordinates[j + 1];
                         
-                        // ตรวจสอบกับ segment แรกของท่อเมนรอง
                         const intersection = findLineIntersection(
                             mainSegStart,
                             mainSegEnd,
-                            subMainStart,
-                            subMainPipe.coordinates[1] || subMainStart
+                            subMainSegStart,
+                            subMainSegEnd
                         );
                         
                         if (intersection) {
@@ -328,13 +416,21 @@ export const findMainToSubMainConnections = (
                             break;
                         }
                     }
-                    
-                    // ถ้าไม่เจอจุดตัด ใช้จุดที่ใกล้ที่สุดบนท่อเมน
-                    connectionPoint = actualIntersection || findClosestPointOnLineSegment(
-                        subMainStart,
-                        mainPipe.coordinates[mainPipe.coordinates.length - 2] || mainEnd,
-                        mainEnd
-                    );
+                    if (actualIntersection) break;
+                }
+                
+                if (actualIntersection) {
+                    // ใช้จุดตัดจริง
+                    connectionPoint = {
+                        lat: parseFloat(actualIntersection.lat.toFixed(8)),
+                        lng: parseFloat(actualIntersection.lng.toFixed(8))
+                    };
+                } else {
+                    // ถ้าไม่เจอจุดตัด ใช้จุดกึ่งกลางระหว่างปลายท่อเมนกับเริ่มท่อเมนรอง
+                    connectionPoint = {
+                        lat: (mainEnd.lat + subMainStart.lat) / 2,
+                        lng: (mainEnd.lng + subMainStart.lng) / 2
+                    };
                 }
 
                 connections.push({
@@ -342,6 +438,29 @@ export const findMainToSubMainConnections = (
                     subMainPipeId: subMainPipe.id,
                     connectionPoint: connectionPoint
                 });
+                continue; // หาเจอแล้ว ไม่ต้องตรวจสอบจุดกลาง
+            }
+            
+            // 🔥 ตรวจสอบจุดปลายของท่อเมนกับจุดกลางของท่อเมนรอง
+            for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+                const segmentStart = subMainPipe.coordinates[i];
+                const segmentEnd = subMainPipe.coordinates[i + 1];
+                
+                // หาจุดที่ใกล้ที่สุดบน segment นี้
+                const closestPoint = findClosestPointOnLineSegment(mainEnd, segmentStart, segmentEnd);
+                const distanceToSegment = calculateDistanceBetweenPoints(mainEnd, closestPoint);
+                
+                if (distanceToSegment <= snapThreshold) {
+                    connections.push({
+                        mainPipeId: mainPipe.id,
+                        subMainPipeId: subMainPipe.id,
+                        connectionPoint: {
+                            lat: parseFloat(closestPoint.lat.toFixed(8)),
+                            lng: parseFloat(closestPoint.lng.toFixed(8))
+                        }
+                    });
+                    break; // หาเจอแล้ว ไม่ต้องตรวจสอบ segment อื่น
+                }
             }
         }
     }
@@ -489,13 +608,16 @@ export const findSubMainToLateralStartConnections = (
                 continue; // ข้าม - ต่างโซนกัน
             }
 
-            // 🔧 ปรับปรุงการตรวจสอบและคำนวณจุดเชื่อมต่อ
+            // 🔧 ปรับปรุงการตรวจสอบ: ตรวจสอบว่าท่อย่อยเริ่มต้นที่ท่อเมนรองจริงๆ
             const closestPoint = findClosestConnectionPoint(lateralStart, subMainPipe);
             
             if (closestPoint) {
                 const distance = calculateDistanceBetweenPoints(lateralStart, closestPoint);
 
                 if (distance <= snapThreshold) {
+                    // 🔥 ลดเงื่อนไขให้ง่ายขึ้น - ถ้าท่อย่อยเริ่มต้นใกล้ท่อเมนรองมาก ให้ถือเป็น connection
+                    // ไม่ต้องตรวจสอบความยาวท่อหรือจุดปลาย เพราะทำให้พลาดจุดเชื่อมที่ถูกต้อง
+                    
                     // 🔥 สร้าง unique key เพื่อป้องกันการซ้ำซ้อน
                     const connectionKey = `${subMainPipe.id}-${lateralPipe.id}`;
                     
@@ -589,6 +711,24 @@ export const findSubMainToMainIntersections = (
             // 🔥 เข้มงวดการตรวจสอบโซน: ห้ามท่อคนละโซนตัดกัน
             if (subMainZone && mainZone && subMainZone !== mainZone) {
                 continue; // ข้าม - ท่อคนละโซนไม่ควรตัดกัน
+            }
+            
+            // 🔥 ตรวจสอบเพิ่มเติม: ถ้าท่อเมนรองเชื่อมกับท่อเมนที่จุดปลาย ให้ข้าม
+            // เพราะนี่ควรเป็น connection (สีแดง) ไม่ใช่ intersection (สีน้ำเงิน)
+            const subMainStart = subMainPipe.coordinates[0];
+            const subMainEnd = subMainPipe.coordinates[subMainPipe.coordinates.length - 1];
+            const mainStart = mainPipe.coordinates[0];
+            const mainEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
+            
+            const distanceToMainStart = calculateDistanceBetweenPoints(subMainStart, mainStart);
+            const distanceToMainEnd = calculateDistanceBetweenPoints(subMainStart, mainEnd);
+            const distanceToMainStartFromEnd = calculateDistanceBetweenPoints(subMainEnd, mainStart);
+            const distanceToMainEndFromEnd = calculateDistanceBetweenPoints(subMainEnd, mainEnd);
+            
+            // ถ้าท่อเมนรองเชื่อมกับท่อเมนที่จุดปลาย (ใกล้มาก) ให้ข้าม
+            if (distanceToMainStart < 20 || distanceToMainEnd < 20 || 
+                distanceToMainStartFromEnd < 20 || distanceToMainEndFromEnd < 20) {
+                continue; // ข้าม - นี่ควรเป็น connection ไม่ใช่ intersection
             }
 
             // ตรวจสอบการตัดกันระหว่างแต่ละ segment

@@ -50,6 +50,24 @@ class EquipmentSeeder extends Seeder
             ]
         );
 
+        $agriculturalFittingsCategory = EquipmentCategory::firstOrCreate(
+            ['name' => 'agricultural_fittings'],
+            [
+                'display_name' => 'ข้อต่อเกษตร',
+                'description' => 'ข้อต่อและอุปกรณ์สำหรับระบบชลประทาน',
+                'icon' => '🔗'
+            ]
+        );
+
+        $pvcFittingsCategory = EquipmentCategory::firstOrCreate(
+            ['name' => 'pvc_fittings'],
+            [
+                'display_name' => 'ข้อต่อ PVC',
+                'description' => 'ข้อต่อ PVC สำหรับระบบท่อน้ำ',
+                'icon' => '🔧'
+            ]
+        );
+
         // สร้าง Attributes สำหรับ Sprinkler
         $this->createSprinklerAttributes($sprinklerCategory);
         
@@ -59,11 +77,19 @@ class EquipmentSeeder extends Seeder
         // สร้าง Attributes สำหรับ Pipe
         $this->createPipeAttributes($pipeCategory);
 
+        // สร้าง Attributes สำหรับ Agricultural Fittings
+        $this->createAgriculturalFittingsAttributes($agriculturalFittingsCategory);
+
+        // สร้าง Attributes สำหรับ PVC Fittings
+        $this->createPvcFittingsAttributes($pvcFittingsCategory);
+
         // สร้างข้อมูลสินค้า
         $this->createSprinklerData($sprinklerCategory);
         $this->createPumpData($pumpCategory);
         $this->createPipeData($pipeCategory);
         $this->createPumpEquipmentData($pumpEquipmentCategory);
+        $this->createAgriculturalFittingsData($agriculturalFittingsCategory);
+        $this->createPvcFittingsData($pvcFittingsCategory);
 
         echo "Equipment seeding completed successfully!\n";
     }
@@ -288,6 +314,118 @@ class EquipmentSeeder extends Seeder
                     'attribute_name' => $attr['attribute_name']
                 ],
                 array_merge($attr, ['category_id' => $pipeCategory->id])
+            );
+        }
+    }
+
+    private function createAgriculturalFittingsAttributes($agriculturalFittingsCategory)
+    {
+        $agriculturalFittingsAttrs = [
+            [
+                'attribute_name' => 'size_mm',
+                'display_name' => 'ขนาด',
+                'data_type' => 'number',
+                'unit' => 'มม.',
+                'is_required' => false,
+                'sort_order' => 1
+            ],
+            [
+                'attribute_name' => 'size_inch',
+                'display_name' => 'ขนาด',
+                'data_type' => 'string',
+                'unit' => 'นิ้ว',
+                'is_required' => false,
+                'sort_order' => 2
+            ],
+            [
+                'attribute_name' => 'main_pipe_inch',
+                'display_name' => 'ท่อหลัก',
+                'data_type' => 'string',
+                'unit' => 'นิ้ว',
+                'is_required' => false,
+                'sort_order' => 3
+            ],
+            [
+                'attribute_name' => 'branch_pipe_mm',
+                'display_name' => 'ท่อแยก',
+                'data_type' => 'number',
+                'unit' => 'มม.',
+                'is_required' => false,
+                'sort_order' => 4
+            ]
+        ];
+
+        foreach ($agriculturalFittingsAttrs as $attr) {
+            EquipmentAttribute::firstOrCreate(
+                [
+                    'category_id' => $agriculturalFittingsCategory->id,
+                    'attribute_name' => $attr['attribute_name']
+                ],
+                array_merge($attr, ['category_id' => $agriculturalFittingsCategory->id])
+            );
+        }
+    }
+
+    private function createPvcFittingsAttributes($pvcFittingsCategory)
+    {
+        $pvcFittingsAttrs = [
+            [
+                'attribute_name' => 'size_inch',
+                'display_name' => 'ขนาด',
+                'data_type' => 'string',
+                'unit' => 'นิ้ว',
+                'is_required' => false,
+                'sort_order' => 1
+            ],
+            [
+                'attribute_name' => 'size_mm',
+                'display_name' => 'ขนาด',
+                'data_type' => 'number',
+                'unit' => 'มม.',
+                'is_required' => false,
+                'sort_order' => 2
+            ],
+            [
+                'attribute_name' => 'main_pipe_inch',
+                'display_name' => 'ท่อหลัก',
+                'data_type' => 'string',
+                'unit' => 'นิ้ว',
+                'is_required' => false,
+                'sort_order' => 3
+            ],
+            [
+                'attribute_name' => 'branch_pipe_inch',
+                'display_name' => 'ท่อแยก',
+                'data_type' => 'string',
+                'unit' => 'นิ้ว',
+                'is_required' => false,
+                'sort_order' => 4
+            ],
+            [
+                'attribute_name' => 'branch_pipe_mm',
+                'display_name' => 'ท่อแยก',
+                'data_type' => 'number',
+                'unit' => 'มม.',
+                'is_required' => false,
+                'sort_order' => 5
+            ],
+            [
+                'attribute_name' => 'is_featured',
+                'display_name' => 'สินค้าแนะนำ',
+                'data_type' => 'boolean',
+                'unit' => '',
+                'is_required' => false,
+                'sort_order' => 6
+            ]
+        ];
+
+        foreach ($pvcFittingsAttrs as $attr) {
+            EquipmentAttribute::firstOrCreate(
+                [
+                    'category_id' => $pvcFittingsCategory->id,
+                    'attribute_name' => $attr['attribute_name']
+                ],
+                array_merge($attr, ['category_id' => $pvcFittingsCategory->id])
             );
         }
     }
@@ -891,7 +1029,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 5,
                 'description' => 'ท่อ HDPE คุณภาพสูง ทนทาน ใช้กับระบบแรงดันสูง',
                 'attributes' => [
-                    'pipeType' => 'HDPE PE 100',
+                    'pipeType' => 'PE',
                     'pn' => 16,
                     'sizeMM' => 20,
                     'sizeInch' => null,
@@ -907,7 +1045,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 3,
                 'description' => 'ท่อ HDPE PE100 ขนาด 25mm ความยาว 100 เมตร',
                 'attributes' => [
-                    'pipeType' => 'HDPE PE 100',
+                    'pipeType' => 'PE',
                     'pn' => 16,
                     'sizeMM' => 25,
                     'sizeInch' => null,
@@ -940,7 +1078,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 4,
                 'description' => 'ท่อ HDPE PE100 ขนาด 32mm ความยาว 100 เมตร ทนแรงดัน',
                 'attributes' => [
-                    'pipeType' => 'HDPE PE 100',
+                    'pipeType' => 'PE',
                     'pn' => 16,
                     'sizeMM' => 32,
                     'sizeInch' => null,
@@ -972,7 +1110,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 120,
                 'description' => 'ท่อ PPR สีเขียว ทนความร้อน เหมาะสำหรับน้ำร้อน',
                 'attributes' => [
-                    'pipeType' => 'PPR',
+                    'pipeType' => 'PVC',
                     'pn' => 20,
                     'sizeMM' => 20,
                     'sizeInch' => null,
@@ -988,7 +1126,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 80,
                 'description' => 'ท่อ PPR สีเขียว 25mm ทนความร้อนสูง',
                 'attributes' => [
-                    'pipeType' => 'PPR',
+                    'pipeType' => 'PVC',
                     'pn' => 20,
                     'sizeMM' => 25,
                     'sizeInch' => null,
@@ -1004,7 +1142,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 8,
                 'description' => 'ท่อ LDPE สำหรับระบบดริป ทนรังสี UV',
                 'attributes' => [
-                    'pipeType' => 'LDPE',
+                    'pipeType' => 'PE',
                     'pn' => 4,
                     'sizeMM' => 16,
                     'sizeInch' => null,
@@ -1036,7 +1174,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 2,
                 'description' => 'ท่อ HDPE PE100 ขนาด 50mm ระบบแรงดันสูง',
                 'attributes' => [
-                    'pipeType' => 'HDPE PE 100',
+                    'pipeType' => 'PE',
                     'pn' => 16,
                     'sizeMM' => 50,
                     'sizeInch' => null,
@@ -1052,7 +1190,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 40,
                 'description' => 'ท่อเหล็กชุบสังกะสี 1 นิ้ว ทนทาน ป้องกันสนิม',
                 'attributes' => [
-                    'pipeType' => 'Galvanized Steel',
+                    'pipeType' => 'PVC`',
                     'pn' => 16,
                     'sizeMM' => 25,
                     'sizeInch' => '1"',
@@ -1068,7 +1206,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 55,
                 'description' => 'ท่อ PPR สีเขียว 32mm ระบบน้ำร้อน-เย็น',
                 'attributes' => [
-                    'pipeType' => 'PPR',
+                    'pipeType' => 'PVC',
                     'pn' => 20,
                     'sizeMM' => 32,
                     'sizeInch' => null,
@@ -1084,7 +1222,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 25,
                 'description' => 'ท่อทองแดงคุณภาพสูง ทนกรดและด่าง',
                 'attributes' => [
-                    'pipeType' => 'Copper',
+                    'pipeType' => 'PVC',
                     'pn' => 25,
                     'sizeMM' => 22,
                     'sizeInch' => null,
@@ -1100,7 +1238,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 150,
                 'description' => 'ท่อ PEX สำหรับระบบน้ำร้อน ยืดหยุ่นสูง',
                 'attributes' => [
-                    'pipeType' => 'PEX',
+                    'pipeType' => 'PE',
                     'pn' => 10,
                     'sizeMM' => 16,
                     'sizeInch' => null,
@@ -1132,7 +1270,7 @@ class EquipmentSeeder extends Seeder
                 'stock' => 90,
                 'description' => 'ท่อหลายชั้น PEX-AL-PEX ทนทาน ไม่ขยายตัว',
                 'attributes' => [
-                    'pipeType' => 'PEX-AL-PEX',
+                    'pipeType' => 'PE',
                     'pn' => 16,
                     'sizeMM' => 20,
                     'sizeInch' => null,
@@ -1283,6 +1421,748 @@ class EquipmentSeeder extends Seeder
                     'is_active' => true
                 ]
             );
+        }
+    }
+
+    private function createAgriculturalFittingsData($category)
+    {
+        $data = [
+            // ตารางที่ 1: ข้อต่อเกษตร (รหัส 358-xx)
+            [
+                'product_code' => '358-55',
+                'name' => 'ข้อต่อเกษตร 358-55',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 37.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ท่อหลัก 1" ท่อแยก 20 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '1"',
+                    'branch_pipe_mm' => 20
+                ]
+            ],
+            [
+                'product_code' => '358-56',
+                'name' => 'ข้อต่อเกษตร 358-56',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 45.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ท่อหลัก 1" ท่อแยก 25 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '1"',
+                    'branch_pipe_mm' => 25
+                ]
+            ],
+            [
+                'product_code' => '358-58',
+                'name' => 'ข้อต่อเกษตร 358-58',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 55.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ท่อหลัก 1 1/2" ท่อแยก 20 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_mm' => 20
+                ]
+            ],
+            [
+                'product_code' => '358-59',
+                'name' => 'ข้อต่อเกษตร 358-59',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 60.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ท่อหลัก 1 1/2" ท่อแยก 25 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_mm' => 25
+                ]
+            ],
+            [
+                'product_code' => '358-60',
+                'name' => 'ข้อต่อเกษตร 358-60',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 75.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ท่อหลัก 1 1/2" ท่อแยก 32 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_mm' => 32
+                ]
+            ],
+            [
+                'product_code' => '358-62',
+                'name' => 'ข้อต่อเกษตร 358-62',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 65.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ท่อหลัก 2" ท่อแยก 20 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_mm' => 20
+                ]
+            ],
+            [
+                'product_code' => '358-63',
+                'name' => 'ข้อต่อเกษตร 358-63',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 70.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ท่อหลัก 2" ท่อแยก 25 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_mm' => 25
+                ]
+            ],
+            [
+                'product_code' => '358-64',
+                'name' => 'ข้อต่อเกษตร 358-64',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 85.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ท่อหลัก 2" ท่อแยก 32 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_mm' => 32
+                ]
+            ],
+
+            // ตารางที่ 2: ข้อต่อเกษตร (รหัส 356-xxRH)
+            [
+                'product_code' => '356-10RH',
+                'name' => 'ข้อต่อเกษตร 356-10RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 86.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 20 มม.',
+                'attributes' => [
+                    'size_mm' => 20
+                ]
+            ],
+            [
+                'product_code' => '356-11RH',
+                'name' => 'ข้อต่อเกษตร 356-11RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 110.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 25 มม.',
+                'attributes' => [
+                    'size_mm' => 25
+                ]
+            ],
+            [
+                'product_code' => '356-12RH',
+                'name' => 'ข้อต่อเกษตร 356-12RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 130.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 32 มม.',
+                'attributes' => [
+                    'size_mm' => 32
+                ]
+            ],
+            [
+                'product_code' => '356-13RH',
+                'name' => 'ข้อต่อเกษตร 356-13RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 255.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 40 มม.',
+                'attributes' => [
+                    'size_mm' => 40
+                ]
+            ],
+            [
+                'product_code' => '356-14RH',
+                'name' => 'ข้อต่อเกษตร 356-14RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 405.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 50 มม.',
+                'attributes' => [
+                    'size_mm' => 50
+                ]
+            ],
+            [
+                'product_code' => '356-15RH',
+                'name' => 'ข้อต่อเกษตร 356-15RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 640.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 63 มม.',
+                'attributes' => [
+                    'size_mm' => 63
+                ]
+            ],
+            [
+                'product_code' => '356-16RH',
+                'name' => 'ข้อต่อเกษตร 356-16RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 825.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 75 มม.',
+                'attributes' => [
+                    'size_mm' => 75
+                ]
+            ],
+            [
+                'product_code' => '356-17RH',
+                'name' => 'ข้อต่อเกษตร 356-17RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 1380.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 90 มม.',
+                'attributes' => [
+                    'size_mm' => 90
+                ]
+            ],
+            [
+                'product_code' => '356-18RH',
+                'name' => 'ข้อต่อเกษตร 356-18RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 2130.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 110 มม.',
+                'attributes' => [
+                    'size_mm' => 110
+                ]
+            ],
+
+            // ตารางที่ 3: ข้อต่อเกษตร (รหัส 356-6x)
+            [
+                'product_code' => '356-60',
+                'name' => 'ข้อต่อเกษตร 356-60',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 45.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 1/2" x 20 มม.',
+                'attributes' => [
+                    'size_inch' => '1/2"',
+                    'size_mm' => 20
+                ]
+            ],
+            [
+                'product_code' => '356-61',
+                'name' => 'ข้อต่อเกษตร 356-61',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 59.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 3/4" x 25 มม.',
+                'attributes' => [
+                    'size_inch' => '3/4"',
+                    'size_mm' => 25
+                ]
+            ],
+            [
+                'product_code' => '356-62',
+                'name' => 'ข้อต่อเกษตร 356-62',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 86.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 1" x 32 มม.',
+                'attributes' => [
+                    'size_inch' => '1"',
+                    'size_mm' => 32
+                ]
+            ],
+            [
+                'product_code' => '356-63',
+                'name' => 'ข้อต่อเกษตร 356-63',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 140.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 1 1/4" x 40 มม.',
+                'attributes' => [
+                    'size_inch' => '1 1/4"',
+                    'size_mm' => 40
+                ]
+            ],
+            [
+                'product_code' => '356-64',
+                'name' => 'ข้อต่อเกษตร 356-64',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 177.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 1 1/2" x 50 มม.',
+                'attributes' => [
+                    'size_inch' => '1 1/2"',
+                    'size_mm' => 50
+                ]
+            ],
+            [
+                'product_code' => '356-65',
+                'name' => 'ข้อต่อเกษตร 356-65',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 252.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 2" x 63 มม.',
+                'attributes' => [
+                    'size_inch' => '2"',
+                    'size_mm' => 63
+                ]
+            ],
+            [
+                'product_code' => '356-66',
+                'name' => 'ข้อต่อเกษตร 356-66',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 578.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 2 1/2" x 75 มม.',
+                'attributes' => [
+                    'size_inch' => '2 1/2"',
+                    'size_mm' => 75
+                ]
+            ],
+            [
+                'product_code' => '356-67',
+                'name' => 'ข้อต่อเกษตร 356-67',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 856.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 3" x 90 มม.',
+                'attributes' => [
+                    'size_inch' => '3"',
+                    'size_mm' => 90
+                ]
+            ],
+            [
+                'product_code' => '356-68',
+                'name' => 'ข้อต่อเกษตร 356-68',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 1391.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร 4" x 110 มม.',
+                'attributes' => [
+                    'size_inch' => '4"',
+                    'size_mm' => 110
+                ]
+            ],
+
+            // ตารางที่ 4: ข้อต่อเกษตร (รหัส 356-xxRH)
+            [
+                'product_code' => '356-49RH',
+                'name' => 'ข้อต่อเกษตร 356-49RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 110.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 1/2"',
+                'attributes' => [
+                    'size_inch' => '1/2"'
+                ]
+            ],
+            [
+                'product_code' => '356-50RH',
+                'name' => 'ข้อต่อเกษตร 356-50RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 170.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 3/4"',
+                'attributes' => [
+                    'size_inch' => '3/4"'
+                ]
+            ],
+            [
+                'product_code' => '356-51RH',
+                'name' => 'ข้อต่อเกษตร 356-51RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 235.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 1"',
+                'attributes' => [
+                    'size_inch' => '1"'
+                ]
+            ],
+            [
+                'product_code' => '356-52RH',
+                'name' => 'ข้อต่อเกษตร 356-52RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 340.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 1 1/4"',
+                'attributes' => [
+                    'size_inch' => '1 1/4"'
+                ]
+            ],
+            [
+                'product_code' => '356-53RH',
+                'name' => 'ข้อต่อเกษตร 356-53RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 450.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 1 1/2"',
+                'attributes' => [
+                    'size_inch' => '1 1/2"'
+                ]
+            ],
+            [
+                'product_code' => '356-54RH',
+                'name' => 'ข้อต่อเกษตร 356-54RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 715.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 2"',
+                'attributes' => [
+                    'size_inch' => '2"'
+                ]
+            ],
+            [
+                'product_code' => '356-55RH',
+                'name' => 'ข้อต่อเกษตร 356-55RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 865.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 2 1/2"',
+                'attributes' => [
+                    'size_inch' => '2 1/2"'
+                ]
+            ],
+            [
+                'product_code' => '356-56RH',
+                'name' => 'ข้อต่อเกษตร 356-56RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 2245.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 3"',
+                'attributes' => [
+                    'size_inch' => '3"'
+                ]
+            ],
+            [
+                'product_code' => '356-57RH',
+                'name' => 'ข้อต่อเกษตร 356-57RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 3400.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อเกษตร ขนาด 4"',
+                'attributes' => [
+                    'size_inch' => '4"'
+                ]
+            ]
+        ];
+
+        foreach ($data as $item) {
+            $this->createEquipmentWithAttributes($category, $item);
+        }
+    }
+
+    private function createPvcFittingsData($category)
+    {
+        $data = [
+            // ตารางที่ 1: ข้อต่อ PVC (รหัส 359-4x)
+            [
+                'product_code' => '359-40',
+                'name' => 'ข้อต่อ PVC 359-40',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 50.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ท่อหลัก 1 1/2" ท่อแยก 1/2"',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_inch' => '1/2"'
+                ]
+            ],
+            [
+                'product_code' => '359-41',
+                'name' => 'ข้อต่อ PVC 359-41',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 50.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ท่อหลัก 1 1/2" ท่อแยก 3/4"',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_inch' => '3/4"'
+                ]
+            ],
+            [
+                'product_code' => '359-42',
+                'name' => 'ข้อต่อ PVC 359-42',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 50.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ท่อหลัก 1 1/2" ท่อแยก 1"',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_inch' => '1"'
+                ]
+            ],
+            [
+                'product_code' => '359-43',
+                'name' => 'ข้อต่อ PVC 359-43',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 60.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ท่อหลัก 2" ท่อแยก 1/2"',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_inch' => '1/2"',
+                    'is_featured' => true
+                ]
+            ],
+            [
+                'product_code' => '359-44',
+                'name' => 'ข้อต่อ PVC 359-44',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 60.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ท่อหลัก 2" ท่อแยก 3/4"',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_inch' => '3/4"',
+                    'is_featured' => true
+                ]
+            ],
+            [
+                'product_code' => '359-45',
+                'name' => 'ข้อต่อ PVC 359-45',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 60.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ท่อหลัก 2" ท่อแยก 1"',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_inch' => '1"',
+                    'is_featured' => true
+                ]
+            ],
+
+            // ตารางที่ 2: ข้อต่อ PVC (รหัส 5000x-RH)
+            [
+                'product_code' => '50001-RH',
+                'name' => 'ข้อต่อ PVC 50001-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 25.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 1/2"',
+                'attributes' => [
+                    'size_inch' => '1/2"',
+                    'is_featured' => true
+                ]
+            ],
+            [
+                'product_code' => '50002-RH',
+                'name' => 'ข้อต่อ PVC 50002-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 35.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 3/4"',
+                'attributes' => [
+                    'size_inch' => '3/4"'
+                ]
+            ],
+            [
+                'product_code' => '50003-RH',
+                'name' => 'ข้อต่อ PVC 50003-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 50.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 1"',
+                'attributes' => [
+                    'size_inch' => '1"',
+                    'is_featured' => true
+                ]
+            ],
+            [
+                'product_code' => '50004-RH',
+                'name' => 'ข้อต่อ PVC 50004-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 120.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 1 1/2"',
+                'attributes' => [
+                    'size_inch' => '1 1/2"'
+                ]
+            ],
+            [
+                'product_code' => '50005-RH',
+                'name' => 'ข้อต่อ PVC 50005-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 150.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 2"',
+                'attributes' => [
+                    'size_inch' => '2"',
+                    'is_featured' => true
+                ]
+            ],
+            [
+                'product_code' => '50008-RH',
+                'name' => 'ข้อต่อ PVC 50008-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 350.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 2 1/2"',
+                'attributes' => [
+                    'size_inch' => '2 1/2"'
+                ]
+            ],
+            [
+                'product_code' => '50006-RH',
+                'name' => 'ข้อต่อ PVC 50006-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 400.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 3"',
+                'attributes' => [
+                    'size_inch' => '3"'
+                ]
+            ],
+            [
+                'product_code' => '50007-RH',
+                'name' => 'ข้อต่อ PVC 50007-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 750.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 4"',
+                'attributes' => [
+                    'size_inch' => '4"'
+                ]
+            ],
+            [
+                'product_code' => '50010-RH',
+                'name' => 'ข้อต่อ PVC 50010-RH',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 3500.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC ขนาด 6"',
+                'attributes' => [
+                    'size_inch' => '6"'
+                ]
+            ],
+
+            // ตารางที่ 3: ข้อต่อ PVC (รหัส 359-6x)
+            [
+                'product_code' => '359-60',
+                'name' => 'ข้อต่อ PVC 359-60',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 40.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC 1 1/2" x 16 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_mm' => 16
+                ]
+            ],
+            [
+                'product_code' => '359-61',
+                'name' => 'ข้อต่อ PVC 359-61',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 40.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC 1 1/2" x 20 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_mm' => 20,
+                    'is_featured' => true
+                ]
+            ],
+            [
+                'product_code' => '359-62',
+                'name' => 'ข้อต่อ PVC 359-62',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 40.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC 1 1/2" x 25 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '1 1/2"',
+                    'branch_pipe_mm' => 25
+                ]
+            ],
+            [
+                'product_code' => '359-63',
+                'name' => 'ข้อต่อ PVC 359-63',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 45.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC 2" x 16 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_mm' => 16
+                ]
+            ],
+            [
+                'product_code' => '359-64',
+                'name' => 'ข้อต่อ PVC 359-64',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 45.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC 2" x 20 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_mm' => 20,
+                    'is_featured' => true
+                ]
+            ],
+            [
+                'product_code' => '359-65',
+                'name' => 'ข้อต่อ PVC 359-65',
+                'brand' => 'ไชโย',
+                'image' => '',
+                'price' => 45.00,
+                'stock' => 100,
+                'description' => 'ข้อต่อ PVC 2" x 25 มม.',
+                'attributes' => [
+                    'main_pipe_inch' => '2"',
+                    'branch_pipe_mm' => 25,
+                    'is_featured' => true
+                ]
+            ]
+        ];
+
+        foreach ($data as $item) {
+            $this->createEquipmentWithAttributes($category, $item);
         }
     }
 

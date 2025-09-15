@@ -489,5 +489,282 @@ export const logPlacesAPIUsage = (
     }
 };
 
+// ======= COORDINATE SEARCH FUNCTIONS =======
+
+// ฟังก์ชันตรวจจับรูปแบบพิกัด
+export const detectCoordinatePattern = (query: string): boolean => {
+    const trimmedQuery = query.trim();
+    
+    // รูปแบบพื้นฐาน: lat,lng หรือ lat, lng
+    const basicPattern = /^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/;
+    
+    // รูปแบบที่มี lat: lng:
+    const namedPattern = /^(lat|latitude)\s*:\s*-?\d+\.?\d*\s*,\s*(lng|longitude)\s*:\s*-?\d+\.?\d*$/i;
+    
+    // รูปแบบที่มีวงเล็บ: (lat, lng)
+    const parenthesesPattern = /^\(-?\d+\.?\d*\s*,\s*-?\d+\.?\d*\)$/;
+    
+    // รูปแบบ degrees, minutes, seconds
+    const dmsPattern = /^\d+°\d+'[\d.]+["N|S]\s*,\s*\d+°\d+'[\d.]+["E|W]$/i;
+    
+    return basicPattern.test(trimmedQuery) || 
+           namedPattern.test(trimmedQuery) || 
+           parenthesesPattern.test(trimmedQuery) || 
+           dmsPattern.test(trimmedQuery);
+};
+
+// ฟังก์ชันแปลงข้อความเป็นพิกัด
+export const parseCoordinatesFromText = (query: string): { lat: number; lng: number } | null => {
+    const trimmedQuery = query.trim();
+    
+    try {
+        // รูปแบบพื้นฐาน: lat,lng
+        const basicMatch = trimmedQuery.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+        if (basicMatch) {
+            const lat = parseFloat(basicMatch[1]);
+            const lng = parseFloat(basicMatch[2]);
+            if (isValidCoordinate(lat, lng)) {
+                return { lat, lng };
+            }
+        }
+        
+        // รูปแบบที่มี lat: lng:
+        const namedMatch = trimmedQuery.match(/^(?:lat|latitude)\s*:\s*(-?\d+\.?\d*)\s*,\s*(?:lng|longitude)\s*:\s*(-?\d+\.?\d*)$/i);
+        if (namedMatch) {
+            const lat = parseFloat(namedMatch[1]);
+            const lng = parseFloat(namedMatch[2]);
+            if (isValidCoordinate(lat, lng)) {
+                return { lat, lng };
+            }
+        }
+        
+        // รูปแบบที่มีวงเล็บ: (lat, lng)
+        const parenthesesMatch = trimmedQuery.match(/^\((-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\)$/);
+        if (parenthesesMatch) {
+            const lat = parseFloat(parenthesesMatch[1]);
+            const lng = parseFloat(parenthesesMatch[2]);
+            if (isValidCoordinate(lat, lng)) {
+                return { lat, lng };
+            }
+        }
+        
+        // รูปแบบ DMS (Degrees, Minutes, Seconds) - แปลงเป็น decimal degrees
+        const dmsMatch = trimmedQuery.match(/^(\d+)°(\d+)'([\d.]+)["](N|S)\s*,\s*(\d+)°(\d+)'([\d.]+)["](E|W)$/i);
+        if (dmsMatch) {
+            const latDeg = parseInt(dmsMatch[1]);
+            const latMin = parseInt(dmsMatch[2]);
+            const latSec = parseFloat(dmsMatch[3]);
+            const latDir = dmsMatch[4].toUpperCase();
+            
+            const lngDeg = parseInt(dmsMatch[5]);
+            const lngMin = parseInt(dmsMatch[6]);
+            const lngSec = parseFloat(dmsMatch[7]);
+            const lngDir = dmsMatch[8].toUpperCase();
+            
+            let lat = latDeg + latMin/60 + latSec/3600;
+            let lng = lngDeg + lngMin/60 + lngSec/3600;
+            
+            if (latDir === 'S') lat = -lat;
+            if (lngDir === 'W') lng = -lng;
+            
+            if (isValidCoordinate(lat, lng)) {
+                return { lat, lng };
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error parsing coordinates:', error);
+    }
+    
+    return null;
+};
+
+// ฟังก์ชันตรวจสอบความถูกต้องของพิกัด
+export const isValidCoordinate = (lat: number, lng: number): boolean => {
+    return !isNaN(lat) && 
+           !isNaN(lng) && 
+           isFinite(lat) && 
+           isFinite(lng) && 
+           lat >= -90 && 
+           lat <= 90 && 
+           lng >= -180 && 
+           lng <= 180;
+};
+
+// ฟังก์ชัน Reverse Geocoding - ค้นหาข้อมูลสถานที่จากพิกัด
+export const reverseGeocode = async (
+    lat: number,
+    lng: number
+): Promise<{ results: SearchResult[]; error?: SearchError }> => {
+    return new Promise((resolve) => {
+        if (!window.google?.maps?.Geocoder) {
+            resolve({
+                results: [],
+                error: {
+                    code: 'GEOCODER_UNAVAILABLE',
+                    message: 'Google Geocoding API ไม่สามารถใช้งานได้',
+                    suggestions: ['ตรวจสอบการโหลด Google Maps API', 'รีเฟรชหน้าเว็บ'],
+                },
+            });
+            return;
+        }
+
+        const geocoder = new google.maps.Geocoder();
+        const latlng = new google.maps.LatLng(lat, lng);
+
+        geocoder.geocode(
+            { 
+                location: latlng,
+                language: GOOGLE_MAPS_CONFIG.placesConfig.language || 'th'
+            },
+            (results, status) => {
+                if (status === 'OK' && results && results.length > 0) {
+                    const searchResults: SearchResult[] = results.map((result) => ({
+                        place_id: result.place_id || '',
+                        name: result.formatted_address || 'สถานที่ไม่ระบุชื่อ',
+                        formatted_address: result.formatted_address || '',
+                        geometry: {
+                            location: result.geometry?.location
+                        },
+                        types: result.types || [],
+                        rating: undefined,
+                        photos: undefined,
+                        vicinity: undefined,
+                        business_status: undefined,
+                    }));
+
+                    resolve({ results: searchResults.slice(0, 5) }); // จำกัดผลลัพธ์ 5 รายการ
+                } else {
+                    let error: SearchError;
+                    
+                    switch (status) {
+                        case 'ZERO_RESULTS':
+                            error = {
+                                code: 'NO_RESULTS',
+                                message: 'ไม่พบข้อมูลสถานที่สำหรับพิกัดนี้',
+                                suggestions: ['ตรวจสอบพิกัดอีกครั้ง', 'ลองใช้พิกัดใกล้เคียง'],
+                            };
+                            break;
+                        case 'OVER_QUERY_LIMIT':
+                            error = {
+                                code: 'QUOTA_EXCEEDED',
+                                message: GOOGLE_MAPS_ERRORS.QUOTA_EXCEEDED.message,
+                                suggestions: GOOGLE_MAPS_ERRORS.QUOTA_EXCEEDED.solutions,
+                            };
+                            break;
+                        case 'REQUEST_DENIED':
+                            error = {
+                                code: 'PERMISSION_DENIED',
+                                message: GOOGLE_MAPS_ERRORS.PERMISSION_DENIED.message,
+                                suggestions: GOOGLE_MAPS_ERRORS.PERMISSION_DENIED.solutions,
+                            };
+                            break;
+                        case 'INVALID_REQUEST':
+                            error = {
+                                code: 'INVALID_REQUEST',
+                                message: 'พิกัดไม่ถูกต้อง',
+                                suggestions: ['ตรวจสอบรูปแบบพิกัด', 'ใช้รูปแบบ lat,lng เช่น 13.7563,100.5018'],
+                            };
+                            break;
+                        default:
+                            error = {
+                                code: 'UNKNOWN_ERROR',
+                                message: 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ',
+                                suggestions: ['ลองใหม่อีกครั้ง', 'ตรวจสอบการเชื่อมต่ออินเทอร์เน็ต'],
+                            };
+                    }
+
+                    resolve({ results: [], error });
+                }
+            }
+        );
+    });
+};
+
+// ฟังก์ชันค้นหาแบบรวม - รองรับทั้งข้อความและพิกัด
+export const universalSearch = async (
+    query: string,
+    options?: {
+        location?: google.maps.LatLng;
+        radius?: number;
+        maxResults?: number;
+        prioritizeTypes?: string[];
+        excludeTypes?: string[];
+    }
+): Promise<{ results: SearchResult[]; error?: SearchError; searchType: 'text' | 'coordinate' }> => {
+    const trimmedQuery = query.trim();
+    
+    if (!trimmedQuery) {
+        return {
+            results: [],
+            searchType: 'text',
+            error: {
+                code: 'EMPTY_QUERY',
+                message: 'กรุณาป้อนคำค้นหาหรือพิกัด',
+                suggestions: ['ป้อนชื่อสถานที่', 'ป้อนพิกัด เช่น 13.7563,100.5018'],
+            },
+        };
+    }
+
+    // ตรวจสอบว่าเป็นพิกัดหรือไม่
+    if (detectCoordinatePattern(trimmedQuery)) {
+        logPlacesAPIUsage('coordinate_search', trimmedQuery);
+        
+        const coordinates = parseCoordinatesFromText(trimmedQuery);
+        if (coordinates) {
+            const reverseResult = await reverseGeocode(coordinates.lat, coordinates.lng);
+            logPlacesAPIUsage('reverse_geocoding', trimmedQuery, reverseResult.results.length, reverseResult.error?.message);
+            
+            return {
+                ...reverseResult,
+                searchType: 'coordinate'
+            };
+        } else {
+            return {
+                results: [],
+                searchType: 'coordinate',
+                error: {
+                    code: 'INVALID_COORDINATES',
+                    message: 'รูปแบบพิกัดไม่ถูกต้อง',
+                    suggestions: [
+                        'รูปแบบที่รองรับ: 13.7563,100.5018',
+                        'หรือ: lat:13.7563, lng:100.5018',
+                        'หรือ: (13.7563, 100.5018)',
+                        'หรือ: 13°45\'22.68"N, 100°30\'6.48"E'
+                    ],
+                },
+            };
+        }
+    }
+
+    // ถึงจุดนี้แสดงว่าเป็นการค้นหาด้วยข้อความ
+    logPlacesAPIUsage('text_search', trimmedQuery);
+    
+    const textResult = await searchPlacesWithText(trimmedQuery, options);
+    logPlacesAPIUsage('places_text_search', trimmedQuery, textResult.results.length, textResult.error?.message);
+
+    // กรองผลลัพธ์ถ้าต้องการ
+    const filteredResults = options?.prioritizeTypes || options?.excludeTypes 
+        ? filterSearchResults(textResult.results, trimmedQuery, options)
+        : textResult.results;
+
+    return {
+        ...textResult,
+        results: filteredResults,
+        searchType: 'text'
+    };
+};
+
+// ฟังก์ชันสร้างข้อความแสดงพิกัด
+export const formatCoordinatesDisplay = (lat: number, lng: number): string => {
+    const formatNumber = (num: number) => parseFloat(num.toFixed(6)).toString();
+    return `${formatNumber(lat)}, ${formatNumber(lng)}`;
+};
+
+// ฟังก์ชันสร้าง Google Maps URL สำหรับพิกัด
+export const createMapsUrlFromCoordinates = (lat: number, lng: number, zoom: number = 16): string => {
+    return `https://www.google.com/maps/@${lat},${lng},${zoom}z`;
+};
+
 // Export error types และ utility functions
 export { GOOGLE_MAPS_ERRORS, GOOGLE_MAPS_CONFIG };

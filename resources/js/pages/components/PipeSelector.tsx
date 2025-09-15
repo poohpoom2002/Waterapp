@@ -1324,7 +1324,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                             <span className="font-medium text-white">
                                                 {selectedPipe.sizeMM} mm.{' '}
                                                 {selectedPipe.sizeInch &&
-                                                    `(${selectedPipe.sizeInch}")`}
+                                                    `(${selectedPipe.sizeInch})`}
                                             </span>
                                         </div>
                                         <div className="flex flex-col">

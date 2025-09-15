@@ -196,16 +196,43 @@ export const useZoneEditor = ({
         setEditState(prevState => stopDragging(prevState));
     }, [editState.isDragging]);
 
-    // บันทึกการเปลี่ยนแปลง
+    // บันทึกการเปลี่ยนแปลง (ปรับปรุงให้มีความปลอดภัยมากขึ้น)
     const applyZoneChanges = useCallback(() => {
         if (!editState.editingZone) return;
         
         try {
+            // 🔧 แก้ไข: ตรวจสอบว่าโซนมี coordinates ที่ถูกต้องหรือไม่
+            if (!editState.editingZone.coordinates || editState.editingZone.coordinates.length < 3) {
+                onError?.('โซนต้องมีพิกัดอย่างน้อย 3 จุด');
+                return;
+            }
+            
+            // 🔧 แก้ไข: ตรวจสอบพิกัดให้ถูกต้อง
+            const validCoordinates = editState.editingZone.coordinates.filter(coord => 
+                coord && 
+                typeof coord.lat === 'number' && 
+                typeof coord.lng === 'number' &&
+                !isNaN(coord.lat) && 
+                !isNaN(coord.lng)
+            );
+            
+            if (validCoordinates.length < 3) {
+                onError?.('โซนมีพิกัดที่ไม่ถูกต้อง');
+                return;
+            }
+            
             // หาต้นไม้ในโซนที่แก้ไขแล้ว
-            const newPlants = findPlantsInEditedZone(editState.editingZone.coordinates, allPlants);
+            const newPlants = findPlantsInEditedZone(validCoordinates, allPlants);
             
             // สร้างโซนที่อัปเดตแล้ว
-            const updatedZone = createUpdatedZone(editState.editingZone, editState.editingZone.coordinates, newPlants);
+            const updatedZone = createUpdatedZone(editState.editingZone, validCoordinates, newPlants);
+            
+            // 🔧 แก้ไข: ตรวจสอบว่าโซนที่อัปเดตแล้วยังคงอยู่ในรายการหรือไม่
+            const existingZoneIndex = zones.findIndex(zone => zone.id === updatedZone.id);
+            if (existingZoneIndex === -1) {
+                onError?.('ไม่พบโซนที่ต้องการแก้ไข');
+                return;
+            }
             
             // อัปเดตรายการโซนทั้งหมด
             const updatedZones = zones.map(zone => 
