@@ -1937,7 +1937,7 @@ const validateZoneOverlaps = (zones: IrrigationZone[]): { errors: string[]; warn
     return { errors, warnings };
 };
 
-// Validate zone boundaries are within main area
+// Validate zone boundaries are within main area (ปรับปรุงให้มีความยืดหยุ่นมากขึ้น)
 const validateZoneBoundaries = (zones: IrrigationZone[], mainArea: Coordinate[]): { errors: string[]; warnings: string[] } => {
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -1948,23 +1948,38 @@ const validateZoneBoundaries = (zones: IrrigationZone[], mainArea: Coordinate[])
     }
 
     zones.forEach((zone, index) => {
+        // 🔧 แก้ไข: ตรวจสอบว่ามี coordinates หรือไม่
+        if (!zone.coordinates || zone.coordinates.length < 3) {
+            errors.push(`โซน ${index + 1} ไม่มีพิกัดที่ถูกต้อง`);
+            return;
+        }
+
         // Check every single point
         const outsidePoints = zone.coordinates.filter(coord => !isPointInPolygon(coord, mainArea));
+        
+        // 🔧 แก้ไข: เปลี่ยนจาก error เป็น warning และเพิ่มความยืดหยุ่น
         if (outsidePoints.length > 0) {
-            errors.push(`โซน ${index + 1} มี ${outsidePoints.length} จุดอยู่นอกพื้นที่หลัก - ทุกจุดต้องอยู่ในพื้นที่หลักเท่านั้น`);
+            const outsidePercentage = (outsidePoints.length / zone.coordinates.length) * 100;
+            
+            if (outsidePercentage > 50) {
+                // ถ้ามากกว่า 50% ของจุดอยู่นอกพื้นที่หลัก ให้เป็น error
+                errors.push(`โซน ${index + 1} มี ${outsidePoints.length} จุด (${outsidePercentage.toFixed(1)}%) อยู่นอกพื้นที่หลัก`);
+            } else if (outsidePercentage > 10) {
+                // ถ้ามากกว่า 10% ให้เป็น warning
+                warnings.push(`โซน ${index + 1} มี ${outsidePoints.length} จุด (${outsidePercentage.toFixed(1)}%) อยู่นอกพื้นที่หลัก`);
+            }
         }
 
-        // Check if zone polygon is entirely contained within main area
-        const isFullyContained = zone.coordinates.every(coord => isPointInPolygon(coord, mainArea));
-        if (!isFullyContained) {
-            errors.push(`โซน ${index + 1} ไม่ได้อยู่ภายในพื้นที่หลักทั้งหมด`);
-        }
-
-        // Additional check: ensure zone area doesn't exceed main area bounds
+        // 🔧 แก้ไข: ตรวจสอบพื้นที่ด้วยความยืดหยุ่นมากขึ้น
         const zoneArea = calculatePolygonArea(zone.coordinates);
         const mainAreaSize = calculatePolygonArea(mainArea);
-        if (zoneArea > mainAreaSize) {
-            errors.push(`โซน ${index + 1} มีพื้นที่เกินขนาดพื้นที่หลัก`);
+        
+        if (zoneArea > mainAreaSize * 1.1) {
+            // ถ้าโซนใหญ่กว่า main area มากกว่า 10% ให้เป็น error
+            errors.push(`โซน ${index + 1} มีพื้นที่เกินขนาดพื้นที่หลักมากเกินไป`);
+        } else if (zoneArea > mainAreaSize) {
+            // ถ้าโซนใหญ่กว่า main area เล็กน้อย ให้เป็น warning
+            warnings.push(`โซน ${index + 1} มีพื้นที่เกินขนาดพื้นที่หลักเล็กน้อย`);
         }
     });
 

@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { AnalyzedPipe, CalculationResults, IrrigationInput } from '../types/interfaces';
+import { AnalyzedPipe, CalculationResults, IrrigationInput, SprinklerSetItem } from '../types/interfaces';
 import { HorticultureProjectData } from '../../utils/horticultureUtils';
 import { GardenPlannerData } from '../../utils/homeGardenData';
 import { GardenStatistics } from '../../utils/gardenStatistics';
@@ -54,6 +54,8 @@ interface PipeSummary {
             quantity: number;
             zones: string[];
             totalCost: number;
+            includesExtra?: boolean;
+            extraLength?: number;
         };
     };
     main: {
@@ -63,6 +65,8 @@ interface PipeSummary {
             quantity: number;
             zones: string[];
             totalCost: number;
+            includesExtra?: boolean;
+            extraLength?: number;
         };
     };
     emitter: {
@@ -72,6 +76,8 @@ interface PipeSummary {
             quantity: number;
             zones: string[];
             totalCost: number;
+            includesExtra?: boolean;
+            extraLength?: number;
         };
     };
 }
@@ -161,6 +167,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             zoneInput: IrrigationInput,
             sprinklerCount: number
         ) => {
+            // Legacy support for extraPipePerSprinkler (kept for backward compatibility)
             if (
                 zoneInput.extraPipePerSprinkler &&
                 zoneInput.extraPipePerSprinkler.pipeId &&
@@ -249,6 +256,156 @@ const CostSummary: React.FC<CostSummaryProps> = ({
 
                 return false;
             }
+            
+            // New support for sprinklerEquipmentSet
+            if (
+                zoneInput.sprinklerEquipmentSet &&
+                zoneInput.sprinklerEquipmentSet.selectedItems &&
+                zoneInput.sprinklerEquipmentSet.selectedItems.length > 0
+            ) {
+                let hasProcessedPipe = false;
+                
+                zoneInput.sprinklerEquipmentSet.selectedItems.forEach((item) => {
+                    const categoryName = item.equipment.category?.name?.toLowerCase();
+                    const isPipe = categoryName === 'pipe' || categoryName?.includes('pipe');
+                    
+                    if (isPipe && item.quantity > 0) {
+                        const extraPipeId = item.equipment.id;
+                        const extraLength = item.quantity; // quantity is already length for pipes
+                        
+                        const zonePipes = selectedPipes[zoneId] || {};
+                        const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
+                        const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
+                        const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
+                        const emitterPipe = zonePipes.emitter || results.autoSelectedEmitterPipe;
+
+                        // Check if extra pipe is same as branch pipe
+                        if (branchPipe && branchPipe.id === extraPipeId) {
+                            const key = `${branchPipe.id}`;
+                            if (!pipeSummary.branch[key]) {
+                                pipeSummary.branch[key] = {
+                                    pipe: branchPipe,
+                                    totalLength: 0,
+                                    quantity: 0,
+                                    zones: [],
+                                    totalCost: 0,
+                                    includesExtra: true,
+                                    extraLength: 0,
+                                };
+                            }
+                            pipeSummary.branch[key].extraLength =
+                                (pipeSummary.branch[key].extraLength || 0) + extraLength;
+                            pipeSummary.branch[key].includesExtra = true;
+                            if (!pipeSummary.branch[key].zones.includes(zoneId)) {
+                                pipeSummary.branch[key].zones.push(zoneId);
+                            }
+                            hasProcessedPipe = true;
+                            return;
+                        }
+
+                        // Check if extra pipe is same as secondary pipe
+                        if (secondaryPipe && secondaryPipe.id === extraPipeId) {
+                            const key = `${secondaryPipe.id}`;
+                            if (!pipeSummary.secondary[key]) {
+                                pipeSummary.secondary[key] = {
+                                    pipe: secondaryPipe,
+                                    totalLength: 0,
+                                    quantity: 0,
+                                    zones: [],
+                                    totalCost: 0,
+                                    includesExtra: true,
+                                    extraLength: 0,
+                                };
+                            }
+                            pipeSummary.secondary[key].extraLength =
+                                (pipeSummary.secondary[key].extraLength || 0) + extraLength;
+                            pipeSummary.secondary[key].includesExtra = true;
+                            if (!pipeSummary.secondary[key].zones.includes(zoneId)) {
+                                pipeSummary.secondary[key].zones.push(zoneId);
+                            }
+                            hasProcessedPipe = true;
+                            return;
+                        }
+
+                        // Check if extra pipe is same as main pipe
+                        if (mainPipe && mainPipe.id === extraPipeId) {
+                            const key = `${mainPipe.id}`;
+                            if (!pipeSummary.main[key]) {
+                                pipeSummary.main[key] = {
+                                    pipe: mainPipe,
+                                    totalLength: 0,
+                                    quantity: 0,
+                                    zones: [],
+                                    totalCost: 0,
+                                    includesExtra: true,
+                                    extraLength: 0,
+                                };
+                            }
+                            pipeSummary.main[key].extraLength =
+                                (pipeSummary.main[key].extraLength || 0) + extraLength;
+                            pipeSummary.main[key].includesExtra = true;
+                            if (!pipeSummary.main[key].zones.includes(zoneId)) {
+                                pipeSummary.main[key].zones.push(zoneId);
+                            }
+                            hasProcessedPipe = true;
+                            return;
+                        }
+
+                        // Check if extra pipe is same as emitter pipe
+                        if (emitterPipe && emitterPipe.id === extraPipeId) {
+                            const key = `${emitterPipe.id}`;
+                            if (!pipeSummary.emitter[key]) {
+                                pipeSummary.emitter[key] = {
+                                    pipe: emitterPipe,
+                                    totalLength: 0,
+                                    quantity: 0,
+                                    zones: [],
+                                    totalCost: 0,
+                                    includesExtra: true,
+                                    extraLength: 0,
+                                };
+                            }
+                            pipeSummary.emitter[key].extraLength =
+                                (pipeSummary.emitter[key].extraLength || 0) + extraLength;
+                            pipeSummary.emitter[key].includesExtra = true;
+                            if (!pipeSummary.emitter[key].zones.includes(zoneId)) {
+                                pipeSummary.emitter[key].zones.push(zoneId);
+                            }
+                            hasProcessedPipe = true;
+                            return;
+                        }
+
+                        // If not matching any main pipes, create as separate extra pipe
+                        const pipeData = {
+                            id: item.equipment.id,
+                            name: item.equipment.name,
+                            productCode: item.equipment.product_code,
+                            price: item.equipment.price || 0,
+                            sizeMM: 20, // fallback size for pipes
+                            lengthM: 100, // standard roll length
+                            image: item.equipment.image
+                        };
+                        
+                        if (!extraPipeSummary) {
+                            extraPipeSummary = {
+                                pipe: pipeData,
+                                totalLength: extraLength,
+                                zones: [zoneId],
+                            };
+                        } else if (extraPipeSummary.pipe.id === pipeData.id) {
+                            extraPipeSummary.totalLength += extraLength;
+                            if (!extraPipeSummary.zones.includes(zoneId)) {
+                                extraPipeSummary.zones.push(zoneId);
+                            }
+                        }
+                        
+                        hasProcessedPipe = true;
+                    }
+                });
+                
+                return hasProcessedPipe;
+            }
+            
             return false;
         };
 
@@ -732,19 +889,22 @@ const CostSummary: React.FC<CostSummaryProps> = ({
         });
 
         Object.values(pipeSummary.secondary).forEach((item) => {
-            item.quantity = calculatePipeRolls(item.totalLength, item.pipe.lengthM);
+            const totalLength = item.totalLength + (item.extraLength || 0);
+            item.quantity = calculatePipeRolls(totalLength, item.pipe.lengthM);
             item.totalCost = item.pipe.price * item.quantity;
             totalSecondaryPipeCost += item.totalCost;
         });
 
         Object.values(pipeSummary.main).forEach((item) => {
-            item.quantity = calculatePipeRolls(item.totalLength, item.pipe.lengthM);
+            const totalLength = item.totalLength + (item.extraLength || 0);
+            item.quantity = calculatePipeRolls(totalLength, item.pipe.lengthM);
             item.totalCost = item.pipe.price * item.quantity;
             totalMainPipeCost += item.totalCost;
         });
 
         Object.values(pipeSummary.emitter).forEach((item) => {
-            item.quantity = calculatePipeRolls(item.totalLength, item.pipe.lengthM);
+            const totalLength = item.totalLength + (item.extraLength || 0);
+            item.quantity = calculatePipeRolls(totalLength, item.pipe.lengthM);
             item.totalCost = item.pipe.price * item.quantity;
             totalEmitterPipeCost += item.totalCost;
         });
@@ -778,19 +938,22 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             });
 
             Object.values(pipeSummary.secondary).forEach((item) => {
-                item.quantity = calculatePipeRolls(item.totalLength, item.pipe.lengthM);
+                const totalLength = item.totalLength + (item.extraLength || 0);
+                item.quantity = calculatePipeRolls(totalLength, item.pipe.lengthM);
                 item.totalCost = item.pipe.price * item.quantity;
                 totalSecondaryPipeCost += item.totalCost;
             });
 
             Object.values(pipeSummary.main).forEach((item) => {
-                item.quantity = calculatePipeRolls(item.totalLength, item.pipe.lengthM);
+                const totalLength = item.totalLength + (item.extraLength || 0);
+                item.quantity = calculatePipeRolls(totalLength, item.pipe.lengthM);
                 item.totalCost = item.pipe.price * item.quantity;
                 totalMainPipeCost += item.totalCost;
             });
 
             Object.values(pipeSummary.emitter).forEach((item) => {
-                item.quantity = calculatePipeRolls(item.totalLength, item.pipe.lengthM);
+                const totalLength = item.totalLength + (item.extraLength || 0);
+                item.quantity = calculatePipeRolls(totalLength, item.pipe.lengthM);
                 item.totalCost = item.pipe.price * item.quantity;
                 totalEmitterPipeCost += item.totalCost;
             });
@@ -1136,11 +1299,18 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         <p className="text-xs text-purple-200">
                                                             {item.zones.join(', ')} |{' '}
                                                             {Number((item.pipe.price || 0).toFixed(2)).toLocaleString('th-TH')}{' '}
-                                                            {t('บาท/ม้วน')}({item.pipe.lengthM}{' '}
+                                                            {t('บาท/ม้วน')} ({item.pipe.lengthM}{' '}
                                                             {t('ม./ม้วน')}) |{' '}
                                                             {t('รวมความยาว:')}{' '}
                                                             {(item.totalLength || 0).toLocaleString()}{' '}
                                                             {t('ม.')}
+                                                            {item.extraLength && item.extraLength > 0 && (
+                                                                <span className="text-yellow-300">
+                                                                    {' '}
+                                                                    (+ {t('Riser')}{' '}
+                                                                    {item.extraLength.toFixed(1)} ม.)
+                                                                </span>
+                                                            )}{' '}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1186,6 +1356,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         {t('รวมความยาว:')}{' '}
                                                         {(item.totalLength || 0).toLocaleString()}{' '}
                                                         {t('ม.')}
+                                                        {item.extraLength && item.extraLength > 0 && (
+                                                            <span className="text-yellow-300">
+                                                                {' '}
+                                                                (+ {t('Riser')}{' '}
+                                                                {item.extraLength.toFixed(1)} ม.)
+                                                            </span>
+                                                        )}{' '}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1230,6 +1407,13 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                                         {t('รวมความยาว:')}{' '}
                                                         {(item.totalLength || 0).toLocaleString()}{' '}
                                                         {t('ม.')}
+                                                        {item.extraLength && item.extraLength > 0 && (
+                                                            <span className="text-yellow-300">
+                                                                {' '}
+                                                                (+ {t('Riser')}{' '}
+                                                                {item.extraLength.toFixed(1)} ม.)
+                                                            </span>
+                                                        )}{' '}
                                                     </p>
                                                 </div>
                                             </div>

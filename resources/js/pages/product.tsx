@@ -179,6 +179,7 @@ export default function Product() {
     const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
     const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
     const [horticultureSystemData, setHorticultureSystemData] = useState<any>(null);
+    const [connectionStats, setConnectionStats] = useState<any[]>([]);
     const [gardenSystemData, setGardenSystemData] = useState<any>(null);
 
     const [zoneOperationMode, setZoneOperationMode] = useState<
@@ -1094,6 +1095,15 @@ export default function Product() {
                 try {
                     horticultureSystemData = JSON.parse(horticultureSystemDataStr);
                     setHorticultureSystemData(horticultureSystemData);
+                    
+                    // ตั้งค่า connection stats
+                    console.log('🔍 Debug horticultureSystemData:', horticultureSystemData);
+                    if (horticultureSystemData.connectionStats) {
+                        console.log('✅ Found connectionStats:', horticultureSystemData.connectionStats);
+                        setConnectionStats(horticultureSystemData.connectionStats);
+                    } else {
+                        console.log('❌ No connectionStats in horticultureSystemData');
+                    }
                 } catch (error) {
                     console.warn('Failed to parse horticulture system data:', error);
                 }
@@ -2091,6 +2101,7 @@ export default function Product() {
                             activeZone={activeZone}
                             projectMode={projectMode}
                             zoneAreaData={getZoneAreaData()}
+                            connectionStats={connectionStats}
                         />
 
                         <SprinklerSelector

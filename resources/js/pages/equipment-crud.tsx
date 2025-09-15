@@ -247,6 +247,36 @@ interface FilterOptions {
     sortOrder: 'asc' | 'desc';
 }
 
+interface EquipmentSetItem {
+    id: string | number;
+    category_id: number;
+    equipment_id: number;
+    quantity: number;
+    unit_price?: number;
+    total_price?: number;
+    sort_order?: number;
+    equipment?: Equipment;
+}
+
+interface EquipmentSetGroup {
+    id: string | number;
+    sort_order?: number;
+    total_price?: number;
+    items_count?: number;
+    items: EquipmentSetItem[];
+}
+
+interface EquipmentSet {
+    id: number | string;
+    name: string;
+    groups: EquipmentSetGroup[];
+    total_price?: number;
+    is_active?: boolean;
+    user_id?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
 const api = {
     getCategories: async (): Promise<EquipmentCategory[]> => {
         try {
@@ -396,6 +426,54 @@ const api = {
         } catch (error) {
             console.error('Product code validation error:', error);
             return false;
+        }
+    },
+
+    // Equipment Set API functions
+    getEquipmentSets: async (): Promise<EquipmentSet[]> => {
+        try {
+            return await apiRequest('/equipment-sets');
+        } catch (error) {
+            console.error('API Error:', error);
+            return [];
+        }
+    },
+
+    createEquipmentSet: async (equipmentSet: Partial<EquipmentSet>): Promise<EquipmentSet> => {
+        return await apiRequest('/equipment-sets', {
+            method: 'POST',
+            body: JSON.stringify(equipmentSet),
+        });
+    },
+
+    updateEquipmentSet: async (
+        id: number,
+        equipmentSet: Partial<EquipmentSet>
+    ): Promise<EquipmentSet> => {
+        return await apiRequest(`/equipment-sets/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(equipmentSet),
+        });
+    },
+
+    deleteEquipmentSet: async (id: number): Promise<void> => {
+        return await apiRequest(`/equipment-sets/${id}`, {
+            method: 'DELETE',
+        });
+    },
+
+    duplicateEquipmentSet: async (id: number): Promise<EquipmentSet> => {
+        return await apiRequest(`/equipment-sets/${id}/duplicate`, {
+            method: 'POST',
+        });
+    },
+
+    getEquipmentSetStats: async (): Promise<any> => {
+        try {
+            return await apiRequest('/equipment-sets/stats');
+        } catch (error) {
+            console.error('Stats Error:', error);
+            return {};
         }
     },
 };
@@ -670,7 +748,7 @@ const CategoryForm: React.FC<{
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3 lg:grid-cols-5">
                                     <input
                                         type="text"
-                                        placeholder={t('ชื่อระบบ (attribute_name)')}
+                                        placeholder={t('ชื่ออังกฤษ')}
                                         value={newAttribute.attribute_name}
                                         onChange={(e) =>
                                             setNewAttribute((prev) => ({
@@ -799,6 +877,633 @@ const CategoryForm: React.FC<{
                             >
                                 <Save className="mr-2 h-4 w-4" />
                                 {t('บันทึก')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const EquipmentSetForm: React.FC<{
+    equipmentSet?: EquipmentSet;
+    categories: EquipmentCategory[];
+    onSave: (equipmentSet: Partial<EquipmentSet>) => void;
+    onCancel: () => void;
+}> = ({ equipmentSet, categories, onSave, onCancel }) => {
+    const { t } = useLanguage();
+
+    const [formData, setFormData] = useState({
+        name: equipmentSet?.name || '',
+        groups:
+            equipmentSet?.groups?.map((group) => ({
+                ...group,
+                items:
+                    group.items?.map((item) => ({
+                        ...item,
+                        category_id: item.equipment?.category_id || item.category_id || 0,
+                    })) || [],
+            })) || [],
+    });
+
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [loading, setLoading] = useState(false);
+    const [availableEquipments, setAvailableEquipments] = useState<{
+        [categoryId: number]: Equipment[];
+    }>({});
+    const [collapsedGroups, setCollapsedGroups] = useState<{ [key: string]: boolean }>({});
+
+    // Load equipments when categories change
+    useEffect(() => {
+        const loadEquipmentsForCategories = async () => {
+            const equipmentsByCategory: { [categoryId: number]: Equipment[] } = {};
+
+            for (const category of categories) {
+                try {
+                    const equipments = await apiRequest(
+                        `/equipments/by-category-id/${category.id}`
+                    );
+                    equipmentsByCategory[category.id] = Array.isArray(equipments) ? equipments : [];
+                } catch (error) {
+                    console.error(`Failed to load equipments for category ${category.id}:`, error);
+                    equipmentsByCategory[category.id] = [];
+                }
+            }
+
+            setAvailableEquipments(equipmentsByCategory);
+        };
+
+        if (categories.length > 0) {
+            loadEquipmentsForCategories();
+        }
+    }, [categories]);
+
+    // Make sure equipment objects are properly set in form data when editing
+    useEffect(() => {
+        if (equipmentSet && availableEquipments && Object.keys(availableEquipments).length > 0) {
+            setFormData((prev) => ({
+                ...prev,
+                groups: prev.groups.map((group) => ({
+                    ...group,
+                    items: group.items.map((item) => {
+                        if (item.equipment_id && item.category_id && !item.equipment) {
+                            const categoryEquipments = availableEquipments[item.category_id] || [];
+                            const equipment = categoryEquipments.find(
+                                (eq) => eq.id === item.equipment_id
+                            );
+                            return {
+                                ...item,
+                                equipment: equipment,
+                            };
+                        }
+                        return item;
+                    }),
+                })),
+            }));
+        }
+    }, [availableEquipments, equipmentSet]);
+
+    const validateForm = () => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formData.name.trim()) {
+            newErrors.name = t('กรุณากรอกชื่อเซ็ต');
+        }
+
+        if (formData.groups.length === 0) {
+            newErrors.groups = t('กรุณาเพิ่มกลุ่มอย่างน้อย 1 กลุ่ม');
+        }
+
+        // Validate each group
+        formData.groups.forEach((group, groupIndex) => {
+            if (group.items.length === 0) {
+                newErrors[`group_${groupIndex}_items`] = t(
+                    'กรุณาเพิ่มรายการในกลุ่มอย่างน้อย 1 รายการ'
+                );
+            }
+
+            // Validate each item in group
+            group.items.forEach((item, itemIndex) => {
+                if (!item.category_id) {
+                    newErrors[`group_${groupIndex}_item_${itemIndex}_category`] =
+                        t('กรุณาเลือกหมวดหมู่');
+                }
+                if (!item.equipment_id) {
+                    newErrors[`group_${groupIndex}_item_${itemIndex}_equipment`] =
+                        t('กรุณาเลือกอุปกรณ์');
+                }
+                if (item.quantity <= 0) {
+                    newErrors[`group_${groupIndex}_item_${itemIndex}_quantity`] =
+                        t('จำนวนต้องมากกว่า 0');
+                }
+            });
+        });
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const addGroup = () => {
+        const newGroup: EquipmentSetGroup = {
+            id: `new_group_${Date.now()}_${Math.random()}`,
+            items: [],
+        };
+
+        setFormData((prev) => ({
+            ...prev,
+            groups: [...prev.groups, newGroup],
+        }));
+    };
+
+    const removeGroup = (groupIndex: number) => {
+        setFormData((prev) => ({
+            ...prev,
+            groups: prev.groups.filter((_, i) => i !== groupIndex),
+        }));
+    };
+
+    const updateGroup = (groupIndex: number, field: keyof EquipmentSetGroup, value: any) => {
+        setFormData((prev) => {
+            const updatedGroups = [...prev.groups];
+            updatedGroups[groupIndex] = {
+                ...updatedGroups[groupIndex],
+                [field]: value,
+            };
+            return {
+                ...prev,
+                groups: updatedGroups,
+            };
+        });
+    };
+
+    const addItemToGroup = (groupIndex: number) => {
+        const newItem: EquipmentSetItem = {
+            id: `new_item_${Date.now()}_${Math.random()}`,
+            category_id: 0,
+            equipment_id: 0,
+            quantity: 1,
+        };
+
+        setFormData((prev) => {
+            const updatedGroups = [...prev.groups];
+            updatedGroups[groupIndex] = {
+                ...updatedGroups[groupIndex],
+                items: [...updatedGroups[groupIndex].items, newItem],
+            };
+            return {
+                ...prev,
+                groups: updatedGroups,
+            };
+        });
+    };
+
+    const removeItemFromGroup = (groupIndex: number, itemIndex: number) => {
+        setFormData((prev) => {
+            const updatedGroups = [...prev.groups];
+            updatedGroups[groupIndex] = {
+                ...updatedGroups[groupIndex],
+                items: updatedGroups[groupIndex].items.filter((_, i) => i !== itemIndex),
+            };
+            return {
+                ...prev,
+                groups: updatedGroups,
+            };
+        });
+    };
+
+    const updateItemInGroup = (
+        groupIndex: number,
+        itemIndex: number,
+        field: keyof EquipmentSetItem,
+        value: any
+    ) => {
+        setFormData((prev) => {
+            const updatedGroups = [...prev.groups];
+            const updatedItems = [...updatedGroups[groupIndex].items];
+            updatedItems[itemIndex] = {
+                ...updatedItems[itemIndex],
+                [field]: value,
+            };
+
+            // If category changed, reset equipment selection
+            if (field === 'category_id') {
+                updatedItems[itemIndex].equipment_id = 0;
+                updatedItems[itemIndex].equipment = undefined;
+            }
+
+            // If equipment changed, update equipment reference
+            if (field === 'equipment_id' && value > 0) {
+                const categoryEquipments =
+                    availableEquipments[updatedItems[itemIndex].category_id] || [];
+                const selectedEquipment = categoryEquipments.find((eq) => eq.id === value);
+                updatedItems[itemIndex].equipment = selectedEquipment;
+            }
+
+            updatedGroups[groupIndex] = {
+                ...updatedGroups[groupIndex],
+                items: updatedItems,
+            };
+
+            return {
+                ...prev,
+                groups: updatedGroups,
+            };
+        });
+    };
+
+    const handleSubmit = () => {
+        if (!validateForm()) return;
+
+        const dataToSend = {
+            ...formData,
+            id: equipmentSet?.id || `set_${Date.now()}`,
+            total_price: calculateTotalPrice(),
+        };
+
+        onSave(dataToSend as Partial<EquipmentSet>);
+    };
+
+    const toggleGroupCollapse = (groupId: string | number) => {
+        setCollapsedGroups((prev) => ({
+            ...prev,
+            [groupId]: !prev[groupId],
+        }));
+    };
+
+    const calculateTotalPrice = () => {
+        return formData.groups.reduce((total, group) => {
+            const groupTotal = group.items.reduce((itemTotal, item) => {
+                const equipment = item.equipment;
+                const price = equipment?.price || 0;
+                return itemTotal + price * item.quantity;
+            }, 0);
+            return total + groupTotal;
+        }, 0);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-50 p-4">
+            <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-lg bg-gray-800 text-white shadow-2xl">
+                <div className="p-6">
+                    <h2 className="mb-4 text-xl font-bold">
+                        {equipmentSet ? t('แก้ไขเซ็ตอุปกรณ์') : t('เพิ่มเซ็ตอุปกรณ์ใหม่')}
+                    </h2>
+
+                    <div className="space-y-6">
+                        {/* Basic Information */}
+                        <div>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium">
+                                    {t('ชื่อเซ็ต')} *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.name}
+                                    onChange={(e) => {
+                                        setFormData((prev) => ({ ...prev, name: e.target.value }));
+                                        if (errors.name) {
+                                            setErrors((prev) => ({ ...prev, name: '' }));
+                                        }
+                                    }}
+                                    className="w-full rounded-lg border border-gray-600 bg-gray-700 p-3 text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    placeholder={t('เช่น ชุดน้ำหยดสำหรับสวนมะนาว')}
+                                />
+                                {errors.name && (
+                                    <p className="mt-1 text-sm text-red-500">{errors.name}</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Product Groups */}
+                        <div>
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="text-lg font-semibold">
+                                    {t('รายการอุปกรณ์ในเซ็ต')}
+                                </h3>
+                                <button
+                                    type="button"
+                                    onClick={addGroup}
+                                    className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+                                >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    {t('เพิ่มกลุ่ม')}
+                                </button>
+                            </div>
+
+                            {errors.groups && (
+                                <p className="mb-4 text-sm text-red-500">{errors.groups}</p>
+                            )}
+
+                            <div className="space-y-6">
+                                {formData.groups.map((group, groupIndex) => {
+                                    const isCollapsed = collapsedGroups[group.id];
+                                    const groupItemCount = group.items.length;
+                                    const groupTotalPrice = group.items.reduce((total, item) => {
+                                        const price = item.equipment?.price || 0;
+                                        return total + price * item.quantity;
+                                    }, 0);
+
+                                    return (
+                                        <div
+                                            key={group.id}
+                                            className="rounded-lg border border-gray-600 bg-gray-700 p-4"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            toggleGroupCollapse(group.id)
+                                                        }
+                                                        className="flex items-center text-gray-300 transition-colors hover:text-white"
+                                                    >
+                                                        {isCollapsed ? (
+                                                            <ChevronRight className="h-5 w-5" />
+                                                        ) : (
+                                                            <ChevronDown className="h-5 w-5" />
+                                                        )}
+                                                    </button>
+                                                    <h4 className="text-lg font-medium">
+                                                        # {t('กลุ่มที่')} {groupIndex + 1}
+                                                    </h4>
+                                                    {isCollapsed && (
+                                                        <div className="flex items-center gap-4 text-sm text-gray-400">
+                                                            <span>
+                                                                ({groupItemCount} {t('รายการ')})
+                                                            </span>
+                                                            <span className="font-medium text-green-400">
+                                                                {groupTotalPrice.toLocaleString()} ฿
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {!isCollapsed && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                addItemToGroup(groupIndex)
+                                                            }
+                                                            className="flex items-center rounded bg-green-600 px-3 py-1 text-sm text-white hover:bg-green-700"
+                                                        >
+                                                            <Plus className="mr-1 h-3 w-3" />
+                                                            {t('เพิ่มรายการ')}
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeGroup(groupIndex)}
+                                                        className="text-red-400 hover:text-red-300"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {!isCollapsed && (
+                                                <div className="mt-4">
+                                                    {errors[`group_${groupIndex}_items`] && (
+                                                        <p className="mb-3 text-sm text-red-500">
+                                                            {errors[`group_${groupIndex}_items`]}
+                                                        </p>
+                                                    )}
+
+                                                    <div className="space-y-3">
+                                                        {group.items.map((item, itemIndex) => (
+                                                            <div
+                                                                key={item.id}
+                                                                className="rounded border border-gray-600 bg-gray-800 p-3"
+                                                            >
+                                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+                                                                    {/* Item Number & Actions */}
+                                                                    <div className="col-span-1 flex flex-col items-center justify-center gap-2">
+                                                                        <label className="mb-1 block text-lg font-bold text-red-400">
+                                                                            # {itemIndex + 1}
+                                                                        </label>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() =>
+                                                                                removeItemFromGroup(
+                                                                                    groupIndex,
+                                                                                    itemIndex
+                                                                                )
+                                                                            }
+                                                                            className="text-red-400 hover:text-red-300"
+                                                                        >
+                                                                            <Trash2 className="h-3 w-3" />
+                                                                        </button>
+                                                                    </div>
+
+                                                                    {/* Equipment Image */}
+                                                                    <div className="col-span-2 flex items-center justify-center">
+                                                                        {item.equipment?.image ? (
+                                                                            <img 
+                                                                                src={item.equipment.image} 
+                                                                                alt={item.equipment?.name || 'Equipment'}
+                                                                                className="h-16 w-16 rounded-md object-cover border border-gray-500"
+                                                                            />
+                                                                        ) : (
+                                                                            <div className="h-16 w-16 rounded-md bg-gray-500 flex items-center justify-center border border-gray-500">
+                                                                                <span className="text-xs text-gray-300 text-center">
+                                                                                    {t('ไม่มีรูป')}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="col-span-3">
+                                                                        <label className="mb-1 block text-sm font-medium">
+                                                                            {t('หมวดหมู่')} *
+                                                                        </label>
+                                                                        <select
+                                                                            value={item.category_id}
+                                                                            onChange={(e) =>
+                                                                                updateItemInGroup(
+                                                                                    groupIndex,
+                                                                                    itemIndex,
+                                                                                    'category_id',
+                                                                                    parseInt(
+                                                                                        e.target
+                                                                                            .value
+                                                                                    )
+                                                                                )
+                                                                            }
+                                                                            className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:border-blue-500 focus:outline-none"
+                                                                        >
+                                                                            <option value={0}>
+                                                                                {t('เลือกหมวดหมู่')}
+                                                                            </option>
+                                                                            {categories.map(
+                                                                                (category) => (
+                                                                                    <option
+                                                                                        key={
+                                                                                            category.id
+                                                                                        }
+                                                                                        value={
+                                                                                            category.id
+                                                                                        }
+                                                                                    >
+                                                                                        {
+                                                                                            category.display_name
+                                                                                        }
+                                                                                    </option>
+                                                                                )
+                                                                            )}
+                                                                        </select>
+                                                                        {errors[
+                                                                            `group_${groupIndex}_item_${itemIndex}_category`
+                                                                        ] && (
+                                                                            <p className="mt-1 text-xs text-red-500">
+                                                                                {
+                                                                                    errors[
+                                                                                        `group_${groupIndex}_item_${itemIndex}_category`
+                                                                                    ]
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Equipment Selection */}
+                                                                    <div className="col-span-4">
+                                                                        <label className="mb-1 block text-sm font-medium">
+                                                                            {t('อุปกรณ์')} *
+                                                                        </label>
+                                                                        <select
+                                                                            value={
+                                                                                item.equipment_id
+                                                                            }
+                                                                            onChange={(e) =>
+                                                                                updateItemInGroup(
+                                                                                    groupIndex,
+                                                                                    itemIndex,
+                                                                                    'equipment_id',
+                                                                                    parseInt(
+                                                                                        e.target
+                                                                                            .value
+                                                                                    )
+                                                                                )
+                                                                            }
+                                                                            disabled={
+                                                                                !item.category_id
+                                                                            }
+                                                                            className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:border-blue-500 focus:outline-none disabled:opacity-50"
+                                                                        >
+                                                                            <option value={0}>
+                                                                                {t('เลือกอุปกรณ์')}
+                                                                            </option>
+                                                                            {(
+                                                                                availableEquipments[
+                                                                                    item.category_id
+                                                                                ] || []
+                                                                            ).map((equipment) => (
+                                                                                <option
+                                                                                    key={
+                                                                                        equipment.id
+                                                                                    }
+                                                                                    value={
+                                                                                        equipment.id
+                                                                                    }
+                                                                                >
+                                                                                    {equipment.name}{' '}
+                                                                                    -{' '}
+                                                                                    {equipment.price.toLocaleString()}{' '}
+                                                                                    ฿
+                                                                                </option>
+                                                                            ))}
+                                                                        </select>
+                                                                        {errors[
+                                                                            `group_${groupIndex}_item_${itemIndex}_equipment`
+                                                                        ] && (
+                                                                            <p className="mt-1 text-xs text-red-500">
+                                                                                {
+                                                                                    errors[
+                                                                                        `group_${groupIndex}_item_${itemIndex}_equipment`
+                                                                                    ]
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Quantity */}
+                                                                    <div className="col-span-1">
+                                                                        <label className="mb-1 block text-sm font-medium">
+                                                                            {t('จำนวน')} *
+                                                                        </label>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            value={item.quantity}
+                                                                            onChange={(e) =>
+                                                                                updateItemInGroup(
+                                                                                    groupIndex,
+                                                                                    itemIndex,
+                                                                                    'quantity',
+                                                                                    parseInt(
+                                                                                        e.target
+                                                                                            .value
+                                                                                    ) || 1
+                                                                                )
+                                                                            }
+                                                                            className="w-full rounded border border-gray-600 bg-gray-600 p-2 text-white focus:border-blue-500 focus:outline-none"
+                                                                        />
+                                                                        {errors[
+                                                                            `group_${groupIndex}_item_${itemIndex}_quantity`
+                                                                        ] && (
+                                                                            <p className="mt-1 text-xs text-red-500">
+                                                                                {
+                                                                                    errors[
+                                                                                        `group_${groupIndex}_item_${itemIndex}_quantity`
+                                                                                    ]
+                                                                                }
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+
+                                                                    {/* Subtotal */}
+                                                                    <div className="col-span-1">
+                                                                        <label className="mb-1 block text-sm font-medium">
+                                                                            {t('ราคารวม')}
+                                                                        </label>
+                                                                        <div className="rounded border border-gray-600 bg-gray-600 p-2 text-gray-300">
+                                                                            {(
+                                                                                (item.equipment
+                                                                                    ?.price || 0) *
+                                                                                item.quantity
+                                                                            ).toLocaleString()}{' '}
+                                                                            ฿
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-4">
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                className="rounded-lg border border-gray-600 px-6 py-2 text-gray-300 hover:bg-gray-600"
+                            >
+                                {t('ยกเลิก')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleSubmit}
+                                disabled={loading}
+                                className="flex items-center rounded-lg bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                            >
+                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                <Save className="mr-2 h-4 w-4" />
+                                {equipmentSet ? t('บันทึกการแก้ไข') : t('สร้างเซ็ต')}
                             </button>
                         </div>
                     </div>
@@ -1837,7 +2542,7 @@ const EquipmentForm: React.FC<{
 
         switch (attr.data_type) {
             case 'string':
-                input = (
+                input =
                     selectedCategory?.name === 'pipe' && attr.attribute_name === 'pipeType' ? (
                         <>
                             <input
@@ -1864,13 +2569,14 @@ const EquipmentForm: React.FC<{
                         <input
                             type="text"
                             value={currentValue || ''}
-                            onChange={(e) => handleAttributeChange(attr.attribute_name, e.target.value)}
+                            onChange={(e) =>
+                                handleAttributeChange(attr.attribute_name, e.target.value)
+                            }
                             className={baseInputClass}
                             required={attr.is_required}
                             placeholder={attr.display_name}
                         />
-                    )
-                );
+                    );
                 break;
 
             case 'number':
@@ -2051,7 +2757,9 @@ const EquipmentForm: React.FC<{
             <div key={attr.id}>
                 <label className="mb-2 block text-sm font-medium">
                     {attr.display_name}
-                    {selectedCategory?.name === 'pipe' && attr.attribute_name === 'pipeType' && ' (ตัวพิมพ์อังกฤษ)'}
+                    {selectedCategory?.name === 'pipe' &&
+                        attr.attribute_name === 'pipeType' &&
+                        ' (ตัวพิมพ์อังกฤษ)'}
                     {attr.unit && `(${attr.unit})`}
                     {attr.is_required && <span className="text-red-400"> *</span>}
                 </label>
@@ -3263,6 +3971,12 @@ const EquipmentCRUD: React.FC = () => {
         imageAlt: '',
     });
 
+    // Equipment Set states
+    const [equipmentSets, setEquipmentSets] = useState<EquipmentSet[]>([]);
+    const [showEquipmentSetForm, setShowEquipmentSetForm] = useState(false);
+    const [editingEquipmentSet, setEditingEquipmentSet] = useState<EquipmentSet | undefined>();
+    const [showEquipmentSetList, setShowEquipmentSetList] = useState(false);
+
     const debouncedSearch = useDebounce(filters.search, 300);
 
     useEffect(() => {
@@ -3296,15 +4010,18 @@ const EquipmentCRUD: React.FC = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const [categoriesData, equipmentsData, statsData] = await Promise.all([
-                    api.getCategories(),
-                    getAllEquipments(),
-                    api.getStats(),
-                ]);
+                const [categoriesData, equipmentsData, statsData, equipmentSetsData] =
+                    await Promise.all([
+                        api.getCategories(),
+                        getAllEquipments(),
+                        api.getStats(),
+                        api.getEquipmentSets(),
+                    ]);
 
                 setCategories(categoriesData);
                 setEquipments(equipmentsData);
                 setStats(statsData);
+                setEquipmentSets(equipmentSetsData);
             } catch (error) {
                 showAlert.error(t('เกิดข้อผิดพลาด'), t('ไม่สามารถโหลดข้อมูลได้'));
             } finally {
@@ -3580,6 +4297,106 @@ const EquipmentCRUD: React.FC = () => {
         setShowEquipmentDetail(true);
     };
 
+    // Equipment Set Functions
+    const handleSaveEquipmentSet = async (equipmentSetData: Partial<EquipmentSet>) => {
+        setSaving(true);
+        try {
+            let response;
+
+            if (editingEquipmentSet && editingEquipmentSet.id) {
+                // Update existing set
+                response = await api.updateEquipmentSet(
+                    editingEquipmentSet.id as number,
+                    equipmentSetData
+                );
+
+                // Update local state
+                const updatedSet = (response as any).data || response;
+                setEquipmentSets((prev) =>
+                    prev.map((set) => (set.id === editingEquipmentSet.id ? updatedSet : set))
+                );
+
+                showAlert.success(
+                    t('แก้ไขเซ็ตสำเร็จ'),
+                    `${equipmentSetData.name} ${t('ได้รับการแก้ไขเรียบร้อยแล้ว')}`
+                );
+            } else {
+                // Create new set
+                response = await api.createEquipmentSet(equipmentSetData);
+
+                // Add to local state
+                const newSet = (response as any).data || response;
+                setEquipmentSets((prev) => [...prev, newSet]);
+
+                showAlert.success(
+                    t('เพิ่มเซ็ตสำเร็จ'),
+                    `${equipmentSetData.name} ${t('ได้รับการเพิ่มเรียบร้อยแล้ว')}`
+                );
+            }
+
+            setShowEquipmentSetForm(false);
+            setEditingEquipmentSet(undefined);
+        } catch (error: any) {
+            console.error('Failed to save equipment set:', error);
+            const errorMessage =
+                error?.response?.data?.message || error?.message || t('ไม่สามารถบันทึกเซ็ตได้');
+            showAlert.error(t('เกิดข้อผิดพลาด'), errorMessage);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteEquipmentSet = async (equipmentSet: EquipmentSet) => {
+        const result = await showAlert.confirm(
+            t('ยืนยันการลบ'),
+            `${t('คุณต้องการลบเซ็ต')} "${equipmentSet.name}" ${t('หรือไม่?')}`
+        );
+
+        if (result.isConfirmed) {
+            try {
+                await api.deleteEquipmentSet(equipmentSet.id as number);
+
+                // Update local state
+                setEquipmentSets((prev) => prev.filter((set) => set.id !== equipmentSet.id));
+
+                showAlert.success(
+                    t('ลบเซ็ตสำเร็จ'),
+                    `${equipmentSet.name} ${t('ได้รับการลบเรียบร้อยแล้ว')}`
+                );
+            } catch (error: any) {
+                console.error('Failed to delete equipment set:', error);
+                const errorMessage =
+                    error?.response?.data?.message || error?.message || t('ไม่สามารถลบเซ็ตได้');
+                showAlert.error(t('เกิดข้อผิดพลาด'), errorMessage);
+            }
+        }
+    };
+
+    const handleEditEquipmentSet = (equipmentSet: EquipmentSet) => {
+        setEditingEquipmentSet(equipmentSet);
+        setShowEquipmentSetForm(true);
+    };
+
+    const handleDuplicateEquipmentSet = async (equipmentSet: EquipmentSet) => {
+        try {
+            const response = await api.duplicateEquipmentSet(equipmentSet.id as number);
+
+            // Add to local state - response.data is the EquipmentSet object
+            const newSet = (response as any).data || response;
+            setEquipmentSets((prev) => [...prev, newSet]);
+
+            showAlert.success(
+                t('คัดลอกเซ็ตสำเร็จ'),
+                `${newSet.name} ${t('ได้รับการสร้างเรียบร้อยแล้ว')}`
+            );
+        } catch (error: any) {
+            console.error('Failed to duplicate equipment set:', error);
+            const errorMessage =
+                error?.response?.data?.message || error?.message || t('ไม่สามารถคัดลอกเซ็ตได้');
+            showAlert.error(t('เกิดข้อผิดพลาด'), errorMessage);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-800">
@@ -3616,6 +4433,16 @@ const EquipmentCRUD: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={() => {
+                                        setEditingEquipmentSet(undefined);
+                                        setShowEquipmentSetForm(true);
+                                    }}
+                                    className="flex items-center rounded-lg bg-purple-600 px-4 py-2 text-white shadow-lg transition-colors hover:bg-purple-700"
+                                >
+                                    <Package className="mr-2 h-5 w-5" />
+                                    {t('เพิ่มเซ็ต')}
+                                </button>
+                                <button
+                                    onClick={() => {
                                         setEditingEquipment(undefined);
                                         setShowEquipmentForm(true);
                                         setFormAccessories([]);
@@ -3630,6 +4457,132 @@ const EquipmentCRUD: React.FC = () => {
                         </div>
 
                         <StatsDashboard stats={stats} categories={categories} />
+
+                        {/* Equipment Sets Section */}
+                        {equipmentSets.length > 0 && (
+                            <div className="mb-6 rounded-lg bg-gray-700 p-4">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <h2 className="flex items-center text-xl font-bold text-white">
+                                        <Package className="mr-2 h-6 w-6 text-purple-400" />
+                                        {t('เซ็ตอุปกรณ์ที่สร้างไว้')}
+                                        <span className="ml-2 rounded-full bg-purple-600 px-2 py-1 text-sm">
+                                            {equipmentSets.length}
+                                        </span>
+                                    </h2>
+                                    <button
+                                        onClick={() =>
+                                            setShowEquipmentSetList(!showEquipmentSetList)
+                                        }
+                                        className="flex items-center rounded-lg bg-gray-600 px-3 py-2 text-white hover:bg-gray-500"
+                                    >
+                                        {showEquipmentSetList ? (
+                                            <>
+                                                <ChevronDown className="mr-1 h-4 w-4" />
+                                                {t('ซ่อน')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <ChevronRight className="mr-1 h-4 w-4" />
+                                                {t('แสดง')}
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {showEquipmentSetList && (
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                        {equipmentSets.map((equipmentSet) => (
+                                            <div
+                                                key={equipmentSet.id}
+                                                className="rounded-lg border border-gray-600 bg-gray-800 p-4 transition-all hover:border-purple-400 hover:shadow-lg"
+                                            >
+                                                <div className="mb-3 flex items-start justify-between">
+                                                    <div className="flex-1">
+                                                        <h3 className="font-semibold text-white">
+                                                            {equipmentSet.name}
+                                                        </h3>
+                                                    </div>
+                                                    <div className="flex gap-1">
+                                                        <button
+                                                            onClick={() =>
+                                                                handleEditEquipmentSet(equipmentSet)
+                                                            }
+                                                            className="rounded p-1 text-blue-400 hover:bg-blue-600/20"
+                                                            title={t('แก้ไข')}
+                                                        >
+                                                            <Edit2 className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() =>
+                                                                handleDuplicateEquipmentSet(
+                                                                    equipmentSet
+                                                                )
+                                                            }
+                                                            className="rounded p-1 text-green-400 hover:bg-green-600/20"
+                                                            title={t('คัดลอก')}
+                                                        >
+                                                            <Plus className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() =>
+                                                                handleDeleteEquipmentSet(
+                                                                    equipmentSet
+                                                                )
+                                                            }
+                                                            className="rounded p-1 text-red-400 hover:bg-red-600/20"
+                                                            title={t('ลบ')}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-3 space-y-2">
+                                                    <div className="text-sm text-gray-300">
+                                                        <strong>{t('กลุ่มอุปกรณ์:')} </strong>
+                                                        {equipmentSet.groups?.length || 0}{' '}
+                                                        {t('กลุ่ม')}
+                                                    </div>
+                                                    {equipmentSet.groups
+                                                        ?.slice(0, 3)
+                                                        .map((group, index) => (
+                                                            <div
+                                                                key={group.id}
+                                                                className="text-sm text-gray-400"
+                                                            >
+                                                                • {t('กลุ่มที่')} {index + 1} (
+                                                                {group.items?.length || 0}{' '}
+                                                                {t('รายการ')})
+                                                            </div>
+                                                        ))}
+                                                    {(equipmentSet.groups?.length || 0) > 3 && (
+                                                        <div className="text-sm text-gray-500">
+                                                            ... {t('และอีก')}{' '}
+                                                            {(equipmentSet.groups?.length || 0) - 3}{' '}
+                                                            {t('กลุ่ม')}
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center justify-between border-t border-gray-600 pt-3">
+                                                    <div className="text-lg font-bold text-green-400">
+                                                        {equipmentSet.total_price?.toLocaleString() ||
+                                                            '0'}{' '}
+                                                        ฿
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        {equipmentSet.created_at &&
+                                                            new Date(
+                                                                equipmentSet.created_at
+                                                            ).toLocaleDateString('th-TH')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div className="space-y-4">
                             <div className="flex flex-col gap-4 md:flex-row">
@@ -3856,7 +4809,7 @@ const EquipmentCRUD: React.FC = () => {
                                                     <img
                                                         src={equipment.image}
                                                         alt={equipment.name}
-                                                        className="mb-3 h-24 w-full cursor-pointer rounded object-cover shadow-lg transition-transform hover:opacity-80 group-hover:scale-105"
+                                                        className="mb-3 h-56 w-full cursor-pointer rounded object-cover shadow-lg transition-transform hover:opacity-80 group-hover:scale-105"
                                                         onError={(e) => {
                                                             const target =
                                                                 e.target as HTMLImageElement;
@@ -3883,7 +4836,7 @@ const EquipmentCRUD: React.FC = () => {
                                                     />
                                                 ) : null}
                                                 <div
-                                                    className={`image-placeholder mb-3 flex h-24 w-full items-center justify-center rounded bg-gray-700 shadow-inner ${equipment.image ? 'hidden' : 'flex'}`}
+                                                    className={`image-placeholder mb-3 flex h-56 w-full items-center justify-center rounded bg-gray-700 shadow-inner ${equipment.image ? 'hidden' : 'flex'}`}
                                                 >
                                                     <Package className="h-8 w-8 text-gray-500" />
                                                 </div>
@@ -3895,18 +4848,6 @@ const EquipmentCRUD: React.FC = () => {
                                                         </span>
                                                         <span className="font-semibold text-green-400">
                                                             ฿{equipment.price.toLocaleString()}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-400">
-                                                            {t('สถานะ:')}
-                                                        </span>
-                                                        <span
-                                                            className={`font-semibold ${equipment.is_active ? 'text-green-400' : 'text-red-400'}`}
-                                                        >
-                                                            {equipment.is_active
-                                                                ? t('ใช้งาน')
-                                                                : t('ปิดใช้งาน')}
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
@@ -3923,16 +4864,6 @@ const EquipmentCRUD: React.FC = () => {
                                                             }
                                                         </span>
                                                     </div>
-                                                    {equipment.stock && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-gray-400">
-                                                                {t('Stock:')}
-                                                            </span>
-                                                            <span className="font-semibold text-blue-400">
-                                                                {equipment.stock.toLocaleString()}
-                                                            </span>
-                                                        </div>
-                                                    )}
                                                 </div>
 
                                                 {equipment.description && (
@@ -4047,9 +4978,9 @@ const EquipmentCRUD: React.FC = () => {
                             <>
                                 <div className="overflow-x-auto rounded-lg shadow-lg">
                                     <table className="w-full text-left text-xs text-gray-300">
-                                        <thead className="bg-gray-600 text-xs uppercase text-gray-400">
+                                        <thead className="bg-gray-600 text-sm uppercase text-gray-400">
                                             <tr>
-                                                <th className="px-6 py-3">
+                                                <th className="px-6 py-3 text-center">
                                                     <input
                                                         type="checkbox"
                                                         checked={
@@ -4067,7 +4998,7 @@ const EquipmentCRUD: React.FC = () => {
                                                 <th className="px-6 py-3 text-center">
                                                     {t('รหัสสินค้า')}
                                                 </th>
-                                                <th className="px-6 py-3">{t('ชื่อสินค้า')}</th>
+                                                <th className="px-3 py-3">{t('ชื่อสินค้า')}</th>
                                                 <th className="px-6 py-3 text-center">
                                                     {t('แบรนด์')}
                                                 </th>
@@ -4117,42 +5048,47 @@ const EquipmentCRUD: React.FC = () => {
                                                             className="h-4 w-4"
                                                         />
                                                     </td>
-                                                    <td className="px-3 text-center">
-                                                        {equipment.image ? (
-                                                            <img
-                                                                src={equipment.image}
-                                                                alt={equipment.name}
-                                                                className="h-10 w-10 cursor-pointer rounded border border-gray-600 object-cover shadow-sm transition-opacity hover:border-blue-400 hover:opacity-80"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    openImageModal(
-                                                                        equipment.image!,
-                                                                        equipment.name
-                                                                    );
-                                                                }}
-                                                                title={t('คลิกเพื่อดูรูปขนาดใหญ่')}
-                                                                onError={(e) => {
-                                                                    const target =
-                                                                        e.target as HTMLImageElement;
-                                                                    target.style.display = 'none';
-                                                                    const parent =
-                                                                        target.parentElement;
-                                                                    if (parent) {
-                                                                        const placeholder =
-                                                                            parent.querySelector(
-                                                                                '.image-placeholder'
-                                                                            ) as HTMLElement;
-                                                                        if (placeholder)
-                                                                            placeholder.style.display =
-                                                                                'flex';
-                                                                    }
-                                                                }}
-                                                            />
-                                                        ) : null}
-                                                        <div
-                                                            className={`image-placeholder flex h-10 w-10 items-center justify-center rounded border border-gray-500 bg-gray-600 shadow-sm ${equipment.image ? 'hidden' : 'flex'}`}
-                                                        >
-                                                            <ImageIcon className="h-5 w-5 text-gray-400" />
+                                                    <td className="px-3 text-center align-middle">
+                                                        <div className="flex items-center justify-center">
+                                                            {equipment.image ? (
+                                                                <img
+                                                                    src={equipment.image}
+                                                                    alt={equipment.name}
+                                                                    className="h-10 w-10 cursor-pointer rounded border border-gray-600 object-cover shadow-sm transition-opacity hover:border-blue-400 hover:opacity-80"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        openImageModal(
+                                                                            equipment.image!,
+                                                                            equipment.name
+                                                                        );
+                                                                    }}
+                                                                    title={t(
+                                                                        'คลิกเพื่อดูรูปขนาดใหญ่'
+                                                                    )}
+                                                                    onError={(e) => {
+                                                                        const target =
+                                                                            e.target as HTMLImageElement;
+                                                                        target.style.display =
+                                                                            'none';
+                                                                        const parent =
+                                                                            target.parentElement;
+                                                                        if (parent) {
+                                                                            const placeholder =
+                                                                                parent.querySelector(
+                                                                                    '.image-placeholder'
+                                                                                ) as HTMLElement;
+                                                                            if (placeholder)
+                                                                                placeholder.style.display =
+                                                                                    'flex';
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            ) : null}
+                                                            <div
+                                                                className={`image-placeholder flex h-10 w-10 items-center justify-center rounded border border-gray-500 bg-gray-600 shadow-sm ${equipment.image ? 'hidden' : 'flex'}`}
+                                                            >
+                                                                <ImageIcon className="h-5 w-5 text-gray-400" />
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td className="px-3 text-center font-medium text-white">
@@ -4322,6 +5258,18 @@ const EquipmentCRUD: React.FC = () => {
                         setFormAccessories([]);
                     }}
                     onImageClick={openImageModal}
+                />
+            )}
+
+            {showEquipmentSetForm && (
+                <EquipmentSetForm
+                    equipmentSet={editingEquipmentSet}
+                    categories={categories}
+                    onSave={handleSaveEquipmentSet}
+                    onCancel={() => {
+                        setShowEquipmentSetForm(false);
+                        setEditingEquipmentSet(undefined);
+                    }}
                 />
             )}
 
