@@ -345,10 +345,12 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
 
     const handleCropToggle = useCallback((cropValue: string) => {
         setSelectedCrops((prev) => {
+            // If the same crop is selected, deselect it
             if (prev.includes(cropValue)) {
-                return prev.filter((crop) => crop !== cropValue);
+                return [];
             } else {
-                return [...prev, cropValue];
+                // Otherwise, select only this crop (replace any existing selection)
+                return [cropValue];
             }
         });
     }, []);
@@ -396,13 +398,15 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
     };
 
     const getSelectedCropsText = () => {
-        return t('Selected Crops ({count})').replace('{count}', selectedCrops.length.toString());
+        return selectedCrops.length > 0 
+            ? t('Selected Crop')
+            : t('No Crop Selected');
     };
 
     const getContinueDescription = () => {
-        const count = selectedCrops.length;
-        return t("You've selected {count} crop(s). Continue to the field mapping tool.")
-            .replace('{count}', count.toString());
+        return selectedCrops.length > 0 
+            ? t("You've selected a crop. Continue to the field mapping tool.")
+            : t("Please select a crop to continue.");
     };
 
     return (
@@ -422,10 +426,10 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                     </button>
                     
                     <h1 className="text-3xl font-bold text-white">
-                        {t('Select Field Crops')}
+                        {t('Select Field Crop')}
                     </h1>
                     <p className="mt-2 text-gray-400">
-                        {t('Choose the crops you want to grow in your field')}
+                        {t('Choose the crop you want to grow in your field')}
                     </p>
                 </div>
 
@@ -498,7 +502,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                             
                             <div className="mb-6 max-h-64 overflow-y-auto">
                                 {selectedCrops.length === 0 ? (
-                                    <p className="text-sm text-gray-500">{t('No crops selected')}</p>
+                                    <p className="text-sm text-gray-500">{t('No crop selected')}</p>
                                 ) : (
                                     <div className="space-y-2">
                                         {selectedCropObjects.map((crop) => (
@@ -523,7 +527,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                                                     <button
                                                         onClick={() => handleCropToggle(crop.value)}
                                                         className="ml-2 text-red-400 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100"
-                                                        title={t('Remove {cropName}').replace('{cropName}', crop.name)}
+                                                        title={t('Deselect {cropName}').replace('{cropName}', crop.name)}
                                                     >
                                                         ✕
                                                     </button>
@@ -569,10 +573,10 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                                 ) : (
                                     <div className="rounded-lg border border-gray-600 bg-gray-700/50 p-4">
                                         <h3 className="text-sm font-medium text-gray-400">
-                                            {t('Select crops to continue')}
+                                            {t('Select a crop to continue')}
                                         </h3>
                                         <p className="text-sm text-gray-500">
-                                            {t('Choose at least one crop to proceed to field mapping')}
+                                            {t('Choose a crop to proceed to field mapping')}
                                         </p>
                                     </div>
                                 )}
@@ -637,7 +641,7 @@ function CropCard({
                         <span>{t('Yield')}: {crop.yield}kg/rai</span>
                     </div>
                     <div className="flex justify-between">
-                        <span>{t('Water')}: {crop.waterRequirement}L/day</span>
+                        <span>{t('Water')}: {crop.waterRequirement}ลิตร/ครั้ง</span>
                         <span>{t('Price')}: ฿{crop.price}/kg</span>
                     </div>
                 </div>
