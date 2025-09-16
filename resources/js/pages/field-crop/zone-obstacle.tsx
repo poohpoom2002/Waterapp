@@ -672,7 +672,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 	const createCombinedPoints = useCallback((): CombinedPoint[] => {
 		const combinedPoints: CombinedPoint[] = [];
 
-		// Plants weighted by normalized daily water per plant (L/day)
+		// Plants weighted by normalized daily water per plant (ลิตร/ครั้ง)
 		const plantWeights = fieldData.plantPoints.map(p => calculateWaterPerPoint(p));
 		const totalPlantWeight = plantWeights.reduce((s, w) => s + w, 0);
 
@@ -836,7 +836,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 								return {
 									...zone,
 									coordinates: simplifiedCoords,
-									name: `${zone.name.split('(')[0].trim()} (${waterInfo.waterRequirement.toFixed(1)}L/day)`,
+									name: `${zone.name.split('(')[0].trim()} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
 									...waterInfo
 								};
 							} else {
@@ -1014,10 +1014,10 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 
 			return {
 				id: `convex-zone-${Date.now()}-${index}`,
-				name: `Zone ${index + 1} (${waterInfo.waterRequirement.toFixed(1)}L/day)`,
+				name: `Zone ${index + 1} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
 				coordinates: hull,
 				color: ZONE_COLORS[index % ZONE_COLORS.length],
-				cropType: fieldData.selectedCrops[0] || 'Mixed',
+				cropType: fieldData.selectedCrops[0],
 				...waterInfo
 			};
 		});
@@ -1032,7 +1032,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			position: { lat: point.lat, lng: point.lng },
 			plantData: {
 				id: index + 1,
-				name: fieldData.selectedCrops[0] || 'Mixed',
+				name: fieldData.selectedCrops[0],
 				plantSpacing: 1, // Default spacing
 				rowSpacing: 1, // Default spacing
 				waterNeed: point.weight || 0 // Use weight as water need
@@ -1060,10 +1060,10 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			
 			return {
 				id: `voronoi-zone-${Date.now()}-${index}`,
-				name: `Zone ${index + 1} (${waterInfo.waterRequirement.toFixed(1)}L/day)`,
+				name: `Zone ${index + 1} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
 				coordinates: zone.coordinates,
 				color: zone.color,
-				cropType: fieldData.selectedCrops[0] || 'Mixed',
+				cropType: fieldData.selectedCrops[0],
 				...waterInfo
 			};
 		});
@@ -1219,7 +1219,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				name: `Zone ${index + 1}`,
 				coordinates,
 				color: ZONE_COLORS[index],
-				cropType: fieldData.selectedCrops[0] || 'Mixed',
+				cropType: fieldData.selectedCrops[0],
 				...waterInfo
 			};
 		});
@@ -1415,7 +1415,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					return {
 						...zone,
 						coordinates: newCoordinates,
-						name: `Zone ${zoneIndex + 1} (${waterInfo.waterRequirement.toFixed(1)}L/day)`,
+						name: `Zone ${zoneIndex + 1} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
 						...waterInfo
 					};
 				}
@@ -1670,10 +1670,10 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 
 				const newZone: Zone = {
 					id: `manual-zone-${Date.now()}`,
-					name: `Zone ${zoneIndex + 1} (${waterInfo.waterRequirement.toFixed(1)}L/day)`,
+					name: `Zone ${zoneIndex + 1} (${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง)`,
 					coordinates,
 					color: previewColor,
-					cropType: fieldData.selectedCrops[0] || 'Mixed',
+					cropType: fieldData.selectedCrops[0],
 					...waterInfo
 				};
 
@@ -1694,7 +1694,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				const equipmentMessage = irrigationInfo.totalEquipmentCount > 0
 					? `\n🚿 Sprinklers: ${irrigationInfo.sprinklerCount} units\n🔄 Pivots: ${irrigationInfo.pivotCount} units\n💧 Drip Tapes: ${irrigationInfo.dripTapeCount} units\n🌊 Water Jets: ${irrigationInfo.waterJetCount} units\n💦 Total Flow: ${irrigationInfo.totalFlow} L/min`
 					: '\n💿 No irrigation equipment in this zone';
-				const message = `Zone created successfully! Water requirement: ${waterInfo.waterRequirement.toFixed(1)}L/day${equipmentMessage}`;
+				const message = `Zone created successfully! Water requirement: ${waterInfo.waterRequirement.toFixed(1)}ลิตร/ครั้ง${equipmentMessage}`;
 				alert(message);
 			} else {
 				polygon.setMap(null);
@@ -2053,7 +2053,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 												<div className="flex justify-between text-gray-400">
 													<span>{t('Total Water Requirement')}:</span>
 													<span className="text-blue-400">
-														{fieldData.totalWaterRequirement.toFixed(1)} L/day
+														{fieldData.totalWaterRequirement.toFixed(1)} ลิตร/ครั้ง
 													</span>
 												</div>
 
@@ -2183,7 +2183,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 												<div className="bg-gray-700 rounded p-2 text-xs">
 													<div className="text-gray-300 mb-1">{t('Calculation Preview')}:</div>
 													<div className="text-blue-300">
-														{t('Water per zone')}: {(fieldData.totalWaterRequirement / desiredZoneCount).toFixed(1)} L/day
+														{t('Water per zone')}: {(fieldData.totalWaterRequirement / desiredZoneCount).toFixed(1)} ลิตร/ครั้ง
 													</div>
 													<div className="text-green-300">
 														{t('Plants per zone')}: ~{Math.ceil(fieldData.plantPoints.length / desiredZoneCount)} {t('points')}
@@ -2273,11 +2273,11 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 												</div>
 												<div className="flex justify-between text-gray-400">
 													<span>{t('Average Water')}:</span>
-													<span className="text-blue-400">{zoneStats.averageWater.toFixed(1)} L/day</span>
+													<span className="text-blue-400">{zoneStats.averageWater.toFixed(1)} ลิตร/ครั้ง</span>
 												</div>
 												<div className="flex justify-between text-gray-400">
 													<span>{t('Water Deviation')}:</span>
-													<span className="text-yellow-400">{zoneStats.waterDeviation.toFixed(1)} L/day</span>
+													<span className="text-yellow-400">{zoneStats.waterDeviation.toFixed(1)} ลิตร/ครั้ง</span>
 												</div>
 												{zoneStats.balanceScore !== null && zoneStats.balanceScore !== undefined && zoneStats.balanceStatus && (
 													<>
@@ -2329,48 +2329,30 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 														<div className="text-xs font-semibold text-blue-300 mb-2">
 															📊 {t('Total Summary')}:
 														</div>
-														<div className="grid grid-cols-2 gap-2 text-xs">
+														<div className="space-y-1 text-xs">
 															<div className="text-gray-300">
-																{t('Total Plants')}:
-																<span className="text-green-400 font-semibold ml-1">
-																	{fieldData.zones.reduce((sum, zone) => sum + (zone.plantCount || 0), 0)}
-																</span>
+																{t('Total Plants')}: {fieldData.zones.reduce((sum, zone) => sum + (zone.plantCount || 0), 0)}
 															</div>
 															<div className="text-gray-300">
-																{t('Total Water')}:
-																<span className="text-blue-400 font-semibold ml-1">
-																	{actualTotalWaterFromZones.toFixed(1)} L/day
-																</span>
+																{t('Total Water')}: {actualTotalWaterFromZones.toFixed(1)} ลิตร/ครั้ง
 															</div>
 															<div className="text-gray-300">
-																{t('Total Equipment')}:
-																<span className="text-blue-400 font-semibold ml-1">
-																	{fieldData.zones.reduce((sum, zone) => {
-																		const irrigationInfo = calculateZoneIrrigationInfo(zone.coordinates);
-																		return sum + irrigationInfo.totalEquipmentCount;
-																	}, 0)}
-																</span>
+																{t('Total Equipment')}: {fieldData.zones.reduce((sum, zone) => {
+																	const irrigationInfo = calculateZoneIrrigationInfo(zone.coordinates);
+																	return sum + irrigationInfo.totalEquipmentCount;
+																}, 0)}
 															</div>
 															<div className="text-gray-300">
-																{t('Total Flow')}:
-																<span className="text-green-400 font-semibold ml-1">
-																	{fieldData.zones.reduce((sum, zone) => {
-																		const irrigationInfo = calculateZoneIrrigationInfo(zone.coordinates);
-																		return sum + irrigationInfo.totalFlow;
-																	}, 0)} L/min
-																</span>
+																{t('Total Flow')}: {fieldData.zones.reduce((sum, zone) => {
+																	const irrigationInfo = calculateZoneIrrigationInfo(zone.coordinates);
+																	return sum + irrigationInfo.totalFlow;
+																}, 0)} L/min
 															</div>
 														</div>
 														{recalculatedTotalWater > 0 && (
 															<div className="mt-2 pt-2 border-t border-gray-600">
 																<div className="text-xs text-blue-400">
-																	{t('Actual Water Need')}: {recalculatedTotalWater.toFixed(1)} L/day
-																</div>
-																<div className="text-xs text-gray-400">
-																	{t('Plant Coverage')}: {plantCoverageStats.coveragePercentage.toFixed(1)}% {t('of plants')}
-																</div>
-																<div className="text-xs text-gray-400">
-																	{t('Uncovered Plants')}: {plantCoverageStats.uncoveredPlants} {t('points')}
+																	{t('Actual Water Need')}: {recalculatedTotalWater.toFixed(1)} ลิตร/ครั้ง
 																</div>
 																{Math.abs(actualTotalWaterFromZones - recalculatedTotalWater) > 0.1 && (
 																	<div className="text-xs text-yellow-400 mt-1">
@@ -2397,8 +2379,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 																		</span>
 																		<span className="text-xs text-gray-300">
 																			{(() => {
-																				const cropKey = zone.cropType || 'Mixed';
-																				if (cropKey === 'Mixed') return 'Mixed';
+																				const cropKey = zone.cropType || fieldData.selectedCrops[0];
 																				const translated = getTranslatedCropByValue(cropKey, language || 'en');
 																				return translated?.name || cropKey;
 																			})()}
@@ -2453,7 +2434,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 																					</option>
 																				);
 																			})}
-																			<option value="Mixed">{t('Mixed')}</option>
 																		</select>
 																	</div>
 																)}
@@ -2474,7 +2454,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 																	<span className="text-gray-300">💧 {t('Water Need')}:</span>
 																	<span className={`font-semibold ${zone.waterStatus === 'warning' ? 'text-yellow-400' : 'text-blue-400'
 																		}`}>
-																		{(zone.waterRequirement || 0).toFixed(1)} L/day
+																		{(zone.waterRequirement || 0).toFixed(1)} ลิตร/ครั้ง
 																	</span>
 																</div>
 
@@ -2522,35 +2502,15 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 																							{irrigationInfo.totalFlow} L/min
 																						</span>
 																					</div>
-																					<div className="text-xs text-gray-400 italic">
-																						💡 {t('Equipment breakdown')}: 🚿{irrigationInfo.sprinklerCount} 🔄{irrigationInfo.pivotCount} 💧{irrigationInfo.dripTapeCount} 🌊{irrigationInfo.waterJetCount}
-																					</div>
 																				</>
 																			)}
 																		</>
 																	);
 																})()}
-																<div className="text-xs text-gray-400 italic">
-																	💡 {t('Based on total plants (inside + border)')}
-																</div>
-																{fieldData.totalWaterRequirement > 0 && (
-																	<div className="flex justify-between items-center">
-																		<span className="text-gray-300">📊 {t('Water %')}:</span>
-																		<span className="text-yellow-400 font-semibold">
-																			{((zone.waterRequirement || 0) / fieldData.totalWaterRequirement * 100).toFixed(1)}%
-																		</span>
-																	</div>
-																)}
-																<div className="flex justify-between items-center">
-																	<span className="text-gray-300">📍 {t('Coordinates')}:</span>
-																	<span className="text-gray-400">
-																		{zone.coordinates.length} {t('points')}
-																	</span>
-																</div>
 																<div className="flex justify-between items-center">
 																	<span className="text-gray-300">🎯 {t('vs Target')}:</span>
 																	<span className={`text-xs text-gray-300`}>
-																		{((zone.waterRequirement || 0) - defaultWaterPerZone).toFixed(1)} L/day
+																		{((zone.waterRequirement || 0) - defaultWaterPerZone).toFixed(1)} ลิตร/ครั้ง
 																	</span>
 																</div>
 															</div>
@@ -2684,7 +2644,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 										<div>Equipment: 🚿{fieldData.irrigationPositions.sprinklers.length} 🔄{fieldData.irrigationPositions.pivots.length} 💧{fieldData.irrigationPositions.dripTapes.length} 🌊{fieldData.irrigationPositions.waterJets.length}</div>
 										{fieldData.totalWaterRequirement > 0 && (
 											<div className="border-t border-gray-400 pt-2 mt-2">
-												<div>Target Water/Zone: {defaultWaterPerZone.toFixed(1)} L/day</div>
+												<div>Target Water/Zone: {defaultWaterPerZone.toFixed(1)} ลิตร/ครั้ง</div>
 											</div>
 										)}
 										{zoneEditingState.isDrawing && (
