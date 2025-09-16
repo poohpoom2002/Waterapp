@@ -58,16 +58,13 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         return parseFloat(String(value)) || 0;
     };
 
-    // Helper function to calculate total score for sprinkler selection (lower is better)
-    const calculateSprinklerScore = useCallback((sprinkler: any): number => {
-        // ใช้ค่าต่ำสุดสำหรับ flowRate และค่าสูงสุดสำหรับ pressure และ radius
-        const flowRate = getMinValue(sprinkler.waterVolumeLitersPerMinute);
-        const pressure = getMaxValue(sprinkler.pressureBar);
-        const radius = getMaxValue(sprinkler.radiusMeters);
-        
-        // คำนวณคะแนนรวม (ค่าน้อยที่สุดจะได้คะแนนต่ำสุด = ดีที่สุด)
-        return flowRate + pressure + radius;
-    }, []);
+    // Helper function to check if value is within range
+    const isValueInRange = (value: any, target: number): boolean => {
+        if (Array.isArray(value)) {
+            return target >= value[0] && target <= value[1];
+        }
+        return Math.abs(value - target) < 0.01; // Allow small floating point differences
+    };
 
     // Auto-select sprinkler for horticulture and garden modes based on system requirements
     useEffect(() => {
@@ -108,25 +105,24 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             if (sprinklerConfig) {
                 const { flowRatePerMinute, pressureBar, radiusMeters } = sprinklerConfig;
                 
-                // กรองสปริงเกอร์ที่มีคุณสมบัติสูงกว่าข้อกำหนดระบบ
+                // กรองสปริงเกอร์ตามเงื่อนไขใหม่
                 const compatibleSprinklers = analyzedSprinklers.filter((sprinkler: any) => {
-                    // ใช้ค่าต่ำสุดในการเปรียบเทียบเพื่อให้แน่ใจว่าสปริงเกอร์สามารถทำงานได้
-                    const sprinklerFlowMin = getMinValue(sprinkler.waterVolumeLitersPerMinute);
-                    const sprinklerPressureMin = getMinValue(sprinkler.pressureBar);
-                    const sprinklerRadiusMin = getMinValue(sprinkler.radiusMeters);
+                    // Flow ต้องอยู่ในช่วง range ของสปริงเกอร์
+                    const flowMatch = isValueInRange(sprinkler.waterVolumeLitersPerMinute, flowRatePerMinute);
                     
-                    // ต้องมีค่าสูงกว่าระบบที่กำหนดทั้ง 3 ค่า
-                    const flowMatch = sprinklerFlowMin > flowRatePerMinute;
-                    const pressureMatch = sprinklerPressureMin > pressureBar;
-                    const radiusMatch = sprinklerRadiusMin > radiusMeters;
+                    // Pressure ต้องอยู่ในช่วง range ของสปริงเกอร์
+                    const pressureMatch = isValueInRange(sprinkler.pressureBar, pressureBar);
+                    
+                    // Radius ต้องอยู่ในช่วง range ของสปริงเกอร์
+                    const radiusMatch = isValueInRange(sprinkler.radiusMeters, radiusMeters);
                     
                     return flowMatch && pressureMatch && radiusMatch;
                 });
                 
-                // เลือกสปริงเกอร์ที่ดีที่สุดเป็น default สำหรับทุกโซน
+                // เลือกสปริงเกอร์ที่ราคาถูกที่สุดเป็น default สำหรับทุกโซน
                 if (compatibleSprinklers.length > 0) {
                     const bestSprinkler = compatibleSprinklers.sort((a: any, b: any) => {
-                        return calculateSprinklerScore(a) - calculateSprinklerScore(b);
+                        return a.price - b.price;
                     })[0];
                     
                     // ตรวจสอบว่ามี global default sprinkler หรือไม่
@@ -147,7 +143,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 }
             }
         }
-    }, [projectMode, selectedSprinkler, analyzedSprinklers, onSprinklerChange, calculateSprinklerScore, gardenStats, activeZone]);
+    }, [projectMode, selectedSprinkler, analyzedSprinklers, onSprinklerChange, gardenStats, activeZone]);
     
     const openImageModal = (src: string, alt: string) => {
         setModalImage({ src, alt });
@@ -204,26 +200,23 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         
         const { flowRatePerMinute, pressureBar, radiusMeters } = sprinklerConfig;
         
-        // กรองสปริงเกอร์ที่มีคุณสมบัติสูงกว่าข้อกำหนดระบบ
+        // กรองสปริงเกอร์ตามเงื่อนไขใหม่
         const compatibleSprinklers = analyzedSprinklers.filter((sprinkler: any) => {
-            // ใช้ค่าต่ำสุดในการเปรียบเทียบเพื่อให้แน่ใจว่าสปริงเกอร์สามารถทำงานได้
-            const sprinklerFlowMin = getMinValue(sprinkler.waterVolumeLitersPerMinute);
-            const sprinklerPressureMin = getMinValue(sprinkler.pressureBar);
-            const sprinklerRadiusMin = getMinValue(sprinkler.radiusMeters);
+            // Flow ต้องอยู่ในช่วง range ของสปริงเกอร์
+            const flowMatch = isValueInRange(sprinkler.waterVolumeLitersPerMinute, flowRatePerMinute);
             
-            // ต้องมีค่าสูงกว่าระบบที่กำหนดทั้ง 3 ค่า
-            const flowMatch = sprinklerFlowMin > flowRatePerMinute;
-            const pressureMatch = sprinklerPressureMin > pressureBar;
-            const radiusMatch = sprinklerRadiusMin > radiusMeters;
+            // Pressure ต้องอยู่ในช่วง range ของสปริงเกอร์
+            const pressureMatch = isValueInRange(sprinkler.pressureBar, pressureBar);
+            
+            // Radius ต้องอยู่ในช่วง range ของสปริงเกอร์
+            const radiusMatch = isValueInRange(sprinkler.radiusMeters, radiusMeters);
             
             return flowMatch && pressureMatch && radiusMatch;
         });
         
-        // เรียงตามคะแนนรวม (ค่าน้อยที่สุดก่อน) แล้วตามราคา
+        // เรียงตามราคา (ถูกที่สุดก่อน)
         return compatibleSprinklers.sort((a: any, b: any) => {
-            const scoreDiff = calculateSprinklerScore(a) - calculateSprinklerScore(b);
-            if (Math.abs(scoreDiff) > 0.1) return scoreDiff; // Use score as primary criteria
-            return a.price - b.price; // Use price as secondary criteria
+            return a.price - b.price;
         });
     };
     
