@@ -348,7 +348,7 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
     onPipeUpdate,
     onEditingChange,
     strokeColor = '#2563eb',
-    strokeWeight = 4,
+    strokeWeight = 3,
     editMode = false,
     tension = 0.3,
     showVisualFeedback = true
@@ -425,7 +425,7 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
                         geodesic: false,
                         strokeColor: '#00FF00', // เขียวสดใส
                         strokeOpacity: 1.0, // ทึบสนิท
-                        strokeWeight: 8, // หนามาก
+                        strokeWeight: 6, // หนามาก
                         map: map,
                         zIndex: 2000, // zIndex สูงสุด
                         clickable: false
