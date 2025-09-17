@@ -338,8 +338,6 @@ export interface ProjectModeConfig {
     areaUnit: 'rai' | 'sqm';
     itemName: string;
 }
-<<<<<<< HEAD
-=======
 
 export interface SprinklerSetItem {
     id: number | string;
@@ -384,4 +382,3 @@ export interface SprinklerEquipmentSet {
     created_at?: string;
     updated_at?: string;
 }
->>>>>>> origin/main
