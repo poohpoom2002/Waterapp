@@ -24,6 +24,8 @@ interface CostSummaryProps {
     showPump?: boolean;
     fieldCropData?: any;
     greenhouseData?: any;
+    sprinklerEquipmentSets?: { [zoneId: string]: any };
+    connectionEquipments?: { [zoneId: string]: any[] };
 }
 
 interface SprinklerSummary {
@@ -97,6 +99,8 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     showPump = true,
     fieldCropData,
     greenhouseData,
+    sprinklerEquipmentSets = {},
+    connectionEquipments = {},
 }) => {
     const { t } = useLanguage();
     
@@ -959,7 +963,61 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             });
         }
 
-        const pumpCost = showPump ? selectedPump?.price || results.autoSelectedPump?.price || 0 : 0;
+        // คำนวณราคาปั๊มน้ำรวมอุปกรณ์ประกอบ
+        let pumpCost = 0;
+        let pumpAccessoriesCost = 0;
+        if (showPump) {
+            const effectivePump = selectedPump || results.autoSelectedPump;
+            if (effectivePump) {
+                pumpCost = effectivePump.price || 0;
+                
+                // คำนวณราคาอุปกรณ์ประกอบ (เฉพาะที่ไม่ได้รวมในชุด)
+                if (effectivePump.pumpAccessories && effectivePump.pumpAccessories.length > 0) {
+                    pumpAccessoriesCost = effectivePump.pumpAccessories
+                        .filter((accessory: any) => !accessory.is_included)
+                        .reduce((sum: number, accessory: any) => {
+                            return sum + (Number(accessory.price) || 0);
+                        }, 0);
+                }
+            }
+        }
+        // คำนวณราคา Sprinkler Equipment Sets
+        let sprinklerEquipmentSetsCost = 0;
+        if (sprinklerEquipmentSets && Object.keys(sprinklerEquipmentSets).length > 0) {
+            console.log('🔍 Debug sprinklerEquipmentSets:', sprinklerEquipmentSets);
+            Object.values(sprinklerEquipmentSets).forEach((equipmentSet: any) => {
+                console.log('🔍 Debug equipmentSet:', equipmentSet);
+                if (equipmentSet.selectedItems) {
+                    // ใช้ selectedItems แทน groups
+                    equipmentSet.selectedItems.forEach((item: any) => {
+                        console.log('🔍 Debug item:', item);
+                        const itemCost = (item.unit_price || item.equipment?.price || 0) * (item.quantity || 0);
+                        console.log('🔍 Debug itemCost:', itemCost);
+                        sprinklerEquipmentSetsCost += itemCost;
+                    });
+                } else if (equipmentSet.groups) {
+                    // Fallback สำหรับโครงสร้างเดิม
+                    equipmentSet.groups.forEach((group: any) => {
+                        if (group.items) {
+                            group.items.forEach((item: any) => {
+                                sprinklerEquipmentSetsCost += (item.unit_price || 0) * (item.quantity || 0);
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        // คำนวณราคา Connection Equipment
+        let connectionEquipmentsCost = 0;
+        if (connectionEquipments && Object.keys(connectionEquipments).length > 0) {
+            Object.values(connectionEquipments).forEach((equipments: any[]) => {
+                equipments.forEach((equipment: any) => {
+                    connectionEquipmentsCost += (equipment.equipment?.price || 0) * (equipment.count || 0);
+                });
+            });
+        }
+
         const totalCost =
             totalSprinklerCost +
             totalBranchPipeCost +
@@ -967,7 +1025,11 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             totalMainPipeCost +
             totalEmitterPipeCost +
             extraPipeCost +
-            pumpCost;
+            pumpCost +
+            pumpAccessoriesCost +
+            sprinklerEquipmentSetsCost +
+            connectionEquipmentsCost;
+
 
         return {
             totalSprinklerCost,
@@ -976,11 +1038,14 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             totalMainPipeCost,
             totalEmitterPipeCost,
             pumpCost,
+            pumpAccessoriesCost,
             totalCost,
             sprinklerSummary,
             pipeSummary,
             extraPipeSummary,
             extraPipeCost,
+            sprinklerEquipmentSetsCost,
+            connectionEquipmentsCost,
         };
     };
 
@@ -1524,6 +1589,16 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             ราคา {Number((costs.pumpCost || 0).toFixed(2)).toLocaleString('th-TH')}{' '}
                             {t('บาท')}
                         </p>
+                        {costs.pumpAccessoriesCost > 0 && (
+                            <div className="mt-2 text-sm">
+                                <p className="text-purple-300">
+                                    🔧 {t('อุปกรณ์ประกอบ')}: +{Number((costs.pumpAccessoriesCost || 0).toFixed(2)).toLocaleString('th-TH')} {t('บาท')}
+                                </p>
+                                <p className="text-lg font-bold text-white">
+                                    {t('รวม')}: {Number(((costs.pumpCost || 0) + (costs.pumpAccessoriesCost || 0)).toFixed(2)).toLocaleString('th-TH')} {t('บาท')}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1613,6 +1688,67 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         {t('บาท')}
                     </p>
                 </div>
+
+                {/* Sprinkler Equipment Sets */}
+                {sprinklerEquipmentSets && Object.keys(sprinklerEquipmentSets).length > 0 && (
+                    <div className="rounded bg-gray-600 p-4">
+                        <h4 className="font-medium text-yellow-300">🎯 {t('อุปกรณ์เสริมสปริงเกอร์')}</h4>
+                        <div className="space-y-1 text-sm">
+                            {Object.entries(sprinklerEquipmentSets).map(([zoneId, equipmentSet]) => (
+                                <div key={zoneId} className="border-l-2 border-yellow-400 pl-2">
+                                    <p className="text-xs text-gray-300">
+                                        {projectMode === 'greenhouse' ? t('แปลง') : t('โซน')} {zoneId}:
+                                    </p>
+                                    {equipmentSet.groups?.map((group: any, groupIndex: number) => (
+                                        <div key={groupIndex} className="ml-2">
+                                            {group.items?.map((item: any, itemIndex: number) => (
+                                                <p key={itemIndex} className="text-xs">
+                                                    • {item.equipment?.name || item.equipment?.product_code} 
+                                                    <span className="text-gray-400">
+                                                        ({item.quantity} {t('ชิ้น')} × {Number((item.unit_price || 0).toFixed(2)).toLocaleString('th-TH')} {t('บาท')})
+                                                    </span>
+                                                </p>
+                                            ))}
+                                        </div>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xl font-bold">
+                            ราคา {Number((costs.sprinklerEquipmentSetsCost || 0).toFixed(2)).toLocaleString('th-TH')}{' '}
+                            {t('บาท')}
+                        </p>
+                    </div>
+                )}
+
+                {/* Connection Equipment */}
+                {connectionEquipments && Object.keys(connectionEquipments).length > 0 && (
+                    <div className="rounded bg-gray-600 p-4">
+                        <h4 className="font-medium text-orange-300">🔗 {t('อุปกรณ์เชื่อมต่อ')}</h4>
+                        <div className="space-y-1 text-sm">
+                            {Object.entries(connectionEquipments).map(([zoneId, equipments]) => (
+                                <div key={zoneId} className="border-l-2 border-orange-400 pl-2">
+                                    <p className="text-xs text-gray-300">
+                                        {projectMode === 'greenhouse' ? t('แปลง') : t('โซน')} {zoneId}:
+                                    </p>
+                                    {equipments.map((equipment: any, index: number) => (
+                                        <p key={index} className="text-xs">
+                                            • {equipment.equipment?.name || equipment.equipment?.product_code}
+                                            <span className="text-gray-400">
+                                                ({equipment.count} {t('ชิ้น')} × {Number((equipment.equipment?.price || 0).toFixed(2)).toLocaleString('th-TH')} {t('บาท')})
+                                            </span>
+                                        </p>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xl font-bold">
+                            ราคา {Number((costs.connectionEquipmentsCost || 0).toFixed(2)).toLocaleString('th-TH')}{' '}
+                            {t('บาท')}
+                        </p>
+                    </div>
+                )}
+
                 <div className="rounded bg-gradient-to-r from-green-600 to-blue-600 p-4 flex flex-col items-center justify-center">
                     <h4 className="font-medium text-white">
                         💎 {t('รวมทั้งหมด')} {getProjectIcon()}

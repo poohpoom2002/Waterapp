@@ -40,6 +40,7 @@ import {
 import { IrrigationZone } from '../utils/irrigationZoneUtils';
 import { 
     findMainToSubMainConnections,
+    findEndToEndConnections,
     findMidConnections,
     findSubMainToLateralStartConnections,
     findLateralSubMainIntersection,
@@ -488,15 +489,64 @@ const GoogleMapsResultsOverlays: React.FC<{
             // }
         });
 
-        // 🔥 แสดงจุดเชื่อมต่อระหว่างท่อเมนและท่อเมนรอง (ปลาย-ปลาย) - แสดงทุกกรณี
+        // 🔥 แสดงจุดเชื่อมต่อปลาย-ปลาย (End-to-End) - สีแดง
         if (projectData.mainPipes && projectData.subMainPipes) {
+            const endToEndConnections = findEndToEndConnections(
+                projectData.mainPipes,
+                projectData.subMainPipes,
+                projectData.zones,
+                irrigationZones,
+                15 // snapThreshold
+            );
+
+
+            endToEndConnections.forEach((connection, index) => {
+                const connectionMarker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                        connection.connectionPoint.lat,
+                        connection.connectionPoint.lng
+                    ),
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                        fillColor: '#DC2626', // สีแดงสำหรับปลาย-ปลาย
+                        fillOpacity: 1.0,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2, // เพิ่มความหนาของขอบ
+                    },
+                    zIndex: 2001,
+                    title: `จุดเชื่อมต่อปลาย-ปลาย (ท่อเมน ↔ ท่อเมนรอง)`
+                });
+                overlaysRef.current.markers.set(`end-to-end-connection-${index}`, connectionMarker);
+
+                // เพิ่ม info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div class="p-2 min-w-[200px]">
+                            <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย</h4>
+                            <div class="space-y-1 text-sm">
+                                <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
+                                <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
+                            </div>
+                        </div>
+                    `
+                });
+
+                connectionMarker.addListener('click', () => {
+                    infoWindow.open(map, connectionMarker);
+                });
+            });
+
+            // 🔥 แสดงจุดเชื่อมต่อปลายท่อเมนกับระหว่างท่อเมนรอง - สีน้ำเงิน
             const mainToSubMainConnections = findMainToSubMainConnections(
                 projectData.mainPipes,
                 projectData.subMainPipes,
                 projectData.zones,
                 irrigationZones,
-                20 // snapThreshold
+                15 // snapThreshold
             );
+
 
             mainToSubMainConnections.forEach((connection, index) => {
                 const connectionMarker = new google.maps.Marker({
@@ -507,14 +557,14 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3, // ลดขนาดจาก 5 เป็น 3
-                        fillColor: '#DC2626', // สีแดงเข้มสำหรับการเชื่อมปลาย-ปลาย
+                        scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                        fillColor: '#3B82F6', // สีน้ำเงินสำหรับปลายเมน-ระหว่างเมนรอง
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 1.5, // ลดความหนาของขอบ
+                        strokeWeight: 2, // เพิ่มความหนาของขอบ
                     },
                     zIndex: 2001,
-                    title: `จุดเชื่อมต่อท่อเมน → ท่อเมนรอง`
+                    title: `จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง`
                 });
                 overlaysRef.current.markers.set(`main-submain-end-connection-${index}`, connectionMarker);
 
@@ -557,11 +607,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3, // ลดขนาดจาก 4 เป็น 3
+                        scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
                         fillColor: '#8B5CF6', // สีม่วงเข้มสำหรับเมนรอง-กลางเมน
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 1.5, // ลดความหนาของขอบ
+                        strokeWeight: 2, // เพิ่มความหนาของขอบ
                     },
                     zIndex: 2004,
                     title: `จุดเชื่อมท่อเมนรอง → กลางท่อเมน`
@@ -656,11 +706,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 3, // ลดขนาดจาก 4 เป็น 3
-                        fillColor: '#3B82F6', // ใช้สีน้ำเงินเพื่อแยกจากเมนรอง-กลางเมน
+                        scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                        fillColor: '#3B82F6', // สีน้ำเงินสำหรับตัดเมนรอง-เมน
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 1.5, // ลดความหนาของขอบ
+                        strokeWeight: 2, // เพิ่มความหนาของขอบ
                     },
                     zIndex: 2003,
                     title: `จุดตัดท่อเมนรอง ↔ ท่อเมน`
@@ -1318,7 +1368,6 @@ function EnhancedHorticultureResultsPageContent() {
                 if (enhancedStats && enhancedStats.sprinklerFlowRate && projectData) {
                     // คำนวณ connection stats
                     const connectionStats = countConnectionPointsByZone(projectData, irrigationZones);
-                    console.log('🔍 Debug connectionStats calculated:', connectionStats);
                     
                     const horticultureSystemData = {
                         // ข้อมูลระบบหัวฉีด
@@ -1876,6 +1925,8 @@ function EnhancedHorticultureResultsPageContent() {
                                 <div className="space-y-3">
                                     {(() => {
                                         const connectionStats = countConnectionPointsByZone(projectData, irrigationZones);
+                                        
+                                        
                                         const totalStats = connectionStats.reduce((acc, zone) => ({
                                             mainToSubMain: acc.mainToSubMain + zone.mainToSubMain,
                                             subMainToMainMid: acc.subMainToMainMid + zone.subMainToMainMid,
@@ -1902,19 +1953,19 @@ function EnhancedHorticultureResultsPageContent() {
                                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                                         <div className="flex items-center gap-2">
                                                             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#DC2626' }}></div>
-                                                            <span>{t('ท่อเมน-เมนรอง')}: {totalStats.mainToSubMain} {t('จุด')}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#8B5CF6' }}></div>
-                                                            <span>{t('เมนรอง-กลางเมน')}: {totalStats.subMainToMainMid} {t('จุด')}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#F59E0B' }}></div>
-                                                            <span>{t('เมนรอง-ท่อย่อย')}: {totalStats.subMainToLateral} {t('จุด')}</span>
+                                                            <span>{t('ปลาย-ปลาย')}: {totalStats.mainToSubMain} {t('จุด')}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#3B82F6' }}></div>
-                                                            <span>{t('ตัดเมนรอง-เมน')}: {totalStats.subMainToMainIntersection} {t('จุด')}</span>
+                                                            <span>{t('ปลายเมน-ระหว่างเมนรอง')}: {totalStats.subMainToMainMid} {t('จุด')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#8B5CF6' }}></div>
+                                                            <span>{t('เมนรอง-กลางเมน')}: {totalStats.subMainToLateral} {t('จุด')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#F59E0B' }}></div>
+                                                            <span>{t('เมนรอง-ท่อย่อย')}: {totalStats.subMainToMainIntersection} {t('จุด')}</span>
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#10B981' }}></div>
@@ -1941,23 +1992,23 @@ function EnhancedHorticultureResultsPageContent() {
                                                                 <div className="grid grid-cols-5 gap-1 text-xs">
                                                                     <div className="flex items-center gap-1">
                                                                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#DC2626' }}></div>
-                                                                        <span>{zoneStats.mainToSubMain}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1">
-                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#8B5CF6' }}></div>
-                                                                        <span>{zoneStats.subMainToMainMid}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-1">
-                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#F59E0B' }}></div>
-                                                                        <span>{zoneStats.subMainToLateral}</span>
+                                                                        <span title="ปลาย-ปลาย">{zoneStats.mainToSubMain}</span>
                                                                     </div>
                                                                     <div className="flex items-center gap-1">
                                                                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#3B82F6' }}></div>
-                                                                        <span>{zoneStats.subMainToMainIntersection}</span>
+                                                                        <span title="ปลายเมน-ระหว่างเมนรอง">{zoneStats.subMainToMainMid}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#8B5CF6' }}></div>
+                                                                        <span title="เมนรอง-กลางเมน">{zoneStats.subMainToLateral}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#F59E0B' }}></div>
+                                                                        <span title="เมนรอง-ท่อย่อย">{zoneStats.subMainToMainIntersection}</span>
                                                                     </div>
                                                                     <div className="flex items-center gap-1">
                                                                         <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#10B981' }}></div>
-                                                                        <span>{zoneStats.lateralToSubMainIntersection}</span>
+                                                                        <span title="ตัดท่อย่อย-เมนรอง">{zoneStats.lateralToSubMainIntersection}</span>
                                                                     </div>
                                                                 </div>
                                                             </div>
