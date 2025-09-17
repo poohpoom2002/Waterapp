@@ -2152,7 +2152,7 @@ export default function InitialArea({
                                                 <div className="text-xs text-orange-300 bg-orange-900 bg-opacity-30 p-2 rounded">🔒 {t('Please set main area before generating plants')}</div>
                                             )}
                                             <div className="flex items-center justify-between text-xs"><span className="text-gray-400">{t('Generated Points')}:</span><span className="text-green-300">{plantCount}</span></div>
-                                            {waterRequirementInfo.total !== null && (<div className="text-xs text-blue-300 bg-blue-900 bg-opacity-30 p-2 rounded">💧 {t('Total Water Requirement')}: {waterRequirementInfo.total?.toFixed(2)} {t('L/day')}</div>)}
+                                            {waterRequirementInfo.total !== null && (<div className="text-xs text-blue-300 bg-blue-900 bg-opacity-30 p-2 rounded">💧 {t('Total Water Requirement')}: {waterRequirementInfo.total?.toFixed(2)} {t('ลิตร/ครั้ง')}</div>)}
                                             {plantCount > 0 && (
                                                 <div className="space-y-2">
                                                     <div className="flex items-center justify-between text-xs"><span className="text-gray-400">{t('Rotate Plants')}:</span><span className="text-yellow-300">{rotationAngle.toFixed(0)}°</span></div>

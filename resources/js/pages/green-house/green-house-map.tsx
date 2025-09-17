@@ -277,24 +277,7 @@ export default function GreenhouseMap() {
             return;
         }
 
-        // Handle fertilizer machine as drawn shape
-        if (selectedTool === 'fertilizer-machine') {
-            const newShape: Shape = {
-                id: `fertilizer-machine-${Date.now()}`,
-                type: 'fertilizer-machine',
-                points: [...currentPath],
-                color: '#84CC16',
-                fillColor: '#84CC1640',
-                name: `${t('เครื่องให้ปุ๋ย')} ${shapes.filter(s => s.type === 'fertilizer-machine').length + 1}`,
-            };
-
-            const newShapes = [...shapes, newShape];
-            setShapes(newShapes);
-            addToHistory(newShapes, irrigationElements);
-            setIsDrawing(false);
-            setCurrentPath([]);
-            return;
-        }
+        // (Removed) fertilizer-machine as drawn shape → now placed as a component on click
 
         const config = elementTypes[selectedTool as keyof typeof elementTypes];
         if (!config) return;
@@ -355,7 +338,7 @@ export default function GreenhouseMap() {
             'solenoid-valve': '/generateTree/solv.png',
             'ball-valve': '/generateTree/ballv.png',
             'water-tank': '/generateTree/silo.png',
-            'fertilizer-machine': '/generateTree/silo.png', // Using same image for now
+            'fertilizer-machine': '/generateTree/fertilizer.png',
         };
 
         const loadImages = async () => {
@@ -749,8 +732,18 @@ export default function GreenhouseMap() {
 
     // Connection utility functions
     const getConnectionPoints = useCallback((element: IrrigationElement | Shape): Point[] => {
-        if (element.type === 'water-tank' || element.type === 'fertilizer-machine') {
-            // For equipment, return the center point
+        if (element.type === 'fertilizer-machine') {
+            // Two-side connection points (left and right of center)
+            if (element.points.length === 0) return [];
+            const c = element.points[0];
+            const dx = 30; // half width ~ matches drawn image width (~52-60px)
+            return [
+                { x: c.x - dx, y: c.y },
+                { x: c.x + dx, y: c.y },
+            ];
+        }
+        if (element.type === 'water-tank' || element.type === 'pump') {
+            // Single center connection point for these equipments
             return element.points.length > 0 ? [element.points[0]] : [];
         }
         // For pipes, return start and end points
@@ -762,15 +755,16 @@ export default function GreenhouseMap() {
 
     const findNearestConnectionPoint = useCallback(
         (point: Point, excludeElementId?: string): { elementId: string; connectionPoint: Point; distance: number } | null => {
-            const SNAP_DISTANCE = 30; // pixels
+            // Require clicking essentially on the connection point (tight threshold)
+            const SNAP_DISTANCE = 6; // pixels
             let nearest: { elementId: string; connectionPoint: Point; distance: number } | null = null;
 
-            // Check irrigation elements (water tanks)
+            // Check irrigation elements (water tanks, pumps)
             irrigationElements.forEach(element => {
                 if (element.id === excludeElementId) return;
                 
-                // Only allow connections to water tanks
-                if (element.type !== 'water-tank') return;
+                // Allow connections to water tanks and pumps
+                if (element.type !== 'water-tank' && element.type !== 'pump') return;
 
                 const connectionPoints = getConnectionPoints(element);
                 connectionPoints.forEach(connectionPoint => {
@@ -819,7 +813,8 @@ export default function GreenhouseMap() {
     );
 
     const findPipeEndpointAtPoint = useCallback((point: Point): { elementId: string; pointIndex: number } | null => {
-        const ENDPOINT_RADIUS = 10;
+        // Also tighten endpoint click detection to avoid accidental grabs
+        const ENDPOINT_RADIUS = 6;
         
         for (const element of irrigationElements) {
             if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
@@ -866,8 +861,9 @@ export default function GreenhouseMap() {
                 // Different sizes for different components
                 let imgSize, containerSize;
                 if (type === 'pump') {
-                    imgSize = isSelected ? 28 : 22;
-                    containerSize = isSelected ? 36 : 30;
+                    // Bigger pump icon and no container
+                    imgSize = isSelected ? 56 : 48;
+                    containerSize = 0; // unused for pump
                 } else if (type === 'water-tank') {
                     imgSize = isSelected ? 84 : 72;
                     containerSize = isSelected ? 64 : 56;
@@ -882,8 +878,8 @@ export default function GreenhouseMap() {
 
                 ctx.save();
 
-                // Draw circular container background for all except water-tank (silo)
-                if (type !== 'water-tank') {
+                // Draw circular container background for all except water-tank and pump
+                if (type !== 'water-tank' && type !== 'pump') {
                     ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
                     ctx.strokeStyle = isSelected ? '#FFD700' : '#666666';
                     ctx.lineWidth = isSelected ? 3 : 2;
@@ -907,27 +903,42 @@ export default function GreenhouseMap() {
             ctx.lineWidth = isSelected ? 3 : 2;
 
             switch (type) {
-                case 'pump':
+                case 'pump': {
+                    const pumpSize = isSelected ? 28 : 24;
+                    // Draw simplified pump shape (rounded rectangle + impeller mark)
+                    const w = pumpSize * 2.0;
+                    const h = pumpSize * 1.2;
+                    const r = 6;
                     ctx.beginPath();
-                    ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
+                    ctx.moveTo(point.x - w / 2 + r, point.y - h / 2);
+                    ctx.lineTo(point.x + w / 2 - r, point.y - h / 2);
+                    ctx.quadraticCurveTo(point.x + w / 2, point.y - h / 2, point.x + w / 2, point.y - h / 2 + r);
+                    ctx.lineTo(point.x + w / 2, point.y + h / 2 - r);
+                    ctx.quadraticCurveTo(point.x + w / 2, point.y + h / 2, point.x + w / 2 - r, point.y + h / 2);
+                    ctx.lineTo(point.x - w / 2 + r, point.y + h / 2);
+                    ctx.quadraticCurveTo(point.x - w / 2, point.y + h / 2, point.x - w / 2, point.y + h / 2 - r);
+                    ctx.lineTo(point.x - w / 2, point.y - h / 2 + r);
+                    ctx.quadraticCurveTo(point.x - w / 2, point.y - h / 2, point.x - w / 2 + r, point.y - h / 2);
+                    ctx.closePath();
                     ctx.fill();
                     ctx.stroke();
 
+                    // Impeller mark
                     ctx.strokeStyle = '#FFFFFF';
                     ctx.lineWidth = 2;
-                    for (let i = 0; i < 4; i++) {
-                        const angle = (i * Math.PI) / 2;
-                        const startX = point.x + Math.cos(angle) * (size * 0.3);
-                        const startY = point.y + Math.sin(angle) * (size * 0.3);
-                        const endX = point.x + Math.cos(angle) * (size * 0.7);
-                        const endY = point.y + Math.sin(angle) * (size * 0.7);
-
+                    for (let i = 0; i < 3; i++) {
+                        const angle = (i * 2 * Math.PI) / 3;
+                        const sx = point.x + Math.cos(angle) * (h * 0.15);
+                        const sy = point.y + Math.sin(angle) * (h * 0.15);
+                        const ex = point.x + Math.cos(angle) * (h * 0.35);
+                        const ey = point.y + Math.sin(angle) * (h * 0.35);
                         ctx.beginPath();
-                        ctx.moveTo(startX, startY);
-                        ctx.lineTo(endX, endY);
+                        ctx.moveTo(sx, sy);
+                        ctx.lineTo(ex, ey);
                         ctx.stroke();
                     }
                     break;
+                }
 
                 case 'solenoid-valve':
                     ctx.fillRect(point.x - size / 2, point.y - size / 2, size, size);
@@ -1184,6 +1195,17 @@ export default function GreenhouseMap() {
                             ctx.fill();
                         }
                         ctx.stroke();
+
+                        // Draw water icon in center (match planner behavior)
+                        if (shape.points.length > 0) {
+                            const centerX = shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
+                            const centerY = shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
+
+                            ctx.fillStyle = '#FFFFFF';
+                            ctx.font = '16px sans-serif';
+                            ctx.textAlign = 'center';
+                            ctx.fillText('💧', centerX, centerY + 5);
+                        }
                     }
 
                     if (isSelected) {
@@ -1194,6 +1216,32 @@ export default function GreenhouseMap() {
                             ctx.fill();
                         });
                     }
+                    return;
+                }
+
+                // Render fertilizer-machine image with label
+                if (shape.type === 'fertilizer-machine') {
+                    const point = shape.points[0];
+                    const img = componentImages['fertilizer-machine'];
+                    const imgSize = isSelected ? 60 : 52;
+                    const labelOffset = 10;
+                    ctx.save();
+                    if (img) {
+                        ctx.drawImage(img, point.x - imgSize / 2, point.y - imgSize / 2, imgSize, imgSize);
+                    } else {
+                        // fallback rectangle if image not loaded
+                        ctx.fillStyle = '#84CC16';
+                        ctx.strokeStyle = isSelected ? '#FFD700' : '#84CC16';
+                        ctx.lineWidth = isSelected ? 3 : 2;
+                        ctx.fillRect(point.x - 24, point.y - 16, 48, 32);
+                        ctx.strokeRect(point.x - 24, point.y - 16, 48, 32);
+                    }
+                    // label
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.textAlign = 'center';
+                    ctx.font = '12px sans-serif';
+                    ctx.fillText(`${t('เครื่องให้ปุ๋ย')}`, point.x, point.y - imgSize / 2 - labelOffset);
+                    ctx.restore();
                     return;
                 }
 
@@ -1241,19 +1289,6 @@ export default function GreenhouseMap() {
 
                     ctx.font = '10px sans-serif';
                     ctx.fillText(shape.name || t('พื้นที่ให้ปุ๋ย'), centerX, centerY + 25);
-                } else if (shape.type === 'fertilizer-machine' && shape.points.length > 0) {
-                    const centerX =
-                        shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
-                    const centerY =
-                        shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
-
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.font = '20px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('⚙️', centerX, centerY + 8);
-
-                    ctx.font = '10px sans-serif';
-                    ctx.fillText(shape.name || t('เครื่องให้ปุ๋ย'), centerX, centerY + 25);
                 } else if (shape.points.length > 0) {
                     const centerX =
                         shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
@@ -1282,6 +1317,8 @@ export default function GreenhouseMap() {
     const drawIrrigationElements = useCallback(
         (ctx: CanvasRenderingContext2D) => {
             irrigationElements.forEach((element) => {
+                // Prevent double-draw: fertilizer-machine is rendered in drawShapes (with image & label)
+                if (element.type === 'fertilizer-machine') return;
                 const isSelected = selectedElement === element.id;
                 const isHovered = hoveredElement === element.id;
 
@@ -1423,9 +1460,9 @@ export default function GreenhouseMap() {
 
     // Main draw function with better performance
     const drawConnectionPoints = useCallback((ctx: CanvasRenderingContext2D) => {
-        // Draw connection points for water tanks
+        // Draw connection points for water tanks and pumps
         irrigationElements.forEach(element => {
-            if (element.type === 'water-tank') {
+            if (element.type === 'water-tank' || element.type === 'pump') {
                 const connectionPoints = getConnectionPoints(element);
                 connectionPoints.forEach(point => {
                     ctx.save();
@@ -1605,7 +1642,7 @@ export default function GreenhouseMap() {
             // Only handle left mouse button for drawing
             if (e.button === 0) {
                 // For line drawing tools, handle directly here to avoid conflicts
-                if (['main-pipe', 'sub-pipe', 'drip-line', 'fertilizer-area', 'fertilizer-machine'].includes(selectedTool)) {
+                if (['main-pipe', 'sub-pipe', 'drip-line', 'fertilizer-area'].includes(selectedTool)) {
                     if (!isDrawing) {
                         // Check for snap target when starting pipe drawing
                         const snapTarget = findNearestConnectionPoint(point);
@@ -1631,8 +1668,8 @@ export default function GreenhouseMap() {
                     return;
                 }
 
-                // For single-point tools
-                if (['pump', 'solenoid-valve', 'ball-valve', 'sprinkler', 'water-tank'].includes(selectedTool)) {
+                // For single-point tools (including fertilizer-machine placement)
+                if (['pump', 'solenoid-valve', 'ball-valve', 'sprinkler', 'water-tank', 'fertilizer-machine'].includes(selectedTool)) {
                     const elementTypes: Record<
                         string,
                         { color: string; width: number; radius?: number }
@@ -1641,6 +1678,7 @@ export default function GreenhouseMap() {
                         'solenoid-valve': { color: '#F59E0B', width: 1 },
                         'ball-valve': { color: '#EAB308', width: 1 },
                         'water-tank': { color: '#0EA5E9', width: 1 },
+                        'fertilizer-machine': { color: '#84CC16', width: 1 },
                         sprinkler: {
                             color: '#3B82F6',
                             width: 1,
@@ -1658,20 +1696,44 @@ export default function GreenhouseMap() {
                                 capacityLiters = parsed;
                             }
                         }
-                        const newElement: IrrigationElement = {
-                            id: `${selectedTool}-${Date.now()}`,
-                            type: selectedTool as IrrigationElement['type'],
-                            points: [point],
-                            color: config.color,
-                            width: config.width,
-                            radius: config.radius,
-                            capacityLiters,
-                        };
+                        if (selectedTool === 'fertilizer-machine') {
+                            // Place as a Shape (to match connection logic already using shapes)
+                            const newShape: Shape = {
+                                id: `fertilizer-machine-${Date.now()}`,
+                                type: 'fertilizer-machine',
+                                points: [point],
+                                color: '#84CC16',
+                                fillColor: '#84CC1640',
+                                name: `${t('เครื่องให้ปุ๋ย')} ${shapes.filter(s => s.type === 'fertilizer-machine').length + 1}`,
+                            };
+                            const newShapes = [...shapes, newShape];
+                            setShapes(newShapes);
+                            // Mirror as irrigation element so summary can render it
+                            const fertEl: IrrigationElement = {
+                                id: `fert-el-${Date.now()}`,
+                                type: 'fertilizer-machine',
+                                points: [point],
+                                color: '#84CC16',
+                                width: 1,
+                            };
+                            const newIrrEls = [...irrigationElements, fertEl];
+                            setIrrigationElements(newIrrEls);
+                            addToHistory(newShapes, newIrrEls);
+                        } else {
+                            const newElement: IrrigationElement = {
+                                id: `${selectedTool}-${Date.now()}`,
+                                type: selectedTool as IrrigationElement['type'],
+                                points: [point],
+                                color: config.color,
+                                width: config.width,
+                                radius: config.radius,
+                                capacityLiters,
+                            };
 
-                        const newIrrigationElements = [...irrigationElements, newElement];
-                        setIrrigationElements(newIrrigationElements);
-                        
-                        addToHistory(shapes, newIrrigationElements);
+                            const newIrrigationElements = [...irrigationElements, newElement];
+                            setIrrigationElements(newIrrigationElements);
+                            addToHistory(shapes, newIrrigationElements);
+                        }
                     }
                     return;
                 }

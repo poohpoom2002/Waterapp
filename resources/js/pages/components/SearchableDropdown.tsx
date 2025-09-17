@@ -14,6 +14,7 @@ interface Option {
     brand?: string;
     price?: number;
     unit?: string; // For price unit like "บาท", "บาท/ม้วน", etc.
+    description?: string; // คำอธิบายสินค้า
     // New properties for recommendation
     isRecommended?: boolean;
     isGoodChoice?: boolean;
@@ -23,6 +24,12 @@ interface Option {
     headLoss?: number; // ค่า head loss ที่คำนวณได้
     calculationDetails?: string; // รายละเอียดการคำนวณ
     hasWarning?: boolean; // มี warning หรือไม่
+    // New properties for pump adequacy
+    isFlowAdequate?: boolean; // Flow เพียงพอหรือไม่
+    isHeadAdequate?: boolean; // Head เพียงพอหรือไม่
+    flowRatio?: number; // อัตราส่วน Flow (ปั๊ม/ที่ต้องการ)
+    headRatio?: number; // อัตราส่วน Head (ปั๊ม/ที่ต้องการ)
+    isSelected?: boolean; // รายการที่เลือกอยู่
 }
 
 interface SearchableDropdownProps {
@@ -63,7 +70,11 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     });
 
     // Get selected option label
+<<<<<<< HEAD
     const selectedOption = options.find((option) => option.value === value);
+=======
+    const selectedOption = options.find(option => String(option.value) === String(value));
+>>>>>>> origin/main
     const displayValue = selectedOption ? selectedOption.label : '';
 
     // Close dropdown when clicking outside
@@ -151,7 +162,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
         if (option.isRecommended)
             return { symbol: '⭐', text: t('แนะนำ'), color: 'text-yellow-300' };
         if (option.isGoodChoice) return { symbol: '✅', text: t('ดี'), color: 'text-green-300' };
-        if (option.isUsable) return { symbol: '⚡', text: t('ใช้ได้'), color: 'text-orange-300' };
+        if (option.isUsable) return { symbol: '⚡', text: t('พอใช้'), color: 'text-orange-300' };
         // Check if any recommendation property is defined
         if (option.isRecommended !== undefined || option.isGoodChoice !== undefined || option.isUsable !== undefined) {
             return { symbol: '⚠️', text: t('ไม่เหมาะสม'), color: 'text-red-300' };
@@ -163,11 +174,18 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     // Render option with enhanced display
     const renderOption = (option: Option, index: number) => {
         const isHighlighted = index === highlightedIndex;
+<<<<<<< HEAD
         const isSelected = option.value === value;
 
         // Check if this option has enhanced data
         const hasEnhancedData =
             option.image || option.productCode || option.name || option.brand || option.price;
+=======
+        const isSelected = String(option.value) === String(value);
+        
+        // Check if this option has enhanced data
+        const hasEnhancedData = option.image || option.productCode || option.name || option.brand || option.price || option.description;
+>>>>>>> origin/main
 
         if (hasEnhancedData) {
             const recommendation = getRecommendationInfo(option);
@@ -180,10 +198,17 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                         isHighlighted
                             ? 'bg-blue-600 text-white'
                             : isSelected
+<<<<<<< HEAD
                               ? 'bg-gray-700 text-blue-300'
                               : option.disabled
                                 ? 'cursor-not-allowed text-gray-500'
                                 : 'text-white hover:bg-gray-700'
+=======
+                            ? 'bg-gray-700 text-blue-300'
+                            : option.disabled
+                            ? 'cursor-not-allowed text-gray-500'
+                            : 'text-white hover:bg-gray-600 hover:text-white'
+>>>>>>> origin/main
                     }`}
                 >
                     <div className="flex items-center space-x-3">
@@ -214,6 +239,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                 {/* Recommendation symbol */}
 
                                 
+<<<<<<< HEAD
                                 {option.productCode && (
                                     <span className="font-medium text-blue-300">
                                         {option.productCode}
@@ -222,12 +248,24 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                 {option.name && (
                                     <span className="font-medium text-white">{option.name}</span>
                                 )}
+=======
+                                <span className="font-medium text-white">
+                                    {option.label}
+                                </span>
+>>>>>>> origin/main
                             </div>
+                            
+                            {/* Description */}
+                            {option.description && (
+                                <div className="text-xs text-gray-300 mt-1 truncate">
+                                    {option.description}
+                                </div>
+                            )}
                             
                             
                             
                             <div className="flex items-center justify-between mt-1">
-                                <div className="flex items-center space-x-2 text-xs text-gray-300">
+                                <div className="flex items-center space-x-2 text-xs text-gray-200">
                                     {option.brand && (
                                         <span className="text-yellow-300">{option.brand}</span>
                                     )}
@@ -244,7 +282,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                         </span>
                                     </div>
                                     {option.calculationDetails && (
-                                        <div className="text-xs text-gray-400 mt-1">
+                                        <div className="text-xs text-gray-200 mt-1">
                                             {option.calculationDetails}
                                         </div>
                                     )}
@@ -254,8 +292,42 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                     {/* Recommendation text - only show if recommendation exists */}
                                     {recommendation && (
                                         <span className={`${recommendation.color}`}>
-                                            {recommendation.text}
+                                            {recommendation.symbol} {recommendation.text}
                                         </span>
+                                    )}
+                                    
+                                    {/* Flow and Head Adequacy Status */}
+                                    {(option.isFlowAdequate !== undefined || option.isHeadAdequate !== undefined) && (
+                                        <div className="flex items-center space-x-2">
+                                            {option.isFlowAdequate !== undefined && (
+                                                <span className={`text-xs px-1 py-0.5 rounded ${
+                                                    option.isFlowAdequate 
+                                                        ? 'bg-green-700 text-green-200' 
+                                                        : 'bg-red-700 text-red-200'
+                                                }`}>
+                                                    Flow:{option.isFlowAdequate ? '✅' : '❌'}
+                                                    {option.flowRatio && (
+                                                        <span className="ml-1 text-gray-200">
+                                                            ({option.flowRatio.toFixed(1)}x)
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            )}
+                                            {option.isHeadAdequate !== undefined && (
+                                                <span className={`text-xs px-1 py-0.5 rounded ${
+                                                    option.isHeadAdequate 
+                                                        ? 'bg-green-700 text-green-200' 
+                                                        : 'bg-red-700 text-red-200'
+                                                }`}>
+                                                    Head:{option.isHeadAdequate ? '✅' : '❌'}
+                                                    {option.headRatio && (
+                                                        <span className="ml-1 text-gray-200">
+                                                            ({option.headRatio.toFixed(1)}x)
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
 
@@ -264,7 +336,11 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                         <span className="font-bold text-green-300">
                                             {option.price.toLocaleString()}
                                         </span>
+<<<<<<< HEAD
                                         <span className="ml-1 text-xs text-gray-400">
+=======
+                                        <span className="text-xs text-gray-200 ml-1">
+>>>>>>> origin/main
                                             {option.unit || t('บาท')}
                                         </span>
                                     </div>
@@ -276,22 +352,62 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             );
         }
 
-        // Fallback to simple text display
+        // Fallback to simple text display with enhanced info
         return (
             <div
                 key={option.value}
                 onClick={() => handleOptionClick(option.value)}
-                className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
+                className={`cursor-pointer px-3 py-3 text-sm transition-colors ${
                     isHighlighted
                         ? 'bg-blue-600 text-white'
                         : isSelected
+<<<<<<< HEAD
                           ? 'bg-gray-700 text-blue-300'
                           : option.disabled
                             ? 'cursor-not-allowed text-gray-500'
                             : 'text-white hover:bg-gray-700'
+=======
+                        ? 'bg-gray-700 text-blue-300'
+                        : option.disabled
+                        ? 'cursor-not-allowed text-gray-500'
+                        : 'text-white hover:bg-gray-600 hover:text-white'
+>>>>>>> origin/main
                 }`}
             >
-                {option.label}
+                <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                        <div className="font-medium text-white truncate">
+                            {option.label}
+                        </div>
+                        {option.description && (
+                            <div className="text-xs text-gray-300 mt-1 truncate">
+                                {option.description}
+                            </div>
+                        )}
+                        <div className="flex items-center space-x-2 text-xs text-gray-200 mt-1">
+                            {option.brand && (
+                                <span className="text-yellow-300">
+                                    {option.brand}
+                                </span>
+                            )}
+                            {option.productCode && (
+                                <span className="text-blue-300">
+                                    {option.productCode}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    {option.price && (
+                        <div className="text-right ml-2">
+                            <span className="font-bold text-green-300">
+                                {option.price.toLocaleString()}
+                            </span>
+                            <span className="text-xs text-gray-200 ml-1">
+                                บาท
+                            </span>
+                        </div>
+                    )}
+                </div>
             </div>
         );
     };
@@ -332,10 +448,10 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             </div>
 
             {isOpen && !disabled && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-500 bg-gray-600 shadow-lg">
+                <div className="absolute z-[9999] mt-1 w-full rounded-md border border-gray-400 bg-gray-800 shadow-xl">
                     <div className="max-h-80 overflow-auto py-1">
                         {filteredOptions.length === 0 ? (
-                            <div className="px-3 py-2 text-sm text-gray-400">
+                            <div className="px-3 py-2 text-sm text-gray-200">
                                 {t('ไม่พบผลลัพธ์')}
                             </div>
                         ) : (

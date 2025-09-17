@@ -93,6 +93,23 @@ Route::prefix('equipments')->group(function () {
 });
 
 // ==================================================
+// 📦 EQUIPMENT SETS ROUTES
+// ==================================================
+
+use App\Http\Controllers\Api\EquipmentSetController;
+
+// Equipment Sets API Resource
+Route::apiResource('equipment-sets', EquipmentSetController::class);
+
+// Equipment Sets additional routes
+Route::prefix('equipment-sets')->group(function () {
+    Route::get('stats', [EquipmentSetController::class, 'stats']);
+    Route::get('by-name/{name}', [EquipmentSetController::class, 'getByName']);
+    Route::post('{equipmentSet}/duplicate', [EquipmentSetController::class, 'duplicate']);
+    Route::patch('{equipmentSet}/toggle-status', [EquipmentSetController::class, 'toggleStatus']);
+});
+
+// ==================================================
 // 📸 IMAGE MANAGEMENT ROUTES (Backward Compatibility)
 // ==================================================
 // เก็บ backward compatibility สำหรับ frontend ที่อาจใช้ /api/images/*

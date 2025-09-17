@@ -529,10 +529,11 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
             setCalculation(calc);
 
-            // เก็บข้อมูล calculation สำหรับ garden mode
-            if (projectMode === 'garden' && calc) {
+            // เก็บข้อมูล calculation สำหรับทุก mode
+            if (calc) {
                 try {
-                    const existingCalcStr = localStorage.getItem('garden_pipe_calculations');
+                    const storageKey = projectMode === 'garden' ? 'garden_pipe_calculations' : 'horticulture_pipe_calculations';
+                    const existingCalcStr = localStorage.getItem(storageKey);
                     const existingCalc = existingCalcStr ? JSON.parse(existingCalcStr) : {};
                     
                     existingCalc[pipeType] = {
@@ -542,9 +543,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         calculatedAt: new Date().toISOString()
                     };
                     
-                    localStorage.setItem('garden_pipe_calculations', JSON.stringify(existingCalc));
+                    localStorage.setItem(storageKey, JSON.stringify(existingCalc));
                 } catch (error) {
-                    console.error('Error saving garden pipe calculations:', error);
+                    console.error(`Error saving ${projectMode} pipe calculations:`, error);
                 }
             }
 
@@ -1324,7 +1325,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                             <span className="font-medium text-white">
                                                 {selectedPipe.sizeMM} mm.{' '}
                                                 {selectedPipe.sizeInch &&
-                                                    `(${selectedPipe.sizeInch}")`}
+                                                    `(${selectedPipe.sizeInch})`}
                                             </span>
                                         </div>
                                         <div className="flex flex-col">
