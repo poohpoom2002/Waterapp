@@ -122,7 +122,7 @@ export default function GreenhouseSummary() {
             'solenoid-valve': '/generateTree/solv.png',
             'ball-valve': '/generateTree/ballv.png',
             'water-tank': '/generateTree/silo.png',
-            'fertilizer-machine': '/generateTree/silo.png',
+            'fertilizer-machine': '/generateTree/fertilizer.png',
         };
 
         const loadImages = async () => {
@@ -908,6 +908,10 @@ export default function GreenhouseSummary() {
                 connections: {
                     mainToSub: 0,
                     subToEmitters: 0
+                },
+                longest: {
+                    main: { length: 0, connections: 0, flowRate: 0 },
+                    sub: { length: 0, emitters: 0, flowRate: 0 }
                 }
             };
         }
@@ -1014,6 +1018,131 @@ export default function GreenhouseSummary() {
         // Calculate emitters per sub pipe
         const emittersPerSubPipe = subPipes.length > 0 ? Math.round(totalEmitters / subPipes.length) : 0;
 
+        // Longest-line metrics
+        const lengthOfPolyline = (points: Point[]) => {
+            if (points.length < 2) return 0;
+            let len = 0;
+            for (let i = 0; i < points.length - 1; i++) {
+                len += distanceBetweenPoints(points[i], points[i + 1]);
+            }
+            return len; // pixels
+        };
+
+        // Find longest main pipe
+        let longestMainLengthPx = 0;
+        let longestMainIndex = -1;
+        mainPipes.forEach((mp, idx) => {
+            const len = lengthOfPolyline(mp.points);
+            if (len > longestMainLengthPx) {
+                longestMainLengthPx = len;
+                longestMainIndex = idx;
+            }
+        });
+
+        // Count connections for the longest main
+        let longestMainConnections = 0;
+        if (longestMainIndex >= 0) {
+            const mp = mainPipes[longestMainIndex];
+            subPipes.forEach((subPipe) => {
+                if (subPipe.points.length > 0 && mp.points.length > 0) {
+                    const subStart = subPipe.points[0];
+                    let isConnected = false;
+                    for (let i = 0; i < mp.points.length - 1; i++) {
+                        const result = closestPointOnLineSegment(
+                            subStart,
+                            mp.points[i],
+                            mp.points[i + 1]
+                        );
+                        if (result.distance < 50) { // 50px tolerance
+                            isConnected = true;
+                            break;
+                        }
+                    }
+                    if (isConnected) longestMainConnections++;
+                }
+            });
+        }
+
+        // Find longest sub pipe length and collect ties
+        let longestSubLengthPx = 0;
+        const subPipeLengths: number[] = subPipes.map(sp => lengthOfPolyline(sp.points));
+        subPipeLengths.forEach(len => { if (len > longestSubLengthPx) longestSubLengthPx = len; });
+
+        const TOL_PX = 20; // consider ties within 20px length
+        const tieIndices: number[] = [];
+        subPipeLengths.forEach((len, idx) => {
+            if (Math.abs(len - longestSubLengthPx) <= TOL_PX) tieIndices.push(idx);
+        });
+
+        // Count actual emitters attached to each candidate longest sub-pipe
+        const attachTolPx = 12;
+        let bestEmitters = 0;
+        let bestFlow = 0;
+        tieIndices.forEach(idx => {
+            const sp = subPipes[idx];
+            let sprCount = 0;
+            let dripEmitterCount = 0;
+
+            // Sprinklers attached to this sub-pipe
+            sprinklers.forEach((spr) => {
+                const p = spr.points[0];
+                if (!p) return;
+                for (let i = 1; i < sp.points.length; i++) {
+                    const res = closestPointOnLineSegment(p, sp.points[i - 1], sp.points[i]);
+                    if (res.distance <= attachTolPx) {
+                        sprCount += 1;
+                        break;
+                    }
+                }
+            });
+
+            // Drip lines attached to this sub-pipe (count emitters along those lines)
+            dripLines.forEach((dl) => {
+                if (dl.points.length < 2 || !dl.spacing) return;
+                let isAttached = false;
+                for (let i = 1; i < dl.points.length && !isAttached; i++) {
+                    for (let j = 1; j < sp.points.length; j++) {
+                        const r1 = closestPointOnLineSegment(dl.points[i - 1], sp.points[j - 1], sp.points[j]);
+                        const r2 = closestPointOnLineSegment(dl.points[i], sp.points[j - 1], sp.points[j]);
+                        if (Math.min(r1.distance, r2.distance) <= attachTolPx) {
+                            isAttached = true;
+                            break;
+                        }
+                    }
+                }
+                if (isAttached) {
+                    let totalLengthM = 0;
+                    for (let i = 1; i < dl.points.length; i++) {
+                        totalLengthM += distanceBetweenPoints(dl.points[i - 1], dl.points[i]) / 25;
+                    }
+                    if (totalLengthM > 0 && dl.spacing > 0) {
+                        const emittersInThisLine = Math.floor(totalLengthM / dl.spacing) + 1;
+                        dripEmitterCount += emittersInThisLine;
+                    }
+                }
+            });
+
+            const flowForThis = sprCount * sprinklerFlowRate + dripEmitterCount * dripEmitterFlowRate;
+            const emittersForThis = sprCount + dripEmitterCount;
+            if (emittersForThis > bestEmitters) {
+                bestEmitters = emittersForThis;
+                bestFlow = flowForThis;
+            }
+        });
+
+        // Fallback to average if no candidates evaluated (e.g., no sub pipes)
+        if (tieIndices.length === 0) {
+            bestEmitters = emittersPerSubPipe;
+            bestFlow = flowRatePerSubPipe;
+        }
+
+        const longestMainLengthM = longestMainLengthPx / 25;
+        const longestSubLengthM = longestSubLengthPx / 25;
+
+        const longestMainFlow = flowRatePerSubPipe * longestMainConnections;
+        const longestSubEmitters = bestEmitters;
+        const longestSubFlow = bestFlow;
+
         return {
             mainPipeCount: mainPipes.length,
             subPipeCount: subPipes.length,
@@ -1024,6 +1153,10 @@ export default function GreenhouseSummary() {
             connections: {
                 mainToSub: mainToSubConnections,
                 subToEmitters: emittersPerSubPipe // Emitters per sub pipe, not total
+            },
+            longest: {
+                main: { length: longestMainLengthM, connections: longestMainConnections, flowRate: longestMainFlow },
+                sub: { length: longestSubLengthM, emitters: longestSubEmitters, flowRate: longestSubFlow }
             }
         };
     };
@@ -1547,8 +1680,9 @@ export default function GreenhouseSummary() {
                 imgSize = 36 * scale;
                 containerSize = 28 * scale;
             } else if (type === 'fertilizer-machine') {
-                imgSize = 15 * scale;
-                containerSize = 19 * scale;
+                // Match map view visual size (≈52px normal)
+                imgSize = 52 * scale;
+                containerSize = 0; // no container for fertilizer icon on summary
             } else {
                 imgSize = 12 * scale;
                 containerSize = 18 * scale;
@@ -1564,18 +1698,46 @@ export default function GreenhouseSummary() {
                 ctx.lineWidth = 1.5 * scale;
                 ctx.fillRect(point.x - containerSize / 2, point.y - containerSize / 2, containerSize, containerSize);
                 ctx.strokeRect(point.x - containerSize / 2, point.y - containerSize / 2, containerSize, containerSize);
-            } else {
-                // Draw circular container for other components
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-            ctx.strokeStyle = '#666666';
-            ctx.lineWidth = 1.5 * scale;
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, containerSize / 2, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.stroke();
+            } else if (type !== 'fertilizer-machine') {
+                // Draw circular container for other components except fertilizer-machine
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.strokeStyle = '#666666';
+                ctx.lineWidth = 1.5 * scale;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, containerSize / 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
             }
             
             ctx.drawImage(img, point.x - imgSize / 2, point.y - imgSize / 2, imgSize, imgSize);
+
+            // Draw connection points for equipments
+            if (type === 'fertilizer-machine') {
+                // Match map: left-right points ~30px from center
+                const dx = 30 * scale;
+                const left = { x: point.x - dx, y: point.y };
+                const right = { x: point.x + dx, y: point.y };
+                ctx.fillStyle = '#00FF00';
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2 * scale;
+                ctx.beginPath();
+                ctx.arc(left.x, left.y, 6 * scale, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(right.x, right.y, 6 * scale, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            } else if (type === 'water-tank' || type === 'pump') {
+                // Single center connection point
+                ctx.fillStyle = '#00FF00';
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2 * scale;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 6 * scale, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
             ctx.restore();
             return;
         }
@@ -1734,7 +1896,15 @@ export default function GreenhouseSummary() {
         offsetX: number = 0,
         offsetY: number = 0
     ) => {
-        elements.forEach((element) => {
+        // Ensure correct layering: pipes below, equipments above
+        const getZIndex = (type: string): number => {
+            if (type === 'main-pipe' || type === 'sub-pipe' || type === 'drip-line') return 0;
+            if (type === 'water-tank' || type === 'pump' || type === 'fertilizer-machine') return 2;
+            return 1; // sprinklers/valves, etc.
+        };
+        const orderedElements = [...elements].sort((a, b) => getZIndex(a.type) - getZIndex(b.type));
+
+        orderedElements.forEach((element) => {
             ctx.strokeStyle = element.color;
             ctx.lineWidth = (element.width || 2) * scale;
             ctx.setLineDash([]);
@@ -1963,6 +2133,11 @@ export default function GreenhouseSummary() {
                                 }
                                 ctx.stroke();
                             }
+                            return;
+                        }
+                        
+                        // Skip legacy fertilizer-machine polygon/shape; this component is drawn from irrigationElements
+                        if ((shape as unknown as { type?: string }).type === 'fertilizer-machine') {
                             return;
                         }
 
@@ -2480,24 +2655,34 @@ export default function GreenhouseSummary() {
                                             </div>
                                         </div>
 
-                                        {/* Connection Information */}
+
+                                        {/* Main and Sub Pipe Flow Rate and Outlet Count Table (Longest lines only) */}
                                         <div className="rounded bg-gray-700 p-3 print:border print:border-gray-200 print:bg-gray-50 print:p-3">
-                                            <h4 className="mb-2 text-sm font-semibold text-orange-400 print:text-sm print:text-black">
-                                                {t('การเชื่อมต่อท่อ')}
+                                            <h4 className="mb-2 text-sm font-semibold text-cyan-400 print:text-sm print:text-black">
+                                                {t('อัตราการไหลและจำนวนทางออกของท่อเมนและท่อเมนย่อย')}
                                             </h4>
-                                            <div className="space-y-2 text-xs">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('จำนวนท่อเมน')}</span>
-                                                    <span className="font-bold text-red-400">{pipeFlowData.mainPipeCount} {t('เส้น')}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('ท่อเมน 1 เส้น → ท่อเมนย่อย')}</span>
-                                                    <span className="font-bold text-blue-400">{pipeFlowData.connections.mainToSub} {t('เส้น')}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">{t('ท่อเมนย่อย 1 เส้น → สปริงเกลอร์/จุดน้ำหยด')}</span>
-                                                    <span className="font-bold text-green-400">{pipeFlowData.connections.subToEmitters} {t('ตัว')}</span>
-                                                </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full border-collapse border border-gray-600/50 print:border-gray-300">
+                                                    <thead>
+                                                        <tr className="bg-gray-800/50 print:bg-gray-100">
+                                                            <th className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-left text-gray-200 print:text-gray-800 font-semibold text-xs">{t('ประเภทท่อ')}</th>
+                                                            <th className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-left text-gray-200 print:text-gray-800 font-semibold text-xs">{t('อัตราการไหล')}</th>
+                                                            <th className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-left text-gray-200 print:text-gray-800 font-semibold text-xs">{t('จำนวนทางออก')}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="text-gray-100 print:text-gray-700">
+                                                        <tr>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-blue-400">{pipeFlowData.longest.main.flowRate.toFixed(2)} {t('L/min')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-blue-400">{pipeFlowData.longest.main.connections} {t('เส้น')}</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs">{t('ท่อเมนย่อย')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-green-400">{pipeFlowData.longest.sub.flowRate.toFixed(2)} {t('L/min')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-green-400">{pipeFlowData.longest.sub.emitters} {t('ตัว')}</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         </div>
 
@@ -3236,95 +3421,60 @@ export default function GreenhouseSummary() {
                                                                 </div>
                                                             </div>
 
-                                                            {/* Pipe Connection Information */}
+                                                            {/* Main and Sub Pipe Flow Rate and Outlet Count for This Plot */}
                                                             {plotPipe && plotPipe.hasPipes && (
                                                                 <div className="mt-2 border-t border-gray-200 pt-2">
                                                                     <div className="mb-2 text-xs font-semibold text-gray-700">
-                                                                        🔗 {t('การเชื่อมต่อท่อ')}
+                                                                        {t('อัตราการไหลและจำนวนทางออกของท่อ')}
                                                                     </div>
-                                                                    <div className="space-y-1 text-xs">
-                                                                        <div className="flex items-center justify-between">
-                                                                            <span className="text-gray-600">{t('ท่อเมนที่เชื่อมต่อ')}</span>
-                                                                            <span className="font-bold text-red-600">
-                                                                                {(() => {
-                                                                                    // คำนวณจำนวนท่อเมนที่เชื่อมต่อกับแปลงนี้
-                                                                                    const elements = summaryData?.irrigationElements || [];
-                                                                                    const mainPipes = elements.filter((e) => e.type === 'main-pipe');
-                                                                                    const subPipes = elements.filter((e) => e.type === 'sub-pipe');
-                                                                                    
-                                                                                    let connectedMainPipes = 0;
-                                                                                    const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
-                                                                                    
-                                                                                    if (plotShape && plotShape.points) {
-                                                                                        mainPipes.forEach((mainPipe) => {
-                                                                                            let isConnected = false;
-                                                                                            subPipes.forEach((subPipe) => {
-                                                                                                // ตรวจสอบว่าท่อย่อยอยู่ในแปลงหรือไม่
-                                                                                                if (subPipeServesPlot(subPipe, plotShape.points)) {
-                                                                                                    // ตรวจสอบว่าท่อย่อยเชื่อมต่อกับท่อเมนหรือไม่
-                                                                                                    if (subPipe.points.length > 0 && mainPipe.points.length > 0) {
-                                                                                                        const subStart = subPipe.points[0];
-                                                                                                        for (let i = 0; i < mainPipe.points.length - 1; i++) {
-                                                                                                            const result = closestPointOnLineSegment(
-                                                                                                                subStart,
-                                                                                                                mainPipe.points[i],
-                                                                                                                mainPipe.points[i + 1]
-                                                                                                            );
-                                                                                                            if (result.distance < 50) { // 50 pixels tolerance
-                                                                                                                isConnected = true;
-                                                                                                                break;
-                                                                                                            }
-                                                                                                        }
-                                                                                                    }
-                                                                                                }
-                                                                                            });
-                                                                                            if (isConnected) {
-                                                                                                connectedMainPipes++;
+                                                                    <div className="overflow-x-auto">
+                                                                        <table className="w-full border-collapse border border-gray-300">
+                                                                            <thead>
+                                                                                <tr className="bg-gray-100">
+                                                                                    <th className="border border-gray-300 px-2 py-1 text-left text-gray-800 font-semibold text-xs">{t('ประเภทท่อ')}</th>
+                                                                                    <th className="border border-gray-300 px-2 py-1 text-left text-gray-800 font-semibold text-xs">{t('อัตราการไหล')}</th>
+                                                                                    <th className="border border-gray-300 px-2 py-1 text-left text-gray-800 font-semibold text-xs">{t('จำนวนทางออก')}</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="text-gray-700">
+                                                                                <tr>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-blue-600">
+                                                                                        {(() => {
+                                                                                            const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
+                                                                                            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
+                                                                                            const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
+                                                                                            return totalFlowRate.toFixed(2);
+                                                                                        })()} {t('L/min')}
+                                                                                    </td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-blue-600">
+                                                                                        {(() => {
+                                                                                            // คำนวณจำนวนท่อย่อยที่เชื่อมต่อกับแปลงนี้
+                                                                                            const elements = summaryData?.irrigationElements || [];
+                                                                                            const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+                                                                                            const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
+                                                                                            
+                                                                                            if (plotShape && plotShape.points) {
+                                                                                                return subPipes.filter(subPipe => subPipeServesPlot(subPipe, plotShape.points)).length;
                                                                                             }
-                                                                                        });
-                                                                                    }
-                                                                                    
-                                                                                    return connectedMainPipes;
-                                                                                })()} {t('เส้น')}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="flex items-center justify-between">
-                                                                            <span className="text-gray-600">{t('ท่อเมนย่อยในแปลง')}</span>
-                                                                            <span className="font-bold text-blue-600">
-                                                                                {(() => {
-                                                                                    // คำนวณจำนวนท่อย่อยในแปลงนี้
-                                                                                    const elements = summaryData?.irrigationElements || [];
-                                                                                    const subPipes = elements.filter((e) => e.type === 'sub-pipe');
-                                                                                    const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
-                                                                                    
-                                                                                    let subPipesInPlot = 0;
-                                                                                    if (plotShape && plotShape.points) {
-                                                                                        subPipes.forEach((subPipe) => {
-                                                                                            if (subPipeServesPlot(subPipe, plotShape.points)) {
-                                                                                                subPipesInPlot++;
-                                                                                            }
-                                                                                        });
-                                                                                    }
-                                                                                    
-                                                                                    return subPipesInPlot;
-                                                                                })()} {t('เส้น')}
-                                                                            </span>
-                                                                        </div>
-                                                                        <div className="flex items-center justify-between">
-                                                                            <span className="text-gray-600">{t('อัตราการไหลรวม')}</span>
-                                                                            <span className="font-bold text-green-600">
-                                                                                {(() => {
-                                                                                    // คำนวณอัตราการไหลรวมของแปลงนี้
-                                                                                    const actualSprinklerCount = plotPipe?.sprinklerCount || 0;
-                                                                                    const actualDripCount = plotPipe?.dripEmitterCount || 0;
-                                                                                    const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
-                                                                                    const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
-                                                                                    
-                                                                                    const totalFlowRate = (actualSprinklerCount * sprinklerFlowRate) + (actualDripCount * dripEmitterFlowRate);
-                                                                                    return totalFlowRate.toFixed(1);
-                                                                                })()} {t('ลิตร/นาที')}
-                                                                            </span>
-                                                                        </div>
+                                                                                            return 0;
+                                                                                        })()} {t('เส้น')}
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs">{t('ท่อเมนย่อย')}</td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">
+                                                                                        {(() => {
+                                                                                            const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
+                                                                                            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
+                                                                                            const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
+                                                                                            return totalFlowRate.toFixed(2);
+                                                                                        })()} {t('L/min')}
+                                                                                    </td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">{plotPipe.totalEmitters} {t('ตัว')}</td>
+                                                                                </tr>
+                                                                            </tbody>
+                                                                        </table>
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -3829,93 +3979,60 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                          </div>
                                                      </div>
 
-                                                     {/* Pipe Connection Information */}
+                                                     {/* Main and Sub Pipe Flow Rate and Outlet Count for This Plot */}
                                                      {plotPipe && plotPipe.hasPipes && (
                                                          <div className="mb-3 rounded bg-gray-600 p-3">
-                                                             <h4 className="mb-3 text-sm font-semibold text-orange-400">
-                                                                 🔗 {t('การเชื่อมต่อท่อ')}
+                                                             <h4 className="mb-3 text-sm font-semibold text-cyan-400">
+                                                                 {t('อัตราการไหลและจำนวนทางออกของท่อ')}
                                                              </h4>
-                                                             <div className="space-y-2 text-xs">
-                                                                 <div className="flex items-center justify-between">
-                                                                     <span className="text-gray-300">{t('ท่อเมนที่เชื่อมต่อ')}</span>
-                                                                     <span className="font-bold text-red-400">
-                                                                         {(() => {
-                                                                             // คำนวณจำนวนท่อเมนที่เชื่อมต่อกับแปลงนี้
-                                                                             const elements = summaryData?.irrigationElements || [];
-                                                                             const mainPipes = elements.filter((e) => e.type === 'main-pipe');
-                                                                             const subPipes = elements.filter((e) => e.type === 'sub-pipe');
-                                                                             
-                                                                             let connectedMainPipes = 0;
-                                                                             const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
-                                                                             
-                                                                             if (plotShape && plotShape.points) {
-                                                                                 mainPipes.forEach((mainPipe) => {
-                                                                                     let isConnected = false;
-                                                                                     subPipes.forEach((subPipe) => {
-                                                                                         // ตรวจสอบว่าท่อย่อยอยู่ในแปลงหรือไม่
-if (subPipeServesPlot(subPipe, plotShape.points)) {
-                                                                                             // ตรวจสอบว่าท่อย่อยเชื่อมต่อกับท่อเมนหรือไม่
-                                                                                             if (subPipe.points.length > 0 && mainPipe.points.length > 0) {
-                                                                                                 const subStart = subPipe.points[0];
-                                                                                                 for (let i = 0; i < mainPipe.points.length - 1; i++) {
-                                                                                                     const result = closestPointOnLineSegment(
-                                                                                                         subStart,
-                                                                                                         mainPipe.points[i],
-                                                                                                         mainPipe.points[i + 1]
-                                                                                                     );
-                                                                                                     if (result.distance < 50) { // 50 pixels tolerance
-                                                                                                         isConnected = true;
-                                                                                                         break;
-                                                                                                     }
-                                                                                                 }
-                                                                                             }
-                                                                                         }
-                                                                                     });
-                                                                                     if (isConnected) {
-                                                                                         connectedMainPipes++;
+                                                             <div className="overflow-x-auto">
+                                                                 <table className="w-full border-collapse border border-gray-500/50">
+                                                                     <thead>
+                                                                         <tr className="bg-gray-700/50">
+                                                                             <th className="border border-gray-500/50 px-2 py-1 text-left text-gray-200 font-semibold text-xs">{t('ประเภทท่อ')}</th>
+                                                                             <th className="border border-gray-500/50 px-2 py-1 text-left text-gray-200 font-semibold text-xs">{t('อัตราการไหล')}</th>
+                                                                             <th className="border border-gray-500/50 px-2 py-1 text-left text-gray-200 font-semibold text-xs">{t('จำนวนทางออก')}</th>
+                                                                         </tr>
+                                                                     </thead>
+                                                                     <tbody className="text-gray-100">
+                                                                         <tr>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
+                                                                                 {(() => {
+                                                                                     const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
+                                                                                     const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
+                                                                                     const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
+                                                                                     return totalFlowRate.toFixed(2);
+                                                                                 })()} {t('L/min')}
+                                                                             </td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
+                                                                                 {(() => {
+                                                                                     // คำนวณจำนวนท่อย่อยที่เชื่อมต่อกับแปลงนี้
+                                                                                     const elements = summaryData?.irrigationElements || [];
+                                                                                     const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+                                                                                     const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
+                                                                                     
+                                                                                     if (plotShape && plotShape.points) {
+                                                                                         return subPipes.filter(subPipe => subPipeServesPlot(subPipe, plotShape.points)).length;
                                                                                      }
-                                                                                 });
-                                                                             }
-                                                                             
-                                                                             return connectedMainPipes;
-                                                                         })()} {t('เส้น')}
-                                                                     </span>
-                                                                 </div>
-                                                                 <div className="flex items-center justify-between">
-                                                                     <span className="text-gray-300">{t('ท่อเมนย่อยในแปลง')}</span>
-                                                                     <span className="font-bold text-blue-400">
-                                                                         {(() => {
-                                                                             // คำนวณจำนวนท่อย่อยในแปลงนี้
-                                                                             const elements = summaryData?.irrigationElements || [];
-                                                                             const subPipes = elements.filter((e) => e.type === 'sub-pipe');
-                                                                             const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
-                                                                             
-                                                                             let subPipesInPlot = 0;
-                                                                             if (plotShape && plotShape.points) {
-                                                                                 subPipes.forEach((subPipe) => {
-if (subPipeServesPlot(subPipe, plotShape.points)) {
-                                                                                         subPipesInPlot++;
-                                                                                     }
-                                                                                 });
-                                                                             }
-                                                                             
-                                                                             return subPipesInPlot;
-                                                                         })()} {t('เส้น')}
-                                                                     </span>
-                                                                 </div>
-                                                                 <div className="flex items-center justify-between">
-                                                                     <span className="text-gray-300">{t('อัตราการไหลรวม')}</span>
-                                                                     <span className="font-bold text-green-400">
-                                                                         {(() => {
-                                                                             // คำนวณอัตราการไหลรวมของแปลงนี้
-                                                                             const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
-                                                                             const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
-                                                                             
-                                                                             const totalFlowRate = (actualSprinklerCount * sprinklerFlowRate) + (actualDripCount * dripEmitterFlowRate);
-                                                                             return totalFlowRate.toFixed(1);
-                                                                         })()} {t('ลิตร/นาที')}
-                                                                     </span>
-                                                                 </div>
+                                                                                     return 0;
+                                                                                 })()} {t('เส้น')}
+                                                                             </td>
+                                                                         </tr>
+                                                                         <tr>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs">{t('ท่อเมนย่อย')}</td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">
+                                                                                 {(() => {
+                                                                                     const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
+                                                                                     const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
+                                                                                     const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
+                                                                                     return totalFlowRate.toFixed(2);
+                                                                                 })()} {t('L/min')}
+                                                                             </td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">{plotPipe.totalEmitters} {t('ตัว')}</td>
+                                                                         </tr>
+                                                                     </tbody>
+                                                                 </table>
                                                              </div>
                                                          </div>
                                                      )}

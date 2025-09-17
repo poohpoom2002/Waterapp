@@ -376,9 +376,9 @@ export default function IrrigationGenerate({
 		// Calculate total water requirement for all plants
 		const totalWaterRequirement = waterPerPlant * finalPlantPoints.length;
 		
-		console.log(`Primary crop: ${primaryCrop}, Water per plant: ${waterPerPlant} L/day/plant`);
+		console.log(`Primary crop: ${primaryCrop}, Water per plant: ${waterPerPlant} ลิตร/ครั้ง/plant`);
 		console.log(`Total plants: ${finalPlantPoints.length}`);
-		console.log('Total water requirement:', totalWaterRequirement, 'L/day');
+		console.log('Total water requirement:', totalWaterRequirement, 'ลิตร/ครั้ง');
 		return totalWaterRequirement;
 	};
 
@@ -867,8 +867,46 @@ export default function IrrigationGenerate({
 			
 			console.log(`Generated ${allRowYs.length} sprinkler rows starting from center`);
 			
-			// Generate sprinklers for each row (same logic as plant generation)
+			// Generate sprinklers for each row with improved symmetrical placement
 			const sprinklers: { lat: number; lng: number }[] = [];
+			
+			// Calculate center X coordinate for symmetrical column placement
+			const centerX = (minX + maxX) / 2;
+			
+			// Calculate how many columns we can fit left and right of center
+			const totalWidth = maxX - minX;
+			const maxCols = Math.floor(totalWidth / effectiveSpacing);
+			const colsLeftOfCenter = Math.floor(maxCols / 2);
+			const colsRightOfCenter = maxCols - colsLeftOfCenter;
+			
+			console.log(`Sprinkler generation: center X=${centerX.toFixed(2)}, cols left=${colsLeftOfCenter}, cols right=${colsRightOfCenter}`);
+			
+			// Generate columns starting from center and expanding outward
+			const allColXs: number[] = [];
+			
+			// Add center column first
+			allColXs.push(centerX);
+			
+			// Add columns right of center (going right)
+			for (let i = 1; i <= colsRightOfCenter; i++) {
+				const xRight = centerX + (i * effectiveSpacing);
+				if (xRight <= maxX) {
+					allColXs.push(xRight);
+				}
+			}
+			
+			// Add columns left of center (going left)
+			for (let i = 1; i <= colsLeftOfCenter; i++) {
+				const xLeft = centerX - (i * effectiveSpacing);
+				if (xLeft >= minX) {
+					allColXs.push(xLeft);
+				}
+			}
+			
+			// Sort columns from left to right for consistent ordering
+			allColXs.sort((a, b) => a - b);
+			
+			console.log(`Generated ${allColXs.length} sprinkler columns starting from center`);
 			
 			for (let rowIndex = 0; rowIndex < allRowYs.length; rowIndex++) {
 				// periodic yield similar to plant generation
@@ -876,12 +914,12 @@ export default function IrrigationGenerate({
 					await yieldToFrame();
 				}
 				const y = allRowYs[rowIndex];
-				let colIndex = 0;
 				
-				for (let x = minX; x <= maxX; x += effectiveSpacing) {
+				for (let colIndex = 0; colIndex < allColXs.length; colIndex++) {
 					if (colIndex % 50 === 0) {
 						await yieldToFrame();
 					}
+					const x = allColXs[colIndex];
 					const pt = { x, y };
 					const insideMain = isPointInPolygonXY(pt, rotatedMain);
 					const insideAnyHole = rotatedObstacles.some(poly => isPointInPolygonXY(pt, poly));
@@ -906,7 +944,6 @@ export default function IrrigationGenerate({
 					} else if (insideAnyHole) {
 						console.log(`Skipped sprinkler at row ${rowIndex}, col ${colIndex} - inside obstacle`);
 					}
-					colIndex++;
 				}
 			}
 			
@@ -1124,14 +1161,52 @@ export default function IrrigationGenerate({
 			
 			console.log(`Generated ${allRowYs.length} pivot rows starting from center`);
 			
-			// Generate pivots for each row
+			// Generate pivots for each row with improved symmetrical placement
 			const pivots: { lat: number; lng: number }[] = [];
+			
+			// Calculate center X coordinate for symmetrical column placement
+			const centerX = (minX + maxX) / 2;
+			
+			// Calculate how many columns we can fit left and right of center
+			const totalWidth = maxX - minX;
+			const maxCols = Math.floor(totalWidth / effectiveSpacing);
+			const colsLeftOfCenter = Math.floor(maxCols / 2);
+			const colsRightOfCenter = maxCols - colsLeftOfCenter;
+			
+			console.log(`Pivot generation: center X=${centerX.toFixed(2)}, cols left=${colsLeftOfCenter}, cols right=${colsRightOfCenter}`);
+			
+			// Generate columns starting from center and expanding outward
+			const allColXs: number[] = [];
+			
+			// Add center column first
+			allColXs.push(centerX);
+			
+			// Add columns right of center (going right)
+			for (let i = 1; i <= colsRightOfCenter; i++) {
+				const xRight = centerX + (i * effectiveSpacing);
+				if (xRight <= maxX) {
+					allColXs.push(xRight);
+				}
+			}
+			
+			// Add columns left of center (going left)
+			for (let i = 1; i <= colsLeftOfCenter; i++) {
+				const xLeft = centerX - (i * effectiveSpacing);
+				if (xLeft >= minX) {
+					allColXs.push(xLeft);
+				}
+			}
+			
+			// Sort columns from left to right for consistent ordering
+			allColXs.sort((a, b) => a - b);
+			
+			console.log(`Generated ${allColXs.length} pivot columns starting from center`);
 			
 			for (let rowIndex = 0; rowIndex < allRowYs.length; rowIndex++) {
 				const y = allRowYs[rowIndex];
-				let colIndex = 0;
 				
-				for (let x = minX; x <= maxX; x += effectiveSpacing) {
+				for (let colIndex = 0; colIndex < allColXs.length; colIndex++) {
+					const x = allColXs[colIndex];
 					const pt = { x, y };
 					const insideMain = isPointInPolygonXY(pt, rotatedMain);
 					const insideAnyHole = rotatedObstacles.some(poly => isPointInPolygonXY(pt, poly));
@@ -1156,7 +1231,6 @@ export default function IrrigationGenerate({
 					} else if (insideAnyHole) {
 						console.log(`Skipped pivot at row ${rowIndex}, col ${colIndex} - inside obstacle`);
 					}
-					colIndex++;
 				}
 			}
 			
@@ -1491,37 +1565,6 @@ export default function IrrigationGenerate({
 					<div className="rounded p-3 border border-white" style={{ backgroundColor: '#000005' }}>
 						<h4 className="font-medium text-white mb-3 text-sm">{t('Sprinkler System Settings')}</h4>
 						<div className="space-y-4">
-						<div className="grid grid-cols-2 gap-3">
-							<div>
-								<label className="block text-xs text-gray-400 mb-2">
-									{t('Flow')} (L/min)
-								</label>
-								<input
-									type="number"
-									min={0.24}
-									max={0.24}
-									step={0.01}
-									value={0.24}
-									readOnly
-									className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm"
-								/>
-							</div>
-							<div>
-								<label className="block text-xs text-gray-400 mb-2">
-									{t('Pressure')} (bar)
-								</label>
-								<input
-									type="number"
-									min={0.5}
-									max={2.0}
-									step={0.1}
-									value={irrigationSettings.drip_tape.pressure}
-									onChange={(e) => handleSettingsChange('drip_tape', 'pressure', parseFloat(e.target.value) || 1.0)}
-									className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-blue-500"
-									placeholder="1.0"
-								/>
-							</div>
-						</div>
 							<div>
 								<label className="block text-xs text-gray-400 mb-2">
 									{t('Coverage Radius')}: {irrigationSettings.sprinkler_system.coverageRadius}m
@@ -1621,38 +1664,6 @@ export default function IrrigationGenerate({
 					<div className="rounded p-3 border border-white" style={{ backgroundColor: '#000005' }}>
 						<h4 className="font-medium text-white mb-3 text-sm">{t('System Pivot Settings')}</h4>
 						<div className="space-y-4">
-						<div className="grid grid-cols-2 gap-3">
-							<div>
-								<label className="block text-xs text-gray-400 mb-2">
-									{t('Flow')} (L/min)
-								</label>
-								<input
-									type="number"
-									min={0.5}
-									max={10}
-									step={0.1}
-									value={irrigationSettings.water_jet_tape.flow}
-									onChange={(e) => handleSettingsChange('water_jet_tape', 'flow', parseFloat(e.target.value) || 1.5)}
-									className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-orange-500"
-									placeholder="1.5"
-								/>
-							</div>
-							<div>
-								<label className="block text-xs text-gray-400 mb-2">
-									{t('Pressure')} (bar)
-								</label>
-								<input
-									type="number"
-									min={0.5}
-									max={3.0}
-									step={0.1}
-									value={irrigationSettings.water_jet_tape.pressure}
-									onChange={(e) => handleSettingsChange('water_jet_tape', 'pressure', parseFloat(e.target.value) || 1.5)}
-									className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white text-sm focus:outline-none focus:border-orange-500"
-									placeholder="1.5"
-								/>
-							</div>
-						</div>
 							<div>
 								<label className="block text-xs text-gray-400 mb-2">
 									{t('Coverage Radius')}: {irrigationSettings.pivot.coverageRadius}m
@@ -2694,7 +2705,7 @@ export default function IrrigationGenerate({
 													{t('Total Water Requirement')}
 												</div>
 												<div className="text-lg font-semibold text-blue-400">
-													{totalWaterRequirement.toFixed(1)} L/day
+													{totalWaterRequirement.toFixed(1)} ลิตร/ครั้ง
 												</div>
 												<div className="text-xs text-gray-400">
 													{t('Total water requirement for all plants')}
@@ -2704,64 +2715,12 @@ export default function IrrigationGenerate({
 													Debug: {finalPlantPoints.length} plants × {finalSelectedCrops.length > 0 ? (() => {
 														const crop = getCropByValue(finalSelectedCrops[0]);
 														return crop ? crop.waterRequirement : 0;
-													})() : 0} L/day/plant
+													})() : 0} ลิตร/ครั้ง/plant
 												</div>
 											</div>
 										</div>
 									)}
 
-									{/* Debug Information */}
-									<div className="rounded-lg p-4 border border-yellow-500" style={{ backgroundColor: '#000005' }}>
-										<h3 className="text-sm font-semibold text-yellow-400 mb-3">
-											🔍 Debug Info
-										</h3>
-										<div className="space-y-2 text-xs">
-											<div className="flex justify-between text-gray-400">
-												<span>Main Area Points:</span>
-												<span className="text-yellow-400">{finalMainArea.length}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Obstacles:</span>
-												<span className="text-yellow-400">{finalObstacles.length}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Plant Points:</span>
-												<span className="text-yellow-400">{finalPlantPoints.length}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Selected Crops:</span>
-												<span className="text-yellow-400">{finalSelectedCrops.length}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Parsed Crops:</span>
-												<span className="text-yellow-400">{parsedSelectedCrops.length}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Original Crops:</span>
-												<span className="text-yellow-400">{selectedCrops.length}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Crops URL Param:</span>
-												<span className="text-yellow-400">{crops || 'none'}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Irrigation Type:</span>
-												<span className="text-yellow-400">{selectedIrrigationType || 'none'}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Distance Overlays:</span>
-												<span className="text-yellow-400">{Object.keys(distanceOverlaysRef.current).length}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Water Sources:</span>
-												<span className="text-yellow-400">{finalObstacles.filter(o => o.type === 'water_source').length}</span>
-											</div>
-											<div className="flex justify-between text-gray-400">
-												<span>Map Loaded:</span>
-												<span className="text-yellow-400">{isMapLoaded ? 'yes' : 'no'}</span>
-											</div>
-										</div>
-									</div>
 
 									{/* Field Information Display */}
 									{finalMainArea.length > 0 && (
@@ -2794,7 +2753,7 @@ export default function IrrigationGenerate({
 														{finalSelectedCrops.length > 0 ? (() => {
 															const crop = getCropByValue(finalSelectedCrops[0]);
 															return crop ? crop.waterRequirement : 0;
-														})() : 0} L/day/plant
+														})() : 0} ลิตร/ครั้ง/plant
 													</span>
 												</div>
 												<div className="flex justify-between text-gray-400">
@@ -2915,87 +2874,6 @@ export default function IrrigationGenerate({
 											</div>
 										</div>
 									</div>
-
-									{/* Irrigation Equipment Summary */}
-									{(irrigationPositions.sprinklers.length > 0 ||
-										irrigationPositions.pivots.length > 0 ||
-										irrigationPositions.dripTapes.length > 0 ||
-										irrigationPositions.waterJets.length > 0) && (
-										<div className="rounded-lg p-4 border border-blue-500" style={{ backgroundColor: '#000005' }}>
-											<h3 className="text-sm font-semibold text-blue-400 mb-3">
-												💧 {t('Irrigation Equipment Summary')}
-											</h3>
-											<div className="space-y-2 text-xs">
-												{irrigationPositions.sprinklers.length > 0 && (
-													<div className="flex justify-between text-gray-400">
-														<span>🚿 {t('Sprinklers')}:</span>
-														<span className="text-blue-400">
-															{irrigationPositions.sprinklers.length} {t('units')}
-														</span>
-													</div>
-												)}
-												{irrigationPositions.pivots.length > 0 && (
-													<div className="flex justify-between text-gray-400">
-														<span>🔄 {t('Pivots')}:</span>
-														<span className="text-orange-400">
-															{irrigationPositions.pivots.length} {t('units')}
-														</span>
-													</div>
-												)}
-												{irrigationPositions.dripTapes.length > 0 && (
-													<div className="flex justify-between text-gray-400">
-														<span>💧 {t('Drip Tapes')}:</span>
-														<span className="text-blue-400">
-															{irrigationPositions.dripTapes.length} {t('units')}
-														</span>
-													</div>
-												)}
-												{irrigationPositions.waterJets.length > 0 && (
-													<div className="flex justify-between text-gray-400">
-														<span>🌊 {t('Water Jets')}:</span>
-														<span className="text-orange-400">
-															{irrigationPositions.waterJets.length} {t('units')}
-														</span>
-													</div>
-												)}
-												<div className="border-t border-gray-600 pt-2 mt-2">
-													<div className="flex justify-between text-gray-300">
-														<span>{t('Total Equipment')}:</span>
-														<span className="text-green-400 font-semibold">
-															{irrigationPositions.sprinklers.length + 
-															 irrigationPositions.pivots.length + 
-															 irrigationPositions.dripTapes.length + 
-															 irrigationPositions.waterJets.length} {t('units')}
-														</span>
-													</div>
-												</div>
-											</div>
-										</div>
-									)}
-
-									{/* Step Completion Status */}
-									{(irrigationPositions.sprinklers.length > 0 ||
-										irrigationPositions.pivots.length > 0 ||
-										irrigationPositions.dripTapes.length > 0 ||
-										irrigationPositions.waterJets.length > 0) && (
-										<div className="rounded-lg p-4 border border-green-500" style={{ backgroundColor: '#000005' }}>
-											<div className="flex items-center gap-2">
-												<svg className="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-													<path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-												</svg>
-												<h3 className="text-sm font-semibold text-green-400">
-													{t('Step 2 Completed')} ✓
-												</h3>
-											</div>
-											<div className="text-xs text-green-300 mt-2">
-												{irrigationPositions.sprinklers.length > 0 && `🚿 ${irrigationPositions.sprinklers.length} ${t('sprinklers')} `}
-												{irrigationPositions.pivots.length > 0 && `🔄 ${irrigationPositions.pivots.length} ${t('pivots')} `}
-												{irrigationPositions.dripTapes.length > 0 && `💧 ${irrigationPositions.dripTapes.length} ${t('drip points')} `}
-												{irrigationPositions.waterJets.length > 0 && `🌊 ${irrigationPositions.waterJets.length} ${t('water jets')} `}
-												{t('generated successfully')}
-											</div>
-										</div>
-									)}
 
 									{/* Irrigation Settings - Show only when type is selected */}
 									{selectedIrrigationType && (
