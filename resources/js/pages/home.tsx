@@ -1210,6 +1210,7 @@ export default function Home() {
         setFolderHistory([]);
     }, []);
 
+
     const handleAddField = () => {
         setShowCategoryModal(true);
     };
@@ -1680,6 +1681,7 @@ export default function Home() {
         setSelectedFolder(null);
         setFolderHistory([]);
     };
+
 
     if (loading) {
         return (
@@ -2303,6 +2305,7 @@ export default function Home() {
                     </div>
                 </div>
             )}
+
         </div>
     );
 }

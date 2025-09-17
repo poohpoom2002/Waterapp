@@ -19,8 +19,12 @@ use App\Http\Controllers\FarmController; // เพิ่มบรรทัดน
 */
 
 Route::get('/', function () {
-    return Inertia::render('home');
+    return Inertia::render('new-home');
 })->middleware(['auth', 'verified'])->name('home');
+
+Route::get('/fields', function () {
+    return Inertia::render('home');
+})->middleware(['auth', 'verified'])->name('fields');
 
 // Test route without authentication
 Route::get('/test', function () {

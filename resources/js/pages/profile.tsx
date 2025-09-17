@@ -18,6 +18,17 @@ interface User {
     created_at?: string;
     profile_photo_url?: string;
     is_super_user?: boolean;
+    tier?: string;
+    tier_expires_at?: string;
+    monthly_tokens?: number;
+    tokens?: number;
+    total_tokens_used?: number;
+    tier_info?: {
+        tier: string;
+        tier_expires_at?: string;
+        monthly_tokens: number;
+        is_tier_active: boolean;
+    };
 }
 
 interface ProfileProps {
@@ -40,6 +51,46 @@ export default function Profile() {
     }
 
     const user = auth.user;
+
+    // Helper function to get tier display information
+    const getTierDisplayInfo = (tier: string) => {
+        switch (tier) {
+            case 'free':
+                return {
+                    name: 'Free',
+                    color: 'text-gray-400',
+                    bgColor: 'bg-gray-900/30',
+                    icon: '🆓',
+                    description: 'Basic features with limited tokens'
+                };
+            case 'pro':
+                return {
+                    name: 'Pro',
+                    color: 'text-blue-400',
+                    bgColor: 'bg-blue-900/30',
+                    icon: '⭐',
+                    description: 'Advanced features with more tokens'
+                };
+            case 'advanced':
+                return {
+                    name: 'Advanced',
+                    color: 'text-purple-400',
+                    bgColor: 'bg-purple-900/30',
+                    icon: '💎',
+                    description: 'Premium features with maximum tokens'
+                };
+            default:
+                return {
+                    name: 'Free',
+                    color: 'text-gray-400',
+                    bgColor: 'bg-gray-900/30',
+                    icon: '🆓',
+                    description: 'Basic features with limited tokens'
+                };
+        }
+    };
+
+    const tierInfo = getTierDisplayInfo(user?.tier || 'free');
 
     const [isEditing, setIsEditing] = useState(false);
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -75,6 +126,7 @@ export default function Profile() {
         router.reload();
     };
 
+
     return (
         <div className="min-h-screen bg-gray-900">
             <Head title="Profile" />
@@ -92,10 +144,10 @@ export default function Profile() {
                                 </p>
                             </div>
                             <button
-                                onClick={() => router.visit('/')}
+                                onClick={() => router.visit('/fields')}
                                 className="rounded-lg bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
                             >
-                                ← Back to Home
+                                ← Back to Fields
                             </button>
                         </div>
                     </div>
@@ -116,7 +168,7 @@ export default function Profile() {
                                             {user.name}
                                         </h2>
                                         <p className="text-gray-400">{user.email}</p>
-                                        <div className="flex gap-2">
+                                        <div className="flex flex-wrap gap-2">
                                             {user.email_verified_at && (
                                                 <span className="inline-flex items-center gap-1 rounded-full bg-green-900/30 px-2 py-1 text-xs text-green-400">
                                                     ✓ Verified Email
@@ -127,6 +179,9 @@ export default function Profile() {
                                                     👑 Super User
                                                 </span>
                                             )}
+                                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${tierInfo.bgColor} ${tierInfo.color}`}>
+                                                    {tierInfo.icon} {tierInfo.name} Plan
+                                                </span>
                                         </div>
                                     </div>
                                 </div>
@@ -229,6 +284,66 @@ export default function Profile() {
 
                         {/* Sidebar */}
                         <div className="space-y-6">
+                            {/* Tier Information */}
+                            <div className="rounded-lg bg-gray-800 p-6">
+                                <h3 className="mb-4 text-lg font-semibold text-white">
+                                    🎯 Subscription Plan
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="text-center">
+                                        <div className={`inline-flex items-center gap-2 rounded-lg ${tierInfo.bgColor} px-4 py-3`}>
+                                            <span className="text-2xl">{tierInfo.icon}</span>
+                                            <div>
+                                                <div className={`text-lg font-bold ${tierInfo.color}`}>
+                                                    {tierInfo.name} Plan
+                                                </div>
+                                                <div className="text-xs text-gray-400">
+                                                    {tierInfo.description}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">Monthly tokens:</span>
+                                            <span className="text-white">
+                                                {user?.monthly_tokens || 100}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">Current tokens:</span>
+                                            <span className="text-white">
+                                                {user?.tokens || 0}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-400">Total used:</span>
+                                            <span className="text-white">
+                                                {user?.total_tokens_used || 0}
+                                            </span>
+                                        </div>
+                                        {user?.tier !== 'free' && user?.tier_expires_at && (
+                                            <div className="flex justify-between">
+                                                <span className="text-gray-400">Expires:</span>
+                                                <span className="text-white">
+                                                    {new Date(user.tier_expires_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {user?.tier === 'free' && !user?.is_super_user && (
+                                        <button
+                                            onClick={() => router.visit('/')}
+                                            className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                                        >
+                                            ⬆️ Upgrade Plan
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Account Stats */}
                             <div className="rounded-lg bg-gray-800 p-6">
                                 <h3 className="mb-4 text-lg font-semibold text-white">
@@ -349,6 +464,7 @@ export default function Profile() {
                     </div>
                 </div>
             )}
+
         </div>
     );
 }
