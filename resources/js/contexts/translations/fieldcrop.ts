@@ -87,7 +87,7 @@ export const fieldCropTranslations = {
         'Search places...': 'Search places...',
         'Clear search': 'Clear search',
         'No places found for "{query}"': 'No places found for "{query}"',
-
+        
         // Zone and plant assignment
         'Assign Plant to {zoneName}': 'Assign Plant to {zoneName}',
         'Zone Color': 'Zone Color',
@@ -106,8 +106,7 @@ export const fieldCropTranslations = {
         'Failed to load saved project data': 'Failed to load saved project data',
         'No saved project data found': 'No saved project data found',
         'Please complete step {step} first': 'Please complete step {step} first',
-        'Please complete step {step} requirements first':
-            'Please complete step {step} requirements first',
+        'Please complete step {step} requirements first': 'Please complete step {step} requirements first',
         'Error placing equipment:': 'Error placing equipment:',
         'Drawing error. Please try again.': 'Drawing error. Please try again.',
         'Maximum number of zones reached': 'Maximum number of zones reached',
@@ -121,7 +120,7 @@ export const fieldCropTranslations = {
         'Snap to Grid': 'Snap to Grid',
         'Enable Grid': 'Enable Grid',
         'Pipe Snap': 'Pipe Snap',
-
+        
         // Field information
         'Map View': 'Map View',
         'Field Area': 'Field Area',
@@ -131,7 +130,7 @@ export const fieldCropTranslations = {
         Area: 'Area',
         Status: 'Status',
         'Calculating...': 'Calculating...',
-
+        
         // Zone Management
         'Zone Management': 'Zone Management',
         Zone: 'Zone',
@@ -191,7 +190,7 @@ export const fieldCropTranslations = {
         'Clear Irrigation': 'Clear Irrigation',
         Generate: 'Generate',
         Clear: 'Clear',
-
+        
         // Irrigation settings
         Radius: 'Radius',
         'Coverage Radius': 'Coverage Radius',
@@ -215,13 +214,11 @@ export const fieldCropTranslations = {
         'Growth Period': 'Growth Period',
         'Reset all spacing to crop defaults': 'Reset all spacing to crop defaults',
         'Reset Defaults': 'Reset Defaults',
-        'No crops selected for spacing configuration':
-            'No crops selected for spacing configuration',
+        'No crops selected for spacing configuration': 'No crops selected for spacing configuration',
         Default: 'Default',
         'Modified spacing': 'Modified spacing',
         'Plants/m²': 'Plants/m²',
-        'Yellow (*) indicates modified values from crop defaults':
-            'Yellow (*) indicates modified values from crop defaults',
+        'Yellow (*) indicates modified values from crop defaults': 'Yellow (*) indicates modified values from crop defaults',
         'Water req': 'Water req',
         Growth: 'Growth',
 
@@ -236,9 +233,8 @@ export const fieldCropTranslations = {
         'View Summary': 'View Summary',
         'Final Step': 'Final Step',
         'Project Complete!': 'Project Complete!',
-        'All steps completed successfully. Ready to view your project summary.':
-            'All steps completed successfully. Ready to view your project summary.',
-
+        'All steps completed successfully. Ready to view your project summary.': 'All steps completed successfully. Ready to view your project summary.',
+        
         // Status indicators
         Confirm: 'Confirm',
         Save: 'Save',
@@ -257,20 +253,15 @@ export const fieldCropTranslations = {
         'Error calculating field area': 'Error calculating field area',
         'Error generating lateral pipes': 'Error generating lateral pipes',
         'Error generating irrigation': 'Error generating irrigation',
-        'Error generating {irrigationType} for {zoneName}: {error}':
-            'Error generating {irrigationType} for {zoneName}: {error}',
-        'Error generating pipes for {zoneName}: {error}':
-            'Error generating pipes for {zoneName}: {error}',
+        'Error generating {irrigationType} for {zoneName}: {error}': 'Error generating {irrigationType} for {zoneName}: {error}',
+        'Error generating pipes for {zoneName}: {error}': 'Error generating pipes for {zoneName}: {error}',
         'Please enter a valid row spacing value': 'Please enter a valid row spacing value',
         'Please enter a valid plant spacing value': 'Please enter a valid plant spacing value',
-        'Row spacing should be between 5cm and 300cm':
-            'Row spacing should be between 5cm and 300cm',
-        'Plant spacing should be between 5cm and 200cm':
-            'Plant spacing should be between 5cm and 200cm',
+        'Row spacing should be between 5cm and 300cm': 'Row spacing should be between 5cm and 300cm',
+        'Plant spacing should be between 5cm and 200cm': 'Plant spacing should be between 5cm and 200cm',
         'Unable to search places': 'Unable to search places',
         'No irrigation points found for this zone': 'No irrigation points found for this zone',
-        'Remove all irrigation from {zoneName} ({count} points)?':
-            'Remove all irrigation from {zoneName} ({count} points)?',
+        'Remove all irrigation from {zoneName} ({count} points)?': 'Remove all irrigation from {zoneName} ({count} points)?',
         'Remove all {count} lateral pipes?': 'Remove all {count} lateral pipes?',
 
         // field-crop-summary.tsx
@@ -309,20 +300,20 @@ export const fieldCropTranslations = {
         'Blue Main Pipes': 'Blue Main Pipes',
         'Green Submain Pipes': 'Green Submain Pipes',
         'Orange/Purple Lateral Pipes': 'Orange/Purple Lateral Pipes',
-
+        
         // Equipment summary
         Equipments: 'Equipment',
         Pumps: 'Pumps',
         Valves: 'Valves',
         Solenoids: 'Solenoids',
-
+        
         // Irrigation summary
         'Irrigation System': 'Irrigation System',
         Sprinklers: 'Sprinklers',
         'Mini Sprinklers': 'Mini Sprinklers',
         'Micro Sprays': 'Micro Sprays',
         'Drip Points': 'Drip Points',
-
+        
         // Financial and water summary
         'Financial & Water Summary': 'Financial & Water Summary',
         'Total Estimated Yield': 'Total Estimated Yield',
@@ -333,12 +324,11 @@ export const fieldCropTranslations = {
         'Total Plants:': 'Total Plants:',
         'Active Zones:': 'Active Zones:',
         'Water Need per Irrigation:': 'Water Need per Irrigation:',
-        'Water Requirements by Zone (per irrigation):':
-            'Water Requirements by Zone (per irrigation):',
+        'Water Requirements by Zone (per irrigation):': 'Water Requirements by Zone (per irrigation):',
         'Water Requirements (liters per irrigation - from cropData)':
             'Water Requirements (liters per irrigation - from cropData)',
         'Water calculation:': 'Water calculation:',
-
+        
         // Zone details
         'Zone Details & Irrigation Systems (liters per irrigation)':
             'Zone Details & Irrigation Systems (liters per irrigation)',
@@ -363,7 +353,7 @@ export const fieldCropTranslations = {
         'Total Pipes in Zone': 'Total Pipes in Zone',
         'No crop assigned to this zone': 'No crop assigned to this zone',
         'Cannot calculate water requirements': 'Cannot calculate water requirements',
-
+        
         // Actions and metadata
         Actions: 'Actions',
         'Edit Project': 'Edit Project',
@@ -374,7 +364,7 @@ export const fieldCropTranslations = {
         'Design water distribution network': 'Design water distribution network',
         'Set irrigation systems for each zone': 'Set irrigation systems for each zone',
         'Calculated approximately {count} points': 'Calculated approximately {count} points',
-
+        
         // Image capture and map
         'Loading Google Maps...': 'Loading Google Maps...',
         'Map image captured successfully': 'Map image captured successfully',
@@ -385,7 +375,7 @@ export const fieldCropTranslations = {
         'Image capture status:': 'Image capture status:',
         'Successfully saved': 'Successfully saved',
         'Image not captured yet': 'Image not captured yet',
-
+        
         // Data and statistics
         'No data to show': 'No data to show',
         trees: 'trees',
@@ -420,12 +410,9 @@ export const fieldCropTranslations = {
         'L/irrigation': 'L/irrigation',
         
         // New spacing update messages
-        'Updated row spacing for {cropName}: {value}cm':
-            'Updated row spacing for {cropName}: {value}cm',
-        'Updated plant spacing for {cropName}: {value}cm':
-            'Updated plant spacing for {cropName}: {value}cm',
-        'Reset spacing to defaults for {count} crops':
-            'Reset spacing to defaults for {count} crops',
+        'Updated row spacing for {cropName}: {value}cm': 'Updated row spacing for {cropName}: {value}cm',
+        'Updated plant spacing for {cropName}: {value}cm': 'Updated plant spacing for {cropName}: {value}cm',
+        'Reset spacing to defaults for {count} crops': 'Reset spacing to defaults for {count} crops',
 
         // Fittings section (trimmed to only keys used by 5 pages)
         Main: 'Main',
@@ -436,21 +423,18 @@ export const fieldCropTranslations = {
         'Total Irrigation Points:': 'Total Irrigation Points:',
 
         // เพิ่มใน translation files
-        'Pipe Connections': 'Pipe Connections',
-        'Click another junction to connect, or draw a new pipe':
-            'Click another junction to connect, or draw a new pipe',
-        'Click a junction point to start connecting pipes':
-            'Click a junction point to start connecting pipes',
-        'Connecting from': 'Connecting from',
-        'Cancel Connection': 'Cancel Connection',
-        'Main pipe junctions': 'Main pipe junctions',
-        'Submain pipe junctions': 'Submain pipe junctions',
-        'Clear All Junctions': 'Clear All Junctions',
-        'Connection Mode Active': 'Connection Mode Active',
-        From: 'From',
-        'Connection Mode: Click another junction or draw a new pipe':
-            'Connection Mode: Click another junction or draw a new pipe',
-        'Error connecting pipes': 'Error connecting pipes',
+        "Pipe Connections": "Pipe Connections",
+        "Click another junction to connect, or draw a new pipe": "Click another junction to connect, or draw a new pipe",
+        "Click a junction point to start connecting pipes": "Click a junction point to start connecting pipes",
+        "Connecting from": "Connecting from",
+        "Cancel Connection": "Cancel Connection",
+        "Main pipe junctions": "Main pipe junctions",
+        "Submain pipe junctions": "Submain pipe junctions",
+        "Clear All Junctions": "Clear All Junctions",
+        "Connection Mode Active": "Connection Mode Active",
+        "From": "From",
+        "Connection Mode: Click another junction or draw a new pipe": "Connection Mode: Click another junction or draw a new pipe",
+        "Error connecting pipes": "Error connecting pipes"
     },
     th: {
         // Common
@@ -537,7 +521,7 @@ export const fieldCropTranslations = {
         'Search places...': 'ค้นหาสถานที่...',
         'Clear search': 'ล้างการค้นหา',
         'No places found for "{query}"': 'ไม่พบสถานที่สำหรับ "{query}"',
-
+        
         // Zone and plant assignment
         'Assign Plant to {zoneName}': 'กำหนดพืชให้กับ {zoneName}',
         'Zone Color': 'สีของโซน',
@@ -556,8 +540,7 @@ export const fieldCropTranslations = {
         'Failed to load saved project data': 'ไม่สามารถโหลดข้อมูลโปรเจกต์ที่บันทึกไว้ได้',
         'No saved project data found': 'ไม่พบข้อมูลโปรเจกต์ที่บันทึกไว้',
         'Please complete step {step} first': 'กรุณาทำขั้นตอนที่ {step} ให้เสร็จก่อน',
-        'Please complete step {step} requirements first':
-            'กรุณาทำตามข้อกำหนดขั้นตอนที่ {step} ให้เสร็จก่อน',
+        'Please complete step {step} requirements first': 'กรุณาทำตามข้อกำหนดขั้นตอนที่ {step} ให้เสร็จก่อน',
         'Error placing equipment:': 'เกิดข้อผิดพลาดในการวางอุปกรณ์:',
         'Drawing error. Please try again.': 'เกิดข้อผิดพลาดในการวาด กรุณาลองใหม่',
         'Maximum number of zones reached': 'ถึงจำนวนโซนสูงสุดแล้ว',
@@ -571,7 +554,7 @@ export const fieldCropTranslations = {
         'Snap to Grid': 'ยึดติดกับตาราง',
         'Enable Grid': 'เปิดใช้ตาราง',
         'Pipe Snap': 'ยึดติดท่อ',
-
+        
         // Field information
         'Map View': 'มุมมองแผนที่',
         'Field Area': 'พื้นที่ไร่',
@@ -581,7 +564,7 @@ export const fieldCropTranslations = {
         Area: 'พื้นที่',
         Status: 'สถานะ',
         'Calculating...': 'กำลังคำนวณ...',
-
+        
         // Zone Management
         'Zone Management': 'การจัดการโซน',
         Zone: 'โซน',
@@ -641,7 +624,7 @@ export const fieldCropTranslations = {
         'Clear Irrigation': 'ลบระบบชลประทาน',
         Generate: 'สร้าง',
         Clear: 'ลบ',
-
+        
         // Irrigation settings
         Radius: 'รัศมี',
         'Coverage Radius': 'รัศมีความครอบคลุม',
@@ -669,8 +652,7 @@ export const fieldCropTranslations = {
         Default: 'ค่าเริ่มต้น',
         'Modified spacing': 'ระยะห่างที่ปรับแล้ว',
         'Plants/m²': 'ต้น/ตร.ม.',
-        'Yellow (*) indicates modified values from crop defaults':
-            'สีเหลือง (*) แสดงค่าที่ปรับจากค่าเริ่มต้นของพืช',
+        'Yellow (*) indicates modified values from crop defaults': 'สีเหลือง (*) แสดงค่าที่ปรับจากค่าเริ่มต้นของพืช',
         'Water req': 'ความต้องการน้ำ',
         Growth: 'การเจริญเติบโต',
 
@@ -685,9 +667,8 @@ export const fieldCropTranslations = {
         'View Summary': 'ดูสรุป',
         'Final Step': 'ขั้นตอนสุดท้าย',
         'Project Complete!': 'โครงการเสร็จสิ้น!',
-        'All steps completed successfully. Ready to view your project summary.':
-            'ทุกขั้นตอนเสร็จสิ้นเรียบร้อย พร้อมดูสรุปโครงการแล้ว',
-
+        'All steps completed successfully. Ready to view your project summary.': 'ทุกขั้นตอนเสร็จสิ้นเรียบร้อย พร้อมดูสรุปโครงการแล้ว',
+        
         // Status indicators
         Confirm: 'ยืนยัน',
         Save: 'บันทึก',
@@ -706,19 +687,15 @@ export const fieldCropTranslations = {
         'Error calculating field area': 'เกิดข้อผิดพลาดในการคำนวณพื้นที่ไร่',
         'Error generating lateral pipes': 'เกิดข้อผิดพลาดในการสร้างท่อย่อย',
         'Error generating irrigation': 'เกิดข้อผิดพลาดในการสร้างระบบชลประทาน',
-        'Error generating {irrigationType} for {zoneName}: {error}':
-            'เกิดข้อผิดพลาดในการสร้าง {irrigationType} สำหรับ {zoneName}: {error}',
-        'Error generating pipes for {zoneName}: {error}':
-            'เกิดข้อผิดพลาดในการสร้างท่อสำหรับ {zoneName}: {error}',
+        'Error generating {irrigationType} for {zoneName}: {error}': 'เกิดข้อผิดพลาดในการสร้าง {irrigationType} สำหรับ {zoneName}: {error}',
+        'Error generating pipes for {zoneName}: {error}': 'เกิดข้อผิดพลาดในการสร้างท่อสำหรับ {zoneName}: {error}',
         'Please enter a valid row spacing value': 'กรุณาใส่ค่าระยะห่างระหว่างแถวที่ถูกต้อง',
         'Please enter a valid plant spacing value': 'กรุณาใส่ค่าระยะห่างระหว่างต้นที่ถูกต้อง',
         'Row spacing should be between 5cm and 300cm': 'ระยะห่างระหว่างแถวควรอยู่ระหว่าง 5-300 ซม.',
-        'Plant spacing should be between 5cm and 200cm':
-            'ระยะห่างระหว่างต้นควรอยู่ระหว่าง 5-200 ซม.',
+        'Plant spacing should be between 5cm and 200cm': 'ระยะห่างระหว่างต้นควรอยู่ระหว่าง 5-200 ซม.',
         'Unable to search places': 'ไม่สามารถค้นหาสถานที่ได้',
         'No irrigation points found for this zone': 'ไม่พบจุดชลประทานสำหรับโซนนี้',
-        'Remove all irrigation from {zoneName} ({count} points)?':
-            'ลบระบบชลประทานทั้งหมดจาก {zoneName} ({count} จุด)?',
+        'Remove all irrigation from {zoneName} ({count} points)?': 'ลบระบบชลประทานทั้งหมดจาก {zoneName} ({count} จุด)?',
         'Remove all {count} lateral pipes?': 'ลบท่อย่อยทั้งหมด {count} เส้น?',
 
         // field-crop-summary.tsx
@@ -757,20 +734,20 @@ export const fieldCropTranslations = {
         'Blue Main Pipes': 'ท่อเมนสีน้ำเงิน',
         'Green Submain Pipes': 'ท่อรองสีเขียว',
         'Orange/Purple Lateral Pipes': 'ท่อย่อยสีส้ม/ม่วง',
-
+        
         // Equipment summary
         Equipments: 'อุปกรณ์',
         Pumps: 'ปั๊ม',
         Valves: 'วาล์ว',
         Solenoids: 'โซลินอยด์',
-
+        
         // Irrigation summary
         'Irrigation System': 'ระบบชลประทาน',
         Sprinklers: 'สปริงเกลอร์',
         'Mini Sprinklers': 'มินิสปริงเกลอร์',
         'Micro Sprays': 'ไมโครสเปรย์',
         'Drip Points': 'จุดน้ำหยด',
-
+        
         // Financial and water summary
         'Financial & Water Summary': 'สรุปการเงินและการใช้น้ำ',
         'Total Estimated Yield': 'ผลผลิตรวมโดยประมาณ',
@@ -785,7 +762,7 @@ export const fieldCropTranslations = {
         'Water Requirements (liters per irrigation - from cropData)':
             'ความต้องการน้ำ (ลิตรต่อการให้น้ำ - จาก cropData)',
         'Water calculation:': 'การคำนวณน้ำ:',
-
+        
         // Zone details
         'Zone Details & Irrigation Systems (liters per irrigation)':
             'รายละเอียดโซนและระบบชลประทาน (ลิตรต่อการให้น้ำ)',
@@ -810,7 +787,7 @@ export const fieldCropTranslations = {
         'Total Pipes in Zone': 'ท่อทั้งหมดในโซน',
         'No crop assigned to this zone': 'ไม่มีพืชที่กำหนดให้กับโซนนี้',
         'Cannot calculate water requirements': 'ไม่สามารถคำนวณความต้องการน้ำได้',
-
+        
         // Actions and metadata
         Actions: 'การดำเนินการ',
         'Edit Project': 'แก้ไขโปรเจกต์',
@@ -821,7 +798,7 @@ export const fieldCropTranslations = {
         'Design water distribution network': 'ออกแบบระบบการกระจายน้ำ',
         'Set irrigation systems for each zone': 'ตั้งค่าระบบชลประทานสำหรับแต่ละโซน',
         'Calculated approximately {count} points': 'คำนวณได้ประมาณ {count} จุด',
-
+        
         // Image capture and map
         'Loading Google Maps...': 'กำลังโหลด Google Maps...',
         'Map image captured successfully': 'จับภาพแผนที่สำเร็จ',
@@ -832,7 +809,7 @@ export const fieldCropTranslations = {
         'Image capture status:': 'สถานะการจับภาพ:',
         'Successfully saved': 'บันทึกสำเร็จ',
         'Image not captured yet': 'ยังไม่ได้จับภาพ',
-
+        
         // Data and statistics
         'No data to show': 'ไม่มีข้อมูลแสดง',
         trees: 'ต้น',
@@ -867,12 +844,9 @@ export const fieldCropTranslations = {
         'L/irrigation': 'ลิตร/ครั้ง',
         
         // New spacing update messages
-        'Updated row spacing for {cropName}: {value}cm':
-            'อัปเดตระยะห่างแถวสำหรับ {cropName}: {value} ซม.',
-        'Updated plant spacing for {cropName}: {value}cm':
-            'อัปเดตระยะห่างต้นสำหรับ {cropName}: {value} ซม.',
-        'Reset spacing to defaults for {count} crops':
-            'รีเซ็ตระยะห่างเป็นค่าเริ่มต้นสำหรับ {count} พืช',
+        'Updated row spacing for {cropName}: {value}cm': 'อัปเดตระยะห่างแถวสำหรับ {cropName}: {value} ซม.',
+        'Updated plant spacing for {cropName}: {value}cm': 'อัปเดตระยะห่างต้นสำหรับ {cropName}: {value} ซม.',
+        'Reset spacing to defaults for {count} crops': 'รีเซ็ตระยะห่างเป็นค่าเริ่มต้นสำหรับ {count} พืช',
 
         // Fittings section (trimmed to only keys used by 5 pages)
         Main: 'ท่อเมน',
@@ -883,20 +857,17 @@ export const fieldCropTranslations = {
         'Total Irrigation Points:': 'จำนวนจุดชลประทานรวม:',
 
         // เพิ่มใน translation files
-        'Pipe Connections': 'การเชื่อมต่อท่อ',
-        'Click another junction to connect, or draw a new pipe':
-            'คลิกจุดเชื่อมอื่นเพื่อเชื่อมต่อ หรือวาดท่อใหม่',
-        'Click a junction point to start connecting pipes':
-            'คลิกที่จุดเชื่อมเพื่อเริ่มเชื่อมต่อท่อ',
-        'Connecting from': 'เชื่อมต่อจาก',
-        'Cancel Connection': 'ยกเลิกการเชื่อมต่อ',
-        'Main pipe junctions': 'จุดเชื่อมท่อหลัก',
-        'Submain pipe junctions': 'จุดเชื่อมท่อย่อย',
-        'Clear All Junctions': 'ลบจุดเชื่อมทั้งหมด',
-        'Connection Mode Active': 'โหมดการเชื่อมต่อเปิดอยู่',
-        From: 'จาก',
-        'Connection Mode: Click another junction or draw a new pipe':
-            'โหมดเชื่อมต่อ: คลิกจุดเชื่อมอื่นหรือวาดท่อใหม่',
-        'Error connecting pipes': 'เกิดข้อผิดพลาดในการเชื่อมต่อท่อ',
+        "Pipe Connections": "การเชื่อมต่อท่อ",
+        "Click another junction to connect, or draw a new pipe": "คลิกจุดเชื่อมอื่นเพื่อเชื่อมต่อ หรือวาดท่อใหม่",
+        "Click a junction point to start connecting pipes": "คลิกที่จุดเชื่อมเพื่อเริ่มเชื่อมต่อท่อ",
+        "Connecting from": "เชื่อมต่อจาก",
+        "Cancel Connection": "ยกเลิกการเชื่อมต่อ",
+        "Main pipe junctions": "จุดเชื่อมท่อหลัก",
+        "Submain pipe junctions": "จุดเชื่อมท่อย่อย",
+        "Clear All Junctions": "ลบจุดเชื่อมทั้งหมด",
+        "Connection Mode Active": "โหมดการเชื่อมต่อเปิดอยู่",
+        "From": "จาก",
+        "Connection Mode: Click another junction or draw a new pipe": "โหมดเชื่อมต่อ: คลิกจุดเชื่อมอื่นหรือวาดท่อใหม่",
+        "Error connecting pipes": "เกิดข้อผิดพลาดในการเชื่อมต่อท่อ"
     },
 };

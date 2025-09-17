@@ -191,17 +191,17 @@ export const greenhouseCrops: Crop[] = [
 
 // Categories definition (greenhouse only)
 export const categories: Record<string, Category> = {
-    vegetables: {
+    vegetables: { 
         name: 'Vegetables', // Default fallback
-        nameEn: 'Vegetables',
-        nameTh: 'ผัก',
-        icon: '🥬',
+        nameEn: 'Vegetables', 
+        nameTh: 'ผัก', 
+        icon: '🥬' 
     },
-    fruits: {
+    fruits: { 
         name: 'Fruits', // Default fallback
-        nameEn: 'Fruits',
-        nameTh: 'ผลไม้',
-        icon: '🍓',
+        nameEn: 'Fruits', 
+        nameTh: 'ผลไม้', 
+        icon: '🍓' 
     },
 };
 

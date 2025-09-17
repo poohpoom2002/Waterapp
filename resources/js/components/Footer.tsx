@@ -2,15 +2,7 @@ import React from 'react';
 import { MapPin, Phone, Mail, Globe, Award, Users, Package, Clock } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 const Footer: React.FC = () => {
-    // Add safety check for language context
-    let t: (key: string) => string;
-    try {
-        const languageContext = useLanguage();
-        t = languageContext.t;
-    } catch (error) {
-        // Fallback function if context is not available
-        t = (key: string) => key;
-    }
+    const { t } = useLanguage();
     return (
         <footer id="contact-footer" className="bg-black text-gray-300">
             {/* Main Footer Content */}
@@ -18,16 +10,12 @@ const Footer: React.FC = () => {
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
                     {/* Company Info - Kanok Product */}
                     <div className="space-y-4">
-                        <h3 className="mb-4 text-xl font-bold text-white">
-                            {t('บจก.กนกโปรดักส์')}
-                        </h3>
+                        <h3 className="mb-4 text-xl font-bold text-white">{t('บจก.กนกโปรดักส์')}</h3>
                         <div className="space-y-3">
                             <div className="flex items-start space-x-3">
                                 <MapPin className="mt-1 h-5 w-5 flex-shrink-0 text-blue-400" />
                                 <p className="text-sm">
-                                    {t(
-                                        '15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150'
-                                    )}
+                                {t('15-23 ซ.พระยามนธาตุฯ แยก10 ถ.บางขุนเทียน แขวงคลองบางบอน เขตบางบอน กรุงเทพมหานคร 10150')}
                                 </p>
                             </div>
                             <div className="flex items-center space-x-3">
@@ -47,17 +35,13 @@ const Footer: React.FC = () => {
                     </div>
 
                     {/* Company Info - Chaiyo */}
-                    <div className="min-w-0 space-y-4">
-                        <h3 className="mb-4 whitespace-nowrap text-xl font-bold text-white">
-                            {t('บจก.ไชโยไปป์แอนด์ฟิตติ้ง')}
-                        </h3>
+                    <div className="space-y-4 min-w-0">
+                        <h3 className="mb-4 text-xl font-bold text-white whitespace-nowrap">{t('บจก.ไชโยไปป์แอนด์ฟิตติ้ง')}</h3>
                         <div className="space-y-3">
                             <div className="flex items-start space-x-3">
                                 <MapPin className="mt-1 h-5 w-5 flex-shrink-0 text-blue-400" />
                                 <p className="text-sm">
-                                    {t(
-                                        '71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000'
-                                    )}
+                                {t('71/6 หมู่ 1 ตำบลคอกกระบือ อำเภอเมืองสมุทรสาคร จ.สมุทรสาคร 74000')}
                                 </p>
                             </div>
                             <div className="flex items-center space-x-3">
@@ -73,9 +57,7 @@ const Footer: React.FC = () => {
 
                     {/* Products & Services */}
                     <div className="space-y-4">
-                        <h3 className="mb-4 text-xl font-bold text-white">
-                            {t('ผลิตภัณฑ์และบริการ')}
-                        </h3>
+                        <h3 className="mb-4 text-xl font-bold text-white">{t('ผลิตภัณฑ์และบริการ')}</h3>
                         <ul className="space-y-2 text-sm">
                             <li className="flex items-center space-x-2">
                                 <Package className="h-4 w-4 text-orange-400" />
@@ -176,9 +158,7 @@ const Footer: React.FC = () => {
                 <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
                     <div className="flex flex-col items-center justify-between space-y-4 md:flex-row md:space-y-0">
                         <div className="text-sm text-gray-300">
-                            {t(
-                                '© 2025 บจก.กนกโปรดักส์ จำกัด และ บจก.ไชโย ไปป์แอนด์ฟิตติ้ง จำกัด สงวนลิขสิทธิ์'
-                            )}
+                            {t('© 2025 บจก.กนกโปรดักส์ จำกัด และ บจก.ไชโย ไปป์แอนด์ฟิตติ้ง จำกัด สงวนลิขสิทธิ์')}
                         </div>
                         <div className="text-sm text-gray-300">{t('ผู้นำด้านระบบน้ำการเกษตร')}</div>
                     </div>

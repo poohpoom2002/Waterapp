@@ -41,8 +41,8 @@ interface FieldMapToolsPanelProps {
     previousStep: () => void;
     resetAll: () => void;
 
-    // NEW: เพิ่ม props สำหรับ crop spacing functions
-    getCropSpacingInfo?: (cropValue: string) => {
+     // NEW: เพิ่ม props สำหรับ crop spacing functions
+     getCropSpacingInfo?: (cropValue: string) => {
         defaultRowSpacing: number;
         defaultPlantSpacing: number;
         currentRowSpacing: number;
@@ -122,31 +122,23 @@ interface FieldMapToolsPanelProps {
         minAngle: number;
         angleStep: number;
     };
-    setBranchPipeSettings: React.Dispatch<
-        React.SetStateAction<{
-            defaultAngle: number;
-            maxAngle: number;
-            minAngle: number;
-            angleStep: number;
-        }>
-    >;
+    setBranchPipeSettings: React.Dispatch<React.SetStateAction<{
+        defaultAngle: number;
+        maxAngle: number;
+        minAngle: number;
+        angleStep: number;
+    }>>;
     realTimeEditing: {
         activePipeId: any;
         activeAngle: number;
         isAdjusting: boolean;
     };
-    setRealTimeEditing: React.Dispatch<
-        React.SetStateAction<{
-            activePipeId: any;
-            activeAngle: number;
-            isAdjusting: boolean;
-        }>
-    >;
-    regenerateLateralPipesWithAngle: (
-        pipeId: any,
-        newAngle: number,
-        targetZone: any
-    ) => LateralPipe[];
+    setRealTimeEditing: React.Dispatch<React.SetStateAction<{
+        activePipeId: any;
+        activeAngle: number;
+        isAdjusting: boolean;
+    }>>;
+    regenerateLateralPipesWithAngle: (pipeId: any, newAngle: number, targetZone: any) => LateralPipe[];
 
     // Irrigation
     irrigationAssignments: any;
@@ -297,7 +289,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
         if (!crop) return [];
 
         const recommendations: string[] = [];
-
+        
         switch (crop.irrigationNeedsKey) {
             case 'high':
                 recommendations.push('sprinkler', 'drip-tape');
@@ -309,7 +301,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                 recommendations.push('micro_spray', 'drip-tape');
                 break;
         }
-
+        
         return recommendations;
     };
 
@@ -323,83 +315,81 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
         return Math.max(0.2, Math.min(0.5, plantSpacingInMeters));
     };
 
-    const calculatePlantsInZone = useCallback(
-        (zoneId: string): number => {
-            const zone = zones.find((z) => z.id.toString() === zoneId);
-            const assignedCrop = zoneAssignments[zoneId];
-
-            if (!zone || !assignedCrop) return 0;
-
-            console.log(`🧮 Calculating plants for zone ${zoneId}:`, {
-                zoneName: zone.name,
-                cropValue: assignedCrop,
-            });
-
-            // ตรวจสอบข้อมูล spacing ปัจจุบัน
-            const currentRowSpacing = rowSpacing[assignedCrop] || 25; // default 25cm for rice
-            const currentPlantSpacing = plantSpacing[assignedCrop] || 25; // default 25cm for rice
-
-            console.log(`📏 Current spacing:`, {
-                rowSpacing: `${currentRowSpacing} cm`,
-                plantSpacing: `${currentPlantSpacing} cm`,
-            });
-
-            try {
-                // คำนวณพื้นที่ zone
-                const polygonCoords = zone.coordinates.map((coord: any) => [coord.lng, coord.lat]);
-                const firstPoint = polygonCoords[0];
-                const lastPoint = polygonCoords[polygonCoords.length - 1];
-
-                if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
-                    polygonCoords.push(firstPoint);
-                }
-
-                const turfPolygon = turf.polygon([polygonCoords]);
-                const areaInSquareMeters = turf.area(turfPolygon);
-
-                console.log(`📐 Zone area: ${areaInSquareMeters.toFixed(2)} ตร.ม.`);
-
-                // ตรวจสอบว่าพื้นที่สมเหตุสมผลหรือไม่
-                if (areaInSquareMeters < 1) {
-                    console.warn(`⚠️ Zone area too small: ${areaInSquareMeters} ตร.ม.`);
-                    return 0;
-                }
-
-                // แปลง cm เป็น m (ต้องแน่ใจว่าหน่วยถูก)
-                const rowSpacingInM = currentRowSpacing / 100;
-                const plantSpacingInM = currentPlantSpacing / 100;
-
-                // คำนวณจำนวนต้นต่อ ตร.ม.
-                const plantsPerSquareMeter = 1 / (rowSpacingInM * plantSpacingInM);
-
-                // จำนวนต้นทั้งหมดใน zone
-                const totalPlants = Math.floor(areaInSquareMeters * plantsPerSquareMeter);
-
-                console.log(`🌱 Plant calculation details:`, {
-                    areaM2: areaInSquareMeters.toFixed(2),
-                    rowSpacingM: rowSpacingInM.toFixed(2),
-                    plantSpacingM: plantSpacingInM.toFixed(2),
-                    plantsPerSqm: plantsPerSquareMeter.toFixed(1),
-                    totalPlants: totalPlants.toLocaleString(),
-                });
-
-                // เตือนถ้าจำนวนต้นน้อยผิดปกติ
-                if (totalPlants < 100 && areaInSquareMeters > 100) {
-                    console.warn(`⚠️ Unusually low plant count for area:`, {
-                        plants: totalPlants,
-                        area: areaInSquareMeters.toFixed(2),
-                        possibleIssue: 'Check spacing units or crop data',
-                    });
-                }
-
-                return totalPlants;
-            } catch (error) {
-                console.error('Error calculating plants in zone:', error);
+    const calculatePlantsInZone = useCallback((zoneId: string): number => {
+        const zone = zones.find(z => z.id.toString() === zoneId);
+        const assignedCrop = zoneAssignments[zoneId];
+        
+        if (!zone || !assignedCrop) return 0;
+        
+        console.log(`🧮 Calculating plants for zone ${zoneId}:`, {
+            zoneName: zone.name,
+            cropValue: assignedCrop
+        });
+        
+        // ตรวจสอบข้อมูล spacing ปัจจุบัน
+        const currentRowSpacing = rowSpacing[assignedCrop] || 25; // default 25cm for rice
+        const currentPlantSpacing = plantSpacing[assignedCrop] || 25; // default 25cm for rice
+        
+        console.log(`📏 Current spacing:`, {
+            rowSpacing: `${currentRowSpacing} cm`,
+            plantSpacing: `${currentPlantSpacing} cm`
+        });
+        
+        try {
+            // คำนวณพื้นที่ zone
+            const polygonCoords = zone.coordinates.map((coord: any) => [coord.lng, coord.lat]);
+            const firstPoint = polygonCoords[0];
+            const lastPoint = polygonCoords[polygonCoords.length - 1];
+            
+            if (firstPoint[0] !== lastPoint[0] || firstPoint[1] !== lastPoint[1]) {
+                polygonCoords.push(firstPoint);
+            }
+            
+            const turfPolygon = turf.polygon([polygonCoords]);
+            const areaInSquareMeters = turf.area(turfPolygon);
+            
+            console.log(`📐 Zone area: ${areaInSquareMeters.toFixed(2)} ตร.ม.`);
+            
+            // ตรวจสอบว่าพื้นที่สมเหตุสมผลหรือไม่
+            if (areaInSquareMeters < 1) {
+                console.warn(`⚠️ Zone area too small: ${areaInSquareMeters} ตร.ม.`);
                 return 0;
             }
-        },
-        [zones, zoneAssignments, rowSpacing, plantSpacing]
-    );
+            
+            // แปลง cm เป็น m (ต้องแน่ใจว่าหน่วยถูก)
+            const rowSpacingInM = currentRowSpacing / 100;
+            const plantSpacingInM = currentPlantSpacing / 100;
+            
+            // คำนวณจำนวนต้นต่อ ตร.ม.
+            const plantsPerSquareMeter = 1 / (rowSpacingInM * plantSpacingInM);
+            
+            // จำนวนต้นทั้งหมดใน zone
+            const totalPlants = Math.floor(areaInSquareMeters * plantsPerSquareMeter);
+            
+            console.log(`🌱 Plant calculation details:`, {
+                areaM2: areaInSquareMeters.toFixed(2),
+                rowSpacingM: rowSpacingInM.toFixed(2),
+                plantSpacingM: plantSpacingInM.toFixed(2),
+                plantsPerSqm: plantsPerSquareMeter.toFixed(1),
+                totalPlants: totalPlants.toLocaleString()
+            });
+            
+            // เตือนถ้าจำนวนต้นน้อยผิดปกติ
+            if (totalPlants < 100 && areaInSquareMeters > 100) {
+                console.warn(`⚠️ Unusually low plant count for area:`, {
+                    plants: totalPlants,
+                    area: areaInSquareMeters.toFixed(2),
+                    possibleIssue: 'Check spacing units or crop data'
+                });
+            }
+            
+            return totalPlants;
+            
+        } catch (error) {
+            console.error('Error calculating plants in zone:', error);
+            return 0;
+        }
+    }, [zones, zoneAssignments, rowSpacing, plantSpacing]);
 
     return (
         <>
@@ -519,9 +509,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                         style={{ backgroundColor: '#000005' }}
                     >
                         <div className="mb-2 flex items-center justify-between">
-                            <span className="text-sm font-medium text-gray-300">
-                                {t('Drawing Mode')}
-                            </span>
+                            <span className="text-sm font-medium text-gray-300">{t('Drawing Mode')}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-1">
                             <button
@@ -597,17 +585,14 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     </span>
                                 </div>
                                 <div className="text-xs text-purple-400">
-                                    {Object.keys(zoneAssignments).length}/{zones.length}{' '}
-                                    {t('assigned')}
+                                    {Object.keys(zoneAssignments).length}/{zones.length} {t('assigned')}
                                 </div>
                             </div>
 
                             <div className="grid gap-3">
                                 {zones.map((zone: any, index: number) => {
                                     const assignedCrop = zoneAssignments[zone.id];
-                                    const cropData = assignedCrop
-                                        ? getTranslatedCropByValue(assignedCrop, language)
-                                        : null;
+                                    const cropData = assignedCrop ? getTranslatedCropByValue(assignedCrop, language) : null;
 
                                     return (
                                         <div
@@ -618,10 +603,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                             <button
                                                 onClick={() => deleteZone(zone.id.toString())}
                                                 className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-sm font-bold text-white shadow-lg transition-all hover:scale-110 hover:bg-red-600"
-                                                title={t('Delete Zone {zoneName}').replace(
-                                                    '{zoneName}',
-                                                    `${index + 1}`
-                                                )}
+                                                title={t('Delete Zone {zoneName}').replace('{zoneName}', `${index + 1}`)}
                                             >
                                                 ×
                                             </button>
@@ -661,10 +643,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                     {t('Select a crop for this zone...')}
                                                 </option>
                                                 {selectedCrops.map((cropValue) => {
-                                                    const crop = getTranslatedCropByValue(
-                                                        cropValue,
-                                                        language
-                                                    );
+                                                    const crop = getTranslatedCropByValue(cropValue, language);
                                                     return crop ? (
                                                         <option key={crop.value} value={crop.value}>
                                                             {crop.icon} {crop.name}
@@ -680,67 +659,42 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                         <div className="flex justify-between">
                                                             <span>{t('Row Spacing')}:</span>
                                                             <span className="text-white">
-                                                                {rowSpacing[assignedCrop] ||
-                                                                    cropData.rowSpacing}{' '}
-                                                                cm
-                                                                {rowSpacing[assignedCrop] &&
-                                                                    rowSpacing[assignedCrop] !==
-                                                                        cropData.rowSpacing && (
-                                                                        <span className="ml-1 text-green-400">
-                                                                            (ปรับแล้ว)
-                                                                        </span>
-                                                                    )}
+                                                                {rowSpacing[assignedCrop] || cropData.rowSpacing} cm
+                                                                {rowSpacing[assignedCrop] && rowSpacing[assignedCrop] !== cropData.rowSpacing && (
+                                                                    <span className="ml-1 text-green-400">(ปรับแล้ว)</span>
+                                                                )}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>{t('Plant Spacing')}:</span>
                                                             <span className="text-white">
-                                                                {plantSpacing[assignedCrop] ||
-                                                                    cropData.plantSpacing}{' '}
-                                                                cm
-                                                                {plantSpacing[assignedCrop] &&
-                                                                    plantSpacing[assignedCrop] !==
-                                                                        cropData.plantSpacing && (
-                                                                        <span className="ml-1 text-green-400">
-                                                                            (ปรับแล้ว)
-                                                                        </span>
-                                                                    )}
+                                                                {plantSpacing[assignedCrop] || cropData.plantSpacing} cm
+                                                                {plantSpacing[assignedCrop] && plantSpacing[assignedCrop] !== cropData.plantSpacing && (
+                                                                    <span className="ml-1 text-green-400">(ปรับแล้ว)</span>
+                                                                )}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>{t('Water Needs')}:</span>
-                                                            <span
-                                                                className={`${
-                                                                    cropData.irrigationNeedsKey ===
-                                                                    'high'
-                                                                        ? 'text-red-300'
-                                                                        : cropData.irrigationNeedsKey ===
-                                                                            'medium'
-                                                                          ? 'text-yellow-300'
-                                                                          : 'text-green-300'
-                                                                }`}
-                                                            >
+                                                            <span className={`${
+                                                                cropData.irrigationNeedsKey === 'high' ? 'text-red-300' :
+                                                                cropData.irrigationNeedsKey === 'medium' ? 'text-yellow-300' :
+                                                                'text-green-300'
+                                                            }`}>
                                                                 {cropData.irrigationNeeds}
                                                             </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>{t('Growth Period')}:</span>
-                                                            <span className="text-white">
-                                                                {cropData.growthPeriod} {t('days')}
-                                                            </span>
+                                                            <span className="text-white">{cropData.growthPeriod} {t('days')}</span>
                                                         </div>
                                                         {/* แสดงจำนวนต้นที่คำนวณจากระยะที่ปรับแล้ว */}
-                                                        {(rowSpacing[assignedCrop] ||
-                                                            plantSpacing[assignedCrop]) && (
-                                                            <div className="mt-2 border-t border-gray-600 pt-2">
+                                                        {(rowSpacing[assignedCrop] || plantSpacing[assignedCrop]) && (
+                                                            <div className="mt-2 pt-2 border-t border-gray-600">
                                                                 <div className="flex justify-between">
-                                                                    <span className="text-green-300">
-                                                                        {t('Estimated Plants')}:
-                                                                    </span>
-                                                                    <span className="font-medium text-white">
-                                                                        {calculatePlantsInZone(
-                                                                            zone.id.toString()
-                                                                        ).toLocaleString()}
+                                                                    <span className="text-green-300">{t('Estimated Plants')}:</span>
+                                                                    <span className="text-white font-medium">
+                                                                        {calculatePlantsInZone(zone.id.toString()).toLocaleString()}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -777,65 +731,38 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     <span className="ml-1 text-white">{zones.length}</span>
                                 </div>
                             </div>
-
+                            
                             {/* แสดงข้อมูลสรุปการปลูกที่ใช้ระยะที่ปรับแล้ว */}
                             {Object.keys(zoneAssignments).length > 0 && (
-                                <div className="mt-3 border-t border-gray-600 pt-3">
-                                    <div className="mb-2 text-xs text-gray-300">
-                                        🌱 {t('Planting Summary')}
-                                    </div>
+                                <div className="mt-3 pt-3 border-t border-gray-600">
+                                    <div className="text-xs text-gray-300 mb-2">🌱 {t('Planting Summary')}</div>
                                     <div className="space-y-1 text-xs">
-                                        {Object.entries(zoneAssignments).map(
-                                            ([zoneId, cropValue]) => {
-                                                const zone = zones.find(
-                                                    (z) => z.id.toString() === zoneId
-                                                );
-                                                const cropData = getTranslatedCropByValue(
-                                                    cropValue as string,
-                                                    language
-                                                );
-                                                const currentRowSpacing =
-                                                    rowSpacing[cropValue as string] ||
-                                                    cropData?.rowSpacing;
-                                                const currentPlantSpacing =
-                                                    plantSpacing[cropValue as string] ||
-                                                    cropData?.plantSpacing;
-                                                const plantCount = calculatePlantsInZone(zoneId);
-
-                                                return zone && cropData ? (
-                                                    <div
-                                                        key={zoneId}
-                                                        className="flex items-center justify-between"
-                                                    >
-                                                        <span className="text-gray-400">
-                                                            {t('Zone')}{' '}
-                                                            {zones.findIndex(
-                                                                (z) => z.id.toString() === zoneId
-                                                            ) + 1}
-                                                            :
-                                                        </span>
-                                                        <div className="text-right">
-                                                            <div className="font-medium text-white">
-                                                                {plantCount.toLocaleString()}{' '}
-                                                                {t('plants')}
-                                                            </div>
-                                                            <div className="text-xs text-gray-400">
-                                                                {currentRowSpacing}×
-                                                                {currentPlantSpacing} cm
-                                                                {(rowSpacing[cropValue as string] ||
-                                                                    plantSpacing[
-                                                                        cropValue as string
-                                                                    ]) && (
-                                                                    <span className="ml-1 text-green-400">
-                                                                        (ปรับแล้ว)
-                                                                    </span>
-                                                                )}
-                                                            </div>
+                                        {Object.entries(zoneAssignments).map(([zoneId, cropValue]) => {
+                                            const zone = zones.find(z => z.id.toString() === zoneId);
+                                            const cropData = getTranslatedCropByValue(cropValue as string, language);
+                                            const currentRowSpacing = rowSpacing[cropValue as string] || cropData?.rowSpacing;
+                                            const currentPlantSpacing = plantSpacing[cropValue as string] || cropData?.plantSpacing;
+                                            const plantCount = calculatePlantsInZone(zoneId);
+                                            
+                                            return zone && cropData ? (
+                                                <div key={zoneId} className="flex justify-between items-center">
+                                                    <span className="text-gray-400">
+                                                        {t('Zone')} {zones.findIndex(z => z.id.toString() === zoneId) + 1}:
+                                                    </span>
+                                                    <div className="text-right">
+                                                        <div className="text-white font-medium">
+                                                            {plantCount.toLocaleString()} {t('plants')}
+                                                        </div>
+                                                        <div className="text-gray-400 text-xs">
+                                                            {currentRowSpacing}×{currentPlantSpacing} cm
+                                                            {(rowSpacing[cropValue as string] || plantSpacing[cropValue as string]) && (
+                                                                <span className="ml-1 text-green-400">(ปรับแล้ว)</span>
+                                                            )}
                                                         </div>
                                                     </div>
-                                                ) : null;
-                                            }
-                                        )}
+                                                </div>
+                                            ) : null;
+                                        })}
                                     </div>
                                 </div>
                             )}
@@ -877,10 +804,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                     <div className="rounded-lg border border-white bg-purple-500/10 p-3">
                         <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-purple-300">
-                                <img
-                                    src="/images/water-pump.png"
-                                    alt="Water Pump"
-                                    className="mr-1 inline h-4 w-4 object-contain"
+                                <img 
+                                    src="/images/water-pump.png" 
+                                    alt="Water Pump" 
+                                    className="inline w-4 h-4 object-contain mr-1"
                                 />
                                 {t('Step 3: Pipe System')}
                             </span>
@@ -966,9 +893,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                             : undefined,
                                 }}
                             >
-                                {isGeneratingPipes
-                                    ? `⏳ ${t('Generating...')}`
-                                    : `⚡ ${t('Generate Lateral Pipes')}`}
+                                {isGeneratingPipes ? `⏳ ${t('Generating...')}` : `⚡ ${t('Generate Lateral Pipes')}`}
                             </button>
 
                             {pipes.filter((p) => p.type === 'lateral').length > 0 && (
@@ -990,324 +915,216 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
                     {/* NEW: Lateral Pipe Settings Section - แสดงเฉพาะเมื่อมีท่อย่อย */}
                     {pipes.filter((p) => p.type === 'lateral').length > 0 && (
-                        <div
-                            className="mt-4 rounded border border-white p-3"
-                            style={{ backgroundColor: '#000005' }}
-                        >
+                        <div className="rounded border border-white p-3 mt-4" style={{ backgroundColor: '#000005' }}>
                             <h4 className="mb-3 text-sm font-semibold text-white">
                                 🎛️ {t('การตั้งค่าท่อย่อย')}
                             </h4>
-
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="mb-1 block text-xs font-medium text-white">
-                                        {t('มุมเริ่มต้น')}: {currentBranchAngle}°
-                                    </label>
-                                    <div className="mb-2 text-xs text-gray-400">
-                                        💡 {t('ปรับมุมเริ่มต้นสำหรับท่อใหม่ที่จะสร้าง')}
+                        
+                        <div className="space-y-3">
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-white">
+                                    {t('มุมเริ่มต้น')}: {currentBranchAngle}°
+                                </label>
+                                <div className="mb-2 text-xs text-gray-400">
+                                    💡 {t('ปรับมุมเริ่มต้นสำหรับท่อใหม่ที่จะสร้าง')}
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="180"
+                                    step="1"
+                                    value={currentBranchAngle}
+                                    onChange={(e) => {
+                                        const newAngle = parseInt(e.target.value);
+                                        setCurrentBranchAngle(newAngle);
+                                        
+                                        // อัปเดตมุมเริ่มต้นสำหรับท่อใหม่ที่จะสร้าง
+                                        setBranchPipeSettings(prev => ({
+                                            ...prev,
+                                            defaultAngle: newAngle
+                                        }));
+                                        
+                                        // เรียกใช้ฟังก์ชันอัปเดต Global Angle สำหรับท่อใหม่
+                                        if (typeof window !== 'undefined' && (window as any).updateGlobalBranchAngle) {
+                                            (window as any).updateGlobalBranchAngle(newAngle);
+                                        }
+                                    }}
+                                    className="w-full accent-blue-600"
+                                />
+                                <div className="flex justify-between text-xs text-white">
+                                    <span>0°</span>
+                                    <span>90°</span>
+                                    <span>180°</span>
+                                </div>
+                            </div>
+                            
+                            {/* แสดงรายการท่อย่อยเรียงตามมุม */}
+                            {pipes.filter(p => p.type === 'lateral').length > 0 && (
+                                <div className="rounded-lg border border-green-200 p-3" style={{ backgroundColor: '#000005' }}>
+                                    <div className="mb-2 text-xs font-medium text-white">
+                                        🎯 {t('รายการท่อย่อย (แสดงข้อมูล)')}
                                     </div>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="180"
-                                        step="1"
-                                        value={currentBranchAngle}
-                                        onChange={(e) => {
-                                            const newAngle = parseInt(e.target.value);
-                                            setCurrentBranchAngle(newAngle);
-
-                                            // อัปเดตมุมเริ่มต้นสำหรับท่อใหม่ที่จะสร้าง
-                                            setBranchPipeSettings((prev) => ({
-                                                ...prev,
-                                                defaultAngle: newAngle,
-                                            }));
-
-                                            // เรียกใช้ฟังก์ชันอัปเดต Global Angle สำหรับท่อใหม่
-                                            if (
-                                                typeof window !== 'undefined' &&
-                                                (window as any).updateGlobalBranchAngle
-                                            ) {
-                                                (window as any).updateGlobalBranchAngle(newAngle);
-                                            }
-                                        }}
-                                        className="w-full accent-blue-600"
-                                    />
-                                    <div className="flex justify-between text-xs text-white">
-                                        <span>0°</span>
-                                        <span>90°</span>
-                                        <span>180°</span>
+                                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                                        {pipes.filter(p => p.type === 'lateral')
+                                            .sort((a, b) => {
+                                                switch (sortType) {
+                                                    case 'angle':
+                                                        return (a.angle || a.currentAngle || 90) - (b.angle || b.currentAngle || 90);
+                                                    case 'length':
+                                                        return (b.length || 0) - (a.length || 0);
+                                                    case 'name':
+                                                        return a.name.localeCompare(b.name);
+                                                    default:
+                                                        return 0;
+                                                }
+                                            })
+                                            .map((pipe) => (
+                                            <div key={pipe.id} className="rounded p-2 text-xs text-white" 
+                                                 style={{ backgroundColor: '#000010' }}>
+                                                <div className="font-medium">{pipe.name}</div>
+                                                <div className="flex justify-between">
+                                                    <span>{t('มุม')}: {pipe.angle || pipe.currentAngle || 90}°</span>
+                                                    <span>{t('ความยาว')}: {pipe.length?.toFixed(1) || 0} {t('ม.')}</span>
+                                                </div>
+                                                <div className="text-gray-400">
+                                                    {t('ฝั่ง')}: {pipe.side === 'left' ? t('ซ้าย') : t('ขวา')}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="mt-2 flex gap-1">
+                                        <button
+                                            onClick={() => {
+                                                setSortType('angle');
+                                                // เรียงตามมุมจากน้อยไปมาก
+                                                const sortedPipes = [...pipes.filter(p => p.type === 'lateral')]
+                                                    .sort((a, b) => (a.angle || a.currentAngle || 90) - (b.angle || b.currentAngle || 90));
+                                                setPipes(prev => [
+                                                    ...prev.filter(p => p.type !== 'lateral'),
+                                                    ...sortedPipes
+                                                ]);
+                                            }}
+                                            className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
+                                                sortType === 'angle' ? 'bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
+                                            }`}
+                                        >
+                                            ↕️ {t('เรียงมุม')}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSortType('length');
+                                                // เรียงตามความยาวจากมากไปน้อย
+                                                const sortedPipes = [...pipes.filter(p => p.type === 'lateral')]
+                                                    .sort((a, b) => (b.length || 0) - (a.length || 0));
+                                                setPipes(prev => [
+                                                    ...prev.filter(p => p.type !== 'lateral'),
+                                                    ...sortedPipes
+                                                ]);
+                                            }}
+                                            className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
+                                                sortType === 'length' ? 'bg-green-700' : 'bg-green-600 hover:bg-green-700'
+                                            }`}
+                                        >
+                                            📏 {t('เรียงความยาว')}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setSortType('name');
+                                                // เรียงตามชื่อ
+                                                const sortedPipes = [...pipes.filter(p => p.type === 'lateral')]
+                                                    .sort((a, b) => a.name.localeCompare(b.name));
+                                                setPipes(prev => [
+                                                    ...prev.filter(p => p.type !== 'lateral'),
+                                                    ...sortedPipes
+                                                ]);
+                                            }}
+                                            className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
+                                                sortType === 'name' ? 'bg-purple-700' : 'bg-purple-600 hover:bg-purple-700'
+                                            }`}
+                                        >
+                                            📝 {t('เรียงชื่อ')}
+                                        </button>
+                                    </div>
+                                    <div className="mt-1 text-xs text-gray-400">
+                                        💡 {t('คลิกปุ่มเพื่อเรียงลำดับท่อย่อยตามมุม/ความยาว/ชื่อ')}
+                                    </div>
+                                    <div className="mt-2 flex gap-1">
+                                        <button
+                                            onClick={() => {
+                                                // แสดงข้อมูลสถิติเพิ่มเติม
+                                                const lateralPipes = pipes.filter(p => p.type === 'lateral');
+                                                const avgAngle = lateralPipes.length > 0 
+                                                    ? lateralPipes.reduce((sum, p) => sum + (p.angle || p.currentAngle || 90), 0) / lateralPipes.length
+                                                    : 0;
+                                                const totalLength = lateralPipes.reduce((sum, p) => sum + (p.length || 0), 0);
+                                                alert(`${t('สถิติท่อย่อย')}\n${t('จำนวนท่อ')}: ${lateralPipes.length} ${t('เส้น')}\n${t('มุมเฉลี่ย')}: ${avgAngle.toFixed(1)}°\n${t('ความยาวรวม')}: ${totalLength.toFixed(1)} ${t('ม.')}`);
+                                            }}
+                                            className="w-full rounded border border-white bg-yellow-600 px-2 py-1 text-xs text-white hover:bg-yellow-700 transition-colors"
+                                        >
+                                            📊 {t('ดูสถิติ')}
+                                        </button>
                                     </div>
                                 </div>
-
-                                {/* แสดงรายการท่อย่อยเรียงตามมุม */}
-                                {pipes.filter((p) => p.type === 'lateral').length > 0 && (
-                                    <div
-                                        className="rounded-lg border border-green-200 p-3"
-                                        style={{ backgroundColor: '#000005' }}
-                                    >
-                                        <div className="mb-2 text-xs font-medium text-white">
-                                            🎯 {t('รายการท่อย่อย (แสดงข้อมูล)')}
+                            )}
+                            
+                            {/* ข้อมูลสถิติท่อย่อย */}
+                            {pipes.filter(p => p.type === 'lateral').length > 0 && (
+                                <div className="rounded border border-green-200 p-3 text-xs" style={{ backgroundColor: '#000005' }}>
+                                    <div className="font-medium text-white mb-2">📊 {t('สถิติท่อย่อย')}</div>
+                                    <div className="space-y-1 text-white">
+                                        <div className="flex justify-between">
+                                            <span>{t('จำนวนท่อย่อย')}:</span>
+                                            <span className="font-bold text-green-400">
+                                                {pipes.filter(p => p.type === 'lateral').length} {t('เส้น')}
+                                            </span>
                                         </div>
-                                        <div className="max-h-32 space-y-2 overflow-y-auto">
-                                            {pipes
-                                                .filter((p) => p.type === 'lateral')
-                                                .sort((a, b) => {
-                                                    switch (sortType) {
-                                                        case 'angle':
-                                                            return (
-                                                                (a.angle || a.currentAngle || 90) -
-                                                                (b.angle || b.currentAngle || 90)
-                                                            );
-                                                        case 'length':
-                                                            return (
-                                                                (b.length || 0) - (a.length || 0)
-                                                            );
-                                                        case 'name':
-                                                            return a.name.localeCompare(b.name);
-                                                        default:
-                                                            return 0;
-                                                    }
-                                                })
-                                                .map((pipe) => (
-                                                    <div
-                                                        key={pipe.id}
-                                                        className="rounded p-2 text-xs text-white"
-                                                        style={{ backgroundColor: '#000010' }}
-                                                    >
-                                                        <div className="font-medium">
-                                                            {pipe.name}
-                                                        </div>
-                                                        <div className="flex justify-between">
-                                                            <span>
-                                                                {t('มุม')}:{' '}
-                                                                {pipe.angle ||
-                                                                    pipe.currentAngle ||
-                                                                    90}
-                                                                °
-                                                            </span>
-                                                            <span>
-                                                                {t('ความยาว')}:{' '}
-                                                                {pipe.length?.toFixed(1) || 0}{' '}
-                                                                {t('ม.')}
-                                                            </span>
-                                                        </div>
-                                                        <div className="text-gray-400">
-                                                            {t('ฝั่ง')}:{' '}
-                                                            {pipe.side === 'left'
-                                                                ? t('ซ้าย')
-                                                                : t('ขวา')}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                        <div className="flex justify-between">
+                                            <span>{t('ความยาวรวม')}:</span>
+                                            <span className="font-bold text-blue-400">
+                                                {pipes.filter(p => p.type === 'lateral')
+                                                     .reduce((sum, p) => sum + (p.length || 0), 0)
+                                                     .toFixed(1)} {t('ม.')}
+                                            </span>
                                         </div>
-                                        <div className="mt-2 flex gap-1">
-                                            <button
-                                                onClick={() => {
-                                                    setSortType('angle');
-                                                    // เรียงตามมุมจากน้อยไปมาก
-                                                    const sortedPipes = [
-                                                        ...pipes.filter(
-                                                            (p) => p.type === 'lateral'
-                                                        ),
-                                                    ].sort(
-                                                        (a, b) =>
-                                                            (a.angle || a.currentAngle || 90) -
-                                                            (b.angle || b.currentAngle || 90)
-                                                    );
-                                                    setPipes((prev) => [
-                                                        ...prev.filter((p) => p.type !== 'lateral'),
-                                                        ...sortedPipes,
-                                                    ]);
-                                                }}
-                                                className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
-                                                    sortType === 'angle'
-                                                        ? 'bg-blue-700'
-                                                        : 'bg-blue-600 hover:bg-blue-700'
-                                                }`}
-                                            >
-                                                ↕️ {t('เรียงมุม')}
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setSortType('length');
-                                                    // เรียงตามความยาวจากมากไปน้อย
-                                                    const sortedPipes = [
-                                                        ...pipes.filter(
-                                                            (p) => p.type === 'lateral'
-                                                        ),
-                                                    ].sort(
-                                                        (a, b) => (b.length || 0) - (a.length || 0)
-                                                    );
-                                                    setPipes((prev) => [
-                                                        ...prev.filter((p) => p.type !== 'lateral'),
-                                                        ...sortedPipes,
-                                                    ]);
-                                                }}
-                                                className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
-                                                    sortType === 'length'
-                                                        ? 'bg-green-700'
-                                                        : 'bg-green-600 hover:bg-green-700'
-                                                }`}
-                                            >
-                                                📏 {t('เรียงความยาว')}
-                                            </button>
-                                            <button
-                                                onClick={() => {
-                                                    setSortType('name');
-                                                    // เรียงตามชื่อ
-                                                    const sortedPipes = [
-                                                        ...pipes.filter(
-                                                            (p) => p.type === 'lateral'
-                                                        ),
-                                                    ].sort((a, b) => a.name.localeCompare(b.name));
-                                                    setPipes((prev) => [
-                                                        ...prev.filter((p) => p.type !== 'lateral'),
-                                                        ...sortedPipes,
-                                                    ]);
-                                                }}
-                                                className={`flex-1 rounded border border-white px-2 py-1 text-xs text-white transition-colors ${
-                                                    sortType === 'name'
-                                                        ? 'bg-purple-700'
-                                                        : 'bg-purple-600 hover:bg-purple-700'
-                                                }`}
-                                            >
-                                                📝 {t('เรียงชื่อ')}
-                                            </button>
-                                        </div>
-                                        <div className="mt-1 text-xs text-gray-400">
-                                            💡{' '}
-                                            {t('คลิกปุ่มเพื่อเรียงลำดับท่อย่อยตามมุม/ความยาว/ชื่อ')}
-                                        </div>
-                                        <div className="mt-2 flex gap-1">
-                                            <button
-                                                onClick={() => {
-                                                    // แสดงข้อมูลสถิติเพิ่มเติม
-                                                    const lateralPipes = pipes.filter(
-                                                        (p) => p.type === 'lateral'
-                                                    );
-                                                    const avgAngle =
-                                                        lateralPipes.length > 0
-                                                            ? lateralPipes.reduce(
-                                                                  (sum, p) =>
-                                                                      sum +
-                                                                      (p.angle ||
-                                                                          p.currentAngle ||
-                                                                          90),
-                                                                  0
-                                                              ) / lateralPipes.length
-                                                            : 0;
-                                                    const totalLength = lateralPipes.reduce(
-                                                        (sum, p) => sum + (p.length || 0),
-                                                        0
-                                                    );
-                                                    alert(
-                                                        `${t('สถิติท่อย่อย')}\n${t('จำนวนท่อ')}: ${lateralPipes.length} ${t('เส้น')}\n${t('มุมเฉลี่ย')}: ${avgAngle.toFixed(1)}°\n${t('ความยาวรวม')}: ${totalLength.toFixed(1)} ${t('ม.')}`
-                                                    );
-                                                }}
-                                                className="w-full rounded border border-white bg-yellow-600 px-2 py-1 text-xs text-white transition-colors hover:bg-yellow-700"
-                                            >
-                                                📊 {t('ดูสถิติ')}
-                                            </button>
+                                        <div className="flex justify-between">
+                                            <span>{t('มุมเฉลี่ย')}:</span>
+                                            <span className="font-bold text-purple-400">
+                                                {pipes.filter(p => p.type === 'lateral').length > 0 
+                                                    ? (pipes.filter(p => p.type === 'lateral')
+                                                           .reduce((sum, p) => sum + (p.currentAngle || 90), 0) / 
+                                                       pipes.filter(p => p.type === 'lateral').length).toFixed(1)
+                                                    : 0}°
+                                            </span>
                                         </div>
                                     </div>
-                                )}
-
-                                {/* ข้อมูลสถิติท่อย่อย */}
-                                {pipes.filter((p) => p.type === 'lateral').length > 0 && (
-                                    <div
-                                        className="rounded border border-green-200 p-3 text-xs"
-                                        style={{ backgroundColor: '#000005' }}
-                                    >
-                                        <div className="mb-2 font-medium text-white">
-                                            📊 {t('สถิติท่อย่อย')}
-                                        </div>
-                                        <div className="space-y-1 text-white">
-                                            <div className="flex justify-between">
-                                                <span>{t('จำนวนท่อย่อย')}:</span>
-                                                <span className="font-bold text-green-400">
-                                                    {
-                                                        pipes.filter((p) => p.type === 'lateral')
-                                                            .length
-                                                    }{' '}
-                                                    {t('เส้น')}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>{t('ความยาวรวม')}:</span>
-                                                <span className="font-bold text-blue-400">
-                                                    {pipes
-                                                        .filter((p) => p.type === 'lateral')
-                                                        .reduce(
-                                                            (sum, p) => sum + (p.length || 0),
-                                                            0
-                                                        )
-                                                        .toFixed(1)}{' '}
-                                                    {t('ม.')}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>{t('มุมเฉลี่ย')}:</span>
-                                                <span className="font-bold text-purple-400">
-                                                    {pipes.filter((p) => p.type === 'lateral')
-                                                        .length > 0
-                                                        ? (
-                                                              pipes
-                                                                  .filter(
-                                                                      (p) => p.type === 'lateral'
-                                                                  )
-                                                                  .reduce(
-                                                                      (sum, p) =>
-                                                                          sum +
-                                                                          (p.currentAngle || 90),
-                                                                      0
-                                                                  ) /
-                                                              pipes.filter(
-                                                                  (p) => p.type === 'lateral'
-                                                              ).length
-                                                          ).toFixed(1)
-                                                        : 0}
-                                                    °
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* ปุ่มรีเซ็ตมุมท่อย่อย */}
-                                {pipes.filter((p) => p.type === 'lateral').length > 0 && (
-                                    <button
-                                        onClick={() => {
-                                            if (
-                                                confirm(
-                                                    t('รีเซ็ตมุมท่อย่อยทั้งหมดเป็น 90° หรือไม่?')
-                                                )
-                                            ) {
-                                                setPipes((prev) =>
-                                                    prev.map((pipe) =>
-                                                        pipe.type === 'lateral'
-                                                            ? {
-                                                                  ...pipe,
-                                                                  currentAngle: 90,
-                                                                  angle: 90,
-                                                              }
-                                                            : pipe
-                                                    )
-                                                );
-                                                setCurrentBranchAngle(90);
-                                                setBranchPipeSettings((prev) => ({
-                                                    ...prev,
-                                                    defaultAngle: 90,
-                                                }));
-                                                setSortType('angle'); // รีเซ็ตการเรียงลำดับ
-                                            }
-                                        }}
-                                        className="w-full rounded border border-white bg-orange-600 px-3 py-2 text-xs text-white transition-colors hover:bg-orange-700"
-                                    >
-                                        🔄 {t('รีเซ็ตมุมท่อย่อย')}
-                                    </button>
-                                )}
-                            </div>
+                                </div>
+                            )}
+                            
+                            {/* ปุ่มรีเซ็ตมุมท่อย่อย */}
+                            {pipes.filter(p => p.type === 'lateral').length > 0 && (
+                                <button
+                                    onClick={() => {
+                                        if (confirm(t('รีเซ็ตมุมท่อย่อยทั้งหมดเป็น 90° หรือไม่?'))) {
+                                            setPipes(prev => prev.map(pipe => 
+                                                pipe.type === 'lateral' 
+                                                    ? { ...pipe, currentAngle: 90, angle: 90 }
+                                                    : pipe
+                                            ));
+                                            setCurrentBranchAngle(90);
+                                            setBranchPipeSettings(prev => ({
+                                                ...prev,
+                                                defaultAngle: 90
+                                            }));
+                                            setSortType('angle'); // รีเซ็ตการเรียงลำดับ
+                                        }
+                                    }}
+                                    className="w-full rounded border border-white bg-orange-600 px-3 py-2 text-xs text-white hover:bg-orange-700 transition-colors"
+                                >
+                                    🔄 {t('รีเซ็ตมุมท่อย่อย')}
+                                </button>
+                            )}
                         </div>
+                    </div>
                     )}
 
                     {pipes.length > 0 && (
@@ -1410,18 +1227,10 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                 {zones.map((zone: any, index: number) => {
                                     const irrigationType = irrigationAssignments[zone.id];
                                     const assignedCrop = zoneAssignments[zone.id];
-                                    const cropData = assignedCrop
-                                        ? getTranslatedCropByValue(assignedCrop, language)
-                                        : null;
-                                    const dripPointCount =
-                                        zoneSummaries[zone.id]?.dripPointCount || 0;
-                                    const currentRadiusConfig =
-                                        irrigationRadiusConfig[
-                                            irrigationType as keyof typeof irrigationRadiusConfig
-                                        ];
-                                    const recommendations = assignedCrop
-                                        ? getIrrigationRecommendation(assignedCrop)
-                                        : [];
+                                    const cropData = assignedCrop ? getTranslatedCropByValue(assignedCrop, language) : null;
+                                    const dripPointCount = zoneSummaries[zone.id]?.dripPointCount || 0;
+                                    const currentRadiusConfig = irrigationRadiusConfig[irrigationType as keyof typeof irrigationRadiusConfig];
+                                    const recommendations = assignedCrop ? getIrrigationRecommendation(assignedCrop) : [];
 
                                     return (
                                         <div
@@ -1450,23 +1259,13 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                             {cropData && (
                                                 <div className="mb-3 rounded border border-gray-600 bg-gray-800/50 p-2">
                                                     <div className="flex items-center space-x-2 text-xs">
-                                                        <span className="text-lg">
-                                                            {cropData.icon}
-                                                        </span>
-                                                        <span className="font-medium text-white">
-                                                            {cropData.name}
-                                                        </span>
-                                                        <span
-                                                            className={`rounded px-2 py-0.5 text-xs ${
-                                                                cropData.irrigationNeedsKey ===
-                                                                'high'
-                                                                    ? 'bg-red-500/20 text-red-300'
-                                                                    : cropData.irrigationNeedsKey ===
-                                                                        'medium'
-                                                                      ? 'bg-yellow-500/20 text-yellow-300'
-                                                                      : 'bg-green-500/20 text-green-300'
-                                                            }`}
-                                                        >
+                                                        <span className="text-lg">{cropData.icon}</span>
+                                                        <span className="text-white font-medium">{cropData.name}</span>
+                                                        <span className={`px-2 py-0.5 rounded text-xs ${
+                                                            cropData.irrigationNeedsKey === 'high' ? 'bg-red-500/20 text-red-300' :
+                                                            cropData.irrigationNeedsKey === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                                                            'bg-green-500/20 text-green-300'
+                                                        }`}>
                                                             {cropData.irrigationNeeds}
                                                         </span>
                                                     </div>
@@ -1494,17 +1293,13 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                             ...prev,
                                                             [zone.id]: e.target.value,
                                                         }));
-
+                                                        
                                                         // Set optimal drip spacing if drip system is selected
-                                                        if (
-                                                            e.target.value === 'drip-tape' &&
-                                                            assignedCrop
-                                                        ) {
-                                                            const optimalSpacing =
-                                                                getOptimalDripSpacing(assignedCrop);
-                                                            setDripSpacing((prev) => ({
+                                                        if (e.target.value === 'drip-tape' && assignedCrop) {
+                                                            const optimalSpacing = getOptimalDripSpacing(assignedCrop);
+                                                            setDripSpacing(prev => ({
                                                                 ...prev,
-                                                                [zone.id]: optimalSpacing,
+                                                                [zone.id]: optimalSpacing
                                                             }));
                                                         }
                                                     } else {
@@ -1516,18 +1311,8 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                 <option value="">
                                                     {t('Select irrigation system...')}
                                                 </option>
-                                                <option
-                                                    value="sprinkler"
-                                                    className={
-                                                        recommendations.includes('sprinkler')
-                                                            ? 'bg-green-700'
-                                                            : ''
-                                                    }
-                                                >
-                                                    🌿 {t('Sprinkler')}{' '}
-                                                    {recommendations.includes('sprinkler')
-                                                        ? '⭐'
-                                                        : ''}
+                                                <option value="sprinkler" className={recommendations.includes('sprinkler') ? 'bg-green-700' : ''}>
+                                                    🌿 {t('Sprinkler')} {recommendations.includes('sprinkler') ? '⭐' : ''}
                                                 </option>
                                                 {/* Removed mini_sprinkler and micro_spray options */}
                                                 <option value="drip-tape" className={recommendations.includes('drip-tape') ? 'bg-green-700' : ''}>
@@ -1557,71 +1342,34 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                         min={0.2}
                                                                         max={0.5}
                                                                         step={0.05}
-                                                                        value={
-                                                                            dripSpacing[zone.id] ||
-                                                                            (assignedCrop
-                                                                                ? getOptimalDripSpacing(
-                                                                                      assignedCrop
-                                                                                  )
-                                                                                : 0.3)
-                                                                        }
+                                                                        value={dripSpacing[zone.id] || (assignedCrop ? getOptimalDripSpacing(assignedCrop) : 0.3)}
                                                                         onChange={(e) =>
                                                                             setDripSpacing({
                                                                                 ...dripSpacing,
-                                                                                [zone.id]:
-                                                                                    parseFloat(
-                                                                                        e.target
-                                                                                            .value
-                                                                                    ),
+                                                                                [zone.id]: parseFloat(e.target.value),
                                                                             })
                                                                         }
                                                                         className="w-full"
                                                                     />
                                                                     <span className="text-sm font-semibold text-white">
-                                                                        {(
-                                                                            dripSpacing[zone.id] ||
-                                                                            (assignedCrop
-                                                                                ? getOptimalDripSpacing(
-                                                                                      assignedCrop
-                                                                                  )
-                                                                                : 0.3)
-                                                                        ).toFixed(2)}
-                                                                        m
+                                                                        {(dripSpacing[zone.id] || (assignedCrop ? getOptimalDripSpacing(assignedCrop) : 0.3)).toFixed(2)}m
                                                                     </span>
                                                                 </div>
                                                                 <div className="text-xs text-gray-500">
-                                                                    {t(
-                                                                        'Spacing between emitters on the tape'
-                                                                    )}
+                                                                    {t('Spacing between emitters on the tape')}
                                                                 </div>
                                                                 {cropData && (
                                                                     <div className="text-xs text-cyan-300">
-                                                                        💡{' '}
-                                                                        {t(
-                                                                            'Optimal for {cropName}: {spacing}m'
-                                                                        )
-                                                                            .replace(
-                                                                                '{cropName}',
-                                                                                cropData.name
-                                                                            )
-                                                                            .replace(
-                                                                                '{spacing}',
-                                                                                getOptimalDripSpacing(
-                                                                                    assignedCrop ||
-                                                                                        ''
-                                                                                ).toFixed(2)
-                                                                            )}
+                                                                        💡 {t('Optimal for {cropName}: {spacing}m')
+                                                                            .replace('{cropName}', cropData.name)
+                                                                            .replace('{spacing}', getOptimalDripSpacing(assignedCrop || '').toFixed(2))}
                                                                     </div>
                                                                 )}
                                                             </div>
                                                             {dripPointCount > 0 && (
                                                                 <div className="text-xs text-cyan-300">
-                                                                    {t(
-                                                                        'Estimated {count} emitters for this zone'
-                                                                    ).replace(
-                                                                        '{count}',
-                                                                        dripPointCount.toLocaleString()
-                                                                    )}
+                                                                    {t('Estimated {count} emitters for this zone')
+                                                                        .replace('{count}', dripPointCount.toLocaleString())}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1638,41 +1386,20 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                                                     <input
                                                                         id={`radius-${zone.id}`}
                                                                         type="range"
-                                                                        min={
-                                                                            currentRadiusConfig.min
-                                                                        }
-                                                                        max={
-                                                                            currentRadiusConfig.max
-                                                                        }
-                                                                        step={
-                                                                            currentRadiusConfig.step
-                                                                        }
-                                                                        value={
-                                                                            irrigationRadius[
-                                                                                zone.id
-                                                                            ] ||
-                                                                            currentRadiusConfig.defaultValue
-                                                                        }
+                                                                        min={currentRadiusConfig.min}
+                                                                        max={currentRadiusConfig.max}
+                                                                        step={currentRadiusConfig.step}
+                                                                        value={irrigationRadius[zone.id] || currentRadiusConfig.defaultValue}
                                                                         onChange={(e) =>
                                                                             setIrrigationRadius({
                                                                                 ...irrigationRadius,
-                                                                                [zone.id]:
-                                                                                    parseFloat(
-                                                                                        e.target
-                                                                                            .value
-                                                                                    ),
+                                                                                [zone.id]: parseFloat(e.target.value),
                                                                             })
                                                                         }
                                                                         className="w-full"
                                                                     />
                                                                     <span className="text-sm font-semibold text-white">
-                                                                        {(
-                                                                            irrigationRadius[
-                                                                                zone.id
-                                                                            ] ||
-                                                                            currentRadiusConfig.defaultValue
-                                                                        ).toFixed(2)}
-                                                                        m
+                                                                        {(irrigationRadius[zone.id] || currentRadiusConfig.defaultValue).toFixed(2)}m
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -1682,22 +1409,13 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
 
                                                     <div className="mt-3 flex space-x-2">
                                                         <button
-                                                            onClick={() =>
-                                                                generateIrrigationForZone(
-                                                                    zone,
-                                                                    irrigationType
-                                                                )
-                                                            }
+                                                            onClick={() => generateIrrigationForZone(zone, irrigationType)}
                                                             className="flex-1 rounded border border-white bg-cyan-600 px-3 py-1 text-xs text-white transition-colors hover:bg-cyan-700"
                                                         >
                                                             🚿 {t('Generate')}
                                                         </button>
                                                         <button
-                                                            onClick={() =>
-                                                                clearIrrigationForZone(
-                                                                    zone.id.toString()
-                                                                )
-                                                            }
+                                                            onClick={() => clearIrrigationForZone(zone.id.toString())}
                                                             className="rounded border border-white bg-red-600 px-3 py-1 text-xs text-white transition-colors hover:bg-red-700"
                                                         >
                                                             🗑️ {t('Clear')}
@@ -1738,9 +1456,7 @@ const FieldMapToolsPanel: React.FC<FieldMapToolsPanelProps> = ({
                                     🎉 {t('Project Complete!')}
                                 </div>
                                 <div className="mb-3 text-xs text-green-400">
-                                    {t(
-                                        'All steps completed successfully. Ready to view your project summary.'
-                                    )}
+                                    {t('All steps completed successfully. Ready to view your project summary.')}
                                 </div>
                                 <button
                                     onClick={handleCaptureMapAndSummary}

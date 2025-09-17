@@ -679,10 +679,10 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
         return (
             <div className="flex h-[60px] w-[85px] items-center justify-center rounded border border-gray-600 bg-gray-500 text-xs text-gray-300">
-                <img
-                    src="/images/water-pump.png"
-                    alt="Water Pump"
-                    className="h-6 w-6 object-contain"
+                <img 
+                    src="/images/water-pump.png" 
+                    alt="Water Pump" 
+                    className="w-6 h-6 object-contain"
                 />
                 {t('ปั๊ม')}
             </div>
@@ -726,7 +726,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
     return (
         <div className="rounded-lg bg-gray-700 p-6">
-            <h3 className="mb-4 text-2xl font-bold text-red-500">{t('ปั๊มน้ำ')}</h3>
+            <h3 className="mb-4 text-2xl font-bold text-red-500">
+                {t('ปั๊มน้ำ')}
+            </h3>
 
             <div className="mb-4 rounded bg-gray-600 p-3 flex flex-row items-center space-x-6">
                 <h4 className="text-lg font-medium text-red-300 mr-4 whitespace-nowrap">⚡ {t('ความต้องการ:')}</h4>
@@ -770,24 +772,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                     }}
                     options={[
                         { value: '', label: `-- ${t('ใช้การเลือกอัตโนมัติ')} --` },
-<<<<<<< HEAD
-                        ...sortedPumps.map((pump) => {
-                            const group = getPumpGrouping(pump);
-                            const isAuto = pump.id === autoSelectedPump?.id;
-                            return {
-                                value: pump.id,
-                                label: `${isAuto ? '🤖 ' : ''}${pump.name || pump.productCode} - ${pump.powerHP}HP - ${pump.price?.toLocaleString()} ${t('บาท')}`,
-                                searchableText: `${pump.productCode || ''} ${pump.name || ''} ${pump.brand || ''} ${pump.powerHP}HP`,
-                                image: (pump as any).image_url || pump.image || (pump as any).imageUrl,
-                                productCode: pump.productCode,
-                                name: pump.name,
-                                brand: pump.brand,
-                                price: pump.price,
-                                unit: t('บาท'),
-                                isAutoSelected: isAuto
-                            };
-                        }),
-=======
                         ...(() => {
                             // สร้าง options จาก pumps
                             const pumpOptions = sortedPumps.map((pump) => {
@@ -867,7 +851,6 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                 return (a.price || 0) - (b.price || 0);
                             });
                         })()
->>>>>>> origin/main
                     ]}
                     placeholder={`-- ${t('ใช้การเลือกอัตโนมัติ')} --`}
                     searchPlaceholder={t('พิมพ์เพื่อค้นหาปั๊ม (ชื่อ, รหัสสินค้า, แบรนด์)...')}
@@ -895,8 +878,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                 <strong>{t('รุ่น:')}</strong> {currentPump.productCode}
                             </p>
                             <p>
-                                <strong>{t('ชื่อ:')}</strong>{' '}
-                                {currentPump.name || currentPump.productCode}
+                                <strong>{t('ชื่อ:')}</strong> {currentPump.name || currentPump.productCode}
                             </p>
                             <p>
                                 <strong>{t('กำลัง:')}</strong>{' '}
@@ -925,25 +907,21 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
                         <div>
                             <p>
-                                <strong>{t('Flow Max:')}</strong> {currentPump.maxFlow || 'N/A'}{' '}
-                                {t('LPM')}
+                                <strong>{t('Flow Max:')}</strong> {currentPump.maxFlow || 'N/A'} {t('LPM')}
                             </p>
                             <p>
-                                <strong>{t('Head Max:')}</strong> {currentPump.maxHead || 'N/A'}{' '}
-                                {t('เมตร')}
+                                <strong>{t('Head Max:')}</strong> {currentPump.maxHead || 'N/A'} {t('เมตร')}
                             </p>
                             <p>
                                 <strong>{t('S.D(ความลึกดูด):')}</strong>{' '}
                                 {currentPump.suction_depth_m || 'N/A'} {t('เมตร')}
                             </p>
                             <p>
-                                <strong>{t('ราคา:')}</strong> {currentPump.price?.toLocaleString()}{' '}
-                                {t('บาท')}
+                                <strong>{t('ราคา:')}</strong> {currentPump.price?.toLocaleString()} {t('บาท')}
                             </p>
                             {currentPump.weight_kg && (
                                 <p>
-                                    <strong>{t('น้ำหนัก:')}</strong> {currentPump.weight_kg}{' '}
-                                    {t('kg')}
+                                    <strong>{t('น้ำหนัก:')}</strong> {currentPump.weight_kg} {t('kg')}
                                 </p>
                             )}
                         </div>
@@ -981,6 +959,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             );
                         })()}
                     </div>
+
 
 
                     {currentPump.description && (
@@ -1045,9 +1024,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
             ) : (
                 <div className="rounded bg-gray-600 p-4 text-center">
                     <p className="text-gray-300">{t('ไม่สามารถหาปั๊มที่เหมาะสมได้')}</p>
-                    <p className="mt-1 text-sm text-gray-400">
-                        {t('อาจไม่มีปั๊มที่เหมาะสมในระบบ')}
-                    </p>
+                    <p className="mt-1 text-sm text-gray-400">{t('อาจไม่มีปั๊มที่เหมาะสมในระบบ')}</p>
                 </div>
             )}
 

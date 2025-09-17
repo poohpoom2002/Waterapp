@@ -106,6 +106,7 @@ class User extends Authenticatable
     }
 
     /**
+<<<<<<< HEAD
      * Check if user has enough tokens for an operation.
      */
     public function hasEnoughTokens(int $requiredTokens = 1): bool
@@ -314,6 +315,8 @@ class User extends Authenticatable
     }
 
     /**
+=======
+>>>>>>> origin/main
      * Get the user's fields.
      */
     public function fields()

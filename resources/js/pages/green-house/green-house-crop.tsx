@@ -20,7 +20,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
     // Initialize with URL parameters
     useEffect(() => {
         const newSelectedCrops: string[] = [];
-
+        
         if (cropType) {
             newSelectedCrops.push(cropType);
         }
@@ -77,15 +77,13 @@ export default function GreenhouseCrop({ cropType, crops }) {
 
     // Helper functions สำหรับการแปลภาษา
     const getCropDisplayName = (crop: Crop) => {
-        return language === 'th' ? crop.nameTh || crop.name : crop.nameEn || crop.name;
+        return language === 'th' ? (crop.nameTh || crop.name) : (crop.nameEn || crop.name);
     };
 
     const getCategoryDisplayName = (categoryKey: string) => {
         const category = categories[categoryKey];
         if (!category) return categoryKey;
-        return language === 'th'
-            ? category.nameTh || category.name
-            : category.nameEn || category.name;
+        return language === 'th' ? (category.nameTh || category.name) : (category.nameEn || category.name);
     };
 
     return (
@@ -162,10 +160,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                                 <button
                                                     onClick={() => handleCropToggle(crop.value)}
                                                     className="ml-2 text-red-400 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100"
-                                                    title={t('ลบ {cropName}').replace(
-                                                        '{cropName}',
-                                                        getCropDisplayName(crop)
-                                                    )}
+                                                    title={t('ลบ {cropName}').replace('{cropName}', getCropDisplayName(crop))}
                                                 >
                                                     ✕
                                                 </button>
@@ -325,9 +320,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                 <h3 className="mb-2 text-xl font-semibold text-gray-400">
                                     {t('ไม่พบพืชที่ค้นหา')}
                                 </h3>
-                                <p className="text-gray-500">
-                                    {t('ลองปรับเปลี่ยนคำค้นหาหรือตัวกรอง')}
-                                </p>
+                                <p className="text-gray-500">{t('ลองปรับเปลี่ยนคำค้นหาหรือตัวกรอง')}</p>
                             </div>
                         )}
 
@@ -340,9 +333,7 @@ export default function GreenhouseCrop({ cropType, crops }) {
                                             {t('พร้อมเลือกวิธีการวางแผนแล้วใช่ไหม?')}
                                         </h3>
                                         <p className="text-sm text-gray-400">
-                                            {t(
-                                                'คุณได้เลือกพืช {count} ชนิดแล้ว ไปเลือกวิธีการวางแผนพื้นที่'
-                                            ).replace('{count}', selectedCrops.length.toString())}
+                                            {t('คุณได้เลือกพืช {count} ชนิดแล้ว ไปเลือกวิธีการวางแผนพื้นที่').replace('{count}', selectedCrops.length.toString())}
                                         </p>
                                     </div>
                                     <a
@@ -377,13 +368,11 @@ export default function GreenhouseCrop({ cropType, crops }) {
 // Separate component for crop cards
 function CropCard({ crop, isSelected, onToggle, language, t }) {
     const getCropDisplayName = (crop) => {
-        return language === 'th' ? crop.nameTh || crop.name : crop.nameEn || crop.name;
+        return language === 'th' ? (crop.nameTh || crop.name) : (crop.nameEn || crop.name);
     };
 
     const getCropDisplayDescription = (crop) => {
-        return language === 'th'
-            ? crop.descriptionTh || crop.description
-            : crop.descriptionEn || crop.description;
+        return language === 'th' ? (crop.descriptionTh || crop.description) : (crop.descriptionEn || crop.description);
     };
 
     return (
@@ -400,7 +389,7 @@ function CropCard({ crop, isSelected, onToggle, language, t }) {
                 <h4 className="mb-1 text-sm font-semibold text-white">
                     {getCropDisplayName(crop)}
                 </h4>
-                <p className="mt-2 line-clamp-2 text-xs text-gray-400">
+                <p className="line-clamp-2 text-xs text-gray-400 mt-2">
                     {getCropDisplayDescription(crop)}
                 </p>
                 {isSelected && (

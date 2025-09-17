@@ -4,7 +4,6 @@
 // resources/js/pages/home-garden-planner.tsx
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { router } from '@inertiajs/react';
-import axios from 'axios';
 
 import GoogleMapDesigner from '../components/homegarden/GoogleMapDesigner';
 import CanvasDesigner from '../components/homegarden/CanvasDesigner';
@@ -111,9 +110,7 @@ const ModeSelection: React.FC<{
                                 onClick={() => {
                                     if (mode.id === 'map') {
                                         alert(
-                                            t(
-                                                'โหมด Google Map อยู่ในช่วงปรับปรุงชั่วคราว กรุณาเลือกโหมดอื่น'
-                                            )
+                                            t('โหมด Google Map อยู่ในช่วงปรับปรุงชั่วคราว กรุณาเลือกโหมดอื่น')
                                         );
                                         return;
                                     }
@@ -230,96 +227,26 @@ export default function HomeGardenPlanner() {
         [currentScale]
     );
 
-    // Load data from database when editing an existing field
     useEffect(() => {
-        const loadFieldFromDatabase = async () => {
-            const currentFieldId = localStorage.getItem('currentFieldId');
-            
-            // Check if this is a new project (when currentFieldId was just cleared by handleCategorySelect)
-            // If currentFieldId exists, we're editing an existing field
-            if (currentFieldId && !currentFieldId.startsWith('mock-')) {
-                try {
-                    console.log('🔄 Loading home garden field from database:', currentFieldId);
-                    const response = await axios.get(`/api/fields/${currentFieldId}`);
-                    
-                    if (response.data.success && response.data.field) {
-                        const field = response.data.field;
-                        
-                        // Check if this field has garden data (i.e., it's actually a home garden field)
-                        if (field.garden_data) {
-                            const gardenData = field.garden_data;
-                            console.log('✅ Found garden data in database, loading...');
-                            
-                            setGardenZones(gardenData.gardenZones || []);
-                            setSprinklers(gardenData.sprinklers || []);
-                            setWaterSource(gardenData.waterSource);
-                            setPipes(gardenData.pipes || []);
-                            setDesignMode(gardenData.designMode);
-                            
-                            if (gardenData.imageData) {
-                                const imageDataWithScale = {
-                                    ...gardenData.imageData,
-                                    isScaleSet:
-                                        gardenData.imageData.isScaleSet ||
-                                        (gardenData.imageData.scale && gardenData.imageData.scale !== 20) ||
-                                        false,
-                                };
-                                setImageData(imageDataWithScale);
-                            }
-                            setCanvasData((prev) => gardenData.canvasData || prev);
-                            console.log('✅ Home garden data loaded from database successfully');
-                            return; // Exit early since we loaded from database
-                        } else {
-                            console.log('ℹ️ Field exists but has no garden data - this might be a different project type');
-                            // Clear the currentFieldId since this isn't a home garden project
-                            localStorage.removeItem('currentFieldId');
-                            localStorage.removeItem('currentFieldName');
-                        }
-                    } else {
-                        console.log('ℹ️ No field found in database with ID:', currentFieldId);
-                        // Clear invalid field ID
-                        localStorage.removeItem('currentFieldId');
-                        localStorage.removeItem('currentFieldName');
-                    }
-                } catch (error) {
-                    console.warn('⚠️ Failed to load garden data from database:', error);
-                    // Clear potentially invalid field ID
-                    localStorage.removeItem('currentFieldId');
-                    localStorage.removeItem('currentFieldName');
-                }
+        const savedData = loadGardenData();
+        if (savedData && savedData.designMode) {
+            setGardenZones(savedData.gardenZones || []);
+            setSprinklers(savedData.sprinklers || []);
+            setWaterSource(savedData.waterSource);
+            setPipes(savedData.pipes || []);
+            setDesignMode(savedData.designMode);
+            if (savedData.imageData) {
+                const imageDataWithScale = {
+                    ...savedData.imageData,
+                    isScaleSet:
+                        savedData.imageData.isScaleSet ||
+                        (savedData.imageData.scale && savedData.imageData.scale !== 20) ||
+                        false,
+                };
+                setImageData(imageDataWithScale);
             }
-            
-            // Only try localStorage if we don't have a valid database field
-            // This ensures we don't auto-load old localStorage data for new projects
-            if (!currentFieldId) {
-                console.log('ℹ️ No currentFieldId - this is a new project, showing mode selection');
-                // Don't load anything - let user choose mode for new project
-            } else {
-                // Fallback to localStorage only if we have a field ID but database load failed
-                const savedData = loadGardenData();
-                if (savedData && savedData.designMode) {
-                    console.log('✅ Loading garden data from localStorage as fallback');
-                    setGardenZones(savedData.gardenZones || []);
-                    setSprinklers(savedData.sprinklers || []);
-                    setWaterSource(savedData.waterSource);
-                    setPipes(savedData.pipes || []);
-                    setDesignMode(savedData.designMode);
-                    if (savedData.imageData) {
-                        const imageDataWithScale = {
-                            ...savedData.imageData,
-                            isScaleSet:
-                                savedData.imageData.isScaleSet ||
-                                (savedData.imageData.scale && savedData.imageData.scale !== 20) ||
-                                false,
-                        };
-                        setImageData(imageDataWithScale);
-                    }
-                    setCanvasData((prev) => savedData.canvasData || prev);
-                }
-            }
-        };
-        
-        loadFieldFromDatabase();
+            setCanvasData((prev) => savedData.canvasData || prev);
+        }
     }, []);
 
     const resetAllData = useCallback(() => {
@@ -948,11 +875,11 @@ export default function HomeGardenPlanner() {
             if (pipeEditMode === 'add') {
                 // Add mode - select sprinkler for connection
                 setSelectedSprinklersForPipe((prev) => {
-                    const newSelection = prev.includes(sprinklerId)
+                    const newSelection = prev.includes(sprinklerId) 
                         ? prev.filter((id) => id !== sprinklerId)
-                        : prev.length < 2
-                          ? [...prev, sprinklerId]
-                          : [prev[0], sprinklerId];
+                        : prev.length < 2 
+                            ? [...prev, sprinklerId]
+                            : [prev[0], sprinklerId];
                     return newSelection;
                 });
                 // Don't change selectedSprinkler when in pipe edit mode
@@ -976,7 +903,7 @@ export default function HomeGardenPlanner() {
         // Case 1: Connect two sprinklers
         if (selectedSprinklersForPipe.length === 2) {
             const [sprinkler1Id, sprinkler2Id] = selectedSprinklersForPipe;
-
+            
             // Check if pipe already exists
             const existingPipes = findPipesBetweenSprinklers(
                 sprinkler1Id,
@@ -1012,7 +939,7 @@ export default function HomeGardenPlanner() {
         else if (selectedSprinklersForPipe.length === 1 && selectedPipes.size === 1) {
             const sprinklerId = selectedSprinklersForPipe[0];
             const pipeId = Array.from(selectedPipes)[0];
-
+            
             const newPipe = addPipeFromSprinklerToPipe(
                 sprinklerId,
                 pipeId,
@@ -1031,15 +958,9 @@ export default function HomeGardenPlanner() {
                 setPipeEditMode('view');
             }
         }
-    }, [
-        selectedSprinklersForPipe,
-        selectedPipes,
-        sprinklers,
-        designMode,
-        canvasData,
-        imageData,
-        pipes,
-    ]);
+    }, [selectedSprinklersForPipe, selectedPipes, sprinklers, designMode, canvasData, imageData, pipes]);
+
+
 
     const handlePipeClick = useCallback(
         (pipeId: string) => {
@@ -1096,15 +1017,7 @@ export default function HomeGardenPlanner() {
                 }
             }
         },
-        [
-            pipeEditMode,
-            selectedSprinklersForPipe,
-            sprinklers,
-            pipes,
-            designMode,
-            canvasData,
-            imageData,
-        ]
+        [pipeEditMode, selectedSprinklersForPipe, sprinklers, pipes, designMode, canvasData, imageData]
     );
 
     const deleteSelectedPipes = useCallback(() => {
@@ -1122,7 +1035,7 @@ export default function HomeGardenPlanner() {
         setSelectedSprinklersForPipe([]);
         setSelectedPipes(new Set());
         setSelectedSprinkler(null);
-
+        
         // Show different instructions based on mode
         if (mode === 'remove') {
             // For remove mode, we don't need to select sprinklers
@@ -1299,129 +1212,13 @@ export default function HomeGardenPlanner() {
             canvasData?.scale || imageData?.scale || 20
         );
 
-        return {
+        return { 
             activeZones,
             totalPipeLength: pipeStats.totalLength,
             longestPipe: pipeStats.longestPath,
-            pipeCount: pipeStats.pipeCount,
+            pipeCount: pipeStats.pipeCount
         };
     }, [sprinklers, pipes, waterSource, designMode, canvasData, imageData]);
-
-    const handleSaveDraft = useCallback(async () => {
-        try {
-            const data: GardenPlannerData = {
-                gardenZones,
-                sprinklers,
-                waterSource,
-                pipes,
-                designMode,
-                imageData,
-                canvasData,
-            };
-
-            // Basic validation - just check if there's some content
-            if (gardenZones.length === 0 && sprinklers.length === 0) {
-                alert(t('กรุณาสร้างโซนหรือวางหัวฉีดอย่างน้อย 1 รายการก่อนบันทึก'));
-                return;
-            }
-
-            // Save to localStorage first
-            saveGardenData(data);
-
-            // Get field ID from localStorage (if editing existing field)
-            const currentFieldId = localStorage.getItem('currentFieldId');
-            const fieldName = localStorage.getItem('currentFieldName') || 'Home Garden Draft';
-
-            let response;
-            
-            if (currentFieldId && !currentFieldId.startsWith('mock-')) {
-                // Update existing field as draft
-                console.log('🔄 Updating existing field as draft:', currentFieldId);
-                const draftData = {
-                    status: 'unfinished',
-                    is_completed: false,
-                    garden_data: data,
-                    project_mode: 'garden',
-                    last_saved: new Date().toISOString(),
-                };
-                response = await axios.put(`/api/fields/${currentFieldId}/data`, draftData);
-            } else {
-                // Create new field as draft
-                console.log('🔄 Creating new field as draft');
-                
-                // Calculate basic stats for the draft
-                const calculatedArea = gardenZones.reduce((total, zone) => {
-                    const coords = zone.canvasCoordinates || zone.coordinates;
-                    if (coords && coords.length >= 3) {
-                        // For map mode, use GPS coordinates (no scale needed)
-                        // For canvas/image mode, use canvas coordinates with proper scale
-                        const scale = designMode === 'canvas' || designMode === 'image' 
-                            ? (canvasData?.scale || imageData?.scale || 20) 
-                            : undefined; // undefined for GPS coordinates
-                        return total + calculatePolygonArea(coords, scale);
-                    }
-                    return total;
-                }, 0);
-
-                const newFieldData = {
-                    name: fieldName,
-                    customer_name: 'Customer',
-                    category: 'home-garden',
-                    area_coordinates: gardenZones[0]?.coordinates || [],
-                    plant_type_id: 21, // Default plant type
-                    total_plants: sprinklers.length,
-                    total_area: calculatedArea / 1600, // Convert to rai
-                    total_water_need: sprinklers.length * 10, // Rough estimate
-                    area_type: 'polygon',
-                    status: 'unfinished',
-                    is_completed: false,
-                    // Required JSON fields with default values
-                    zone_inputs: [],
-                    selected_pipes: [],
-                    selected_pump: null,
-                    zone_sprinklers: [],
-                    zone_operation_mode: 'sequential',
-                    zone_operation_groups: [],
-                    project_data: null,
-                    project_stats: null,
-                    effective_equipment: null,
-                    zone_calculation_data: [],
-                    project_mode: 'garden',
-                    active_zone_id: null,
-                    show_pump_option: false,
-                    quotation_data: null,
-                    quotation_data_customer: null,
-                    garden_data: data,
-                    garden_stats: null,
-                    field_crop_data: null,
-                    greenhouse_data: null,
-                    last_saved: new Date().toISOString(),
-                };
-                
-                response = await axios.post('/api/fields', newFieldData);
-            }
-
-            if (response.data.success) {
-                console.log('✅ Draft saved successfully');
-                
-                // Store the field ID if it's a new field
-                if (response.data.field?.id) {
-                    localStorage.setItem('currentFieldId', response.data.field.id);
-                    localStorage.setItem('currentFieldName', fieldName);
-                }
-                
-                alert(t('บันทึกร่างเรียบร้อยแล้ว! สามารถแก้ไขต่อได้ในภายหลัง'));
-                
-                // Navigate to home page after successful save
-                router.visit('/');
-            } else {
-                throw new Error('Failed to save draft');
-            }
-        } catch (error) {
-            console.error('❌ Error saving draft:', error);
-            alert(t('เกิดข้อผิดพลาดในการบันทึกร่าง กรุณาลองใหม่อีกครั้ง'));
-        }
-    }, [gardenZones, sprinklers, waterSource, pipes, designMode, imageData, canvasData, t]);
 
     const navigateToSummary = useCallback(() => {
         const data: GardenPlannerData = {
@@ -1557,12 +1354,6 @@ export default function HomeGardenPlanner() {
                             </div>
 
                             <button
-                                onClick={handleSaveDraft}
-                                className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-yellow-600 to-orange-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all hover:from-yellow-700 hover:to-orange-700"
-                            >
-                                💾 {t('บันทึกร่าง')}
-                            </button>
-                            <button
                                 onClick={navigateToSummary}
                                 className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 px-4 py-2 text-sm font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-blue-700"
                             >
@@ -1574,7 +1365,7 @@ export default function HomeGardenPlanner() {
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
                     <div className="order-2 space-y-3 overflow-auto lg:order-1 lg:col-span-1">
-                        <div className="flex justify-center rounded-lg bg-red-800 p-1">
+                        <div className="flex rounded-lg bg-red-800 p-1 justify-center">
                             {[
                                 { id: 'zones', name: t('กำหนดโซน'), icon: '🗺️' },
                                 { id: 'sprinklers', name: t('วางหัวฉีด'), icon: '💧' },
@@ -1594,32 +1385,35 @@ export default function HomeGardenPlanner() {
                             ))}
                         </div>
                         <div className="mb-4 space-y-2">
-                            {editMode !== 'draw' ? (
-                                <button
-                                    onClick={() => setEditMode('draw')}
-                                    className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg transition-all hover:bg-blue-700"
-                                >
-                                    ✏️ {t('ใช้เครื่องมือวาดรูปทรง')}
-                                </button>
-                            ) : (
-                                <div className="space-y-2">
-                                    <button
-                                        onClick={() => {
-                                            setEditMode('view');
-                                            if (designMode === 'canvas' || designMode === 'image') {
-                                                window.dispatchEvent(
-                                                    new CustomEvent('cancelDrawing')
-                                                );
-                                            }
-                                            setSelectedZoneForConfig(null);
-                                        }}
-                                        className="w-full rounded-lg bg-red-600 py-2 font-medium text-white transition-all hover:bg-red-700"
-                                    >
-                                        ❌ {t('ยกเลิกการวาด')}
-                                    </button>
+                                    {editMode !== 'draw' ? (
+                                        <button
+                                            onClick={() => setEditMode('draw')}
+                                            className="w-full rounded-lg bg-blue-600 py-3 font-medium text-white shadow-lg transition-all hover:bg-blue-700"
+                                        >
+                                            ✏️ {t('ใช้เครื่องมือวาดรูปทรง')}
+                                        </button>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <button
+                                                onClick={() => {
+                                                    setEditMode('view');
+                                                    if (
+                                                        designMode === 'canvas' ||
+                                                        designMode === 'image'
+                                                    ) {
+                                                        window.dispatchEvent(
+                                                            new CustomEvent('cancelDrawing')
+                                                        );
+                                                    }
+                                                    setSelectedZoneForConfig(null);
+                                                }}
+                                                className="w-full rounded-lg bg-red-600 py-2 font-medium text-white transition-all hover:bg-red-700"
+                                            >
+                                                ❌ {t('ยกเลิกการวาด')}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </div>
                         {activeTab === 'zones' && (
                             <div className="rounded-xl bg-gray-800/90 p-6 shadow-2xl backdrop-blur">
                                 <h3 className="mb-4 text-xl font-semibold text-blue-400">
@@ -1655,6 +1449,8 @@ export default function HomeGardenPlanner() {
                                         ))}
                                     </div>
                                 </div>
+
+                                
 
                                 {gardenZones.length > 0 && (
                                     <div>
@@ -1982,7 +1778,9 @@ export default function HomeGardenPlanner() {
 
                                         <button
                                             onClick={() =>
-                                                setEditMode(editMode === 'place' ? '' : 'place')
+                                                setEditMode(
+                                                    editMode === 'place' ? '' : 'place'
+                                                )
                                             }
                                             className={`w-full rounded-lg py-3 font-medium transition-all ${
                                                 editMode === 'place'
@@ -2163,9 +1961,11 @@ export default function HomeGardenPlanner() {
 
                                         <button
                                             onClick={() =>
-                                                setEditMode(editMode === 'edit' ? '' : 'edit')
+                                                setEditMode(
+                                                    editMode === 'edit' ? '' : 'edit'
+                                                )
                                             }
-                                            className={`flex w-full items-center justify-center gap-2 rounded-lg py-3 font-medium transition-all ${
+                                            className={`w-full rounded-lg py-3 font-medium transition-all flex items-center justify-center gap-2 ${
                                                 editMode === 'edit'
                                                     ? 'bg-red-300 text-red-900 shadow-lg'
                                                     : 'bg-green-700 text-white hover:bg-green-600'
@@ -2268,9 +2068,7 @@ export default function HomeGardenPlanner() {
                                                                     <div className="flex items-center space-x-2">
                                                                         <div className="text-right">
                                                                             <div className="font-bold text-blue-400">
-                                                                                {
-                                                                                    zoneSprinklers.length
-                                                                                }{' '}
+                                                                                {zoneSprinklers.length}{' '}
                                                                                 {t('หัว')}
                                                                             </div>
                                                                             {zoneSprinklers.length > 0 && (
@@ -2281,30 +2079,13 @@ export default function HomeGardenPlanner() {
                                                                         </div>
                                                                         <button
                                                                             onClick={() => {
-                                                                                const zoneSprinklerIds =
-                                                                                    zoneSprinklers.map(
-                                                                                        (s) => s.id
-                                                                                    );
-                                                                                setSprinklers(
-                                                                                    (prev) =>
-                                                                                        prev.filter(
-                                                                                            (s) =>
-                                                                                                !zoneSprinklerIds.includes(
-                                                                                                    s.id
-                                                                                                )
-                                                                                        )
+                                                                                const zoneSprinklerIds = zoneSprinklers.map(s => s.id);
+                                                                                setSprinklers(prev => 
+                                                                                    prev.filter(s => !zoneSprinklerIds.includes(s.id))
                                                                                 );
-                                                                                setSelectedSprinkler(
-                                                                                    null
-                                                                                );
-                                                                                setSelectedSprinklersForPipe(
-                                                                                    (prev) =>
-                                                                                        prev.filter(
-                                                                                            (id) =>
-                                                                                                !zoneSprinklerIds.includes(
-                                                                                                    id
-                                                                                                )
-                                                                                        )
+                                                                                setSelectedSprinkler(null);
+                                                                                setSelectedSprinklersForPipe(prev => 
+                                                                                    prev.filter(id => !zoneSprinklerIds.includes(id))
                                                                                 );
                                                                             }}
                                                                             className="ml-2 rounded bg-red-600 px-2 py-1 text-xs text-white transition-all hover:bg-red-700"
@@ -2347,31 +2128,15 @@ export default function HomeGardenPlanner() {
                                                                 </div>
                                                                 <button
                                                                     onClick={() => {
-                                                                        const virtualSprinklerIds =
-                                                                            sprinklers
-                                                                                .filter(
-                                                                                    (s) =>
-                                                                                        s.zoneId ===
-                                                                                        'virtual_zone'
-                                                                                )
-                                                                                .map((s) => s.id);
-                                                                        setSprinklers((prev) =>
-                                                                            prev.filter(
-                                                                                (s) =>
-                                                                                    !virtualSprinklerIds.includes(
-                                                                                        s.id
-                                                                                    )
-                                                                            )
+                                                                        const virtualSprinklerIds = sprinklers
+                                                                            .filter(s => s.zoneId === 'virtual_zone')
+                                                                            .map(s => s.id);
+                                                                        setSprinklers(prev => 
+                                                                            prev.filter(s => !virtualSprinklerIds.includes(s.id))
                                                                         );
                                                                         setSelectedSprinkler(null);
-                                                                        setSelectedSprinklersForPipe(
-                                                                            (prev) =>
-                                                                                prev.filter(
-                                                                                    (id) =>
-                                                                                        !virtualSprinklerIds.includes(
-                                                                                            id
-                                                                                        )
-                                                                                )
+                                                                        setSelectedSprinklersForPipe(prev => 
+                                                                            prev.filter(id => !virtualSprinklerIds.includes(id))
                                                                         );
                                                                     }}
                                                                     className="ml-2 rounded bg-red-600 px-2 py-1 text-xs text-white transition-all hover:bg-red-700"
@@ -2474,18 +2239,14 @@ export default function HomeGardenPlanner() {
                                                             📊 {t('สถิติระบบท่อ (สีม่วง):')}
                                                         </div>
                                                         <div>
-                                                            {t('จำนวนท่อทั้งหมด:')}{' '}
-                                                            {statistics.pipeCount} {t('เส้น')}
+                                                            {t('จำนวนท่อทั้งหมด:')} {statistics.pipeCount}{' '}
+                                                            {t('เส้น')}
                                                         </div>
                                                         <div>
-                                                            {t('ความยาวรวม:')}{' '}
-                                                            {formatDistance(
-                                                                statistics.totalPipeLength
-                                                            )}
+                                                            {t('ความยาวรวม:')} {formatDistance(statistics.totalPipeLength)}
                                                         </div>
                                                         <div>
-                                                            {t('ท่อที่ยาวที่สุด:')}{' '}
-                                                            {formatDistance(statistics.longestPipe)}
+                                                            {t('ท่อที่ยาวที่สุด:')} {formatDistance(statistics.longestPipe)}
                                                         </div>
                                                     </div>
 
@@ -2533,44 +2294,22 @@ export default function HomeGardenPlanner() {
                                                         {pipeEditMode === 'add' && (
                                                             <div className="space-y-2">
                                                                 <div className="text-xs text-blue-200">
-                                                                    {t('เลือกหัวฉีด')} 2{' '}
-                                                                    {t('ตัวเพื่อเชื่อมต่อท่อ')} หรือ{' '}
-                                                                    {t('เลือกหัวฉีด')} 1{' '}
-                                                                    {t('ตัวและท่อ')} 1{' '}
-                                                                    {t('เส้นเพื่อเชื่อมต่อ')} (
-                                                                    {
-                                                                        selectedSprinklersForPipe.length
-                                                                    }
-                                                                    /2 {t('หัวฉีด')},{' '}
-                                                                    {selectedPipes.size}/1{' '}
-                                                                    {t('ท่อ')})
+                                                                    {t('เลือกหัวฉีด')} 2 {t('ตัวเพื่อเชื่อมต่อท่อ')} หรือ {t('เลือกหัวฉีด')} 1 {t('ตัวและท่อ')} 1 {t('เส้นเพื่อเชื่อมต่อ')} (
+                                                                    {selectedSprinklersForPipe.length}/2 {t('หัวฉีด')}, {selectedPipes.size}/1 {t('ท่อ')})
                                                                 </div>
-                                                                {(selectedSprinklersForPipe.length ===
-                                                                    2 ||
-                                                                    (selectedSprinklersForPipe.length ===
-                                                                        1 &&
-                                                                        selectedPipes.size ===
-                                                                            1)) && (
+                                                                {(selectedSprinklersForPipe.length === 2 || (selectedSprinklersForPipe.length === 1 && selectedPipes.size === 1)) && (
                                                                     <div className="text-xs text-green-200">
-                                                                        ✅{' '}
-                                                                        {t('กำลังเชื่อมต่อท่อ...')}
+                                                                        ✅ {t('กำลังเชื่อมต่อท่อ...')}
                                                                     </div>
                                                                 )}
-                                                                {selectedSprinklersForPipe.length >
-                                                                    0 && (
+                                                                {selectedSprinklersForPipe.length > 0 && (
                                                                     <div className="text-xs text-blue-300">
-                                                                        {t('เลือกหัวฉีดแล้ว:')}{' '}
-                                                                        {
-                                                                            selectedSprinklersForPipe.length
-                                                                        }{' '}
-                                                                        {t('ตัว')}
+                                                                        {t('เลือกหัวฉีดแล้ว:')} {selectedSprinklersForPipe.length} {t('ตัว')}
                                                                     </div>
                                                                 )}
                                                                 {selectedPipes.size > 0 && (
                                                                     <div className="text-xs text-blue-300">
-                                                                        {t('เลือกท่อแล้ว:')}{' '}
-                                                                        {selectedPipes.size}{' '}
-                                                                        {t('เส้น')}
+                                                                        {t('เลือกท่อแล้ว:')} {selectedPipes.size} {t('เส้น')}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -2579,9 +2318,7 @@ export default function HomeGardenPlanner() {
                                                         {pipeEditMode === 'remove' && (
                                                             <div className="space-y-2">
                                                                 <div className="text-xs text-red-200">
-                                                                    {t(
-                                                                        'คลิกที่เส้นท่อที่ต้องการลบ'
-                                                                    )}
+                                                                    {t('คลิกที่เส้นท่อที่ต้องการลบ')}
                                                                 </div>
                                                             </div>
                                                         )}
@@ -2620,35 +2357,33 @@ export default function HomeGardenPlanner() {
                     {/* <div className="lg:col-span-3"> */}
                     <div className="order-1 lg:order-2 lg:col-span-3">
                         <div className="relative h-[83vh] overflow-hidden rounded-xl border border-gray-600 shadow-2xl">
-                            {designMode === 'map' && (
-                                <div className="flex h-full w-full items-center justify-center bg-gray-900">
-                                    <div className="mx-4 max-w-lg rounded-xl border border-amber-600 bg-amber-900/30 p-6 text-center shadow-2xl">
-                                        <div className="mb-2 text-4xl">🚧</div>
-                                        <h2 className="mb-2 text-xl font-bold text-amber-300">
-                                            {t('โหมด Google Map อยู่ในช่วงปรับปรุง')}
-                                        </h2>
-                                        <p className="mb-4 text-sm text-amber-200">
-                                            {t(
-                                                'ขณะนี้ไม่สามารถใช้งานโหมดแผนที่ได้ชั่วคราว กรุณาเลือกโหมด วาดเอง หรือ รูปแบบแปลน เพื่อใช้งานต่อ'
-                                            )}
-                                        </p>
-                                        <div className="flex justify-center gap-2">
-                                            <button
-                                                onClick={() => setDesignMode('canvas')}
-                                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
-                                            >
-                                                ✏️ {t('ไปที่โหมดวาดเอง')}
-                                            </button>
-                                            <button
-                                                onClick={() => setDesignMode('image')}
-                                                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
-                                            >
-                                                🖼️ {t('ไปที่โหมดรูปแบบแปลน')}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+            {designMode === 'map' && (
+                <div className="flex h-full w-full items-center justify-center bg-gray-900">
+                    <div className="mx-4 max-w-lg rounded-xl border border-amber-600 bg-amber-900/30 p-6 text-center shadow-2xl">
+                        <div className="mb-2 text-4xl">🚧</div>
+                        <h2 className="mb-2 text-xl font-bold text-amber-300">
+                            {t('โหมด Google Map อยู่ในช่วงปรับปรุง')}
+                        </h2>
+                        <p className="mb-4 text-sm text-amber-200">
+                            {t('ขณะนี้ไม่สามารถใช้งานโหมดแผนที่ได้ชั่วคราว กรุณาเลือกโหมด วาดเอง หรือ รูปแบบแปลน เพื่อใช้งานต่อ')}
+                        </p>
+                        <div className="flex justify-center gap-2">
+                            <button
+                                onClick={() => setDesignMode('canvas')}
+                                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+                            >
+                                ✏️ {t('ไปที่โหมดวาดเอง')}
+                            </button>
+                            <button
+                                onClick={() => setDesignMode('image')}
+                                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700"
+                            >
+                                🖼️ {t('ไปที่โหมดรูปแบบแปลน')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
                             {designMode === 'canvas' && (
                                 <div className="flex h-full w-full items-center justify-center bg-gray-900">

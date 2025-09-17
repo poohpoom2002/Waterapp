@@ -930,20 +930,8 @@ const findClosestPointOnLineSegment = (
 };
 
 function EnhancedHorticultureResultsPageContent() {
-    // Defensive usePage call with error handling
-    let page;
-    let auth;
-    try {
-        page = usePage();
-        auth = (page.props as any).auth;
-    } catch (error) {
-        console.warn(
-            'Inertia context not available in HorticultureResultsPage, using fallback values'
-        );
-        page = { props: {} };
-        auth = null;
-    }
-
+    const page = usePage();
+    const auth = (page.props as any).auth;
     const { t } = useLanguage();
     const [projectData, setProjectData] = useState<EnhancedProjectData | null>(null);
     const [projectSummary, setProjectSummary] = useState<ProjectSummaryData | null>(null);
@@ -1211,37 +1199,6 @@ function EnhancedHorticultureResultsPageContent() {
         setIconSize(1);
     };
 
-    const handleManualCleanup = () => {
-        try {
-            console.log('🧹 Manual localStorage cleanup initiated...');
-            
-            // Clear horticulture-specific data
-            localStorage.removeItem('horticultureIrrigationData');
-            localStorage.removeItem('horticultureIrrigationBackup');
-            localStorage.removeItem('horticultureSettings');
-            
-            // Clear project images that might be causing quota issues
-            localStorage.removeItem('projectMapImage');
-            localStorage.removeItem('projectType');
-            
-            // Clear any other map-related images
-            const keysToRemove: string[] = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && (key.includes('mapImage') || key.includes('projectImage'))) {
-                    keysToRemove.push(key);
-                }
-            }
-            keysToRemove.forEach(key => localStorage.removeItem(key));
-            
-            console.log('✅ Manual cleanup successful!');
-            alert('localStorage cleanup completed successfully!\n\nCleared:\n- Horticulture data\n- Project images\n- Map images\n\nYou can now try "คำนวณระบบน้ำ" again.');
-        } catch (error) {
-            console.error('❌ Manual cleanup failed:', error);
-            alert('localStorage cleanup failed!');
-        }
-    };
-
     const handleNewProject = () => {
         router.visit('/horticulture/planner');
     };
@@ -1308,35 +1265,10 @@ function EnhancedHorticultureResultsPageContent() {
     };
 
     const handleExportMapToProduct = async () => {
-        console.log('🔍 Debug: Starting handleExportMapToProduct');
-        console.log('🔍 Debug: mapContainerRef.current:', mapContainerRef.current);
-        console.log('🔍 Debug: enhancedStats:', enhancedStats);
-        console.log('🔍 Debug: projectData:', projectData);
-        
         if (!mapContainerRef.current) {
-            console.log('❌ Debug: No map container found');
             alert(t('ไม่พบแผนที่'));
             return;
         }
-
-        // Check if sprinkler configuration exists
-        if (!enhancedStats || !enhancedStats.sprinklerFlowRate) {
-            console.log('❌ Debug: No sprinkler configuration found');
-            console.log('🔍 Debug: enhancedStats:', enhancedStats);
-            console.log('🔍 Debug: sprinklerFlowRate:', enhancedStats?.sprinklerFlowRate);
-            alert(
-                '❌ ยังไม่ได้ตั้งค่าระบบหัวฉีด\n\nกรุณาตั้งค่าระบบหัวฉีดก่อน:\n1. กดปุ่ม "ตั้งค่าระบบหัวฉีด"\n2. ใส่ข้อมูลหัวฉีดที่ต้องการ\n3. กดบันทึก\n4. ลองใหม่'
-            );
-            return;
-        }
-
-        // Check if project data exists
-        if (!projectData) {
-            console.log('❌ Debug: No project data found');
-            alert('❌ ไม่พบข้อมูลโครงการ\n\nกรุณาโหลดข้อมูลโครงการใหม่');
-            return;
-        }
-
         setIsCreatingImage(true);
         try {
             const currentRotation = mapRotation;
@@ -1347,12 +1279,9 @@ function EnhancedHorticultureResultsPageContent() {
 
             await new Promise((resolve) => setTimeout(resolve, 2000));
 
-            console.log('🔍 Debug: About to import html2canvas');
             const html2canvas = await import('html2canvas');
             const html2canvasLib = html2canvas.default || html2canvas;
-            console.log('🔍 Debug: html2canvas imported successfully');
 
-            console.log('🔍 Debug: About to create canvas from map container');
             const canvas = await html2canvasLib(mapContainerRef.current, {
                 useCORS: true,
                 allowTaint: true,
@@ -1427,48 +1356,15 @@ function EnhancedHorticultureResultsPageContent() {
                 },
             });
 
-            console.log('🔍 Debug: Canvas created successfully');
             const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-            console.log('🔍 Debug: DataURL created, length:', dataUrl.length);
-            console.log('🔍 Debug: DataURL preview:', dataUrl.substring(0, 50) + '...');
 
             if (currentRotation !== 0) {
                 setMapRotation(currentRotation);
             }
 
             if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
-                console.log('🔍 Debug: DataURL is valid, proceeding with export');
-                
-                // Store project type first
+                localStorage.setItem('projectMapImage', dataUrl);
                 localStorage.setItem('projectType', 'horticulture');
-                
-                // Try to store the image, but handle quota exceeded error gracefully
-                try {
-                    localStorage.setItem('projectMapImage', dataUrl);
-                    console.log('🔍 Debug: Image stored in localStorage successfully');
-                } catch (storageError) {
-                    console.warn('⚠️ localStorage quota exceeded, image will not be stored:', storageError);
-                    
-                    // Clear some localStorage space if possible
-                    try {
-                        // Remove old project images to free up space
-                        const keysToRemove: string[] = [];
-                        for (let i = 0; i < localStorage.length; i++) {
-                            const key = localStorage.key(i);
-                            if (key && (key.includes('projectMapImage') || key.includes('mapImage'))) {
-                                keysToRemove.push(key);
-                            }
-                        }
-                        keysToRemove.forEach(key => localStorage.removeItem(key));
-                        
-                        // Try again with the original image
-                        localStorage.setItem('projectMapImage', dataUrl);
-                        console.log('🔍 Debug: Image stored after clearing old images');
-                    } catch (retryError) {
-                        console.warn('⚠️ Still cannot store image, continuing without it:', retryError);
-                        // Continue without the image - the product page can work without it
-                    }
-                }
                 
                 // ส่งข้อมูลระบบหัวฉีดและโซนสำหรับ product page
                 console.log('Debug handleExportMapToProduct:', {
@@ -1628,36 +1524,13 @@ function EnhancedHorticultureResultsPageContent() {
                 
                 window.location.href = '/product';
             } else {
-                console.log('❌ Debug: DataURL is invalid');
-                console.log('🔍 Debug: dataUrl:', dataUrl);
-                console.log('🔍 Debug: dataUrl length:', dataUrl?.length);
-                console.log('🔍 Debug: dataUrl === "data:,"', dataUrl === 'data:,');
                 throw new Error('ไม่สามารถสร้างภาพแผนที่ได้');
             }
         } catch (error) {
             console.error('❌ Error creating map image:', error);
-            
-            // Provide more specific error messages
-            let errorMessage = '❌ เกิดข้อผิดพลาดในการสร้างภาพแผนผัง\n\n';
-            
-            if (error instanceof Error) {
-                if (error.message.includes('quota') || error.message.includes('Quota')) {
-                    errorMessage += 'ปัญหา: พื้นที่เก็บข้อมูลเต็ม (localStorage quota exceeded)\n\n';
-                    errorMessage += 'วิธีแก้ไข:\n';
-                    errorMessage += '1. ล้างข้อมูล localStorage (กดปุ่ม "ล้างข้อมูล")\n';
-                    errorMessage += '2. หรือใช้วิธี Screenshot ด้านล่าง\n\n';
-                } else if (error.message.includes('html2canvas')) {
-                    errorMessage += 'ปัญหา: ไม่สามารถสร้างภาพจากแผนที่ได้\n\n';
-                } else if (error.message.includes('ไม่สามารถสร้างภาพแผนที่ได้')) {
-                    errorMessage += 'ปัญหา: ภาพที่สร้างได้มีขนาดเล็กเกินไป\n\n';
-                } else {
-                    errorMessage += `ปัญหา: ${error.message}\n\n`;
-                }
-            }
-            
-            errorMessage += 'กรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อ Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือใช้ Extension "Full Page Screen Capture"';
-            
-            alert(errorMessage);
+            alert(
+                '❌ เกิดข้อผิดพลาดในการสร้างภาพแผนผัง\n\nกรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อ Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือใช้ Extension "Full Page Screen Capture"'
+            );
         } finally {
             setIsCreatingImage(false);
         }
@@ -1726,25 +1599,9 @@ function EnhancedHorticultureResultsPageContent() {
                                 </button>
                             )}
                             <button
-                                onClick={handleManualCleanup}
-                                className="rounded-lg bg-yellow-600 px-6 py-3 font-semibold transition-colors hover:bg-yellow-700"
-                                title={t('ล้างข้อมูล localStorage เมื่อเกิดข้อผิดพลาด') || 'ล้างข้อมูล localStorage เมื่อเกิดข้อผิดพลาด'}
-                            >
-                                🗑️ {t('ล้างข้อมูล') || 'ล้างข้อมูล'}
-                            </button>
-                            <button
                                 onClick={handleExportMapToProduct}
-                                disabled={isCreatingImage || !enhancedStats?.sprinklerFlowRate}
-                                className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-                                    enhancedStats?.sprinklerFlowRate 
-                                        ? 'bg-blue-600 hover:bg-blue-700' 
-                                        : 'bg-gray-500 hover:bg-gray-600'
-                                }`}
-                                title={
-                                    !enhancedStats?.sprinklerFlowRate 
-                                        ? 'กรุณาตั้งค่าระบบหัวฉีดก่อน' 
-                                        : 'คำนวณระบบน้ำและส่งออกไปยังหน้าสินค้า'
-                                }
+                                disabled={isCreatingImage}
+                                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isCreatingImage ? (
                                     <>
@@ -2215,7 +2072,7 @@ function EnhancedHorticultureResultsPageContent() {
                                 </div>
 
                                 {/* Enhanced Statistics */}
-                                {enhancedStats && enhancedStats.sprinklerFlowRate ? (
+                                {enhancedStats && enhancedStats.sprinklerFlowRate && (
                                     <div className="mt-6 rounded border border-blue-700/50 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 p-4">
                                         <h4 className="mb-3 text-lg font-semibold text-cyan-300">
                                             🚿 {t('ข้อมูลระบบหัวฉีดของพื้นที่รวมทั้ังหมด')} (แรงดัน{' '}
@@ -2256,23 +2113,6 @@ function EnhancedHorticultureResultsPageContent() {
                                                     }
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="mt-6 rounded border border-yellow-700/50 bg-gradient-to-r from-yellow-900/30 to-orange-900/30 p-4">
-                                        <h4 className="mb-3 text-lg font-semibold text-yellow-300">
-                                            ⚠️ {t('ยังไม่ได้ตั้งค่าระบบหัวฉีด')}
-                                        </h4>
-                                        <div className="text-sm text-yellow-200">
-                                            <p className="mb-2">
-                                                {t('กรุณาตั้งค่าระบบหัวฉีดก่อนคำนวณระบบน้ำ:')}
-                                            </p>
-                                            <ol className="ml-4 list-decimal space-y-1">
-                                                <li>{t('กดปุ่ม "ตั้งค่าหัวฉีด" ด้านบน')}</li>
-                                                <li>{t('ใส่ข้อมูลหัวฉีดที่ต้องการ (แรงดัน, รัศมี, อัตราการไหล)')}</li>
-                                                <li>{t('กดบันทึก')}</li>
-                                                <li>{t('กดปุ่ม "คำนวณระบบน้ำ" เพื่อส่งออกไปยังหน้าสินค้า')}</li>
-                                            </ol>
                                         </div>
                                     </div>
                                 )}

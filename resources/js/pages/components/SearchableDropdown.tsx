@@ -46,35 +46,31 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     options,
     value,
     onChange,
-    placeholder = 'เลือกตัวเลือก',
-    className = '',
+    placeholder = "เลือกตัวเลือก",
+    className = "",
     disabled = false,
-    searchPlaceholder = 'พิมพ์เพื่อค้นหา...',
+    searchPlaceholder = "พิมพ์เพื่อค้นหา..."
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const { t } = useLanguage();
-
+    
     const dropdownRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
     // Filter options based on search term
-    const filteredOptions = options.filter((option) => {
+    const filteredOptions = options.filter(option => {
         const searchText = searchTerm.toLowerCase();
         const labelMatch = option.label.toLowerCase().includes(searchText);
-        const searchableTextMatch = option.searchableText
-            ? option.searchableText.toLowerCase().includes(searchText)
+        const searchableTextMatch = option.searchableText 
+            ? option.searchableText.toLowerCase().includes(searchText) 
             : false;
         return labelMatch || searchableTextMatch;
     });
 
     // Get selected option label
-<<<<<<< HEAD
-    const selectedOption = options.find((option) => option.value === value);
-=======
     const selectedOption = options.find(option => String(option.value) === String(value));
->>>>>>> origin/main
     const displayValue = selectedOption ? selectedOption.label : '';
 
     // Close dropdown when clicking outside
@@ -101,7 +97,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 if (!isOpen) {
                     setIsOpen(true);
                 } else {
-                    setHighlightedIndex((prev) =>
+                    setHighlightedIndex(prev => 
                         prev < filteredOptions.length - 1 ? prev + 1 : 0
                     );
                 }
@@ -109,7 +105,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
             case 'ArrowUp':
                 e.preventDefault();
                 if (isOpen) {
-                    setHighlightedIndex((prev) =>
+                    setHighlightedIndex(prev => 
                         prev > 0 ? prev - 1 : filteredOptions.length - 1
                     );
                 }
@@ -159,8 +155,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 
     // Get recommendation symbol and text
     const getRecommendationInfo = (option: Option) => {
-        if (option.isRecommended)
-            return { symbol: '⭐', text: t('แนะนำ'), color: 'text-yellow-300' };
+        if (option.isRecommended) return { symbol: '⭐', text: t('แนะนำ'), color: 'text-yellow-300' };
         if (option.isGoodChoice) return { symbol: '✅', text: t('ดี'), color: 'text-green-300' };
         if (option.isUsable) return { symbol: '⚡', text: t('พอใช้'), color: 'text-orange-300' };
         // Check if any recommendation property is defined
@@ -174,22 +169,14 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     // Render option with enhanced display
     const renderOption = (option: Option, index: number) => {
         const isHighlighted = index === highlightedIndex;
-<<<<<<< HEAD
-        const isSelected = option.value === value;
-
-        // Check if this option has enhanced data
-        const hasEnhancedData =
-            option.image || option.productCode || option.name || option.brand || option.price;
-=======
         const isSelected = String(option.value) === String(value);
         
         // Check if this option has enhanced data
         const hasEnhancedData = option.image || option.productCode || option.name || option.brand || option.price || option.description;
->>>>>>> origin/main
 
         if (hasEnhancedData) {
             const recommendation = getRecommendationInfo(option);
-
+            
             return (
                 <div
                     key={option.value}
@@ -198,17 +185,10 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                         isHighlighted
                             ? 'bg-blue-600 text-white'
                             : isSelected
-<<<<<<< HEAD
-                              ? 'bg-gray-700 text-blue-300'
-                              : option.disabled
-                                ? 'cursor-not-allowed text-gray-500'
-                                : 'text-white hover:bg-gray-700'
-=======
                             ? 'bg-gray-700 text-blue-300'
                             : option.disabled
                             ? 'cursor-not-allowed text-gray-500'
                             : 'text-white hover:bg-gray-600 hover:text-white'
->>>>>>> origin/main
                     }`}
                 >
                     <div className="flex items-center space-x-3">
@@ -231,28 +211,19 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                         </div>
 
                         {/* Product Information */}
-                        <div className="min-w-0 flex-1">
+                        <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2">
                                 {/* Auto-selection indicator */}
-                                {option.isAutoSelected && <span className="text-sm">🤖</span>}
-
+                                {option.isAutoSelected && (
+                                    <span className="text-sm">🤖</span>
+                                )}
+                                
                                 {/* Recommendation symbol */}
 
                                 
-<<<<<<< HEAD
-                                {option.productCode && (
-                                    <span className="font-medium text-blue-300">
-                                        {option.productCode}
-                                    </span>
-                                )}
-                                {option.name && (
-                                    <span className="font-medium text-white">{option.name}</span>
-                                )}
-=======
                                 <span className="font-medium text-white">
                                     {option.label}
                                 </span>
->>>>>>> origin/main
                             </div>
                             
                             {/* Description */}
@@ -267,7 +238,9 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                             <div className="flex items-center justify-between mt-1">
                                 <div className="flex items-center space-x-2 text-xs text-gray-200">
                                     {option.brand && (
-                                        <span className="text-yellow-300">{option.brand}</span>
+                                        <span className="text-yellow-300">
+                                            {option.brand}
+                                        </span>
                                     )}
 
                                     {/* Head Loss calculation display */}
@@ -330,17 +303,13 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                                         </div>
                                     )}
                                 </div>
-
+                                
                                 {option.price && (
                                     <div className="text-right">
                                         <span className="font-bold text-green-300">
                                             {option.price.toLocaleString()}
                                         </span>
-<<<<<<< HEAD
-                                        <span className="ml-1 text-xs text-gray-400">
-=======
                                         <span className="text-xs text-gray-200 ml-1">
->>>>>>> origin/main
                                             {option.unit || t('บาท')}
                                         </span>
                                     </div>
@@ -361,17 +330,10 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                     isHighlighted
                         ? 'bg-blue-600 text-white'
                         : isSelected
-<<<<<<< HEAD
-                          ? 'bg-gray-700 text-blue-300'
-                          : option.disabled
-                            ? 'cursor-not-allowed text-gray-500'
-                            : 'text-white hover:bg-gray-700'
-=======
                         ? 'bg-gray-700 text-blue-300'
                         : option.disabled
                         ? 'cursor-not-allowed text-gray-500'
                         : 'text-white hover:bg-gray-600 hover:text-white'
->>>>>>> origin/main
                 }`}
             >
                 <div className="flex items-center justify-between">
@@ -428,7 +390,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-text'
                     }`}
                 />
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                     <svg
                         className={`h-5 w-5 text-gray-400 transition-transform ${
                             isOpen ? 'rotate-180' : ''
@@ -464,4 +426,4 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     );
 };
 
-export default SearchableDropdown;
+export default SearchableDropdown; 

@@ -36,131 +36,132 @@ interface HorticultureDrawingManagerProps {
     onLateralPipeMouseMove?: (event: google.maps.MapMouseEvent) => void;
 }
 
-const snapPointToPump = (
-    point: Coordinate,
-    pumpPosition: Coordinate | null,
-    snapThreshold: number = 10
-): Coordinate => {
-    if (!pumpPosition) {
-        return point;
-    }
-
-    const distance = utilsCalculateDistanceBetweenPoints(point, pumpPosition);
-
-    if (distance <= snapThreshold) {
-        return pumpPosition;
-    }
-
-    return point;
-};
-
-const snapPointToMainPipeEnd = (
-    point: Coordinate,
-    mainPipes: any[],
-    snapThreshold: number = 5
-): Coordinate => {
-    if (!mainPipes || mainPipes.length === 0) {
-        return point;
-    }
-
-    let closestPoint = point;
-    let minDistance = Infinity;
-    let closestPipeId = '';
-
-    for (const mainPipe of mainPipes) {
-        if (!mainPipe.coordinates || mainPipe.coordinates.length === 0) {
-            continue;
+    const snapPointToPump = (
+        point: Coordinate,
+        pumpPosition: Coordinate | null,
+        snapThreshold: number = 10
+    ): Coordinate => {
+        if (!pumpPosition) {
+            return point;
         }
 
-        const pipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-        const distance = utilsCalculateDistanceBetweenPoints(point, pipeEnd);
+        const distance = calculateDistanceBetweenPoints(point, pumpPosition);
 
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestPoint = pipeEnd;
-            closestPipeId = mainPipe.id;
+        if (distance <= snapThreshold) {
+            return pumpPosition;
         }
-    }
 
-    if (minDistance <= snapThreshold) {
-        return closestPoint;
-    }
-
-    return point;
-};
-
-const snapPointToSubMainPipe = (
-    point: Coordinate,
-    subMainPipes: any[],
-    snapThreshold: number = 5
-): Coordinate => {
-    if (!subMainPipes || subMainPipes.length === 0) {
         return point;
-    }
+    };
 
-    let closestPoint = point;
-    let minDistance = Infinity;
-    let closestPipeId = '';
-
-    for (const subMainPipe of subMainPipes) {
-        if (!subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
-            continue;
+    const snapPointToMainPipeEnd = (
+        point: Coordinate,
+        mainPipes: any[],
+        snapThreshold: number = 5
+    ): Coordinate => {
+        if (!mainPipes || mainPipes.length === 0) {
+            return point;
         }
 
-        for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
-            const start = subMainPipe.coordinates[i];
-            const end = subMainPipe.coordinates[i + 1];
-            
-            const closestPointOnSegment = utilsFindClosestPointOnLineSegment(point, start, end);
-            const distance = utilsCalculateDistanceBetweenPoints(point, closestPointOnSegment);
+        let closestPoint = point;
+        let minDistance = Infinity;
+        let closestPipeId = '';
+
+        for (const mainPipe of mainPipes) {
+            if (!mainPipe.coordinates || mainPipe.coordinates.length === 0) {
+                continue;
+            }
+
+            const pipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
+            const distance = calculateDistanceBetweenPoints(point, pipeEnd);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPoint = pipeEnd;
+                closestPipeId = mainPipe.id;
+            }
+        }
+
+        if (minDistance <= snapThreshold) {
+            return closestPoint;
+        }
+
+        return point;
+    };
+
+    const snapPointToSubMainPipe = (
+        point: Coordinate,
+        subMainPipes: any[],
+        snapThreshold: number = 5
+    ): Coordinate => {
+        if (!subMainPipes || subMainPipes.length === 0) {
+            return point;
+        }
+
+        let closestPoint = point;
+        let minDistance = Infinity;
+        let closestPipeId = '';
+
+        for (const subMainPipe of subMainPipes) {
+            if (!subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
+                continue;
+            }
+
+            for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
+                const start = subMainPipe.coordinates[i];
+                const end = subMainPipe.coordinates[i + 1];
+                
+                const closestPointOnSegment = findClosestPointOnLineSegment(point, start, end);
+                const distance = calculateDistanceBetweenPoints(point, closestPointOnSegment);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestPoint = closestPointOnSegment;
+                    closestPipeId = subMainPipe.id;
+                }
+            }
+        }
+
+        if (minDistance <= snapThreshold) {
+            return closestPoint;
+        }
+
+        return point;
+    };
+
+    const snapPointToMainAreaBoundary = (
+        point: Coordinate,
+        mainArea: Coordinate[],
+        snapThreshold: number = 5
+    ): Coordinate => {
+        if (!mainArea || mainArea.length < 3) {
+            return point;
+        }
+
+        let closestPoint = point;
+        let minDistance = Infinity;
+        let snappedEdgeIndex = -1;
+
+        for (let i = 0; i < mainArea.length; i++) {
+            const start = mainArea[i];
+            const end = mainArea[(i + 1) % mainArea.length];
+
+            const closestPointOnSegment = findClosestPointOnLineSegment(point, start, end);
+            const distance = calculateDistanceBetweenPoints(point, closestPointOnSegment);
 
             if (distance < minDistance) {
                 minDistance = distance;
                 closestPoint = closestPointOnSegment;
-                closestPipeId = subMainPipe.id;
+                snappedEdgeIndex = i;
             }
         }
-    }
 
-    if (minDistance <= snapThreshold) {
-        return closestPoint;
-    }
-
-    return point;
-};
-
-const snapPointToMainAreaBoundary = (
-    point: Coordinate,
-    mainArea: Coordinate[],
-    snapThreshold: number = 5
-): Coordinate => {
-    if (!mainArea || mainArea.length < 3) {
-        return point;
-    }
-
-    let closestPoint = point;
-    let minDistance = Infinity;
-
-    for (let i = 0; i < mainArea.length; i++) {
-        const start = mainArea[i];
-        const end = mainArea[(i + 1) % mainArea.length];
-
-        const closestPointOnSegment = utilsFindClosestPointOnLineSegment(point, start, end);
-        const distance = utilsCalculateDistanceBetweenPoints(point, closestPointOnSegment);
-
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestPoint = closestPointOnSegment;
+        if (minDistance <= snapThreshold) {
+            return closestPoint;
         }
-    }
 
-    if (minDistance <= snapThreshold) {
-        return closestPoint;
-    }
-
-    return point;
-};
-
+        return point;
+    };
 
 // ใช้ฟังก์ชัน findClosestPointOnLineSegment จาก horticultureUtils.ts
 const findClosestPointOnLineSegment = utilsFindClosestPointOnLineSegment;
@@ -230,7 +231,7 @@ const advancedSnapToMainArea = (
         const start = mainArea[i];
         const end = mainArea[(i + 1) % mainArea.length];
         const edgeLength = calculateDistanceBetweenPoints(start, end);
-
+        
         if (edgeLength > longestEdge) {
             longestEdge = edgeLength;
             longestEdgeStart = start;
@@ -255,9 +256,8 @@ const advancedSnapToMainArea = (
     });
 
     const originalCount = coordinates.length;
-    const snappedCount = snappedCoordinates.filter(
-        (coord, index) =>
-            coord.lat !== coordinates[index].lat || coord.lng !== coordinates[index].lng
+    const snappedCount = snappedCoordinates.filter((coord, index) => 
+        coord.lat !== coordinates[index].lat || coord.lng !== coordinates[index].lng
     ).length;
 
     if (snappedCount > 0) {
@@ -469,13 +469,13 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
             return coordinates;
         }
 
-    const snappedCoordinates = [...coordinates];
-    if (pumpPosition) {
-        snappedCoordinates[0] = snapPointToPump(coordinates[0], pumpPosition);
-    }
+        const snappedCoordinates = [...coordinates];
+        if (pumpPosition) {
+            snappedCoordinates[0] = snapPointToPump(coordinates[0], pumpPosition);
+        }
 
-    return snappedCoordinates;
-};
+        return snappedCoordinates;
+    };
 
     const snapSubMainPipeCoordinates = (
         coordinates: Coordinate[],
@@ -531,6 +531,8 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
 
     // ใช้ฟังก์ชัน snap จาก horticultureUtils.ts แทนฟังก์ชันเดิม
     const snapMainPipeEndToSubMainPipe = utilsSnapMainPipeEndToSubMainPipe;
+
+
 
 const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
     map,
@@ -737,19 +739,14 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     let coordinates = extractCoordinatesFromShape(polyline);
                     
                     if (editMode === 'mainPipe') {
-                        coordinates = snapMainPipeCoordinates(
-                            coordinates,
-                            pump,
-                            mainArea,
-                            subMainPipes
-                        );
+                        coordinates = snapMainPipeCoordinates(coordinates, pump, mainArea, subMainPipes);
                     } else if (editMode === 'subMainPipe') {
                         coordinates = snapSubMainPipeCoordinates(coordinates, mainPipes, mainArea);
                     } else if (editMode === 'lateralPipe') {
                         // สำหรับ lateral pipe ใช้ coordinates ที่วาดได้เลย
                         // การ snap และการจัดการจะทำใน handleLateralPipeClick
                     }
-
+                    
                     if (coordinates.length > 0) {
                         onCreated(coordinates, 'polyline');
                     }
@@ -893,7 +890,9 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                         google.maps.event.removeListener(listener);
                     }
                 });
+                
 
+                
                 if (drawingManagerRef.current) {
                     drawingManagerRef.current.setMap(null);
                     drawingManagerRef.current = null;

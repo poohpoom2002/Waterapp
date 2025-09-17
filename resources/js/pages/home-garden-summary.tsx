@@ -2,7 +2,6 @@
 // resources/js/pages/home-garden-summary.tsx
 import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { router } from '@inertiajs/react';
-import axios from 'axios';
 import Navbar from '../components/Navbar';
 import GoogleMapSummary from '../components/homegarden/GoogleMapSummary';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -19,53 +18,6 @@ import {
     canvasToGPS,
 } from '../utils/homeGardenData';
 import { calculateGardenStatistics } from '../utils/gardenStatistics';
-
-// localStorage utility functions (matching HorticultureResultsPage.tsx pattern)
-const cleanupLocalStorage = () => {
-    const keysToRemove = [
-        'projectMapImage',
-        'horticultureIrrigationData',
-        'garden_planner_data',
-        'garden_statistics',
-        'gardenMapImage',
-        'gardenPlanImage',
-        'mapCaptureImage',
-        'projectMapMetadata',
-        'gardenMapMetadata',
-    ];
-    
-    keysToRemove.forEach(key => {
-        try {
-            localStorage.removeItem(key);
-        } catch (error) {
-            console.warn(`Failed to remove ${key} from localStorage:`, error);
-        }
-    });
-    
-    console.log('🧹 Cleaned up localStorage for garden project');
-};
-
-const safeLocalStorageSet = (key: string, value: string): boolean => {
-    try {
-        localStorage.setItem(key, value);
-        return true;
-    } catch (error) {
-        if (error instanceof DOMException && error.code === 22) {
-            console.warn('🚨 localStorage quota exceeded, cleaning up...');
-            cleanupLocalStorage();
-            try {
-                localStorage.setItem(key, value);
-                return true;
-            } catch (retryError) {
-                console.error('❌ Failed to save after cleanup:', retryError);
-                return false;
-            }
-        }
-        console.error('❌ Failed to save to localStorage:', error);
-        return false;
-    }
-};
-
 interface HomeGardenSummaryProps {
     data?: GardenPlannerData;
 }
@@ -1257,83 +1209,26 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
             `;
             document.body.appendChild(loadingDiv);
 
+            if (gardenData) {
+                localStorage.setItem('garden_planner_data', JSON.stringify(gardenData));
+            }
+
+            if (statistics) {
+                localStorage.setItem('garden_statistics', JSON.stringify(statistics));
+            }
+
             const imageUrl = await createMapImage();
 
-            if (imageUrl && imageUrl !== 'data:,' && imageUrl.length > 100) {
-                const currentFieldId = localStorage.getItem('currentFieldId');
-                if (currentFieldId && !currentFieldId.startsWith('mock-')) {
-                    try {
-                        console.log('🔄 Saving complete home garden project data to database...');
-                        const completeProjectData = {
-                            status: 'finished',
-                            is_completed: true,
-                            garden_data: gardenData, // Contains all garden project elements
-                            garden_stats: statistics, // Contains all calculated stats
-                            project_mode: 'home-garden',
-                            show_pump_option: true,
-                            last_saved: new Date().toISOString(),
-                            project_image: imageUrl,
-                            project_image_type: 'image/png',
-                        };
-                        const dataResponse = await axios.put(`/api/fields/${currentFieldId}/data`, completeProjectData);
-                        if (dataResponse.data.success) {
-                            console.log('✅ Complete home garden project data saved to database successfully');
-                            
-                            // Also save data to localStorage for immediate product page loading
-                            if (gardenData && !safeLocalStorageSet('garden_planner_data', JSON.stringify(gardenData))) {
-                                console.warn('⚠️ Failed to save garden_planner_data to localStorage, but data is saved to database');
-                            }
-                            
-                            if (statistics && !safeLocalStorageSet('garden_statistics', JSON.stringify(statistics))) {
-                                console.warn('⚠️ Failed to save garden_statistics to localStorage, but data is saved to database');
-                            }
-                            
-                            if (!safeLocalStorageSet('projectType', 'home-garden')) {
-                                console.warn('⚠️ Failed to save projectType to localStorage, but data is saved to database');
-                            }
-                            
-                            document.body.removeChild(loadingDiv);
-                            router.visit('/product?mode=garden');
-                        } else {
-                            throw new Error('Database save failed: ' + dataResponse.data.message);
-                        }
-                    } catch (error) {
-                        console.error('❌ Failed to save complete home garden project data to database:', error);
-                        // Fallback to localStorage if database fails
-                        if (gardenData && !safeLocalStorageSet('garden_planner_data', JSON.stringify(gardenData))) {
-                            throw new Error('ไม่สามารถบันทึกข้อมูลสวนบ้านได้ - ทั้ง database และ localStorage ล้มเหลว');
-                        }
-                        if (statistics && !safeLocalStorageSet('garden_statistics', JSON.stringify(statistics))) {
-                            throw new Error('ไม่สามารถบันทึกสถิติโครงการได้ - localStorage เต็ม');
-                        }
-                        if (!safeLocalStorageSet('projectMapImage', imageUrl)) {
-                            throw new Error('ไม่สามารถบันทึกภาพแผนที่ได้ - localStorage เต็ม');
-                        }
-                        if (!safeLocalStorageSet('projectType', 'home-garden')) {
-                            throw new Error('ไม่สามารถบันทึกประเภทโครงการได้ - localStorage เต็ม');
-                        }
-                        document.body.removeChild(loadingDiv);
-                        router.visit('/product?mode=garden');
-                    }
-                } else {
-                    // Fallback to localStorage for mock fields or when no field ID
-                    if (gardenData && !safeLocalStorageSet('garden_planner_data', JSON.stringify(gardenData))) {
-                        throw new Error('ไม่สามารถบันทึกข้อมูลสวนบ้านได้ - localStorage เต็ม');
-                    }
-                    if (statistics && !safeLocalStorageSet('garden_statistics', JSON.stringify(statistics))) {
-                        throw new Error('ไม่สามารถบันทึกสถิติโครงการได้ - localStorage เต็ม');
-                    }
-                    if (!safeLocalStorageSet('projectMapImage', imageUrl)) {
-                        throw new Error('ไม่สามารถบันทึกภาพแผนที่ได้ - localStorage เต็ม');
-                    }
-                    if (!safeLocalStorageSet('projectType', 'home-garden')) {
-                        throw new Error('ไม่สามารถบันทึกประเภทโครงการได้ - localStorage เต็ม');
-                    }
-                    document.body.removeChild(loadingDiv);
-                    router.visit('/product?mode=garden');
-                }
+            if (imageUrl) {
+                localStorage.setItem('projectMapImage', imageUrl);
+                localStorage.setItem('projectType', 'home-garden');
+
+                document.body.removeChild(loadingDiv);
+
+                window.location.href = '/product?mode=garden';
             } else {
-                throw new Error('ไม่สามารถสร้างภาพแผนที่ได้');
+                document.body.removeChild(loadingDiv);
+                router.visit('/product?mode=garden');
             }
         } catch (error) {
             console.error('🏡 Error navigating to equipment calculation:', error);
@@ -1346,7 +1241,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
         } finally {
             setIsCreatingImage(false);
         }
-    }, [gardenData, statistics, t]);
+    }, [gardenData, statistics]);
 
     useEffect(() => {
         if (error) {
@@ -1566,34 +1461,19 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                             </div>
                                             <div className="text-xs">
                                                 <div className="text-purple-300">
-                                                    {t('ท่อ')}:{' '}
-                                                    {
-                                                        statistics.summary.junctionStatistics
-                                                            .pipeJunctions
-                                                    }
+                                                    {t('ท่อ')}: {statistics.summary.junctionStatistics.pipeJunctions}
                                                 </div>
                                                 <div className="text-purple-300">
-                                                    {t('หัวฉีด')}:{' '}
-                                                    {
-                                                        statistics.summary.junctionStatistics
-                                                            .sprinklerJunctions
-                                                    }
+                                                    {t('หัวฉีด')}: {statistics.summary.junctionStatistics.sprinklerJunctions}
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    {Object.keys(
-                                        statistics.summary.junctionStatistics.junctionsByWays
-                                    ).length > 0 && (
+                                    {Object.keys(statistics.summary.junctionStatistics.junctionsByWays).length > 0 && (
                                         <div className="mt-2 border-t border-gray-600 pt-2">
-                                            <div className="mb-1 text-xs text-gray-500">
-                                                {t('จำนวนทางแยก:')}
-                                            </div>
+                                            <div className="text-xs text-gray-500 mb-1">{t('จำนวนทางแยก:')}</div>
                                             <div className="grid grid-cols-3 gap-1 text-xs">
-                                                {Object.entries(
-                                                    statistics.summary.junctionStatistics
-                                                        .junctionsByWays
-                                                ).map(([ways, count]) => (
+                                                {Object.entries(statistics.summary.junctionStatistics.junctionsByWays).map(([ways, count]) => (
                                                     <div key={ways} className="text-purple-300">
                                                         {ways}-{t('ทาง')}: {count}
                                                     </div>
@@ -1761,6 +1641,8 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 </div>
                                             </div>
                                         )}
+
+
                                     </div>
                                 </div>
                             ))}

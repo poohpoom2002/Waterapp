@@ -90,7 +90,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         let emitterCalc: PipeCalculationResult | null = null;
         if (selectedPipes?.emitter && systemData?.sprinklerConfig) {
             // หา lateral pipe ที่ยาวที่สุดจาก localStorage
-            const currentProject = localStorage.getItem('horticultureIrrigationData');
+            const currentProject = localStorage.getItem('currentHorticultureProject');
             let longestEmitterLength = 10; // default
 
             if (currentProject) {

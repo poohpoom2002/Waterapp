@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Navbar from '../components/Navbar';
-import {
-    getTranslatedCrops,
-    getTranslatedCropByValue,
+import { 
+    getTranslatedCrops, 
+    getTranslatedCropByValue, 
     searchTranslatedCrops,
     getCropsByCategory,
     getAvailableCategories,
-    type TranslatedCrop,
+    type TranslatedCrop 
 } from '@/pages/utils/cropData';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -62,10 +62,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
         if (selectedCategory === 'all') {
             crops = getTranslatedCrops(language);
         } else {
-            crops = getCropsByCategory(
-                selectedCategory as 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed',
-                language
-            );
+            crops = getCropsByCategory(selectedCategory as 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed', language);
         }
 
         // Apply search filter
@@ -81,7 +78,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
     }, [selectedCrops.length]);
 
     const handleBackToPlanner = () => {
-        window.location.href = '/';
+        window.location.href = "/";
     };
 
     const getSelectedCropsText = () => {
@@ -90,10 +87,8 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
 
     const getContinueDescription = () => {
         const count = selectedCrops.length;
-        return t("You've selected {count} crop(s). Continue to the field mapping tool.").replace(
-            '{count}',
-            count.toString()
-        );
+        return t("You've selected {count} crop(s). Continue to the field mapping tool.")
+            .replace('{count}', count.toString());
     };
 
     return (
@@ -173,10 +168,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                                                 <button
                                                     onClick={() => handleCropToggle(crop.value)}
                                                     className="ml-2 text-red-400 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100"
-                                                    title={t('Remove {cropName}').replace(
-                                                        '{cropName}',
-                                                        crop.name
-                                                    )}
+                                                    title={t('Remove {cropName}').replace('{cropName}', crop.name)}
                                                 >
                                                     ✕
                                                 </button>
@@ -287,8 +279,8 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                         <div className="mb-4 text-sm text-gray-400">
                             {filteredCrops.length > 0 ? (
                                 <span>
-                                    {language === 'th'
-                                        ? `พบ ${filteredCrops.length} ชนิด`
+                                    {language === 'th' 
+                                        ? `พบ ${filteredCrops.length} ชนิด` 
                                         : `Found ${filteredCrops.length} crops`}
                                 </span>
                             ) : null}
@@ -384,34 +376,28 @@ function CropCard({
             <div className="text-center">
                 <div className="mb-2 text-3xl">{crop.icon}</div>
                 <h4 className="mb-1 text-sm font-semibold text-white">{crop.name}</h4>
-                <p className="mb-2 line-clamp-2 text-xs text-gray-400">{crop.description}</p>
-
+                <p className="line-clamp-2 text-xs text-gray-400 mb-2">{crop.description}</p>
+                
                 {/* Category and Irrigation tags */}
                 <div className="mb-2 flex justify-center gap-1 text-xs">
                     <span className="rounded bg-gray-600 px-2 py-1 text-gray-300">
                         {crop.category}
                     </span>
-                    <span
-                        className={`rounded px-2 py-1 ${
-                            crop.irrigationNeedsKey === 'high'
-                                ? 'bg-red-600 text-red-100'
-                                : crop.irrigationNeedsKey === 'medium'
-                                  ? 'bg-yellow-600 text-yellow-100'
-                                  : 'bg-green-600 text-green-100'
-                        }`}
-                    >
+                    <span className={`rounded px-2 py-1 ${
+                        crop.irrigationNeedsKey === 'high' 
+                            ? 'bg-red-600 text-red-100'
+                            : crop.irrigationNeedsKey === 'medium'
+                            ? 'bg-yellow-600 text-yellow-100'
+                            : 'bg-green-600 text-green-100'
+                    }`}>
                         {crop.irrigationNeeds}
                     </span>
                 </div>
 
                 {/* Growth period and yield info */}
-                <div className="space-y-1 text-xs text-gray-500">
-                    <div>
-                        {crop.growthPeriod} {t('days')}
-                    </div>
-                    <div>
-                        {crop.yield} {t('kg')}/{t('Rai')}
-                    </div>
+                <div className="text-xs text-gray-500 space-y-1">
+                    <div>{crop.growthPeriod} {t('days')}</div>
+                    <div>{crop.yield} {t('kg')}/{t('Rai')}</div>
                 </div>
 
                 {isSelected && (

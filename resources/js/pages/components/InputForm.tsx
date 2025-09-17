@@ -1049,9 +1049,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                         updateInput('irrigationTimeMinutes', value);
                                     }
                                 }}
-                                onBlur={(e) =>
-                                    updateInputOnBlur('irrigationTimeMinutes', e.target.value)
-                                }
+                                onBlur={(e) => updateInputOnBlur('irrigationTimeMinutes', e.target.value)}
                                 className="w-full rounded border border-gray-500 bg-gray-600 p-2 text-white focus:border-blue-400"
                             />
                         </div> */}

@@ -134,7 +134,9 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                             />
                         </div>
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{t('Name:')}</label>
+                            <label className="mb-2 block text-sm font-medium">
+                                {t('Name:')}
+                            </label>
                             <input
                                 type="text"
                                 value={quotationDataCustomer.name}
@@ -167,7 +169,9 @@ const QuotationModal: React.FC<QuotationModalProps> = ({
                             />
                         </div>
                         <div>
-                            <label className="mb-2 block text-sm font-medium">{t('Phone:')}</label>
+                            <label className="mb-2 block text-sm font-medium">
+                                {t('Phone:')}
+                            </label>
                             <input
                                 type="text"
                                 value={quotationDataCustomer.phone}

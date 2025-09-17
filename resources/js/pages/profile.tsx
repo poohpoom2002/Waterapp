@@ -126,7 +126,6 @@ export default function Profile() {
         router.reload();
     };
 
-
     return (
         <div className="min-h-screen bg-gray-900">
             <Head title="Profile" />
@@ -464,7 +463,6 @@ export default function Profile() {
                     </div>
                 </div>
             )}
-
         </div>
     );
 }

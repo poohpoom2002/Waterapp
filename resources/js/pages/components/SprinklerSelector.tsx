@@ -271,8 +271,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     return (
         <div className="rounded-lg bg-gray-700 p-6">
             <h3 className="mb-4 text-2xl font-bold text-green-400">
-                {t('เลือก')}
-                {projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
+                {t('เลือก')}{projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}
                 {activeZone && (
                     <span className="ml-2 text-sm font-normal text-gray-400">
                         - {activeZone.name}
@@ -348,8 +347,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 </h4>
                 <div className="text-xs text-gray-300">
                     <p>
-                        {t('อัตราการไหล')} {projectMode === 'garden' ? t('ต่อหัวฉีด') : t('ต่อหัว')}
-                        :{' '}
+                        {t('อัตราการไหล')} {projectMode === 'garden' ? t('ต่อหัวฉีด') : t('ต่อหัว')}:{' '}
                         <span className="font-bold text-blue-300">
                             {results.waterPerSprinklerLPM.toFixed(1)} {t('LPM')}
                         </span>
@@ -359,9 +357,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         <span className="font-bold text-yellow-300">
                             {results.totalSprinklers} {t('หัว')}
                         </span>
-                        {activeZone && (
-                            <span className="ml-1 text-gray-400">({t('ในโซนนี้')})</span>
-                        )}
+                        {activeZone && <span className="ml-1 text-gray-400">({t('ในโซนนี้')})</span>}
                     </p>
                 </div>
             </div> */}
@@ -381,9 +377,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     onSprinklerChange(selected);
                 }}
                 options={[
-                    {
-                        value: '',
-                        label: `-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`,
+                    { 
+                        value: '', 
+                        label: `-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`
                     },
                     ...sortedSprinklers.map((sprinkler) => ({
                         value: sprinkler.id,
@@ -398,11 +394,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     }))
                 ]}
                 placeholder={`-- ${t('เลือก')} ${projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')}${activeZone ? ` ${t('สำหรับ')} ${activeZone.name}` : ''} --`}
-                searchPlaceholder={
-                    t('พิมพ์เพื่อค้นหา') +
-                    (projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')) +
-                    ' (ชื่อ, รหัสสินค้า, แบรนด์)...'
-                }
+                searchPlaceholder={t('พิมพ์เพื่อค้นหา') + (projectMode === 'garden' ? t('หัวฉีด') : t('สปริงเกอร์')) + ' (ชื่อ, รหัสสินค้า, แบรนด์)...'}
                 className="mb-4 w-full"
             />
 
@@ -451,8 +443,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </p>
                             <p>
                                 <strong>{t('อัตราการไหล:')}</strong>{' '}
-                                {formatRangeValue(selectedSprinkler.waterVolumeLitersPerMinute)}{' '}
-                                {t('LPM')}
+                                {formatRangeValue(selectedSprinkler.waterVolumeLitersPerMinute)} {t('LPM')}
                             </p>
                             <p>
                                 <strong>{t('รัศมี:')}</strong>{' '}
@@ -466,20 +457,15 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
                         <div className="col-span-4">
                             <p>
-                                <strong>{t('แบรนด์:')}</strong>{' '}
-                                {selectedSprinkler.brand || selectedSprinkler.brand_name || '-'}
+                                <strong>{t('แบรนด์:')}</strong> {selectedSprinkler.brand || selectedSprinkler.brand_name || '-'}
                             </p>
                             <p>
-                                <strong>{t('ราคาต่อหัว:')}</strong>{' '}
-                                {selectedSprinkler.price?.toLocaleString()} {t('บาท')}
+                                <strong>{t('ราคาต่อหัว:')}</strong> {selectedSprinkler.price?.toLocaleString()} {t('บาท')}
                             </p>
                             <p>
-                                <strong>{t('จำนวนที่ต้องใช้:')}</strong> {results.totalSprinklers}{' '}
-                                {t('หัว')}
+                                <strong>{t('จำนวนที่ต้องใช้:')}</strong> {results.totalSprinklers} {t('หัว')}
                                 {activeZone && (
-                                    <span className="ml-1 text-xs text-gray-400">
-                                        ({t('โซนนี้')})
-                                    </span>
+                                    <span className="ml-1 text-xs text-gray-400">({t('โซนนี้')})</span>
                                 )}
                             </p>
                             <p>
@@ -510,11 +496,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             </h5>
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div>
+                                    <p>{t('ประเภทหัวฉีด:')} {selectedSprinkler.type || 'ไม่ระบุ'}</p>
                                     <p>
-                                        {t('ประเภทหัวฉีด:')} {selectedSprinkler.type || 'ไม่ระบุ'}
-                                    </p>
-                                    <p>
-                                        {t('พื้นที่ครอบคลุม:')}{' '}
+                                        {t('พื้นที่ครอบคลุม:')} {' '}
                                         {(
                                             Math.PI *
                                             Math.pow(
@@ -526,12 +510,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                                     </p>
                                 </div>
                                 <div>
+                                    <p>{t('เหมาะสำหรับ:')} {selectedSprinkler.suitable_for || 'ทั่วไป'}</p>
                                     <p>
-                                        {t('เหมาะสำหรับ:')}{' '}
-                                        {selectedSprinkler.suitable_for || 'ทั่วไป'}
-                                    </p>
-                                    <p>
-                                        {t('การติดตั้ง:')}{' '}
+                                        {t('การติดตั้ง:')} {' '}
                                         {selectedSprinkler.installation || 'ฝังดิน/ยกพื้น'}
                                     </p>
                                 </div>

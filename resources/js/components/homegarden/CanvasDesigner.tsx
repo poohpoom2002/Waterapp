@@ -681,7 +681,14 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
             ctx.restore();
         },
-        [showRuler, enhancedMode, canvasSize, viewport, enhancedScale, canvasData.scale]
+        [
+            showRuler,
+            enhancedMode,
+            canvasSize,
+            viewport,
+            enhancedScale,
+            canvasData.scale,
+        ]
     );
 
     const drawZone = useCallback(
@@ -1533,11 +1540,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
             }
 
             // Handle zone drawing tools (rectangle, circle, polygon) - only when editMode is 'draw'
-            if (
-                enhancedMode &&
-                editMode === 'draw' &&
-                ['rectangle', 'circle', 'polygon', 'freehand'].includes(currentZoneTool)
-            ) {
+            if (enhancedMode && editMode === 'draw' && ['rectangle', 'circle', 'polygon', 'freehand'].includes(currentZoneTool)) {
                 switch (currentZoneTool) {
                     case 'freehand':
                         if (!enhancedDrawing.isDrawing) {
@@ -1648,6 +1651,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 onMainPipePoint(worldPos);
                 return;
             }
+
+
         },
         [
             editMode,
@@ -1772,14 +1777,14 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                 // This is a touch-generated wheel event, ignore it
                 return;
             }
-
+            
             try {
                 e.preventDefault();
             } catch (error) {
                 // Ignore preventDefault errors in passive event listeners
                 return;
             }
-
+            
             const rect = canvasRef.current?.getBoundingClientRect();
             if (!rect) return;
 
@@ -1886,7 +1891,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 
         const handleWheelNonPassive = (e: WheelEvent) => {
             e.preventDefault();
-
+            
             const rect = canvas.getBoundingClientRect();
             const centerX = e.clientX - rect.left;
             const centerY = e.clientY - rect.top;
@@ -2130,12 +2135,9 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                         const touch2 = e.touches[1];
                         const initialDistance = Math.sqrt(
                             Math.pow(touch2.clientX - touch1.clientX, 2) +
-                                Math.pow(touch2.clientY - touch1.clientY, 2)
+                            Math.pow(touch2.clientY - touch1.clientY, 2)
                         );
-                        e.currentTarget.setAttribute(
-                            'data-initial-distance',
-                            initialDistance.toString()
-                        );
+                        e.currentTarget.setAttribute('data-initial-distance', initialDistance.toString());
                     }
                 }}
                 onTouchMove={(e) => {
@@ -2159,12 +2161,10 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                         const touch2 = e.touches[1];
                         const currentDistance = Math.sqrt(
                             Math.pow(touch2.clientX - touch1.clientX, 2) +
-                                Math.pow(touch2.clientY - touch1.clientY, 2)
+                            Math.pow(touch2.clientY - touch1.clientY, 2)
                         );
-                        const initialDistance = parseFloat(
-                            e.currentTarget.getAttribute('data-initial-distance') || '0'
-                        );
-
+                        const initialDistance = parseFloat(e.currentTarget.getAttribute('data-initial-distance') || '0');
+                        
                         if (initialDistance > 0) {
                             const scale = currentDistance / initialDistance;
                             const rect = canvasRef.current?.getBoundingClientRect();
@@ -2191,6 +2191,8 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     // Clear the initial distance for pinch-to-zoom
                     e.currentTarget.removeAttribute('data-initial-distance');
                 }}
+
+
             />
 
             {showSprinklerRadius && (
@@ -2461,8 +2463,7 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                                             dimensionDirection === dir.id
                                                 ? 'border-2 border-yellow-400 bg-yellow-600 text-white'
                                                 : 'border-2 border-transparent bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        }`}
-                                    >
+                                        }`}                                    >
                                         <div className="text-lg">{dir.icon}</div>
                                         <div className="mt-1">{dir.label}</div>
                                     </button>
@@ -2695,10 +2696,10 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
                     {editMode === 'edit' && (
                         <div className="absolute bottom-4 left-4 rounded-lg border border-yellow-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
                             <div className="mb-2 flex items-center gap-2">
-                                <img
-                                    src="/images/water-pump.png"
-                                    alt="Water Pump"
-                                    className="h-4 w-4 object-contain"
+                                <img 
+                                    src="/images/water-pump.png" 
+                                    alt="Water Pump" 
+                                    className="w-4 h-4 object-contain"
                                 />
                                 <span className="font-semibold">{t('โหมดจัดการแหล่งน้ำ')}</span>
                             </div>

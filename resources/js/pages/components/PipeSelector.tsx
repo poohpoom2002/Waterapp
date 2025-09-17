@@ -110,7 +110,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 // สำหรับ emitter pipe ใช้ข้อมูลพิเศษ
                 if (horticultureSystemData?.sprinklerConfig) {
                     // หาความยาวท่อ emitter ที่ยาวที่สุดจาก localStorage
-                    const currentProject = localStorage.getItem('horticultureIrrigationData');
+                    const currentProject = localStorage.getItem('currentHorticultureProject');
                     let longestEmitterLength = 10; // default
 
                     if (currentProject) {
