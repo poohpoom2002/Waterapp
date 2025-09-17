@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -1104,6 +1105,16 @@ function EnhancedHorticultureResultsPageContent() {
                 const config = loadSprinklerConfig();
                 if (config) {
                     setSprinklerConfig(config);
+                    // Recalculate enhanced stats after loading sprinkler config
+                    const updatedStats = getOverallStats();
+                    setEnhancedStats(updatedStats);
+                    console.log('✅ Sprinkler config loaded and stats updated:', {
+                        config,
+                        updatedStats,
+                        sprinklerFlowRate: updatedStats?.sprinklerFlowRate
+                    });
+                } else {
+                    console.warn('⚠️ No sprinkler config found in localStorage');
                 }
 
                 if (data.mainArea && data.mainArea.length > 0) {

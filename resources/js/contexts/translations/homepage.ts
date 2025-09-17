@@ -386,6 +386,7 @@ export const homepageTranslations = {
         residential_watering: 'ระบบรดน้ำในบ้าน',
         equipment: 'อุปกรณ์',
         manage_equipment: 'จัดการอุปกรณ์',
+        project_categories: 'หมวดหมู่โครงการ',
         product: 'ผลิตภัณฑ์',
         product_recommendations: 'คำแนะนำผลิตภัณฑ์',
         create_dream_system: 'สร้างระบบชลประทานในฝัน',

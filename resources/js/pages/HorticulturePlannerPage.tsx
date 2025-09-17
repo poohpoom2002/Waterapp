@@ -1,6 +1,7 @@
     /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useMemo, useCallback, useReducer } from 'react';
+import axios from 'axios';
 
 import HorticultureMapComponent from '../components/horticulture/HorticultureMapComponent';
 import HorticultureDrawingManager from '../components/horticulture/HorticultureDrawingManager';
@@ -95,6 +96,91 @@ import {
     FaRuler,
     FaBezierCurve,
 } from 'react-icons/fa';
+
+// Function to clean up localStorage when quota is exceeded
+const cleanupLocalStorage = () => {
+    try {
+        console.log('🧹 Cleaning up localStorage...');
+        
+        // Get all keys
+        const keys = Object.keys(localStorage);
+        console.log('📦 Total localStorage items:', keys.length);
+        
+        // Remove old project data (keep only the most recent)
+        const projectKeys = keys.filter(key => 
+            key.startsWith('horticultureIrrigationData') || 
+            key.startsWith('savedProductProject_') ||
+            key.startsWith('projectMapImage')
+        );
+        
+        if (projectKeys.length > 3) {
+            // Keep only the 3 most recent items
+            const keysToRemove = projectKeys.slice(0, projectKeys.length - 3);
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+                console.log('🗑️ Removed:', key);
+            });
+        }
+        
+        // Remove old mock fields
+        const mockKeys = keys.filter(key => key.startsWith('mock-'));
+        mockKeys.forEach(key => {
+            localStorage.removeItem(key);
+            console.log('🗑️ Removed mock field:', key);
+        });
+        
+        console.log('✅ localStorage cleanup completed');
+        return true;
+    } catch (error) {
+        console.error('❌ Error during localStorage cleanup:', error);
+        return false;
+    }
+};
+
+// Make cleanup function available globally for console access
+if (typeof window !== 'undefined') {
+    (window as any).clearHorticultureStorage = () => {
+        console.log('🧹 Manual localStorage cleanup initiated...');
+        if (cleanupLocalStorage()) {
+            console.log('✅ Manual cleanup successful!');
+            alert('localStorage cleanup completed successfully!');
+        } else {
+            console.log('❌ Manual cleanup failed!');
+            alert('localStorage cleanup failed!');
+        }
+    };
+    
+    (window as any).clearAllStorage = () => {
+        console.log('🧹 Clearing ALL localStorage...');
+        localStorage.clear();
+        console.log('✅ All localStorage cleared!');
+        alert('All localStorage cleared!');
+    };
+}
+
+// Function to safely save to localStorage with cleanup
+const safeLocalStorageSet = (key: string, value: string): boolean => {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (error) {
+        if (error instanceof Error && error.name === 'QuotaExceededError') {
+            console.warn('⚠️ localStorage quota exceeded, attempting cleanup...');
+            if (cleanupLocalStorage()) {
+                try {
+                    localStorage.setItem(key, value);
+                    console.log('✅ Successfully saved after cleanup');
+                    return true;
+                } catch (retryError) {
+                    console.error('❌ Still failed after cleanup:', retryError);
+                    return false;
+                }
+            }
+        }
+        console.error('❌ localStorage save failed:', error);
+        return false;
+    }
+};
 
 const isPointInPolygon = (
     point: { lat: number; lng: number },
@@ -4980,6 +5066,7 @@ export default function EnhancedHorticulturePlannerPage() {
     } | null>(null);
     const [headLossResults, setHeadLossResults] = useState<HeadLossResult[]>([]);
     const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
+    const [isEditingExistingField, setIsEditingExistingField] = useState<boolean>(false);
 
     // Head Loss Functions
     const toggleZoneExpansion = (zoneId: string) => {
@@ -6000,7 +6087,14 @@ export default function EnhancedHorticulturePlannerPage() {
         const isEditingExisting = localStorage.getItem('isEditingExistingProject');
         const savedData = localStorage.getItem('horticultureIrrigationData');
 
-        if (isEditingExisting === 'true' && savedData) {
+        // Check if we're editing a field from the database
+        const urlParams = new URLSearchParams(window.location.search);
+        const editFieldId = urlParams.get('editFieldId');
+
+        if (editFieldId) {
+            // Load field data from database
+            loadFieldDataFromDatabase(editFieldId);
+        } else if (isEditingExisting === 'true' && savedData) {
             try {
                 const projectData = JSON.parse(savedData);
 
@@ -6058,6 +6152,180 @@ export default function EnhancedHorticulturePlannerPage() {
             }
         }
     }, [initialState, t]);
+
+    const regeneratePlantsForAllZones = (state: ProjectState) => {
+        try {
+            console.log('🔄 Regenerating plants for all zones...');
+            
+            // If plants already exist, don't regenerate them
+            if (state.plants && state.plants.length > 0) {
+                console.log('✅ Plants already exist, skipping regeneration:', state.plants.length, 'plants');
+                return;
+            }
+            
+            const updatedState = { ...state };
+            let allPlants: PlantLocation[] = [];
+            
+            // Regenerate plants for each zone
+            if (state.useZones && state.zones.length > 0) {
+                state.zones.forEach((zone) => {
+                    // Find sub-main pipes for this zone
+                    const zoneSubMainPipes = state.subMainPipes.filter(pipe => pipe.zoneId === zone.id);
+                    
+                    zoneSubMainPipes.forEach((subMainPipe) => {
+                        // TODO: Implement generateEnhancedBranchPipes function
+                        const branchPipes: any[] = [];
+                        
+                        // Collect plants from all branch pipes
+                        branchPipes.forEach(branch => {
+                            if (branch.plants) {
+                                allPlants = [...allPlants, ...branch.plants];
+                            }
+                        });
+                    });
+                });
+            } else {
+                // For non-zone mode, regenerate plants for all sub-main pipes
+                state.subMainPipes.forEach((subMainPipe) => {
+                    // TODO: Implement generateEnhancedBranchPipes function
+                    const branchPipes: any[] = [];
+                    
+                    // Collect plants from all branch pipes
+                    branchPipes.forEach(branch => {
+                        if (branch.plants) {
+                            allPlants = [...allPlants, ...branch.plants];
+                        }
+                    });
+                });
+            }
+            
+            // Only update plants if we actually generated some
+            if (allPlants.length > 0) {
+                updatedState.plants = allPlants;
+                // Update history with the new state
+                dispatchHistory({ type: 'PUSH_STATE', state: updatedState });
+                console.log('✅ Plants regenerated successfully:', allPlants.length, 'plants');
+            } else {
+                console.log('⚠️ No plants generated, keeping existing plants');
+            }
+        } catch (error) {
+            console.error('❌ Error regenerating plants:', error);
+        }
+    };
+
+    const loadFieldDataFromDatabase = async (fieldId: string) => {
+        try {
+            console.log('🔄 Loading field data from database:', fieldId);
+            
+            const response = await axios.get(`/api/fields/${fieldId}`);
+            
+            if (response.data.success && response.data.field) {
+                const fieldData = response.data.field;
+                console.log('📦 Field data loaded:', fieldData);
+                
+                // Extract project data from the field
+                const projectData = fieldData.project_data || {};
+                const projectStats = fieldData.project_stats || {};
+                
+                // Convert the data to the format expected by the planner
+                const loadedState: ProjectState = {
+                    ...initialState,
+                    mainArea: projectData.mainArea || [],
+                    zones: projectData.zones || [],
+                    pump: projectData.pump || null,
+                    mainPipes: projectData.mainPipes || [],
+                    subMainPipes: projectData.subMainPipes || [],
+                    lateralPipes: projectData.lateralPipes || [], // Add lateral pipes
+                    plants: projectData.plants || [],
+                    exclusionAreas: projectData.exclusionAreas || [],
+                    irrigationZones: projectData.irrigationZones || [], // Add irrigation zones
+                    useZones: projectData.useZones || false,
+                    selectedPlantType: projectData.selectedPlantType || DEFAULT_PLANT_TYPES(t)[0],
+                    availablePlants: projectData.availablePlants || DEFAULT_PLANT_TYPES(t), // Use saved available plants
+                    branchPipeSettings: projectData.branchPipeSettings || {
+                        defaultAngle: 90,
+                        maxAngle: 180,
+                        minAngle: 0,
+                        angleStep: 1,
+                    },
+                    lateralPipeSettings: projectData.lateralPipeSettings || {
+                        placementMode: 'over_plants',
+                        snapThreshold: 5,
+                        autoGenerateEmitters: true,
+                        emitterDiameter: 4,
+                    },
+                };
+
+                // Store the field ID for later use when saving
+                if (!safeLocalStorageSet('currentFieldId', fieldId)) {
+                    console.error('❌ Failed to save currentFieldId');
+                }
+                if (!safeLocalStorageSet('currentFieldName', fieldData.name || 'Edited Field')) {
+                    console.error('❌ Failed to save currentFieldName');
+                }
+                
+                // Set flag to indicate we're editing an existing field
+                setIsEditingExistingField(true);
+                
+                console.log('📊 Loaded state:', loadedState);
+                console.log('🗺️ Main area coordinates:', loadedState.mainArea);
+                console.log('🚫 Exclusion areas:', loadedState.exclusionAreas);
+                console.log('🌱 Plants loaded:', loadedState.plants.length);
+                console.log('🏗️ Zones loaded:', loadedState.zones.length);
+                console.log('💧 Irrigation zones loaded:', loadedState.irrigationZones.length);
+                console.log('🔧 Lateral pipes loaded:', loadedState.lateralPipes.length);
+                
+                dispatchHistory({ type: 'PUSH_STATE', state: loadedState });
+
+                // Force map refresh and regenerate plants
+                setTimeout(() => {
+                    console.log('🔄 Forcing map refresh...');
+                    
+                    // Trigger a map resize to force re-render
+                    if (mapRef.current) {
+                        google.maps.event.trigger(mapRef.current, 'resize');
+                    }
+                    
+                    // Regenerate plants for all zones to ensure proper display
+                    regeneratePlantsForAllZones(loadedState);
+                }, 500);
+
+                // Auto-zoom to the main area
+                if (projectData.mainArea && projectData.mainArea.length > 0) {
+                    setTimeout(() => {
+                        if (mapRef.current) {
+                            try {
+                                const bounds = new google.maps.LatLngBounds();
+
+                                projectData.mainArea.forEach((coord: any) => {
+                                    bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
+                                });
+
+                                mapRef.current.fitBounds(bounds, {
+                                    top: 50,
+                                    right: 50,
+                                    bottom: 50,
+                                    left: 50,
+                                });
+                                
+                                console.log('✅ Auto-zoomed to main area');
+                            } catch (error) {
+                                console.warn('⚠️ Could not auto-zoom to area:', error);
+                            }
+                        }
+                    }, 1000);
+                }
+                
+                console.log('✅ Field data loaded successfully');
+            } else {
+                console.error('❌ Failed to load field data:', response.data);
+                alert(t('failed_to_load_field'));
+            }
+        } catch (error) {
+            console.error('❌ Error loading field data:', error);
+            alert(t('error_loading_field'));
+        }
+    };
 
     const tabs = [
         {
@@ -7547,7 +7815,9 @@ export default function EnhancedHorticulturePlannerPage() {
 
                 const subMainPipeId = generateUniqueId('submain');
                 const storageKey = `original-submain-${subMainPipeId}`;
-                localStorage.setItem(storageKey, JSON.stringify(coordinates));
+                if (!safeLocalStorageSet(storageKey, JSON.stringify(coordinates))) {
+                    console.error('❌ Failed to save original submain coordinates');
+                }
 
                 const newSubMainPipe: SubMainPipe = {
                     id: subMainPipeId,
@@ -7938,6 +8208,292 @@ export default function EnhancedHorticulturePlannerPage() {
         ]
     );
 
+    const handleSaveDraft = useCallback(async () => {
+        console.log('💾 Saving draft...');
+        
+        // Check if we're editing an existing field
+        const existingFieldId = localStorage.getItem('currentFieldId');
+        const isEditingExisting = existingFieldId && !existingFieldId.startsWith('mock-');
+        
+        // Create a draft name with timestamp (or use existing name if editing)
+        const draftName = isEditingExisting 
+            ? localStorage.getItem('currentFieldName') || `Draft - ${new Date().toLocaleString('th-TH')}`
+            : `Draft - ${new Date().toLocaleString('th-TH')}`;
+        
+        // Prepare project data for draft
+        const projectData = {
+            projectName: draftName,
+            customerName: customerName || 'Draft Customer',
+            version: '4.0.0',
+            totalArea: totalArea,
+            mainArea: history.present.mainArea,
+            pump: history.present.pump,
+            zones: history.present.zones,
+            mainPipes: history.present.mainPipes,
+            subMainPipes: history.present.subMainPipes,
+            exclusionAreas: history.present.exclusionAreas,
+            plants: history.present.plants,
+            useZones: history.present.useZones,
+            selectedPlantType: history.present.selectedPlantType,
+            branchPipeSettings: history.present.branchPipeSettings,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        };
+
+                        // Save to localStorage for backup (same format as new fields)
+                if (!safeLocalStorageSet('horticultureIrrigationData', JSON.stringify(projectData))) {
+                    console.error('❌ Failed to save to horticultureIrrigationData');
+                }
+                
+                // Also save to field-specific localStorage for product page compatibility
+                const fieldSpecificKey = `savedProductProject_${existingFieldId || 'new'}`;
+                const productPageData = {
+                    projectMode: 'horticulture',
+                    projectData: projectData,
+                    projectStats: {
+                        totalAreaInRai: totalArea / 1600,
+                        totalPlants: history.present.plants.length,
+                        totalWaterNeedPerSession: history.present.plants.length * (history.present.selectedPlantType?.waterNeed || 50),
+                        zones: history.present.zones.length,
+                        mainPipes: history.present.mainPipes.length,
+                        subMainPipes: history.present.subMainPipes.length,
+                        branchPipes: history.present.subMainPipes.reduce((total, pipe) => total + (pipe.branchPipes?.length || 0), 0),
+                        exclusionAreas: history.present.exclusionAreas.length,
+                    },
+                    activeZoneId: history.present.zones.length > 0 ? history.present.zones[0].id : 'main-area',
+                    zoneInputs: {},
+                    zoneSprinklers: {},
+                    selectedPipes: {},
+                    selectedPump: null,
+                    showPumpOption: true,
+                    zoneOperationMode: 'sequential',
+                    zoneOperationGroups: [],
+                    quotationData: {},
+                    quotationDataCustomer: {},
+                    gardenData: null,
+                    gardenStats: null,
+                    fieldCropData: null,
+                    greenhouseData: null,
+                    projectImage: null,
+                };
+                if (!safeLocalStorageSet(fieldSpecificKey, JSON.stringify(productPageData))) {
+                    console.error('❌ Failed to save to field-specific storage');
+                }
+
+                            // Create field data for database
+        const fieldData = {
+            name: draftName,
+            field_name: draftName, // Add field_name for updateField method
+            customer_name: customerName || 'Draft Customer',
+                category: 'horticulture',
+                status: 'unfinished',
+                is_completed: false,
+                total_area: totalArea / 1600, // Convert to rai
+                total_plants: history.present.plants.length,
+                total_water_need: history.present.plants.length * (history.present.selectedPlantType?.waterNeed || 50),
+                area_coordinates: history.present.mainArea, // Changed from 'area' to 'area_coordinates'
+                plant_type_id: (() => {
+                    // Map frontend plant type IDs to database IDs
+                    const frontendToDbIdMap: { [key: number]: number } = {
+                        1: 21, // มะม่วง
+                        2: 22, // ทุเรียน
+                        3: 23, // สับปะรด
+                        4: 24, // กล้วย
+                        5: 25, // มะละกอ
+                        6: 26, // มะพร้าว
+                        7: 27, // กาแฟอาราบิก้า
+                        8: 28, // โกโก้
+                        9: 29, // ปาล์มน้ำมัน
+                        10: 30, // ยางพารา
+                    };
+                    
+                    const frontendId = history.present.selectedPlantType?.id;
+                    return frontendId && frontendToDbIdMap[frontendId] ? frontendToDbIdMap[frontendId] : 21; // Default to มะม่วง
+                })(),
+                area_type: 'polygon',
+                zone_operation_mode: 'sequential', // Add required field
+                zone_operation_groups: [], // Add required field
+                zone_inputs: {}, // Add required field
+                selected_pipes: {}, // Add required field
+                selected_pump: null, // Add required field
+                zone_sprinklers: {}, // Add required field
+                effective_equipment: {}, // Add required field
+                zone_calculation_data: [], // Add required field
+                active_zone_id: '', // Add required field
+                show_pump_option: true, // Add required field
+                quotation_data: {}, // Add required field
+                quotation_data_customer: {}, // Add required field
+                garden_data: null, // Add required field
+                garden_stats: null, // Add required field
+                field_crop_data: null, // Add required field
+                greenhouse_data: null, // Add required field
+                project_mode: 'horticulture',
+                project_data: projectData,
+                project_stats: {
+                    totalAreaInRai: totalArea / 1600,
+                    totalPlants: history.present.plants.length,
+                    totalWaterNeedPerSession: history.present.plants.length * (history.present.selectedPlantType?.waterNeed || 50),
+                    zones: history.present.zones.length,
+                    mainPipes: history.present.mainPipes.length,
+                    subMainPipes: history.present.subMainPipes.length,
+                    branchPipes: history.present.subMainPipes.reduce((total, pipe) => total + (pipe.branchPipes?.length || 0), 0),
+                    exclusionAreas: history.present.exclusionAreas.length,
+                },
+                last_saved: new Date().toISOString(),
+            };
+
+                            console.log('📦 Field data to send:', fieldData);
+        console.log('🌱 Selected plant type:', history.present.selectedPlantType);
+        console.log('🆔 Plant type ID being sent:', fieldData.plant_type_id);
+        console.log('🔄 Is editing existing field:', isEditingExisting);
+        console.log('🆔 Existing field ID:', existingFieldId);
+
+        try {
+
+            let response;
+            
+            if (isEditingExisting) {
+                // Update existing field using updateFieldData for JSON fields
+                console.log('🔄 Updating existing draft field:', existingFieldId);
+                
+                // First, get the existing field data to preserve any existing work
+                let existingProjectData: any = null;
+                try {
+                    const existingFieldResponse = await axios.get(`/api/fields/${existingFieldId}`);
+                    if (existingFieldResponse.data.success && existingFieldResponse.data.field) {
+                        existingProjectData = existingFieldResponse.data.field.project_data;
+                        console.log('📦 Found existing project data:', existingProjectData);
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Could not fetch existing field data:', error);
+                }
+                
+                // Merge existing data with current data to preserve work
+                const mergedProjectData = {
+                    ...(existingProjectData || {}), // Preserve existing data (or empty object if null)
+                    ...projectData, // Override with current data
+                    updatedAt: new Date().toISOString(), // Update timestamp
+                };
+                
+                console.log('🔄 Merged project data - existing zones:', existingProjectData?.zones?.length || 0);
+                console.log('🔄 Merged project data - current zones:', projectData.zones.length);
+                console.log('🔄 Merged project data - existing plants:', existingProjectData?.plants?.length || 0);
+                console.log('🔄 Merged project data - current plants:', projectData.plants.length);
+                
+                // First update the basic field information
+                const basicFieldData = {
+                    name: draftName,
+                    field_name: draftName,
+                    customer_name: customerName || 'Draft Customer',
+                    category: 'horticulture',
+                    status: 'unfinished',
+                    is_completed: false,
+                    total_area: totalArea / 1600,
+                    total_plants: history.present.plants.length,
+                    total_water_need: history.present.plants.length * (history.present.selectedPlantType?.waterNeed || 50),
+                    area_coordinates: history.present.mainArea,
+                    plant_type_id: (() => {
+                        const frontendToDbIdMap: { [key: number]: number } = {
+                            1: 21, 2: 22, 3: 23, 4: 24, 5: 25,
+                            6: 26, 7: 27, 8: 28, 9: 29, 10: 30,
+                        };
+                        const frontendId = history.present.selectedPlantType?.id;
+                        return frontendId && frontendToDbIdMap[frontendId] ? frontendToDbIdMap[frontendId] : 21;
+                    })(),
+                    area_type: 'polygon',
+                };
+                
+                // Update basic field info using updateField
+                await axios.put(`/api/fields/${existingFieldId}`, basicFieldData);
+                
+                // Then update the JSON data using updateFieldData with merged data
+                const jsonFieldData = {
+                    status: 'unfinished',
+                    is_completed: false,
+                    zone_operation_mode: 'sequential',
+                    zone_operation_groups: [],
+                    zone_inputs: {},
+                    selected_pipes: {},
+                    selected_pump: null,
+                    zone_sprinklers: {},
+                    effective_equipment: {},
+                    zone_calculation_data: [],
+                    active_zone_id: '',
+                    show_pump_option: true,
+                    quotation_data: {},
+                    quotation_data_customer: {},
+                    garden_data: null,
+                    garden_stats: null,
+                    field_crop_data: null,
+                    greenhouse_data: null,
+                    project_mode: 'horticulture',
+                    project_data: mergedProjectData, // Use merged data instead of current data
+                    project_stats: {
+                        totalAreaInRai: totalArea / 1600,
+                        totalPlants: history.present.plants.length,
+                        totalWaterNeedPerSession: history.present.plants.length * (history.present.selectedPlantType?.waterNeed || 50),
+                        zones: history.present.zones.length,
+                        mainPipes: history.present.mainPipes.length,
+                        subMainPipes: history.present.subMainPipes.length,
+                        branchPipes: history.present.subMainPipes.reduce((total, pipe) => total + (pipe.branchPipes?.length || 0), 0),
+                        exclusionAreas: history.present.exclusionAreas.length,
+                    },
+                    last_saved: new Date().toISOString(),
+                };
+                
+                response = await axios.put(`/api/fields/${existingFieldId}/data`, jsonFieldData);
+            } else {
+                // Create new field
+                console.log('🆕 Creating new draft field');
+                response = await axios.post('/api/fields', fieldData);
+            }
+            
+                                if (response.data.success) {
+                        // Handle different response formats from createField vs updateField
+                        const fieldId = response.data.field?.id || response.data.field_id;
+                        console.log('✅ Draft saved successfully:', fieldId);
+                        
+                        // Store the field ID for future reference
+                        if (!safeLocalStorageSet('currentFieldId', fieldId)) {
+                            console.error('❌ Failed to save currentFieldId');
+                        }
+                        if (!safeLocalStorageSet('currentFieldName', draftName)) {
+                            console.error('❌ Failed to save currentFieldName');
+                        }
+                
+                const message = isEditingExisting 
+                    ? t('อัปเดตร่างสำเร็จ! แปลงได้รับการอัปเดตในโฟลเดอร์ "ยังไม่เสร็จ"')
+                    : t('บันทึกร่างสำเร็จ! แปลงจะถูกเก็บในโฟลเดอร์ "ยังไม่เสร็จ"');
+                
+                alert(message);
+                
+                // Navigate to home page to show the saved draft
+                router.visit('/');
+            } else {
+                throw new Error('Failed to save draft');
+            }
+        } catch (error: any) {
+            console.error('❌ Error saving draft:', error);
+            console.error('Error details:', error.response?.data);
+            console.error('Request data:', fieldData);
+            alert(t('เกิดข้อผิดพลาดในการบันทึกร่าง กรุณาลองใหม่อีกครั้ง'));
+        }
+    }, [
+        history.present.mainArea,
+        history.present.pump,
+        history.present.zones,
+        history.present.mainPipes,
+        history.present.subMainPipes,
+        history.present.exclusionAreas,
+        history.present.plants,
+        history.present.useZones,
+        history.present.selectedPlantType,
+        history.present.branchPipeSettings,
+        customerName,
+        totalArea,
+        t,
+    ]);
+
     const handleSaveProject = useCallback(() => {
         if (!history.present.pump || history.present.mainArea.length === 0) {
             alert(t('กรุณาวางปั๊มและสร้างพื้นที่หลักก่อนบันทึก'));
@@ -7967,8 +8523,11 @@ export default function EnhancedHorticulturePlannerPage() {
             updatedAt: new Date().toISOString(),
         };
 
-        localStorage.setItem('horticultureIrrigationData', JSON.stringify(projectData));
+                        if (!safeLocalStorageSet('horticultureIrrigationData', JSON.stringify(projectData))) {
+                    console.error('❌ Failed to save to horticultureIrrigationData');
+                }
 
+        // Always go to results page first, regardless of whether it's a new project or finished draft
         const params = new URLSearchParams({
             projectName,
             customerName,
@@ -7997,6 +8556,7 @@ export default function EnhancedHorticulturePlannerPage() {
     ]);
 
     const canSaveProject = history.present.pump && history.present.mainArea.length > 0;
+    const canSaveDraft = history.present.mainArea.length > 0;
 
     const handleRetry = () => {
         setIsRetrying(true);
@@ -10591,6 +11151,12 @@ export default function EnhancedHorticulturePlannerPage() {
                                 <h1 className="text-xl font-bold text-white">
                                     {t('ระบบออกแบบระบบน้ำพืชสวน')}
                                 </h1>
+                                {isEditingExistingField && (
+                                    <div className="flex items-center space-x-1 rounded-lg bg-blue-600 px-2 py-1 text-xs text-white">
+                                        <span>✏️</span>
+                                        <span>{t('แก้ไขแปลง')}</span>
+                                    </div>
+                                )}
                             </div>
 
                             {!isCompactMode && (
@@ -12491,6 +13057,24 @@ export default function EnhancedHorticulturePlannerPage() {
                         </div>
                     )}
                     <button
+                        onClick={handleSaveDraft}
+                        disabled={!canSaveDraft}
+                        className={`flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${
+                            canSaveDraft
+                                ? 'bg-yellow-600 text-white hover:bg-yellow-700'
+                                : 'cursor-not-allowed bg-gray-300 text-gray-500'
+                        }`}
+                    >
+                        {!isCompactMode ? (
+                            <div className="flex items-center space-x-2">
+                                <FaSave />
+                                <span>{t('บันทึกร่าง')}</span>
+                            </div>
+                        ) : (
+                            <FaSave />
+                        )}
+                    </button>
+                    <button
                         onClick={handleSaveProject}
                         disabled={!canSaveProject}
                         className={`flex items-center justify-center space-x-2 px-4 py-2 font-medium transition-colors ${
@@ -12618,6 +13202,7 @@ export default function EnhancedHorticulturePlannerPage() {
                                 return null;
                             })()}
                             <EnhancedGoogleMapsOverlays
+                                key={`overlays-${history.present.mainArea.length}-${history.present.exclusionAreas.length}-${history.present.zones.length}`}
                                 map={mapRef.current}
                                 data={history.present}
                                 currentDrawnZone={currentDrawnZone}
