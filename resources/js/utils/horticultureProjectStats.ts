@@ -23,6 +23,7 @@ import {
 import { loadSprinklerConfig, calculateTotalFlowRate, formatFlowRate, formatFlowRatePerHour } from './sprinklerUtils';
 import {
     findMainToSubMainConnections,
+    findEndToEndConnections,
     findMidConnections,
     findSubMainToLateralStartConnections,
     findLateralSubMainIntersection,
@@ -1373,8 +1374,8 @@ export const findBestMainPipeInZone = (
         
         // 🔥 ท่อเมนที่ผ่านการกรองแล้วจะจบที่โซนนี้แน่นอน
         
-        // Find end-to-end connections - เพิ่ม threshold เป็น 100m สำหรับการหา connection
-        const endToEndConnections = findMainToSubMainConnections(
+        // Find end-to-end connections - ใช้ฟังก์ชันที่ถูกต้องสำหรับการนับท่อเมนรองที่เชื่อมกับท่อเมน
+        const endToEndConnections = findEndToEndConnections(
             [mainPipe],
             projectData.subMainPipes,
             projectData.zones || [],
@@ -1528,15 +1529,15 @@ export const findBestMainPipeInZone = (
 export interface ConnectionPointStats {
     zoneId: string;
     zoneName: string;
-    mainToSubMain: number;        // จุดเชื่อมท่อเมน-เมนรอง (สีแดง)
-    subMainToMainMid: number;     // จุดเชื่อมเมนรอง-กลางเมน (สีม่วง)
-    subMainToLateral: number;     // จุดเชื่อมเมนรอง-ท่อย่อย (สีเหลือง)
-    subMainToMainIntersection: number; // จุดตัดเมนรอง-เมน (สีม่วง)
+    mainToSubMain: number;        // จุดเชื่อมปลาย-ปลาย (สีแดง)
+    subMainToMainMid: number;     // จุดเชื่อมปลายเมน-ระหว่างเมนรอง (สีน้ำเงิน)
+    subMainToLateral: number;     // จุดเชื่อมเมนรอง-กลางเมน (สีม่วง)
+    subMainToMainIntersection: number; // จุดเชื่อมเมนรอง-ท่อย่อย (สีเหลือง)
     lateralToSubMainIntersection: number; // จุดตัดท่อย่อย-เมนรอง (สีเขียว)
     total: number;
 }
 
-// ฟังก์ชันนับจุดเชื่อมต่อในแต่ละโซน (แก้ไขให้แม่นยำ)
+// ฟังก์ชันนับจุดเชื่อมต่อในแต่ละโซน (ปรับปรุงให้แม่นยำขึ้น)
 export const countConnectionPointsByZone = (
     projectData: EnhancedProjectData,
     irrigationZones: any[]
@@ -1563,15 +1564,47 @@ export const countConnectionPointsByZone = (
         // ใช้ Set เพื่อป้องกันการนับซ้ำ
         const countedConnections = new Set<string>();
         
-        // 1. นับจุดเชื่อมท่อเมน-เมนรอง (สีแดง) - ใช้ threshold เดียวกับแผนที่
+        // 1. นับจุดเชื่อมปลาย-ปลาย (End-to-End) - สีแดง
+        const endToEndConnections = findEndToEndConnections(
+            projectData.mainPipes,
+            projectData.subMainPipes,
+            projectData.zones || [],
+            irrigationZones,
+            15 // ใช้ threshold เดียวกับแผนที่ (15 เมตร)
+        );
+
+        // 2. นับจุดเชื่อมปลายเมน-ระหว่างเมนรอง - สีน้ำเงิน
         const mainToSubMainConnections = findMainToSubMainConnections(
             projectData.mainPipes,
             projectData.subMainPipes,
             projectData.zones || [],
             irrigationZones,
-            10 // ใช้ threshold เดียวกับแผนที่ (10 เมตร)
+            15 // ใช้ threshold เดียวกับแผนที่ (15 เมตร)
         );
+
         
+        // นับจุดเชื่อมปลาย-ปลาย (End-to-End) - สีแดง
+        for (const connection of endToEndConnections) {
+            const mainPipe = projectData.mainPipes.find(mp => mp.id === connection.mainPipeId);
+            const subMainPipe = projectData.subMainPipes.find(smp => smp.id === connection.subMainPipeId);
+            
+            if (mainPipe && subMainPipe) {
+                // 🔥 ใช้ฟังก์ชันเดียวกับที่ใช้ในแผนที่
+                const mainZoneId = findPipeZoneForConnection(mainPipe, projectData.zones || [], irrigationZones);
+                const subMainZoneId = findPipeZoneForConnection(subMainPipe, projectData.zones || [], irrigationZones);
+                
+                // นับเฉพาะจุดเชื่อมที่อยู่ในโซนนี้เท่านั้น
+                if (mainZoneId === zone.id && subMainZoneId === zone.id) {
+                    const connectionKey = `end-to-end-${connection.mainPipeId}-${connection.subMainPipeId}`;
+                    if (!countedConnections.has(connectionKey)) {
+                        zoneStats.mainToSubMain++; // สีแดง - ปลาย-ปลาย
+                        countedConnections.add(connectionKey);
+                    }
+                }
+            }
+        }
+
+        // นับจุดเชื่อมปลายเมน-ระหว่างเมนรอง - สีน้ำเงิน
         for (const connection of mainToSubMainConnections) {
             const mainPipe = projectData.mainPipes.find(mp => mp.id === connection.mainPipeId);
             const subMainPipe = projectData.subMainPipes.find(smp => smp.id === connection.subMainPipeId);
@@ -1583,20 +1616,20 @@ export const countConnectionPointsByZone = (
                 
                 // นับเฉพาะจุดเชื่อมที่อยู่ในโซนนี้เท่านั้น
                 if (mainZoneId === zone.id && subMainZoneId === zone.id) {
-                    const connectionKey = `main-submain-${connection.mainPipeId}-${connection.subMainPipeId}`;
+                    const connectionKey = `mid-connection-${connection.mainPipeId}-${connection.subMainPipeId}`;
                     if (!countedConnections.has(connectionKey)) {
-                        zoneStats.mainToSubMain++;
+                        zoneStats.subMainToMainMid++; // สีน้ำเงิน - ปลายเมน-ระหว่างเมนรอง
                         countedConnections.add(connectionKey);
                     }
                 }
             }
         }
         
-        // 2. นับจุดเชื่อมเมนรอง-กลางเมน (สีม่วง) - ใช้ threshold ที่เข้มงวดมาก
+        // 3. นับจุดเชื่อมเมนรอง-กลางเมน (สีม่วง) - ใช้ threshold เดียวกับแผนที่
         const midConnections = findMidConnections(
             projectData.subMainPipes,
             projectData.mainPipes,
-            10, // ลดจาก 20 เป็น 10 เมตร เพื่อให้เข้มงวดมากขึ้น
+            15, // ใช้ threshold เดียวกับแผนที่ (15 เมตร)
             projectData.zones || [],
             irrigationZones
         );
@@ -1613,14 +1646,14 @@ export const countConnectionPointsByZone = (
                 if (subMainZoneId === zone.id && mainZoneId === zone.id) {
                     const connectionKey = `submain-main-${connection.sourcePipeId}-${connection.targetPipeId}`;
                     if (!countedConnections.has(connectionKey)) {
-                        zoneStats.subMainToMainMid++;
+                        zoneStats.subMainToLateral++; // สีม่วง - เมนรอง-กลางเมน
                         countedConnections.add(connectionKey);
                     }
                 }
             }
         }
         
-        // 3. นับจุดเชื่อมเมนรอง-ท่อย่อย (สีเหลือง) - ใช้ threshold เดียวกับแผนที่
+        // 4. นับจุดเชื่อมเมนรอง-ท่อย่อย (สีเหลือง) - ใช้ threshold เดียวกับแผนที่
         const subMainToLateralConnections = findSubMainToLateralStartConnections(
             projectData.subMainPipes,
             projectData.lateralPipes,
@@ -1640,15 +1673,17 @@ export const countConnectionPointsByZone = (
                 // นับเฉพาะจุดเชื่อมที่อยู่ในโซนนี้เท่านั้น
                 if (subMainZoneId === zone.id && lateralZoneId === zone.id) {
                     const connectionKey = `submain-lateral-${connection.subMainPipeId}-${connection.lateralPipeId}`;
+                    
+                    // 🔥 ตรวจสอบเฉพาะการนับซ้ำในประเภทเดียวกัน
                     if (!countedConnections.has(connectionKey)) {
-                        zoneStats.subMainToLateral++;
+                        zoneStats.subMainToMainIntersection++; // สีเหลือง - เมนรอง-ท่อย่อย
                         countedConnections.add(connectionKey);
                     }
                 }
             }
         }
         
-        // 4. นับจุดตัดเมนรอง-เมน (สีม่วง)
+        // 5. นับจุดตัดเมนรอง-เมน (สีส้ม) - ใช้ threshold เดียวกับแผนที่
         const subMainToMainIntersections = findSubMainToMainIntersections(
             projectData.subMainPipes,
             projectData.mainPipes,
@@ -1668,7 +1703,7 @@ export const countConnectionPointsByZone = (
                 if (subMainZoneId === zone.id && mainZoneId === zone.id) {
                     const intersectionKey = `submain-main-intersection-${intersection.subMainPipeId}-${intersection.mainPipeId}`;
                     if (!countedConnections.has(intersectionKey)) {
-                        zoneStats.subMainToMainIntersection++;
+                        zoneStats.subMainToMainMid++; // รวมกับสีน้ำเงินอื่นๆ
                         countedConnections.add(intersectionKey);
                     }
                 }
@@ -1683,6 +1718,7 @@ export const countConnectionPointsByZone = (
             irrigationZones,
             10 // ลดจาก 20 เป็น 10 เมตร เพื่อให้เข้มงวดมากขึ้น
         );
+
         
         for (const intersection of lateralToSubMainIntersections) {
             const lateralPipe = projectData.lateralPipes.find(lp => lp.id === intersection.lateralPipeId);
@@ -1695,6 +1731,8 @@ export const countConnectionPointsByZone = (
                 // นับเฉพาะจุดตัดที่อยู่ในโซนนี้เท่านั้น
                 if (lateralZoneId === zone.id && subMainZoneId === zone.id) {
                     const intersectionKey = `lateral-submain-intersection-${intersection.lateralPipeId}-${intersection.subMainPipeId}`;
+                    
+                    // 🔥 ตรวจสอบเฉพาะการนับซ้ำในประเภทเดียวกัน
                     if (!countedConnections.has(intersectionKey)) {
                         zoneStats.lateralToSubMainIntersection++;
                         countedConnections.add(intersectionKey);
@@ -1704,11 +1742,16 @@ export const countConnectionPointsByZone = (
         }
         
         // คำนวณรวม
+        // คำนวณ total และปรับสีเหลืองให้ลบสีเขียวออก
+        const originalYellow = zoneStats.subMainToMainIntersection;
+        zoneStats.subMainToMainIntersection = Math.max(0, zoneStats.subMainToMainIntersection - zoneStats.lateralToSubMainIntersection);
+        
         zoneStats.total = zoneStats.mainToSubMain + 
                          zoneStats.subMainToMainMid + 
                          zoneStats.subMainToLateral + 
                          zoneStats.subMainToMainIntersection + 
                          zoneStats.lateralToSubMainIntersection;
+
         
         stats.push(zoneStats);
     }

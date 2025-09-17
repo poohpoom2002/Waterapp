@@ -43,6 +43,7 @@ import {
     findLateralSubMainIntersection,
     calculateLateralPipeSegmentStats,
     findMainToSubMainConnections,
+    findEndToEndConnections,
     findSubMainToLateralStartConnections,
     // 🚀 เพิ่มฟังก์ชันใหม่สำหรับ multi-segment
     accumulatePlantsFromAllSegments,
@@ -14725,12 +14726,60 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 
             // 🚀 แสดงจุดเชื่อมต่อระหว่างท่อเมนกับท่อเมนรอง (เฉพาะท่อในโซนเดียวกัน)
             if (data.layerVisibility.pipes) {
+                // 🔥 แสดงจุดเชื่อมต่อปลาย-ปลาย (End-to-End) - สีแดง
+                const endToEndConnections = findEndToEndConnections(
+                    data.mainPipes,
+                    data.subMainPipes,
+                    data.zones,
+                    data.irrigationZones || manualZones,
+                    15 // snapThreshold
+                );
+
+                endToEndConnections.forEach((connection, index) => {
+                    const connectionMarker = new google.maps.Marker({
+                        position: new google.maps.LatLng(
+                            connection.connectionPoint.lat,
+                            connection.connectionPoint.lng
+                        ),
+                        map: map,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                            fillColor: '#DC2626', // สีแดงสำหรับปลาย-ปลาย
+                            fillOpacity: 1.0,
+                            strokeColor: '#FFFFFF',
+                            strokeWeight: 2, // เพิ่มความหนาของขอบ
+                        },
+                        zIndex: 2001,
+                        title: `จุดเชื่อมต่อปลาย-ปลาย (ท่อเมน ↔ ท่อเมนรอง)`
+                    });
+                    overlaysRef.current.markers.set(`end-to-end-connection-${connection.mainPipeId}-${connection.subMainPipeId}`, connectionMarker);
+
+                    // เพิ่ม info window
+                    const infoWindow = new google.maps.InfoWindow({
+                        content: `
+                            <div class="p-2 min-w-[200px]">
+                                <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย</h4>
+                                <div class="space-y-1 text-sm">
+                                    <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
+                                    <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
+                                </div>
+                            </div>
+                        `
+                    });
+
+                    connectionMarker.addListener('click', () => {
+                        infoWindow.open(map, connectionMarker);
+                    });
+                });
+
+                // 🔥 แสดงจุดเชื่อมต่อปลายท่อเมนกับระหว่างท่อเมนรอง - สีน้ำเงิน
                 const mainToSubMainConnections = findMainToSubMainConnections(
                     data.mainPipes,
                     data.subMainPipes,
                     data.zones, // ส่ง zones
                     data.irrigationZones || manualZones, // ส่ง irrigationZones
-                    20 // snapThreshold - ปรับให้สอดคล้องกับหน้า Results
+                    15 // snapThreshold - ปรับให้สอดคล้องกับหน้า Results
                 );
 
 
@@ -14745,14 +14794,14 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         map: map,
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
-                            scale: 3, // ลดขนาดจาก 5 เป็น 3
-                            fillColor: '#DC2626', // สีแดงเข้มเหมือนในหน้า Results
+                            scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                            fillColor: '#3B82F6', // สีน้ำเงินสำหรับปลายเมน-ระหว่างเมนรอง
                             fillOpacity: 1.0,
                             strokeColor: '#FFFFFF',
-                            strokeWeight: 1.5, // ลดความหนาของขอบ
+                            strokeWeight: 2, // เพิ่มความหนาของขอบ
                         },
                         zIndex: 2001,
-                        title: `จุดเชื่อมต่อท่อเมน → ท่อเมนรอง`
+                        title: `จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง`
                     });
                     overlaysRef.current.markers.set(`main-submain-connection-${connection.mainPipeId}-${connection.subMainPipeId}`, connectionMarker);
 
@@ -14792,11 +14841,11 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         map: map,
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
-                            scale: 3, // ลดขนาดจาก 4 เป็น 3
+                            scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
                             fillColor: '#8B5CF6', // สีม่วงเข้มสำหรับเมนรอง-กลางเมน
                             fillOpacity: 1.0,
                             strokeColor: '#FFFFFF',
-                            strokeWeight: 1.5, // ลดความหนาของขอบ
+                            strokeWeight: 2, // เพิ่มความหนาของขอบ
                         },
                         zIndex: 2004,
                         title: `จุดเชื่อมท่อเมนรอง → กลางท่อเมน`
@@ -14889,11 +14938,11 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         map: map,
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
-                            scale: 3, // ปรับให้เท่ากับจุดเชื่อมต่ออื่นๆ
-                            fillColor: '#3B82F6', // สีน้ำเงินเพื่อแยกจากเมนรอง-กลางเมน
+                            scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                            fillColor: '#3B82F6', // สีน้ำเงินสำหรับตัดเมนรอง-เมน
                             fillOpacity: 1.0,
                             strokeColor: '#FFFFFF',
-                            strokeWeight: 1.5, // ปรับให้เท่ากับจุดเชื่อมต่ออื่นๆ
+                            strokeWeight: 2, // เพิ่มความหนาของขอบ
                         },
                         zIndex: 2003,
                         title: `จุดตัดท่อเมนรอง ↔ ท่อเมน`

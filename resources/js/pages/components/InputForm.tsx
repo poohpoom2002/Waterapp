@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
     IrrigationInput,
     ProjectMode,
@@ -33,6 +33,7 @@ interface InputFormProps {
         coordinates?: { lat: number; lng: number }[];
     };
     connectionStats?: ConnectionPointStats[];
+    onConnectionEquipmentsChange?: (equipments: ConnectionPointEquipment[]) => void;
 }
 
 interface BranchPipeStats {
@@ -87,6 +88,7 @@ const InputForm: React.FC<InputFormProps> = ({
     projectMode = 'horticulture' as ProjectMode,
     zoneAreaData,
     connectionStats = [],
+    onConnectionEquipmentsChange,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
@@ -129,13 +131,13 @@ const InputForm: React.FC<InputFormProps> = ({
             : connectionStats;
         
         filteredStats.forEach(zoneStats => {
-            // สร้างอุปกรณ์สำหรับแต่ละประเภทจุดเชื่อมต่อ
+            // สร้างอุปกรณ์สำหรับแต่ละประเภทจุดเชื่อมต่อ (แก้ไขให้ตรงกับการแสดงผลในแผนที่)
             const connectionTypes = [
-                { key: 'mainToSubMain', name: 'ท่อเมน-เมนรอง', color: '#DC2626' },
-                { key: 'subMainToMainMid', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' },
-                { key: 'subMainToLateral', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' },
-                { key: 'subMainToMainIntersection', name: 'ตัดเมนรอง-เมน', color: '#3B82F6' },
-                { key: 'lateralToSubMainIntersection', name: 'ตัดท่อย่อย-เมนรอง', color: '#10B981' }
+                { key: 'mainToSubMain', name: 'ปลาย-ปลาย', color: '#DC2626' }, // สีแดง - endToEndConnections
+                { key: 'subMainToMainMid', name: 'ปลายเมน-ระหว่างเมนรอง', color: '#3B82F6' }, // สีน้ำเงิน - mainToSubMainConnections + subMainToMainIntersections
+                { key: 'subMainToLateral', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' }, // สีม่วง - midConnections
+                { key: 'subMainToMainIntersection', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' }, // สีเหลือง - subMainToLateralConnections (ลบสีเขียวออกแล้ว)
+                { key: 'lateralToSubMainIntersection', name: 'ตัดท่อย่อย-เมนรอง', color: '#10B981' } // สีเขียว - lateralToSubMainIntersections
             ];
 
             connectionTypes.forEach(type => {
@@ -176,7 +178,7 @@ const InputForm: React.FC<InputFormProps> = ({
     }, [connectionStats, activeZone]);
 
     // ฟังก์ชันโหลดหมวดหมู่อุปกรณ์ connection points
-    const fetchConnectionCategories = async () => {
+    const fetchConnectionCategories = useCallback(async () => {
         setLoadingConnectionCategories(true);
         try {
             const response = await fetch('/api/equipment-categories');
@@ -193,7 +195,7 @@ const InputForm: React.FC<InputFormProps> = ({
         } finally {
             setLoadingConnectionCategories(false);
         }
-    };
+    }, []);
 
     // ฟังก์ชันโหลดอุปกรณ์ในหมวดหมู่
     const fetchConnectionEquipments = async (categoryName: string) => {
@@ -329,15 +331,26 @@ const InputForm: React.FC<InputFormProps> = ({
         fetchPipeData();
     }, []);
 
-    // Initialize connection point equipments when connectionStats changes
+    // Initialize connection point equipments when connectionStats or activeZone changes
     useEffect(() => {
         initializeConnectionPointEquipments();
-    }, [connectionStats, initializeConnectionPointEquipments]);
+    }, [connectionStats, activeZone, initializeConnectionPointEquipments]);
 
-    // Load connection equipment categories
+    // Load connection equipment categories (แยกออกจาก connection equipments)
     useEffect(() => {
         if (connectionPointEquipments.length > 0) {
             fetchConnectionCategories();
+        }
+    }, [connectionPointEquipments.length, fetchConnectionCategories]); // เพิ่ม fetchConnectionCategories ใน dependencies
+
+    // ใช้ useRef เพื่อเก็บ reference ของ callback function
+    const onConnectionEquipmentsChangeRef = useRef(onConnectionEquipmentsChange);
+    onConnectionEquipmentsChangeRef.current = onConnectionEquipmentsChange;
+
+    // ส่งข้อมูล connection equipments ไปยัง parent component (แยก useEffect)
+    useEffect(() => {
+        if (onConnectionEquipmentsChangeRef.current) {
+            onConnectionEquipmentsChangeRef.current(connectionPointEquipments);
         }
     }, [connectionPointEquipments]);
 
@@ -372,6 +385,15 @@ const InputForm: React.FC<InputFormProps> = ({
         };
         fetchSprinklerGroups();
     }, []);
+
+    // Sync sprinkler equipment sets when activeZone changes
+    useEffect(() => {
+        if (activeZone && input.sprinklerEquipmentSet) {
+            setSelectedSprinklerItems(input.sprinklerEquipmentSet.selectedItems || []);
+        } else {
+            setSelectedSprinklerItems([]);
+        }
+    }, [activeZone, input.sprinklerEquipmentSet]);
 
     // Load categories for adding new items
     useEffect(() => {
@@ -1629,24 +1651,45 @@ const InputForm: React.FC<InputFormProps> = ({
                                         {/* แสดงข้อมูลอุปกรณ์ที่เลือก */}
                                         {equipment.equipment && (
                                             <div className="mt-2 rounded bg-gray-500 p-2">
-                                                <div className="text-xs text-gray-200">
-                                                    <div className="flex justify-between">
-                                                        <span>{t('รหัสสินค้า')}:</span>
-                                                        <span>{equipment.equipment.product_code}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>{t('ราคา')}:</span>
-                                                        <span>{equipment.equipment.price?.toLocaleString()} {t('บาท')}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>{t('จำนวนที่ต้องการ')}:</span>
-                                                        <span>{equipment.count} {t('ชิ้น')}</span>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span>{t('ราคารวม')}:</span>
-                                                        <span className="font-semibold text-green-300">
-                                                            {(equipment.equipment.price * equipment.count).toLocaleString()} {t('บาท')}
-                                                        </span>
+                                                <div className="flex gap-3">
+                                                    {/* รูปภาพอุปกรณ์ */}
+                                                    {equipment.equipment.image ? (
+                                                        <div className="flex-shrink-0">
+                                                            <img
+                                                                src={equipment.equipment.image}
+                                                                alt={equipment.equipment.name || equipment.equipment.product_code}
+                                                                className="h-16 w-16 rounded border border-gray-400 object-cover"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.style.display = 'none';
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex h-16 w-16 items-center justify-center rounded border border-gray-500 bg-gray-600 text-xs text-gray-300">
+                                                            {t('ไม่มีรูป')}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* ข้อมูลอุปกรณ์ */}
+                                                    <div className="flex-1 text-xs text-gray-200">
+                                                        <div className="flex justify-between">
+                                                            <span>{t('รหัสสินค้า')}:</span>
+                                                            <span>{equipment.equipment.product_code}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>{t('ราคา')}:</span>
+                                                            <span>{equipment.equipment.price?.toLocaleString()} {t('บาท')}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>{t('จำนวนที่ต้องการ')}:</span>
+                                                            <span>{equipment.count} {t('ชิ้น')}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span>{t('ราคารวม')}:</span>
+                                                            <span className="font-semibold text-green-300">
+                                                                {(equipment.equipment.price * equipment.count).toLocaleString()} {t('บาท')}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1701,26 +1744,77 @@ const InputForm: React.FC<InputFormProps> = ({
                                 <label className="mb-2 block text-sm font-medium text-gray-300">
                                     {t('เลือกสินค้า')}
                                 </label>
-                                <select
-                                    value={selectedEquipment || ''}
-                                    onChange={(e) => setSelectedEquipment(parseInt(e.target.value) || null)}
-                                    className="w-full rounded border border-gray-500 bg-gray-700 p-2 text-white focus:border-blue-400"
-                                    disabled={!selectedCategory || loadingEquipments}
-                                >
-                                    <option value="">
+                                {!selectedCategory || loadingEquipments ? (
+                                    <div className="w-full rounded border border-gray-500 bg-gray-700 p-2 text-gray-400">
                                         {loadingEquipments 
                                             ? t('กำลังโหลด...')
-                                            : !selectedCategory 
-                                                ? t('-- เลือกหมวดหมู่ก่อน --')
-                                                : t('-- เลือกสินค้า --')
+                                            : t('-- เลือกหมวดหมู่ก่อน --')
                                         }
-                                    </option>
-                                    {equipments.map((equipment) => (
-                                        <option key={equipment.id} value={equipment.id}>
-                                            {equipment.name || equipment.product_code} - {equipment.price?.toLocaleString()} {t('บาท')}
-                                        </option>
-                                    ))}
-                                </select>
+                                    </div>
+                                ) : (
+                                    (() => {
+                                        const mappedOptions = equipments.map(eq => {
+                                            // สร้าง label ที่แสดงชื่อ, รหัส, และคุณสมบัติ
+                                            let label = eq.name || eq.product_code;
+                                            if (eq.name && eq.product_code) {
+                                                label = `${eq.name} (${eq.product_code})`;
+                                            }
+                                            
+                                            // เพิ่มคุณสมบัติที่สำคัญ
+                                            const attributes: string[] = [];
+                                            if (eq.brand) attributes.push(`ยี่ห้อ: ${eq.brand}`);
+                                            if (eq.waterVolumeLitersPerMinute) attributes.push(`ปริมาณน้ำ: ${eq.waterVolumeLitersPerMinute} ลิตร/นาที`);
+                                            if (eq.radiusMeters) attributes.push(`รัศมี: ${eq.radiusMeters} เมตร`);
+                                            if (eq.pressureBar) attributes.push(`แรงดัน: ${eq.pressureBar} บาร์`);
+                                            if (eq.powerHP) attributes.push(`กำลัง: ${eq.powerHP} แรงม้า`);
+                                            if (eq.powerKW) attributes.push(`กำลัง: ${eq.powerKW} กิโลวัตต์`);
+                                            if (eq.inlet_size_inch) attributes.push(`ขนาดทางเข้า: ${eq.inlet_size_inch} นิ้ว`);
+                                            if (eq.outlet_size_inch) attributes.push(`ขนาดทางออก: ${eq.outlet_size_inch} นิ้ว`);
+                                            if (eq.pipeType) attributes.push(`ประเภทท่อ: ${eq.pipeType}`);
+                                            if (eq.pn) attributes.push(`PN: ${eq.pn}`);
+                                            if (eq.sizeMM) attributes.push(`ขนาด: ${eq.sizeMM} มม.`);
+                                            if (eq.sizeInch) attributes.push(`ขนาด: ${eq.sizeInch} นิ้ว`);
+                                            if (eq.lengthM) attributes.push(`ความยาว: ${eq.lengthM} เมตร`);
+                                            
+                                            if (attributes.length > 0) {
+                                                label += ` - ${attributes.join(', ')}`;
+                                            }
+                                            
+                                            return {
+                                                value: eq.id,
+                                                label: label,
+                                                productCode: eq.product_code,
+                                                price: eq.price,
+                                                image: eq.image,
+                                                brand: eq.brand,
+                                                name: eq.name,
+                                                description: eq.description,
+                                                searchableText: `${eq.name || ''} ${eq.product_code || ''} ${eq.brand || ''} ${attributes.join(' ')}`
+                                            };
+                                        });
+                                        
+                                        
+                                        // ถ้าไม่มีข้อมูลให้แสดงข้อความ
+                                        if (mappedOptions.length === 0) {
+                                            return (
+                                                <div className="w-full rounded border border-gray-500 bg-gray-700 p-2 text-gray-400 text-sm">
+                                                    {t('ไม่พบอุปกรณ์ในหมวดหมู่นี้')}
+                                                </div>
+                                            );
+                                        }
+                                        
+                                        return (
+                                            <SearchableDropdown
+                                                options={mappedOptions}
+                                                value={selectedEquipment || ''}
+                                                onChange={(value) => setSelectedEquipment(parseInt(String(value)) || null)}
+                                                placeholder={t('พิมพ์เพื่อค้นหาสินค้า...')}
+                                                searchPlaceholder={t('พิมพ์เพื่อค้นหาจากชื่อ, รหัสสินค้า, ยี่ห้อ, หรือคุณสมบัติ...')}
+                                                className="text-sm"
+                                            />
+                                        );
+                                    })()
+                                )}
                             </div>
 
                             {/* Selected Equipment Preview */}

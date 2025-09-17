@@ -52,6 +52,8 @@ interface QuotationDocumentProps {
     showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
     selectedPipes: { [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any } };
+    sprinklerEquipmentSets?: { [zoneId: string]: any }; // เพิ่มสำหรับ Sprinkler Equipment Sets
+    connectionEquipments?: { [zoneId: string]: any[] }; // เพิ่มสำหรับ Connection Equipments
     onClose: () => void;
 }
 const QuotationDocument: React.FC<QuotationDocumentProps> = ({
@@ -72,6 +74,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     gardenData,
     zoneSprinklers,
     selectedPipes,
+    sprinklerEquipmentSets = {},
+    connectionEquipments = {},
     showPump,
     onClose,
 }) => {
@@ -107,33 +111,86 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         }
 
         if (effectivePage === 1) {
-            if (totalPages === 1 + imagePageOffset) {
-                return Math.min(10, Math.max(0, totalItems));
+            // หน้าแรก: แสดง 7 รายการ
+            if (totalItems <= 7) {
+                return totalItems;
+            } else if (totalItems === 8) {
+                return 7; // รายการที่ 8 ไปหน้าถัดไป
+            } else if (totalItems === 9) {
+                return 8; // รายการที่ 9 ไปหน้าถัดไป
+            } else if (totalItems === 10) {
+                return 9; // รายการที่ 10 ไปหน้าถัดไป
+            } else {
+                return 10; // มากกว่า 10 รายการ แสดง 10 รายการ
             }
-            return 10;
         } else if (effectivePage === totalPages - imagePageOffset) {
-            return Math.min(11, 14);
+            // หน้าสุดท้าย: แสดงรายการที่เหลือ
+            const firstPageItems = getItemsPerPage(1 + imagePageOffset, totalPages, totalItems);
+            return totalItems - firstPageItems;
         } else {
-            return 14;
+            // หน้าอุปกรณ์อื่นๆ (หน้า 2+): แสดง 10 รายการ
+            // คำนวณจำนวนรายการที่เหลือในหน้านี้
+            const firstPageItems = getItemsPerPage(1 + imagePageOffset, totalPages, totalItems);
+            const remainingItems = totalItems - firstPageItems;
+            const itemsInThisPage = remainingItems - (effectivePage - 2) * 13;
+            
+            if (itemsInThisPage <= 10) {
+                return itemsInThisPage;
+            } else if (itemsInThisPage === 11) {
+                return 10; // รายการที่ 11 ไปหน้าถัดไป
+            } else if (itemsInThisPage === 12) {
+                return 11; // รายการที่ 12 ไปหน้าถัดไป
+            } else if (itemsInThisPage === 13) {
+                return 12; // รายการที่ 13 ไปหน้าถัดไป
+            } else {
+                return 13; // มากกว่า 13 รายการ แสดง 13 รายการ
+            }
         }
     };
 
     const calculateTotalPages = (totalItems: number) => {
         if (totalItems === 0) return hasProjectImagePage ? 1 : 0; // ถ้าไม่มี items แต่มีรูป ให้แสดง 1 หน้า
 
-        if (totalItems <= 10) {
-            return 1 + (hasProjectImagePage ? 1 : 0); // หน้าเดียวพอ + หน้ารูป (ถ้ามี)
+        // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
+        let firstPageItems;
+        if (totalItems <= 7) {
+            firstPageItems = totalItems;
+        } else if (totalItems === 8) {
+            firstPageItems = 7;
+        } else if (totalItems === 9) {
+            firstPageItems = 8;
+        } else if (totalItems === 10) {
+            firstPageItems = 9;
+        } else {
+            firstPageItems = 10;
         }
 
-        let remainingItems = totalItems - 10; // หักหน้าแรก 10 รายการ
+        // ถ้ารายการทั้งหมดพอดีกับหน้าแรก
+        if (firstPageItems === totalItems) {
+            return 1 + (hasProjectImagePage ? 1 : 0);
+        }
+
+        // คำนวณหน้าถัดไป
+        let remainingItems = totalItems - firstPageItems;
         let additionalPages = 0;
 
+        // คำนวณจำนวนหน้าตามกฎใหม่
         while (remainingItems > 0) {
-            if (remainingItems <= 14) {
+            if (remainingItems <= 10) {
                 additionalPages += 1;
                 break;
+            } else if (remainingItems === 11) {
+                additionalPages += 2; // หน้าแสดง 10 รายการ + หน้าแสดง 1 รายการ
+                break;
+            } else if (remainingItems === 12) {
+                additionalPages += 2; // หน้าแสดง 11 รายการ + หน้าแสดง 1 รายการ
+                break;
+            } else if (remainingItems === 13) {
+                additionalPages += 2; // หน้าแสดง 12 รายการ + หน้าแสดง 1 รายการ
+                break;
             } else {
-                remainingItems -= 14;
+                // มากกว่า 13 รายการ แสดง 13 รายการในหน้านี้
+                remainingItems -= 13;
                 additionalPages += 1;
             }
         }
@@ -259,7 +316,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             description: `${equipment.productCode} - ${equipment.name}${equipment.brand ? ` (${equipment.brand})` : ''}`,
             quantity: 1,
             unitPrice: equipment.price,
-            discount: 30.0,
+            discount: 0.0,
             taxes: 'Output\nVAT\n7%',
             originalData: equipment,
         };
@@ -335,7 +392,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             description: `${zoneSprinkler.productCode || zoneSprinkler.product_code || ''} - ${zoneSprinkler.name || 'สปริงเกอร์'} (${zoneSprinkler.brand || ''})`,
                             quantity: zone.plantCount,
                             unitPrice: zoneSprinkler.price || 0,
-                            discount: 30.0,
+                            discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: zoneSprinkler,
                             zones: [zone.name],
@@ -365,7 +422,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             description: `${branchPipe.productCode || branchPipe.product_code || ''} - ท่อย่อย ${branchPipe.pipeType || ''} ${branchPipe.sizeMM || ''}mm ยาว ${branchPipe.lengthM || ''} ม./ม้วน`,
                             quantity: rolls,
                             unitPrice: branchPipe.price || 0,
-                            discount: 30.0,
+                            discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: branchPipe,
                             zones: [zone.name],
@@ -395,7 +452,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             description: `${secondaryPipe.productCode || secondaryPipe.product_code || ''} - ท่อรอง ${secondaryPipe.pipeType || ''} ${secondaryPipe.sizeMM || ''}mm ยาว ${secondaryPipe.lengthM || ''} ม./ม้วน`,
                             quantity: rolls,
                             unitPrice: secondaryPipe.price || 0,
-                            discount: 30.0,
+                            discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: secondaryPipe,
                             zones: [zone.name],
@@ -425,7 +482,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             description: `${mainPipe.productCode || mainPipe.product_code || ''} - ท่อหลัก ${mainPipe.pipeType || ''} ${mainPipe.sizeMM || ''}mm ยาว ${mainPipe.lengthM || ''} ม./ม้วน`,
                             quantity: rolls,
                             unitPrice: mainPipe.price || 0,
-                            discount: 30.0,
+                            discount: 0.0,
                             taxes: 'Output\nVAT\n7%',
                             originalData: mainPipe,
                             zones: [zone.name],
@@ -436,9 +493,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
             for (const [key, item] of equipmentMap.entries()) {
                 if (item.zones && item.zones.length > 1) {
-                    item.description += ` (ใช้ในโซน: ${item.zones.join(', ')})`;
+                    item.description += ``;
                 } else if (item.zones && item.zones.length === 1) {
-                    item.description += ` (ใช้ในโซน: ${item.zones[0]})`;
+                    item.description += ``;
                 }
                 delete item.zones;
                 initialItems.push(item);
@@ -453,7 +510,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     description: `${selectedSprinkler.productCode || selectedSprinkler.product_code || ''} - ${selectedSprinkler.name || 'สปริงเกอร์'} (${selectedSprinkler.brand || ''})`,
                     quantity: results.totalSprinklers || 0,
                     unitPrice: selectedSprinkler.price || 0,
-                    discount: 30.0,
+                    discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
                     originalData: selectedSprinkler,
                 });
@@ -468,7 +525,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     description: `${selectedBranchPipe.productCode || selectedBranchPipe.product_code || ''} - ท่อย่อย ${selectedBranchPipe.pipeType || ''} ${selectedBranchPipe.sizeMM || ''}mm ยาว ${selectedBranchPipe.lengthM || ''} ม./ม้วน`,
                     quantity: results.branchPipeRolls || 0,
                     unitPrice: selectedBranchPipe.price || 0,
-                    discount: 30.0,
+                    discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
                     originalData: selectedBranchPipe,
                 });
@@ -483,7 +540,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     description: `${selectedSecondaryPipe.productCode || selectedSecondaryPipe.product_code || ''} - ท่อรอง ${selectedSecondaryPipe.pipeType || ''} ${selectedSecondaryPipe.sizeMM || ''}mm ยาว ${selectedSecondaryPipe.lengthM || ''} ม./ม้วน`,
                     quantity: results.secondaryPipeRolls || 0,
                     unitPrice: selectedSecondaryPipe.price || 0,
-                    discount: 30.0,
+                    discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
                     originalData: selectedSecondaryPipe,
                 });
@@ -498,7 +555,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     description: `${selectedMainPipe.productCode || selectedMainPipe.product_code || ''} - ท่อหลัก ${selectedMainPipe.pipeType || ''} ${selectedMainPipe.sizeMM || ''}mm ยาว ${selectedMainPipe.lengthM || ''} ม./ม้วน`,
                     quantity: results.mainPipeRolls || 0,
                     unitPrice: selectedMainPipe.price || 0,
-                    discount: 30.0,
+                    discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
                     originalData: selectedMainPipe,
                 });
@@ -513,14 +570,14 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     description: `${selectedEmitterPipe.productCode || selectedEmitterPipe.product_code || ''} - ท่อย่อยแยก ${selectedEmitterPipe.pipeType || ''} ${selectedEmitterPipe.sizeMM || ''}mm ยาว ${selectedEmitterPipe.lengthM || ''} ม./ม้วน`,
                     quantity: results.emitterPipeRolls || 0,
                     unitPrice: selectedEmitterPipe.price || 0,
-                    discount: 30.0,
+                    discount: 0.0,
                     taxes: 'Output\nVAT\n7%',
                     originalData: selectedEmitterPipe,
                 });
             }
         }
 
-        if (selectedPump && results) {
+        if (selectedPump && results && showPump) {
             const pumpDescription = `${selectedPump.productCode || selectedPump.product_code || ''} - ${selectedPump.name || ''} ${selectedPump.powerHP || ''}HP ${selectedPump.phase || ''}เฟส (${selectedPump.brand || ''})`;
 
             initialItems.push({
@@ -531,7 +588,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 description: pumpDescription,
                 quantity: 1,
                 unitPrice: selectedPump.price || 0,
-                discount: 30.0,
+                discount: 0.0,
                 taxes: 'Output\nVAT\n7%',
                 originalData: selectedPump,
             });
@@ -577,10 +634,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     seq: seq++,
                                     image: accessory.image_url || accessory.image || '',
                                     date: '',
-                                    description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''} - ${typeName}${accessory.is_included ? ' (รวมในชุด)' : ' (แยกขาย)'}`,
+                                    description: `${accessory.name}${accessory.size ? ` ขนาด ${accessory.size}` : ''}`,
                                     quantity: 1,
                                     unitPrice: accessory.is_included ? 0 : accessory.price || 0,
-                                    discount: accessory.is_included ? 0 : 30.0,
+                                    discount: accessory.is_included ? 0 : 0.0,
                                     taxes: 'Output\nVAT\n7%',
                                     originalData: accessory,
                                 });
@@ -601,11 +658,55 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     selectedExtraPipe.totalLength / (selectedExtraPipe.pipe.lengthM || 1)
                 ),
                 unitPrice: selectedExtraPipe.pipe.price || 0,
-                discount: 30.0,
+                discount: 0.0,
                 taxes: 'Output\nVAT\n7%',
                 originalData: selectedExtraPipe.pipe,
             });
         }
+
+        // เพิ่มอุปกรณ์จาก Sprinkler Equipment Sets
+        Object.entries(sprinklerEquipmentSets).forEach(([zoneId, equipmentSet]) => {
+            if (equipmentSet && equipmentSet.selectedItems && equipmentSet.selectedItems.length > 0) {
+                equipmentSet.selectedItems.forEach((item: any) => {
+                    if (item.equipment && item.quantity > 0) {
+                        initialItems.push({
+                            id: `sprinkler_equipment_${zoneId}_${item.equipment.id}`,
+                            seq: seq++,
+                            image: item.equipment.image || '',
+                            date: '',
+                            description: `${item.equipment.product_code || ''} - ${item.equipment.name || ''} (${item.equipment.brand || ''})`,
+                            quantity: item.quantity,
+                            unitPrice: item.unit_price || item.equipment.price || 0,
+                            discount: 0.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: item.equipment,
+                        });
+                    }
+                });
+            }
+        });
+
+        // เพิ่มอุปกรณ์เชื่อมต่อท่อ
+        Object.entries(connectionEquipments).forEach(([zoneId, equipments]) => {
+            if (equipments && equipments.length > 0) {
+                equipments.forEach((equipment: any) => {
+                    if (equipment.equipment && equipment.count > 0) {
+                        initialItems.push({
+                            id: `connection_equipment_${zoneId}_${equipment.connectionType}_${equipment.equipment.id}`,
+                            seq: seq++,
+                            image: equipment.equipment.image || '',
+                            date: '',
+                            description: `${equipment.equipment.product_code || ''} - ${equipment.equipment.name || ''} (${equipment.equipment.brand || ''})`,
+                            quantity: equipment.count,
+                            unitPrice: equipment.equipment.price || 0,
+                            discount: 0.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: equipment.equipment,
+                        });
+                    }
+                });
+            }
+        });
 
         setItems(initialItems);
         if (hasProjectImagePage && initialItems.length > 0) {
@@ -635,10 +736,13 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         selectedPipes,
         projectData,
         selectedExtraPipe,
+        sprinklerEquipmentSets,
+        connectionEquipments,
     ]);
 
     const calculateItemAmount = (item: QuotationItem) => {
-        return item.unitPrice * item.quantity - item.unitPrice * (item.discount / 100);
+        const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0;
+        return unitPrice * item.quantity - unitPrice * (item.discount / 100);
     };
 
     const calculateTotal = () => {
@@ -686,7 +790,21 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         if (effectivePage === 1) {
             return items.slice(0, itemsPerPage);
         } else {
-            const startIndex = 10 + (effectivePage - 2) * 14;
+            // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
+            let firstPageItems;
+            if (items.length <= 7) {
+                firstPageItems = items.length;
+            } else if (items.length === 8) {
+                firstPageItems = 7;
+            } else if (items.length === 9) {
+                firstPageItems = 8;
+            } else if (items.length === 10) {
+                firstPageItems = 9;
+            } else {
+                firstPageItems = 10;
+            }
+
+            const startIndex = firstPageItems + (effectivePage - 2) * 13;
             const endIndex = startIndex + itemsPerPage;
             return items.slice(startIndex, endIndex);
         }
@@ -927,7 +1045,21 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             if (page === 1 + imagePageOffset) {
                 pageItems = currentItems.slice(0, itemsPerPage);
             } else {
-                const startIndex = 10 + (page - 2 - imagePageOffset) * 14;
+                // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
+                let firstPageItems;
+                if (currentItems.length <= 7) {
+                    firstPageItems = currentItems.length;
+                } else if (currentItems.length === 8) {
+                    firstPageItems = 7;
+                } else if (currentItems.length === 9) {
+                    firstPageItems = 8;
+                } else if (currentItems.length === 10) {
+                    firstPageItems = 9;
+                } else {
+                    firstPageItems = 10;
+                }
+
+                const startIndex = firstPageItems + (page - 2 - imagePageOffset) * 13;
                 const endIndex = startIndex + itemsPerPage;
                 pageItems = currentItems.slice(startIndex, endIndex);
             }
@@ -1013,9 +1145,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                         <td class="border border-gray-400 p-1 text-right align-top">
                             ${item.quantity.toFixed(4)}<br />${t('Unit')}
                         </td>
-                        <td class="border border-gray-400 p-1 text-right align-top">${item.unitPrice.toFixed(4)}</td>
+                        <td class="border border-gray-400 p-1 text-right align-top">${(typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0).toFixed(4)}</td>
                         <td class="border border-gray-400 p-1 text-right align-top">${item.discount.toFixed(3)}</td>
-                        <td class="border border-gray-400 p-1 text-right align-top">${(item.unitPrice * (item.discount / 100)).toFixed(2)}</td>
+                        <td class="border border-gray-400 p-1 text-right align-top">${((typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0) * (item.discount / 100)).toFixed(2)}</td>
                         <td class="border border-gray-400 p-1 text-right align-top">${item.taxes.replace(/\n/g, '<br />')}</td>
                         <td class="border border-gray-400 p-1 text-right align-top">${itemAmount.toFixed(2)} ฿</td>
                     </tr>
@@ -1170,8 +1302,23 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         const currentIndex = currentPageItems.findIndex((i) => i.id === item.id);
         const imagePageOffset = hasProjectImagePage ? 1 : 0;
         const effectivePage = currentPage - imagePageOffset;
+        
+        // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
+        let firstPageItems;
+        if (items.length <= 7) {
+            firstPageItems = items.length;
+        } else if (items.length === 8) {
+            firstPageItems = 7;
+        } else if (items.length === 9) {
+            firstPageItems = 8;
+        } else if (items.length === 10) {
+            firstPageItems = 9;
+        } else {
+            firstPageItems = 10;
+        }
+        
         const absoluteIndex =
-            effectivePage === 1 ? currentIndex : 10 + (effectivePage - 2) * 14 + currentIndex;
+            effectivePage === 1 ? currentIndex : firstPageItems + (effectivePage - 2) * 13 + currentIndex;
 
         return (
             <tr key={item.id}>
@@ -1259,7 +1406,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             step="0.001"
                         />
                     ) : (
-                        item.unitPrice.toFixed(4)
+                        (typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0).toFixed(4)
                     )}
                 </td>
                 <td className="border border-gray-400 p-1 text-right align-top">
@@ -1280,7 +1427,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     )}
                 </td>
                 <td className="border border-gray-400 p-1 text-right align-top">
-                    {(item.unitPrice * (item.discount / 100)).toFixed(2)}
+                    {((typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0) * (item.discount / 100)).toFixed(2)}
                 </td>
                 <td className="border border-gray-400 p-1 text-right align-top">
                     {item.taxes.split('\n').map((line, i) => (

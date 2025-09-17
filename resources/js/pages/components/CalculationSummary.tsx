@@ -1,7 +1,7 @@
 // resources\js\pages\components\CalculationSummary.tsx
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -58,68 +58,96 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const actualEmitterPipe = results.autoSelectedEmitterPipe;
 
     // ฟังก์ชันสำหรับดึงค่า Head Loss จากท่อแต่ละชนิด
-    const getActualPipeHeadLoss = () => {
-        if (projectMode === 'garden') {
-            // สำหรับ garden mode ใช้ข้อมูลจาก PipeSelector calculations ที่เก็บใน localStorage
-            try {
-                const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
-                if (pipeCalculationsStr) {
-                    const pipeCalculations = JSON.parse(pipeCalculationsStr);
-                    
-                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
-                    const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
-                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
-                    const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
+    const getActualPipeHeadLoss = useCallback(() => {
+        // ลองดึงข้อมูลจาก localStorage ก่อน (สำหรับทุก mode)
+        try {
+            const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+            if (pipeCalculationsStr) {
+                const pipeCalculations = JSON.parse(pipeCalculationsStr);
+                
+                const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
 
-                    const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
-                    return {
-                        branch: branchHeadLoss,
-                        secondary: secondaryHeadLoss,
-                        main: mainHeadLoss,
-                        emitter: emitterHeadLoss,
-                        total: totalHeadLoss,
-                    };
-                }
-            } catch (error) {
-                console.error('Error loading garden pipe calculations:', error);
+                return {
+                    branch: branchHeadLoss,
+                    secondary: secondaryHeadLoss,
+                    main: mainHeadLoss,
+                    emitter: emitterHeadLoss,
+                    total: totalHeadLoss,
+                };
             }
-            
-            // Fallback: ใช้ข้อมูลจาก auto-selected pipes
-            const branchHeadLoss = actualBranchPipe?.headLoss || 0;
-            const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
-            const mainHeadLoss = actualMainPipe?.headLoss || 0;
-            const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
-
-            const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
-
-            return {
-                branch: branchHeadLoss,
-                secondary: secondaryHeadLoss,
-                main: mainHeadLoss,
-                emitter: emitterHeadLoss,
-                total: totalHeadLoss,
-            };
-        } else {
-            // สำหรับ mode อื่นๆ ใช้ค่าจาก results.headLoss
-            const branchHeadLoss = results.headLoss?.branch?.total || 0;
-            const secondaryHeadLoss = results.headLoss?.secondary?.total || 0;
-            const mainHeadLoss = results.headLoss?.main?.total || 0;
-            const emitterHeadLoss = results.headLoss?.emitter?.total || 0;
-
-            const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
-
-            return {
-                branch: branchHeadLoss,
-                secondary: secondaryHeadLoss,
-                main: mainHeadLoss,
-                emitter: emitterHeadLoss,
-                total: totalHeadLoss,
-            };
+        } catch (error) {
+            console.error('Error loading pipe calculations from localStorage:', error);
         }
-    };
 
-    const actualHeadLoss = getActualPipeHeadLoss();
+        // ลองดึงข้อมูลจาก horticulture pipe calculations
+        try {
+            const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+            if (horticulturePipeCalculationsStr) {
+                const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
+                
+                const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
+                const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
+                const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
+                const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
+
+                const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+                return {
+                    branch: branchHeadLoss,
+                    secondary: secondaryHeadLoss,
+                    main: mainHeadLoss,
+                    emitter: emitterHeadLoss,
+                    total: totalHeadLoss,
+                };
+            }
+        } catch (error) {
+            console.error('Error loading horticulture pipe calculations from localStorage:', error);
+        }
+        
+        // Fallback: ใช้ข้อมูลจาก auto-selected pipes
+        const branchHeadLoss = actualBranchPipe?.headLoss || 0;
+        const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
+        const mainHeadLoss = actualMainPipe?.headLoss || 0;
+        const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
+
+        const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+        return {
+            branch: branchHeadLoss,
+            secondary: secondaryHeadLoss,
+            main: mainHeadLoss,
+            emitter: emitterHeadLoss,
+            total: totalHeadLoss,
+        };
+    }, [actualBranchPipe, actualSecondaryPipe, actualMainPipe, actualEmitterPipe]);
+
+    const [actualHeadLoss, setActualHeadLoss] = useState(() => getActualPipeHeadLoss());
+
+    // อัปเดตค่า Head Loss เมื่อมีการเปลี่ยนแปลงใน localStorage
+    useEffect(() => {
+        const handleStorageChange = () => {
+            setActualHeadLoss(getActualPipeHeadLoss());
+        };
+
+        // ฟังการเปลี่ยนแปลงใน localStorage
+        window.addEventListener('storage', handleStorageChange);
+        
+        // อัปเดตค่าเมื่อ component mount หรือเมื่อมีการเปลี่ยนแปลง
+        const interval = setInterval(() => {
+            const newHeadLoss = getActualPipeHeadLoss();
+            setActualHeadLoss(newHeadLoss);
+        }, 1000); // ตรวจสอบทุก 1 วินาที
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            clearInterval(interval);
+        };
+    }, [getActualPipeHeadLoss]);
 
     const getEquipmentName = () => {
         switch (projectMode) {
