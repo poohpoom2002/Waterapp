@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import Navbar from '../../components/Navbar';
 import HorticultureMapComponent from '../../components/horticulture/HorticultureMapComponent';
+import NotificationModal from '../../components/NotificationModal';
 import { isPointInPolygonEnhanced } from '../../utils/fieldCropData';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 
@@ -1124,6 +1125,8 @@ const useMapManager = () => {
         pills.forEach(p => p.setMap(null));
         overlaysRef.current.pipeLabelPills.delete(pipeId);
       }
+      // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
+      removeConnectionLinesForPipe(pipeId);
     });
     
     // ลบจุดเชื่อมต่อเมื่อลบท่อย่อยจะถูกจัดการใน useEffect
@@ -1721,6 +1724,8 @@ const useMapManager = () => {
           pills.forEach(p => p.setMap(null));
           overlaysRef.current.pipeLabelPills.delete(pipeId);
         }
+        // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
+        removeConnectionLinesForPipe(pipeId);
       }
     });
 
@@ -1766,7 +1771,7 @@ const useMapManager = () => {
     position: Coordinate;
     connectedLaterals: string[];
     submainId: string;
-    type: 'single' | 'junction' | 'crossing';
+    type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
   }>) => {
     const overlays = overlaysRef.current;
     
@@ -1779,48 +1784,58 @@ const useMapManager = () => {
     if (!mapRef.current) return;
     
     connectionPoints.forEach(connectionPoint => {
-      let icon;
       let title;
       
+      // ใช้ SVG แทน SymbolPath เพื่อลดการกระพริบ
+      let color = '#FFD700'; // default yellow
+      let size = 8;
+      
       if (connectionPoint.type === 'junction') {
-        icon = {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: '#FF6B35',
-          fillOpacity: 1,
-          strokeColor: '#FFFFFF',
-          strokeWeight: 2,
-        };
+        color = '#FFD700'; // สีเหลือง
+        size = 8;
         title = `จุดเชื่อมต่อ (${connectionPoint.connectedLaterals.length} ท่อ)`;
       } else if (connectionPoint.type === 'crossing') {
-        icon = {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 7,
-          fillColor: '#9C27B0',
-          fillOpacity: 1,
-          strokeColor: '#FFFFFF',
-          strokeWeight: 2,
-        };
+        color = '#4CAF50'; // สีเขียว
+        size = 7;
         title = `จุดข้ามท่อเมนย่อย (${connectionPoint.connectedLaterals.length} ท่อ)`;
+      } else if (connectionPoint.type === 'l_shape') {
+        color = '#F44336'; // สีแดง
+        size = 8;
+        title = 'จุดเชื่อมต่อรูปตัว L (ปลายท่อเมน)';
+      } else if (connectionPoint.type === 't_shape') {
+        color = '#2196F3'; // สีน้ำเงิน
+        size = 8;
+        title = 'จุดเชื่อมต่อรูปตัว T (ผ่านปลายท่อเมน)';
+      } else if (connectionPoint.type === 'cross_shape') {
+        color = '#9C27B0'; // สีม่วง
+        size = 8;
+        title = 'จุดเชื่อมต่อรูป + (ผ่านเส้นท่อเมน)';
       } else {
-        icon = {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 6,
-          fillColor: '#4CAF50',
-          fillOpacity: 1,
-          strokeColor: '#FFFFFF',
-          strokeWeight: 1,
-        };
+        color = '#FFD700'; // สีเหลือง
+        size = 6;
         title = 'จุดเชื่อมต่อท่อย่อย';
       }
+      
+      const icon = {
+        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" stroke="#FFFFFF" stroke-width="1"/>
+          </svg>
+        `),
+        scaledSize: new google.maps.Size(size, size),
+        anchor: new google.maps.Point(size/2, size/2)
+      };
       
       const marker = new google.maps.Marker({
         position: connectionPoint.position,
         map: mapRef.current,
         icon: icon,
         title: title,
-        zIndex: 1001,
-        optimized: false
+        zIndex: 650, // ใช้ zIndex เดียวกับจุดสปริงเกลอร์
+        optimized: true, // เปิดการปรับปรุงประสิทธิภาพเพื่อลดการกระพริบ
+        animation: null, // ปิดการเคลื่อนไหวเพื่อลดการกระพริบ
+        clickable: false, // ปิดการคลิกเพื่อลดการกระพริบเหมือนจุดสปริงเกลอร์
+        draggable: false
       });
       
       if (overlays.connectionPoints) {
@@ -1846,6 +1861,9 @@ const useMapManager = () => {
       overlays.connectionLines = new Map();
     }
     
+    // Set สำหรับเก็บสปริงเกลอร์ที่เชื่อมต่อแล้ว
+    const connectedSprinklers = new Set<string>();
+    
     lateralPipes.forEach(lateral => {
       if (!lateral.coordinates || lateral.coordinates.length < 2) return;
       
@@ -1867,6 +1885,14 @@ const useMapManager = () => {
       
       // วาดเส้นเชื่อมต่อจากท่อย่อยไปยังแต่ละจุดให้น้ำ
       allConnectedPoints.forEach((irrigationPoint, index) => {
+        // สร้าง unique key สำหรับสปริงเกลอร์นี้
+        const sprinklerKey = `${irrigationPoint.lat.toFixed(6)}-${irrigationPoint.lng.toFixed(6)}`;
+        
+        // ตรวจสอบว่าสปริงเกลอร์นี้เชื่อมต่อแล้วหรือยัง
+        if (connectedSprinklers.has(sprinklerKey)) {
+          return; // ข้ามสปริงเกลอร์นี้
+        }
+        
         // หาจุดที่ใกล้ที่สุดบนท่อย่อย
         let closestPointOnLateral = lateral.coordinates[0];
         let minDistance = calculateDistanceBetweenPoints(irrigationPoint, closestPointOnLateral);
@@ -1883,7 +1909,7 @@ const useMapManager = () => {
           }
         }
         
-        // สร้างเส้นเชื่อมต่อ
+        // สร้างเส้นเชื่อมต่อเฉพาะจากท่อย่อยไปยังสปริงเกลอร์
         const connectionLine = new google.maps.Polyline({
           path: [closestPointOnLateral, irrigationPoint],
           strokeColor: '#00ff00',
@@ -1897,8 +1923,38 @@ const useMapManager = () => {
         // เก็บเส้นเชื่อมต่อใน Map
         const lineId = `${lateral.id}-connection-${index}`;
         overlays.connectionLines.set(lineId, connectionLine);
+        
+        // บันทึกว่าสปริงเกลอร์นี้เชื่อมต่อแล้ว
+        connectedSprinklers.add(sprinklerKey);
       });
     });
+    
+    console.log(`🔗 Created ${overlays.connectionLines.size} connection lines for ${lateralPipes.length} lateral pipes, connected ${connectedSprinklers.size} unique sprinklers`);
+  }, []);
+
+  // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
+  const removeConnectionLinesForPipe = useCallback((pipeId: string) => {
+    const overlays = overlaysRef.current;
+    if (!overlays.connectionLines) return;
+    
+    // หาเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยนี้
+    const linesToRemove: string[] = [];
+    overlays.connectionLines.forEach((line, lineId) => {
+      if (lineId.startsWith(`${pipeId}-connection-`)) {
+        linesToRemove.push(lineId);
+      }
+    });
+    
+    // ลบเส้นเชื่อมต่อที่เกี่ยวข้อง
+    linesToRemove.forEach(lineId => {
+      const line = overlays.connectionLines.get(lineId);
+      if (line) {
+        line.setMap(null);
+        overlays.connectionLines.delete(lineId);
+      }
+    });
+    
+    console.log(`🗑️ Removed ${linesToRemove.length} connection lines for pipe ${pipeId}`);
   }, []);
 
   const drawControlHandles = useCallback((pipe: Pipe | undefined, onHandleDrag: (index: number, newPosition: Coordinate) => void) => {
@@ -2329,6 +2385,7 @@ const useMapManager = () => {
     drawControlHandles,
     drawConnectionPoints,
     drawConnectionLines,
+    removeConnectionLinesForPipe,
     fitBounds,
     updateMapVisuals
   };
@@ -2398,6 +2455,18 @@ export default function PipeGenerate(props: PipeGenerateProps) {
 
   const [lateralReference, setLateralReference] = useState<{ pipeId: string; length: number; flowLpm: number } | null>(null);
 
+  // Notification modal state
+  const [notificationModal, setNotificationModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    warningMessage: '',
+    type: 'info' as 'info' | 'warning' | 'success' | 'error',
+    showColorOptions: false,
+    onConfirm: null as ((selectedPattern?: 'extending' | 'crossing') => void) | null,
+    onCancel: null as (() => void) | null
+  });
+
   // ===== Sprinkler-based recommended pipe length warnings (submain & lateral only) =====
   // Deprecated legacy maps for prior logic removed
 
@@ -2434,6 +2503,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
   const fieldDataHashRef = useRef<string>('');
   const mapVisualsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
   const connectionPointsDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+  const lastZoomLevel = useRef<number | null>(null);
   
   // สร้าง hash ของ fieldData เพื่อเปรียบเทียบ
   const createFieldDataHash = useCallback((data: FieldData) => {
@@ -2866,6 +2936,8 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         // If a pipe is selected, ESC deletes that pipe
         if (pipeManager.editingPipeId) {
           const toDelete = pipeManager.editingPipeId;
+          // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
+          mapManager.removeConnectionLinesForPipe(toDelete);
           pipeManager.removePipe(toDelete);
           pipeManager.setEditingPipeId(null);
         }
@@ -3296,17 +3368,29 @@ export default function PipeGenerate(props: PipeGenerateProps) {
             }
           }
 
-          const confirmed = confirm(t('ยืนยันสร้างท่อในแนวเดียวกันตามท่อแรกตลอดแนวท่อเมนย่อย?'));
-          if (confirmed) {
-            const generated = generateGuidedLateralsFromTemplate(newPipe);
-            if (generated.length > 0) {
-              pipeManager.setPipes(prev => [...prev, ...generated]);
-              
-              // วาดเส้นเชื่อมต่อสำหรับท่อย่อยที่สร้างตามแนวเสร็จ
-              const allLateralPipes = pipeManager.pipes.filter(p => p.type === 'lateral');
-              mapManager.drawConnectionLines(allLateralPipes, fieldData.irrigationPositions, pipeManager.lateralMode, pipeManager.findNearbyConnectedIrrigationPoints);
+          // Show notification modal instead of confirm dialog
+          setNotificationModal({
+            isOpen: true,
+            title: t('การสร้างท่อย่อยอัตโนมัติ'),
+            message: t('เลือกรูปแบบการสร้างท่อย่อย:'),
+            warningMessage: t('การวาดท่ออัตโนมัติ กรุณาวาดให้เป็นเส้นตรง ไม่งั้นการสร้างท่ออาจจะผิดปกติ'),
+            type: 'warning',
+            showColorOptions: true,
+            onConfirm: (selectedPattern?: 'extending' | 'crossing') => {
+              const generated = generateGuidedLateralsFromTemplate(newPipe, selectedPattern);
+              if (generated.length > 0) {
+                pipeManager.setPipes(prev => [...prev, ...generated]);
+                
+                // วาดเส้นเชื่อมต่อสำหรับท่อย่อยที่สร้างตามแนวเสร็จ
+                const allLateralPipes = pipeManager.pipes.filter(p => p.type === 'lateral');
+                mapManager.drawConnectionLines(allLateralPipes, fieldData.irrigationPositions, pipeManager.lateralMode, pipeManager.findNearbyConnectedIrrigationPoints);
+              }
+              setNotificationModal(prev => ({ ...prev, isOpen: false }));
+            },
+            onCancel: () => {
+              setNotificationModal(prev => ({ ...prev, isOpen: false }));
             }
-          }
+          });
         }
       snapSystem.hideIndicator();
       // Explicitly end drawing after successful finalize
@@ -3577,7 +3661,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       position: Coordinate;
       connectedLaterals: string[];
       submainId: string;
-      type: 'single' | 'junction' | 'crossing';
+      type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
     }> = [];
 
     // หาท่อเมนย่อยทั้งหมด
@@ -3673,6 +3757,378 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     return connectionPoints;
   }, [pipeManager.pipes, checkLateralCrossingSubmain]);
 
+  // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
+  const createSubmainToMainConnectionPoints = useCallback(() => {
+    const connectionPoints: Array<{
+      id: string;
+      position: Coordinate;
+      connectedLaterals: string[];
+      submainId: string;
+      type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+    }> = [];
+
+    // หาท่อเมนและท่อเมนย่อยทั้งหมด
+    const mainPipes = pipeManager.pipes.filter(p => p.type === 'main');
+    const submainPipes = pipeManager.pipes.filter(p => p.type === 'submain');
+
+    if (mainPipes.length === 0 || submainPipes.length === 0) {
+      return connectionPoints;
+    }
+
+    submainPipes.forEach(submain => {
+      if (!submain.coordinates || submain.coordinates.length < 2) return;
+
+      const submainStart = submain.coordinates[0];
+      const submainEnd = submain.coordinates[submain.coordinates.length - 1];
+
+      mainPipes.forEach(main => {
+        if (!main.coordinates || main.coordinates.length < 2) return;
+
+        // ตรวจสอบการเชื่อมต่อที่ปลายท่อเมน (L-shape และ T-shape)
+        const mainStart = main.coordinates[0];
+        const mainEnd = main.coordinates[main.coordinates.length - 1];
+
+        const threshold = 2; // ระยะห่างไม่เกิน 2 เมตร
+
+        // ตรวจสอบ L-shape: ท่อเมนย่อยลากออกจากปลายท่อเมน
+        // ตรวจสอบว่าปลายท่อเมนย่อยอยู่ใกล้ปลายท่อเมน (L-shape)
+        const submainStartToMainStart = calculateDistanceBetweenPoints(submainStart, mainStart);
+        const submainStartToMainEnd = calculateDistanceBetweenPoints(submainStart, mainEnd);
+        const submainEndToMainStart = calculateDistanceBetweenPoints(submainEnd, mainStart);
+        const submainEndToMainEnd = calculateDistanceBetweenPoints(submainEnd, mainEnd);
+
+        // L-shape: ปลายท่อเมนย่อยอยู่ใกล้ปลายท่อเมน (ลากออกจาก)
+        if (submainStartToMainStart < threshold) {
+          const positionHash = `${mainStart.lat.toFixed(6)}-${mainStart.lng.toFixed(6)}`;
+          const existingPoint = connectionPoints.find(cp => 
+            calculateDistanceBetweenPoints(cp.position, mainStart) < 1
+          );
+          
+          if (!existingPoint) {
+            connectionPoints.push({
+              id: `l-shape-start-${submain.id}-${positionHash}`,
+              position: mainStart,
+              connectedLaterals: [submain.id],
+              submainId: submain.id,
+              type: 'l_shape'
+            });
+          }
+        }
+
+        if (submainStartToMainEnd < threshold) {
+          const positionHash = `${mainEnd.lat.toFixed(6)}-${mainEnd.lng.toFixed(6)}`;
+          const existingPoint = connectionPoints.find(cp => 
+            calculateDistanceBetweenPoints(cp.position, mainEnd) < 1
+          );
+          
+          if (!existingPoint) {
+            connectionPoints.push({
+              id: `l-shape-end-${submain.id}-${positionHash}`,
+              position: mainEnd,
+              connectedLaterals: [submain.id],
+              submainId: submain.id,
+              type: 'l_shape'
+            });
+          }
+        }
+
+        if (submainEndToMainStart < threshold) {
+          const positionHash = `${mainStart.lat.toFixed(6)}-${mainStart.lng.toFixed(6)}`;
+          const existingPoint = connectionPoints.find(cp => 
+            calculateDistanceBetweenPoints(cp.position, mainStart) < 1
+          );
+          
+          if (!existingPoint) {
+            connectionPoints.push({
+              id: `l-shape-start-${submain.id}-${positionHash}`,
+              position: mainStart,
+              connectedLaterals: [submain.id],
+              submainId: submain.id,
+              type: 'l_shape'
+            });
+          }
+        }
+
+        if (submainEndToMainEnd < threshold) {
+          const positionHash = `${mainEnd.lat.toFixed(6)}-${mainEnd.lng.toFixed(6)}`;
+          const existingPoint = connectionPoints.find(cp => 
+            calculateDistanceBetweenPoints(cp.position, mainEnd) < 1
+          );
+          
+          if (!existingPoint) {
+            connectionPoints.push({
+              id: `l-shape-end-${submain.id}-${positionHash}`,
+              position: mainEnd,
+              connectedLaterals: [submain.id],
+              submainId: submain.id,
+              type: 'l_shape'
+            });
+          }
+        }
+
+        // ตรวจสอบ T-shape: ท่อเมนย่อยลากผ่านปลายท่อเมน
+        // T-shape คือเมื่อท่อเมนย่อยตัดกับท่อเมนที่จุดใดจุดหนึ่ง และจุดตัดนั้นอยู่ใกล้ปลายท่อเมน
+        
+        // ตรวจสอบการตัดกันจริงๆ ระหว่างท่อเมนย่อยกับท่อเมน
+        for (let i = 0; i < main.coordinates.length - 1; i++) {
+          const mainSegmentStart = main.coordinates[i];
+          const mainSegmentEnd = main.coordinates[i + 1];
+
+          // ตรวจสอบการตัดกันระหว่างท่อเมนย่อยกับส่วนของท่อเมน
+          const intersection = getLineIntersection(
+            submainStart, submainEnd,
+            mainSegmentStart, mainSegmentEnd
+          );
+
+          if (intersection) {
+            // ตรวจสอบว่าเป็นจุดตัดที่ปลายท่อเมนหรือไม่ (T-shape)
+            const isAtMainStart = calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
+            const isAtMainEnd = calculateDistanceBetweenPoints(intersection, mainEnd) < threshold;
+            
+            // ถ้าเป็นจุดตัดที่ปลายท่อเมน ให้เป็น T-shape
+            if (isAtMainStart) {
+              // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
+              const isLShape = submainStartToMainStart < threshold || submainEndToMainStart < threshold;
+              if (!isLShape) {
+                const positionHash = `${mainStart.lat.toFixed(6)}-${mainStart.lng.toFixed(6)}`;
+                const existingPoint = connectionPoints.find(cp => 
+                  calculateDistanceBetweenPoints(cp.position, mainStart) < 1
+                );
+                
+                if (!existingPoint) {
+                  connectionPoints.push({
+                    id: `t-shape-start-${submain.id}-${positionHash}`,
+                    position: mainStart,
+                    connectedLaterals: [submain.id],
+                    submainId: submain.id,
+                    type: 't_shape'
+                  });
+                }
+              }
+            }
+            
+            if (isAtMainEnd) {
+              // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
+              const isLShape = submainStartToMainEnd < threshold || submainEndToMainEnd < threshold;
+              if (!isLShape) {
+                const positionHash = `${mainEnd.lat.toFixed(6)}-${mainEnd.lng.toFixed(6)}`;
+                const existingPoint = connectionPoints.find(cp => 
+                  calculateDistanceBetweenPoints(cp.position, mainEnd) < 1
+                );
+                
+                if (!existingPoint) {
+                  connectionPoints.push({
+                    id: `t-shape-end-${submain.id}-${positionHash}`,
+                    position: mainEnd,
+                    connectedLaterals: [submain.id],
+                    submainId: submain.id,
+                    type: 't_shape'
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        // T-shape (Additional): submain passes through main but not at ends
+        for (let i = 0; i < main.coordinates.length - 1; i++) {
+          const intersection = getLineIntersection(submainStart, submainEnd, main.coordinates[i], main.coordinates[i + 1]);
+          if (intersection) {
+            const isAtMainStart = calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
+            const isAtMainEnd = calculateDistanceBetweenPoints(intersection, mainEnd) < threshold;
+            
+            // ถ้าตัดกันแต่ไม่ใช่ที่ปลาย และไม่ใช่ + shape
+            if (!isAtMainStart && !isAtMainEnd) {
+              // ตรวจสอบว่า submain ผ่าน main ใกล้ปลาย main หรือไม่
+              const distanceToStart = calculateDistanceBetweenPoints(intersection, mainStart);
+              const distanceToEnd = calculateDistanceBetweenPoints(intersection, mainEnd);
+              const mainLength = calculateDistanceBetweenPoints(mainStart, mainEnd);
+              
+              // ถ้าอยู่ใกล้ปลาย main (ภายใน 30% ของความยาว main)
+              if (distanceToStart < mainLength * 0.3 || distanceToEnd < mainLength * 0.3) {
+                const positionHash = `${intersection.lat.toFixed(6)}-${intersection.lng.toFixed(6)}`;
+                const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, intersection) < 1);
+                if (!existingPoint) {
+                  connectionPoints.push({
+                    id: `t-shape-through-${submain.id}-${i}-${positionHash}`,
+                    position: intersection,
+                    connectedLaterals: [submain.id],
+                    submainId: submain.id,
+                    type: 't_shape'
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        // ตรวจสอบ Auto-snap: ท่อเมนย่อยอยู่ใกล้ท่อเมนมาก (สำหรับกรณีที่วาดท่อย่อยก่อน)
+        // ตรวจสอบระยะห่างระหว่างท่อเมนย่อยกับส่วนต่างๆ ของท่อเมน
+        for (let i = 0; i < main.coordinates.length - 1; i++) {
+          const mainSegmentStart = main.coordinates[i];
+          const mainSegmentEnd = main.coordinates[i + 1];
+
+          // หาจุดที่ใกล้ที่สุดบนส่วนของท่อเมนจากท่อเมนย่อย
+          const { point: closestPointOnMain, distance: distanceToMain } = getClosestPointOnSegment(
+            submainStart, mainSegmentStart, mainSegmentEnd
+          );
+          
+          const { point: closestPointOnMain2, distance: distanceToMain2 } = getClosestPointOnSegment(
+            submainEnd, mainSegmentStart, mainSegmentEnd
+          );
+
+          // ถ้าท่อเมนย่อยอยู่ใกล้ท่อเมนมาก (auto-snap scenario)
+          if (distanceToMain < threshold || distanceToMain2 < threshold) {
+            const closestPoint = distanceToMain < distanceToMain2 ? closestPointOnMain : closestPointOnMain2;
+            
+            // ตรวจสอบว่าจุดที่ใกล้ที่สุดอยู่ใกล้ปลายท่อเมนหรือไม่
+            const isNearMainStart = calculateDistanceBetweenPoints(closestPoint, mainStart) < threshold;
+            const isNearMainEnd = calculateDistanceBetweenPoints(closestPoint, mainEnd) < threshold;
+            
+            // ถ้าอยู่ใกล้ปลายท่อเมน ให้เป็น T-shape (auto-snap)
+            if (isNearMainStart) {
+              // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
+              const isLShape = submainStartToMainStart < threshold || submainEndToMainStart < threshold;
+              if (!isLShape) {
+                const positionHash = `${mainStart.lat.toFixed(6)}-${mainStart.lng.toFixed(6)}`;
+                const existingPoint = connectionPoints.find(cp => 
+                  calculateDistanceBetweenPoints(cp.position, mainStart) < 1
+                );
+                
+                if (!existingPoint) {
+                  connectionPoints.push({
+                    id: `t-shape-snap-start-${submain.id}-${positionHash}`,
+                    position: mainStart,
+                    connectedLaterals: [submain.id],
+                    submainId: submain.id,
+                    type: 't_shape'
+                  });
+                }
+              }
+            }
+            
+            if (isNearMainEnd) {
+              // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
+              const isLShape = submainStartToMainEnd < threshold || submainEndToMainEnd < threshold;
+              if (!isLShape) {
+                const positionHash = `${mainEnd.lat.toFixed(6)}-${mainEnd.lng.toFixed(6)}`;
+                const existingPoint = connectionPoints.find(cp => 
+                  calculateDistanceBetweenPoints(cp.position, mainEnd) < 1
+                );
+                
+                if (!existingPoint) {
+                  connectionPoints.push({
+                    id: `t-shape-snap-end-${submain.id}-${positionHash}`,
+                    position: mainEnd,
+                    connectedLaterals: [submain.id],
+                    submainId: submain.id,
+                    type: 't_shape'
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        // ตรวจสอบ +-shape: ท่อเมนย่อยลากผ่านเส้นท่อเมน
+        for (let i = 0; i < main.coordinates.length - 1; i++) {
+          const mainSegmentStart = main.coordinates[i];
+          const mainSegmentEnd = main.coordinates[i + 1];
+
+          // ตรวจสอบการตัดกันจริงๆ ระหว่างท่อเมนย่อยกับส่วนของท่อเมน
+          const intersection = getLineIntersection(
+            submainStart, submainEnd,
+            mainSegmentStart, mainSegmentEnd
+          );
+
+          if (intersection) {
+            // ตรวจสอบว่าเป็นจุดตัดที่ปลายท่อเมนหรือไม่
+            const isAtMainStart = calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
+            const isAtMainEnd = calculateDistanceBetweenPoints(intersection, mainEnd) < threshold;
+            
+            // ถ้าไม่ใช่ที่ปลายท่อเมน ให้เป็น cross-shape
+            if (!isAtMainStart && !isAtMainEnd) {
+              // ตรวจสอบว่าไม่ใช่ T-shape (ไม่ใกล้ปลาย main)
+              const distanceToStart = calculateDistanceBetweenPoints(intersection, mainStart);
+              const distanceToEnd = calculateDistanceBetweenPoints(intersection, mainEnd);
+              const mainLength = calculateDistanceBetweenPoints(mainStart, mainEnd);
+              
+              // ถ้าไม่ใกล้ปลาย main (เกิน 30% ของความยาว main) ให้เป็น + shape
+              if (distanceToStart >= mainLength * 0.3 && distanceToEnd >= mainLength * 0.3) {
+                const positionHash = `${intersection.lat.toFixed(6)}-${intersection.lng.toFixed(6)}`;
+                const existingPoint = connectionPoints.find(cp => 
+                  calculateDistanceBetweenPoints(cp.position, intersection) < 1
+                );
+                
+                if (!existingPoint) {
+                  connectionPoints.push({
+                    id: `cross-shape-${submain.id}-${i}-${positionHash}`,
+                    position: intersection,
+                    connectedLaterals: [submain.id],
+                    submainId: submain.id,
+                    type: 'cross_shape'
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        // ตรวจสอบ Auto-snap สำหรับ +-shape: ท่อเมนย่อยอยู่ใกล้ท่อเมนมาก (ไม่ใช่ที่ปลาย)
+        for (let i = 0; i < main.coordinates.length - 1; i++) {
+          const mainSegmentStart = main.coordinates[i];
+          const mainSegmentEnd = main.coordinates[i + 1];
+
+          // หาจุดที่ใกล้ที่สุดบนส่วนของท่อเมนจากท่อเมนย่อย
+          const { point: closestPointOnMain, distance: distanceToMain } = getClosestPointOnSegment(
+            submainStart, mainSegmentStart, mainSegmentEnd
+          );
+          
+          const { point: closestPointOnMain2, distance: distanceToMain2 } = getClosestPointOnSegment(
+            submainEnd, mainSegmentStart, mainSegmentEnd
+          );
+
+          // ถ้าท่อเมนย่อยอยู่ใกล้ท่อเมนมาก (auto-snap scenario)
+          if (distanceToMain < threshold || distanceToMain2 < threshold) {
+            const closestPoint = distanceToMain < distanceToMain2 ? closestPointOnMain : closestPointOnMain2;
+            
+            // ตรวจสอบว่าจุดที่ใกล้ที่สุดไม่อยู่ใกล้ปลายท่อเมน (เป็น +-shape)
+            const isNearMainStart = calculateDistanceBetweenPoints(closestPoint, mainStart) < threshold;
+            const isNearMainEnd = calculateDistanceBetweenPoints(closestPoint, mainEnd) < threshold;
+            
+            // ถ้าไม่อยู่ใกล้ปลายท่อเมน ให้เป็น +-shape (auto-snap)
+            if (!isNearMainStart && !isNearMainEnd) {
+              // ตรวจสอบว่าไม่ใช่ T-shape (ไม่ใกล้ปลาย main)
+              const distanceToStart = calculateDistanceBetweenPoints(closestPoint, mainStart);
+              const distanceToEnd = calculateDistanceBetweenPoints(closestPoint, mainEnd);
+              const mainLength = calculateDistanceBetweenPoints(mainStart, mainEnd);
+              
+              // ถ้าไม่ใกล้ปลาย main (เกิน 30% ของความยาว main) ให้เป็น + shape
+              if (distanceToStart >= mainLength * 0.3 && distanceToEnd >= mainLength * 0.3) {
+                const positionHash = `${closestPoint.lat.toFixed(6)}-${closestPoint.lng.toFixed(6)}`;
+                const existingPoint = connectionPoints.find(cp => 
+                  calculateDistanceBetweenPoints(cp.position, closestPoint) < 1
+                );
+                
+                if (!existingPoint) {
+                  connectionPoints.push({
+                    id: `cross-shape-snap-${submain.id}-${i}-${positionHash}`,
+                    position: closestPoint,
+                    connectedLaterals: [submain.id],
+                    submainId: submain.id,
+                    type: 'cross_shape'
+                  });
+                }
+              }
+            }
+          }
+        }
+      });
+    });
+
+    return connectionPoints;
+  }, [pipeManager.pipes, getLineIntersection]);
+
   // สร้างจุดเชื่อมต่อสำหรับท่อย่อยทั้งหมด - ใช้ debounce เพื่อป้องกันการกระพริบ
   useEffect(() => {
     if (!mapManager.mapRef.current) return;
@@ -3682,17 +4138,48 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       clearTimeout(connectionPointsDebounceTimer.current);
     }
     
-    // ใช้ debounce เพื่อลดการอัปเดตที่บ่อยเกินไป
+    // ใช้ debounce เพื่อลดการอัปเดตที่บ่อยเกินไป และป้องกันการอัปเดตระหว่างการซูม
     connectionPointsDebounceTimer.current = setTimeout(() => {
+      // ตรวจสอบว่าแผนที่ยังคงอยู่และไม่มีการซูมอยู่
+      if (!mapManager.mapRef.current) return;
+      
+      // ตรวจสอบ zoom level เพื่อป้องกันการอัปเดตระหว่างการซูม
+      const currentZoom = mapManager.mapRef.current.getZoom();
+      if (currentZoom !== undefined) {
+        if (lastZoomLevel.current !== null && Math.abs(currentZoom - lastZoomLevel.current) > 0.1) {
+          // กำลังมีการซูม ให้ข้ามการอัปเดตครั้งนี้
+          lastZoomLevel.current = currentZoom;
+          return;
+        }
+        lastZoomLevel.current = currentZoom;
+      }
       const lateralPipes = pipeManager.pipes.filter(p => p.type === 'lateral');
+      const allConnectionPoints: Array<{
+        id: string;
+        position: Coordinate;
+        connectedLaterals: string[];
+        submainId: string;
+        type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+      }> = [];
+
+      // สร้างจุดเชื่อมต่อของท่อย่อยกับท่อเมนย่อย
       if (lateralPipes.length > 0) {
-        const connectionPoints = createLateralConnectionPoints(lateralPipes);
-        mapManager.drawConnectionPoints(connectionPoints);
+        const lateralConnectionPoints = createLateralConnectionPoints(lateralPipes);
+        allConnectionPoints.push(...lateralConnectionPoints);
         
         // วาดเส้นเชื่อมต่อระหว่างท่อย่อยกับสปริงเกลอร์
         mapManager.drawConnectionLines(lateralPipes, fieldData.irrigationPositions, pipeManager.lateralMode, pipeManager.findNearbyConnectedIrrigationPoints);
+      }
+
+      // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
+      const submainToMainConnectionPoints = createSubmainToMainConnectionPoints();
+      allConnectionPoints.push(...submainToMainConnectionPoints);
+
+      // วาดจุดเชื่อมต่อทั้งหมด
+      if (allConnectionPoints.length > 0) {
+        mapManager.drawConnectionPoints(allConnectionPoints);
       } else {
-        // ลบจุดเชื่อมต่อทั้งหมดเมื่อไม่มีท่อย่อย
+        // ลบจุดเชื่อมต่อทั้งหมดเมื่อไม่มีจุดเชื่อมต่อ
         const overlays = mapManager.overlaysRef.current;
         if (overlays.connectionPoints) {
           overlays.connectionPoints.forEach(marker => marker.setMap(null));
@@ -3710,10 +4197,87 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         clearTimeout(connectionPointsDebounceTimer.current);
       }
     };
-  }, [pipeManager.pipes, mapManager, createLateralConnectionPoints]);
+  }, [pipeManager.pipes, mapManager, createLateralConnectionPoints, createSubmainToMainConnectionPoints]);
+
+  // วิเคราะห์รูปแบบของท่อต้นแบบ: "ลากผ่าน" หรือ "ออกจากด้านใดด้านหนึ่ง"
+  function analyzeTemplatePattern(template: Pipe, nearestSubmain: Pipe): 'crossing' | 'extending' {
+    if (!template.coordinates || template.coordinates.length < 2 || !nearestSubmain.coordinates) {
+      return 'extending'; // default
+    }
+
+    const templateStart = template.coordinates[0];
+    const templateEnd = template.coordinates[template.coordinates.length - 1];
+    const submainCoords = nearestSubmain.coordinates as Coordinate[];
+    
+    const threshold = 2; // ระยะห่างไม่เกิน 2 เมตร
+
+    // ตรวจสอบว่าท่อต้นแบบลากผ่านท่อเมนย่อยหรือไม่
+    for (let i = 0; i < submainCoords.length - 1; i++) {
+      const submainStart = submainCoords[i];
+      const submainEnd = submainCoords[i + 1];
+
+      // ตรวจสอบการตัดกันจริงๆ ระหว่างท่อต้นแบบกับส่วนของท่อเมนย่อย
+      const intersection = getLineIntersection(
+        templateStart, templateEnd,
+        submainStart, submainEnd
+      );
+
+      if (intersection) {
+        // ถ้ามีจุดตัด = ลากผ่าน
+        return 'crossing';
+      }
+    }
+
+    // ตรวจสอบ auto-snap: ท่อต้นแบบอยู่ใกล้ท่อเมนย่อยมาก
+    for (let i = 0; i < submainCoords.length - 1; i++) {
+      const submainStart = submainCoords[i];
+      const submainEnd = submainCoords[i + 1];
+
+      // หาจุดที่ใกล้ที่สุดบนท่อเมนย่อยจากท่อต้นแบบ
+      const { point: closestPointOnSubmain, distance: minDistance } = getClosestPointOnSegment(
+        templateStart, submainStart, submainEnd
+      );
+      
+      const { point: closestPointOnSubmain2, distance: minDistance2 } = getClosestPointOnSegment(
+        templateEnd, submainStart, submainEnd
+      );
+
+      const closestPoint = minDistance < minDistance2 ? closestPointOnSubmain : closestPointOnSubmain2;
+      const closestDistance = Math.min(minDistance, minDistance2);
+
+      if (closestDistance < threshold) {
+        // ตรวจสอบว่าท่อต้นแบบข้ามท่อเมนย่อยหรือไม่
+        // โดยดูว่าจุดที่ใกล้ที่สุดอยู่ระหว่างปลายท่อต้นแบบหรือไม่
+        
+        // คำนวณระยะห่างจากจุดที่ใกล้ที่สุดไปยังปลายท่อต้นแบบ
+        const distanceToStart = calculateDistanceBetweenPoints(closestPoint, templateStart);
+        const distanceToEnd = calculateDistanceBetweenPoints(closestPoint, templateEnd);
+        const templateLength = calculateDistanceBetweenPoints(templateStart, templateEnd);
+        
+        // ถ้าจุดที่ใกล้ที่สุดอยู่ใกล้ปลายท่อต้นแบบมาก = ออกจากด้านใดด้านหนึ่ง
+        if (distanceToStart < templateLength * 0.3 || distanceToEnd < templateLength * 0.3) {
+          return 'extending';
+        }
+        
+        // ถ้าจุดที่ใกล้ที่สุดอยู่ใกล้จุดกลางของท่อต้นแบบ = ลากผ่าน
+        const templateMid = {
+          lat: (templateStart.lat + templateEnd.lat) / 2,
+          lng: (templateStart.lng + templateEnd.lng) / 2
+        };
+        const distanceToMid = calculateDistanceBetweenPoints(closestPoint, templateMid);
+        
+        if (distanceToMid < templateLength * 0.4) {
+          return 'crossing';
+        }
+      }
+    }
+
+    // ถ้าไม่ตรงเงื่อนไขใดๆ ให้เป็น default
+    return 'extending';
+  }
 
   // สร้างท่อย่อยตาม "แถวของจุดให้น้ำ" โดยใช้มุมการหมุนของแปลง
-  function generateGuidedLateralsFromTemplate(template: Pipe): Pipe[] {
+  function generateGuidedLateralsFromTemplate(template: Pipe, selectedPattern?: 'extending' | 'crossing'): Pipe[] {
     if (!template.coordinates || template.coordinates.length < 2) return [];
 
     // เลือกโซนเดียวกับต้นแบบเพื่อจำกัดขอบเขตการสร้าง
@@ -3767,6 +4331,18 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       }
     }
     if (!nearestSubmain) return [];
+
+    // วิเคราะห์รูปแบบของท่อต้นแบบ: "ลากผ่าน" หรือ "ออกจากด้านใดด้านหนึ่ง"
+    // ถ้ามี selectedPattern ให้ใช้แทนการวิเคราะห์อัตโนมัติ
+    const templatePattern = selectedPattern || analyzeTemplatePattern(template, nearestSubmain);
+    
+    // Debug logging สำหรับ templatePattern
+    console.log('🔍 Template Pattern Analysis:', {
+      selectedPattern,
+      analyzedPattern: analyzeTemplatePattern(template, nearestSubmain),
+      finalTemplatePattern: templatePattern,
+      mode: pipeManager.lateralMode
+    });
     const subRot = (nearestSubmain.coordinates as Coordinate[]).map(c => rotateXY(toXYm(c)));
     // หา x ที่จุดตัดระหว่างเส้นแนวนอน y=y0 กับเส้น submain ในพิกัดที่หมุนแล้ว
     const horizontalIntersectionsX = (y0: number): number[] => {
@@ -3832,115 +4408,239 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     const already = pipeManager.pipes.filter(p => p.type === 'lateral');
     const mode = pipeManager.lateralMode;
     if (mode === 'betweenRows') {
-      // Determine which adjacent-row parity to use so that we alternate relative to the template line
-      const tStartR = rotateXY(vStart);
-      const tEndR = rotateXY(vEnd);
-      const templateMidY = (tStartR.y + tEndR.y) / 2;
-      const minSeparationBase = Math.max(0.8, spacingEst * 0.5);
-      let nearestPairIndex = 0; let nearestPairDy = Infinity;
-      for (let i = 0; i < rows.length - 1; i++) {
-        const dy = Math.abs(rows[i + 1].y - rows[i].y);
-        if (dy < minSeparationBase) continue; // ignore degenerate pairs
-        const midY = (rows[i].y + rows[i + 1].y) / 2;
-        const d = Math.abs(midY - templateMidY);
-        if (d < nearestPairDy) { nearestPairDy = d; nearestPairIndex = i; }
-      }
-      // Use same parity as the template's nearest pair so we generate indices j0±2, j0±4, ... (แถวเว้นแถว)
-      const startParity = (nearestPairIndex % 2);
-
-      // Generate mid-row laterals parallel to the template line, centered between adjacent rows
-      // แถวเว้นแถว: ใช้ parity ที่เลือกเพื่อเว้นเส้นติดกับเส้นต้นแบบ
-      for (let r = startParity; r < rows.length - 1; r += 2) {
-        if (r === nearestPairIndex) continue; // don't duplicate the template's own midline
-        const rowA = rows[r];
-        const rowB = rows[r + 1];
-        // Skip if two rows are effectively the same band (bad clustering) to avoid on-row lines
-        const separation = Math.abs(rowB.y - rowA.y);
-        const minSeparation = minSeparationBase;
-        if (separation < minSeparation) continue;
-        const midY = (rowA.y + rowB.y) / 2;
-        const xs = horizontalIntersectionsX(midY);
-        if (xs.length === 0) continue;
-        const ptsA = [...rowA.points].sort((a, b) => a.xy.x - b.xy.x);
-        const ptsB = [...rowB.points].sort((a, b) => a.xy.x - b.xy.x);
-        const allPts = [...ptsA, ...ptsB];
-        const rowXs = allPts.map(p => p.xy.x);
-        const medianX = rowXs[Math.floor(rowXs.length / 2)];
-        let anchorX = xs[0];
-        let bestDx = Math.abs(anchorX - medianX);
-        for (let i = 1; i < xs.length; i++) {
-          const dx = Math.abs(xs[i] - medianX);
-          if (dx < bestDx) { bestDx = dx; anchorX = xs[i]; }
+      // ตรวจสอบ templatePattern ที่ผู้ใช้เลือก
+      console.log('🌾 Between Rows Mode - Template Pattern:', templatePattern);
+      if (templatePattern === 'crossing') {
+        // รูปแบบ "ลากผ่าน": สร้างท่อย่อยเส้นเดียวผ่านแถว (ระหว่างแถว)
+        console.log('✅ Creating crossing pattern (single line between rows)');
+        
+        // หาแถวที่ใกล้กับท่อต้นแบบที่สุด
+        const minSeparationBase = Math.max(0.8, spacingEst * 0.5);
+        
+        // สร้างท่อย่อยระหว่างแถว (เว้นแถว - ท่อย่อยหนึ่งเส้นเชื่อมสองแถว)
+        console.log(`📊 Total rows: ${rows.length}, Creating between-rows laterals (skip every other row)`);
+        
+        // หาแถวที่ใกล้กับท่อต้นแบบที่สุดเพื่อกำหนด parity
+        const tStartR = rotateXY(vStart);
+        const tEndR = rotateXY(vEnd);
+        const templateMidY = (tStartR.y + tEndR.y) / 2;
+        
+        // หาแถวที่ใกล้กับท่อต้นแบบที่สุด
+        let nearestRowIndex = 0;
+        let nearestRowDistance = Infinity;
+        for (let i = 0; i < rows.length; i++) {
+          const distance = Math.abs(rows[i].y - templateMidY);
+          if (distance < nearestRowDistance) {
+            nearestRowDistance = distance;
+            nearestRowIndex = i;
+          }
         }
-
-        // Right side (outward)
-        const outward = allPts.filter(p => p.xy.x > anchorX);
-        if (outward.length > 0) {
-          const endX = outward[outward.length - 1].xy.x;
-          if (Math.abs(endX - anchorX) >= 0.5) {
-            const startXY = unrotateXY({ x: anchorX, y: midY });
-            const endXY = unrotateXY({ x: endX, y: midY });
-            const start = fromXYm(startXY);
-            const end = fromXYm(endXY);
-            if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
-                isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
-              const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
-              const minGapM = 0.6;
-              const templateGapM = Math.max(1.0, spacingEst * 0.6);
-              const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
-              if (distToTemplate >= templateGapM) {
-                const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
-                let overlapsExisting = false;
-                if (!overlapsGenerated) {
-                  for (const p of already) {
-                    if (!p.coordinates || p.coordinates.length < 2) continue;
-                    for (let i = 0; i < p.coordinates.length - 1; i++) {
-                      const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
-                      if (distance < minGapM) { overlapsExisting = true; break; }
-                    }
-                    if (overlapsExisting) break;
+        
+        // กำหนด parity เริ่มต้น (0 หรือ 1) เพื่อเว้นแถว
+        const startParity = nearestRowIndex % 2;
+        console.log(`🎯 Template near row ${nearestRowIndex}, starting with parity ${startParity} (skip every other row)`);
+        
+        for (let r = startParity; r < rows.length - 1; r += 2) {
+          const rowA = rows[r];
+          const rowB = rows[r + 1];
+          
+          // ตรวจสอบว่าระยะห่างระหว่างแถวเหมาะสม
+          const separation = Math.abs(rowB.y - rowA.y);
+          if (separation < minSeparationBase) {
+            console.log(`⏭️ Skipping rows ${r}-${r+1}: separation too small (${separation.toFixed(2)}m < ${minSeparationBase.toFixed(2)}m)`);
+            continue;
+          }
+          
+          const midY = (rowA.y + rowB.y) / 2;
+          const xs = horizontalIntersectionsX(midY);
+          if (xs.length === 0) {
+            console.log(`⏭️ Skipping rows ${r}-${r+1}: no submain intersections`);
+            continue;
+          }
+          
+          // รวมจุดจากทั้งสองแถว
+          const ptsA = [...rowA.points].sort((a, b) => a.xy.x - b.xy.x);
+          const ptsB = [...rowB.points].sort((a, b) => a.xy.x - b.xy.x);
+          const allPts = [...ptsA, ...ptsB];
+          
+          if (allPts.length < 2) {
+            console.log(`⏭️ Skipping rows ${r}-${r+1}: insufficient points (${allPts.length})`);
+            continue;
+          }
+          
+          // หาจุดซ้ายสุดและขวาสุด
+          const leftmost = allPts[0];
+          const rightmost = allPts[allPts.length - 1];
+          
+          console.log(`✅ Processing rows ${r}-${r+1}: ${ptsA.length} + ${ptsB.length} = ${allPts.length} points, separation: ${separation.toFixed(2)}m`);
+          
+          // สร้างท่อย่อยเส้นเดียวจากจุดซ้ายสุดไปจุดขวาสุด (ระหว่างแถว)
+          const startXY = unrotateXY({ x: leftmost.xy.x, y: midY });
+          const endXY = unrotateXY({ x: rightmost.xy.x, y: midY });
+          const start = fromXYm(startXY);
+          const end = fromXYm(endXY);
+          
+          if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
+              isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
+            const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
+            const minGapM = 0.6;
+            const templateGapM = Math.max(1.5, spacingEst * 0.8);
+            const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
+            const distStartToTemplate = pointToPolylineDistance(start, template.coordinates || []);
+            const distEndToTemplate = pointToPolylineDistance(end, template.coordinates || []);
+            const minDistToTemplate = Math.min(distToTemplate, distStartToTemplate, distEndToTemplate);
+            
+            if (minDistToTemplate >= templateGapM) {
+              const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
+              let overlapsExisting = false;
+              if (!overlapsGenerated) {
+                for (const p of already) {
+                  if (!p.coordinates || p.coordinates.length < 2) continue;
+                  for (let i = 0; i < p.coordinates.length - 1; i++) {
+                    const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
+                    if (distance < minGapM) { overlapsExisting = true; break; }
                   }
+                  if (overlapsExisting) break;
                 }
-                const lengthM = calculateDistance([start, end]);
-                if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
-                  generated.push({ id: `lateral-midrow-${Date.now()}-${generated.length}-right`, type: 'lateral', coordinates: [start, end], length: lengthM });
-                }
+              }
+              const lengthM = calculateDistance([start, end]);
+              if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
+                generated.push({ id: `lateral-betweenrows-${Date.now()}-${generated.length}-crossing`, type: 'lateral', coordinates: [start, end], length: lengthM });
+                console.log(`🎯 Created between-rows lateral: ${lengthM.toFixed(2)}m, rows ${r}-${r+1} (connects 2 rows, skips next 2 rows)`);
+              } else {
+                console.log(`❌ Failed to create lateral: length=${lengthM.toFixed(2)}m, overlapsGenerated=${overlapsGenerated}, overlapsExisting=${overlapsExisting}`);
               }
             }
           }
         }
+        
+        // แสดงสรุปการสร้างท่อย่อยระหว่างแถว
+        console.log(`📋 Between-rows crossing pattern summary: Created ${generated.length} laterals, skipped every other row pair`);
+      } else {
+        // รูปแบบ "ออกจากด้านใดด้านหนึ่ง": สร้างท่อย่อยแยกเป็นสองเส้น (ด้านละเส้น)
+        console.log('✅ Creating extending pattern (split lines left-right)');
+        // Determine which adjacent-row parity to use so that we alternate relative to the template line
+        const tStartR = rotateXY(vStart);
+        const tEndR = rotateXY(vEnd);
+        const templateMidY = (tStartR.y + tEndR.y) / 2;
+        const minSeparationBase = Math.max(0.8, spacingEst * 0.5);
+        let nearestPairIndex = 0; let nearestPairDy = Infinity;
+        for (let i = 0; i < rows.length - 1; i++) {
+          const dy = Math.abs(rows[i + 1].y - rows[i].y);
+          if (dy < minSeparationBase) continue; // ignore degenerate pairs
+          const midY = (rows[i].y + rows[i + 1].y) / 2;
+          const d = Math.abs(midY - templateMidY);
+          if (d < nearestPairDy) { nearestPairDy = d; nearestPairIndex = i; }
+        }
+        // Use same parity as the template's nearest pair so we generate indices j0±2, j0±4, ... (แถวเว้นแถว)
+        const startParity = (nearestPairIndex % 2);
 
-        // Left side (inward)
-        const inward = allPts.filter(p => p.xy.x < anchorX);
-        if (inward.length > 0) {
-          const endX = inward[0].xy.x;
-          if (Math.abs(endX - anchorX) >= 0.5) {
-            const startXY = unrotateXY({ x: anchorX, y: midY });
-            const endXY = unrotateXY({ x: endX, y: midY });
-            const start = fromXYm(startXY);
-            const end = fromXYm(endXY);
-            if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
-                isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
-              const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
-              const minGapM = 0.6;
-              const templateGapM = Math.max(1.0, spacingEst * 0.6);
-              const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
-              if (distToTemplate >= templateGapM) {
-                const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
-                let overlapsExisting = false;
-                if (!overlapsGenerated) {
-                  for (const p of already) {
-                    if (!p.coordinates || p.coordinates.length < 2) continue;
-                    for (let i = 0; i < p.coordinates.length - 1; i++) {
-                      const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
-                      if (distance < minGapM) { overlapsExisting = true; break; }
+        // Generate mid-row laterals parallel to the template line, centered between adjacent rows
+        // แถวเว้นแถว: ใช้ parity ที่เลือกเพื่อเว้นเส้นติดกับเส้นต้นแบบ
+        for (let r = startParity; r < rows.length - 1; r += 2) {
+          if (r === nearestPairIndex) continue; // don't duplicate the template's own midline
+          const rowA = rows[r];
+          const rowB = rows[r + 1];
+          // Skip if two rows are effectively the same band (bad clustering) to avoid on-row lines
+          const separation = Math.abs(rowB.y - rowA.y);
+          const minSeparation = minSeparationBase;
+          if (separation < minSeparation) continue;
+          const midY = (rowA.y + rowB.y) / 2;
+          const xs = horizontalIntersectionsX(midY);
+          if (xs.length === 0) continue;
+          const ptsA = [...rowA.points].sort((a, b) => a.xy.x - b.xy.x);
+          const ptsB = [...rowB.points].sort((a, b) => a.xy.x - b.xy.x);
+          const allPts = [...ptsA, ...ptsB];
+          const rowXs = allPts.map(p => p.xy.x);
+          const medianX = rowXs[Math.floor(rowXs.length / 2)];
+          let anchorX = xs[0];
+          let bestDx = Math.abs(anchorX - medianX);
+          for (let i = 1; i < xs.length; i++) {
+            const dx = Math.abs(xs[i] - medianX);
+            if (dx < bestDx) { bestDx = dx; anchorX = xs[i]; }
+          }
+
+          // Right side (outward)
+          const outward = allPts.filter(p => p.xy.x > anchorX);
+          if (outward.length > 0) {
+            const endX = outward[outward.length - 1].xy.x;
+            if (Math.abs(endX - anchorX) >= 0.5) {
+              const startXY = unrotateXY({ x: anchorX, y: midY });
+              const endXY = unrotateXY({ x: endX, y: midY });
+              const start = fromXYm(startXY);
+              const end = fromXYm(endXY);
+              if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
+                  isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
+                const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
+                const minGapM = 0.6;
+                const templateGapM = Math.max(1.5, spacingEst * 0.8); // เพิ่มระยะห่างจากท่อต้นแบบ
+                const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
+                
+                // ตรวจสอบระยะห่างจากทุกจุดของท่อที่สร้างไปยังท่อต้นแบบ
+                const distStartToTemplate = pointToPolylineDistance(start, template.coordinates || []);
+                const distEndToTemplate = pointToPolylineDistance(end, template.coordinates || []);
+                const minDistToTemplate = Math.min(distToTemplate, distStartToTemplate, distEndToTemplate);
+                
+                if (minDistToTemplate >= templateGapM) {
+                  const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
+                  let overlapsExisting = false;
+                  if (!overlapsGenerated) {
+                    for (const p of already) {
+                      if (!p.coordinates || p.coordinates.length < 2) continue;
+                      for (let i = 0; i < p.coordinates.length - 1; i++) {
+                        const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
+                        if (distance < minGapM) { overlapsExisting = true; break; }
+                      }
+                      if (overlapsExisting) break;
                     }
-                    if (overlapsExisting) break;
+                  }
+                  const lengthM = calculateDistance([start, end]);
+                  if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
+                    generated.push({ id: `lateral-midrow-${Date.now()}-${generated.length}-right`, type: 'lateral', coordinates: [start, end], length: lengthM });
                   }
                 }
-                const lengthM = calculateDistance([start, end]);
-                if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
-                  generated.push({ id: `lateral-midrow-${Date.now()}-${generated.length}-left`, type: 'lateral', coordinates: [start, end], length: lengthM });
+              }
+            }
+          }
+
+          // Left side (inward)
+          const inward = allPts.filter(p => p.xy.x < anchorX);
+          if (inward.length > 0) {
+            const endX = inward[0].xy.x;
+            if (Math.abs(endX - anchorX) >= 0.5) {
+              const startXY = unrotateXY({ x: anchorX, y: midY });
+              const endXY = unrotateXY({ x: endX, y: midY });
+              const start = fromXYm(startXY);
+              const end = fromXYm(endXY);
+              if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
+                  isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
+                const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
+                const minGapM = 0.6;
+                const templateGapM = Math.max(1.5, spacingEst * 0.8); // เพิ่มระยะห่างจากท่อต้นแบบ
+                const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
+                
+                // ตรวจสอบระยะห่างจากทุกจุดของท่อที่สร้างไปยังท่อต้นแบบ
+                const distStartToTemplate = pointToPolylineDistance(start, template.coordinates || []);
+                const distEndToTemplate = pointToPolylineDistance(end, template.coordinates || []);
+                const minDistToTemplate = Math.min(distToTemplate, distStartToTemplate, distEndToTemplate);
+                
+                if (minDistToTemplate >= templateGapM) {
+                  const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
+                  let overlapsExisting = false;
+                  if (!overlapsGenerated) {
+                    for (const p of already) {
+                      if (!p.coordinates || p.coordinates.length < 2) continue;
+                      for (let i = 0; i < p.coordinates.length - 1; i++) {
+                        const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
+                        if (distance < minGapM) { overlapsExisting = true; break; }
+                      }
+                      if (overlapsExisting) break;
+                    }
+                  }
+                  const lengthM = calculateDistance([start, end]);
+                  if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
+                    generated.push({ id: `lateral-midrow-${Date.now()}-${generated.length}-left`, type: 'lateral', coordinates: [start, end], length: lengthM });
+                  }
                 }
               }
             }
@@ -3963,16 +4663,18 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         const dx = Math.abs(xs[i] - medianX);
         if (dx < bestDx) { bestDx = dx; anchorX = xs[i]; }
       }
-      // สร้างท่อย่อยทั้งสองฝั่งจากจุดเชื่อมต่อกับท่อเมนย่อย
-      const outward = pts.filter(p => p.xy.x > anchorX);
-      const inward = pts.filter(p => p.xy.x < anchorX);
-      
-      // สร้างท่อฝั่งขวา (outward)
-      if (outward.length > 0) {
-        const endX = outward[outward.length - 1].xy.x; // ค่าสูงสุดด้านนอก
-        if (Math.abs(endX - anchorX) >= 0.5) { // สั้นเกินไป
-          const startXY = unrotateXY({ x: anchorX, y: row.y });
-          const endXY = unrotateXY({ x: endX, y: row.y });
+      // สร้างท่อย่อยตามรูปแบบของท่อต้นแบบ
+      if (templatePattern === 'crossing') {
+        // รูปแบบ "ลากผ่าน": สร้างท่อย่อยจากจุดซ้ายสุดไปจุดขวาสุด (เส้นเดียวต่อแถว)
+        const allPts = [...pts].sort((a, b) => a.xy.x - b.xy.x);
+        
+        if (allPts.length >= 2) {
+          const leftmost = allPts[0];
+          const rightmost = allPts[allPts.length - 1];
+          
+          // สร้างท่อย่อยจากจุดซ้ายสุดไปจุดขวาสุด (เส้นเดียวต่อแถว)
+          const startXY = unrotateXY({ x: leftmost.xy.x, y: row.y });
+          const endXY = unrotateXY({ x: rightmost.xy.x, y: row.y });
           const start = fromXYm(startXY);
           const end = fromXYm(endXY);
           
@@ -3983,10 +4685,15 @@ export default function PipeGenerate(props: PipeGenerateProps) {
             
             // กันซ้อนกับท่อเดิม/ที่สร้างระหว่างรอบนี้ และห้ามทับท่อต้นแบบ
             const minGapM = 0.6;
-            const templateGapM = Math.max(1.0, spacingEst * 0.6);
+            const templateGapM = Math.max(1.5, spacingEst * 0.8); // เพิ่มระยะห่างจากท่อต้นแบบ
             const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
             
-            if (distToTemplate >= templateGapM) { // ใกล้ท่อต้นแบบเกินไป ไม่สร้างซ้ำแนวเดียวกัน
+            // ตรวจสอบระยะห่างจากทุกจุดของท่อที่สร้างไปยังท่อต้นแบบ
+            const distStartToTemplate = pointToPolylineDistance(start, template.coordinates || []);
+            const distEndToTemplate = pointToPolylineDistance(end, template.coordinates || []);
+            const minDistToTemplate = Math.min(distToTemplate, distStartToTemplate, distEndToTemplate);
+            
+            if (minDistToTemplate >= templateGapM) { // ใกล้ท่อต้นแบบเกินไป ไม่สร้างซ้ำแนวเดียวกัน
               const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
               let overlapsExisting = false;
               if (!overlapsGenerated) {
@@ -4001,48 +4708,103 @@ export default function PipeGenerate(props: PipeGenerateProps) {
               }
               const lengthM = calculateDistance([start, end]);
               if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
-                generated.push({ id: `lateral-row-${Date.now()}-${generated.length}-right`, type: 'lateral', coordinates: [start, end], length: lengthM });
+                generated.push({ id: `lateral-row-${Date.now()}-${generated.length}-crossing`, type: 'lateral', coordinates: [start, end], length: lengthM });
               }
             }
           }
         }
-      }
-      
-      // สร้างท่อฝั่งซ้าย (inward)
-      if (inward.length > 0) {
-        const endX = inward[0].xy.x; // ค่าต่ำสุดด้านใน
-        if (Math.abs(endX - anchorX) >= 0.5) { // สั้นเกินไป
-          const startXY = unrotateXY({ x: anchorX, y: row.y });
-          const endXY = unrotateXY({ x: endX, y: row.y });
-          const start = fromXYm(startXY);
-          const end = fromXYm(endXY);
-          
-          // ความยาวต้องพอสมควรและอยู่ในโซน
-          if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
-              isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
-            const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
+      } else {
+        // รูปแบบ "ออกจากด้านใดด้านหนึ่ง": สร้างท่อย่อยแยกเป็นสองเส้น (ด้านละเส้น)
+        const outward = pts.filter(p => p.xy.x > anchorX);
+        const inward = pts.filter(p => p.xy.x < anchorX);
+        
+        // สร้างท่อฝั่งขวา (outward)
+        if (outward.length > 0) {
+          const endX = outward[outward.length - 1].xy.x; // ค่าสูงสุดด้านนอก
+          if (Math.abs(endX - anchorX) >= 0.5) { // สั้นเกินไป
+            const startXY = unrotateXY({ x: anchorX, y: row.y });
+            const endXY = unrotateXY({ x: endX, y: row.y });
+            const start = fromXYm(startXY);
+            const end = fromXYm(endXY);
             
-            // กันซ้อนกับท่อเดิม/ที่สร้างระหว่างรอบนี้ และห้ามทับท่อต้นแบบ
-            const minGapM = 0.6;
-            const templateGapM = Math.max(1.0, spacingEst * 0.6);
-            const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
-            
-            if (distToTemplate >= templateGapM) { // ใกล้ท่อต้นแบบเกินไป ไม่สร้างซ้ำแนวเดียวกัน
-              const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
-              let overlapsExisting = false;
-              if (!overlapsGenerated) {
-                for (const p of already) {
-                  if (!p.coordinates || p.coordinates.length < 2) continue;
-                  for (let i = 0; i < p.coordinates.length - 1; i++) {
-                    const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
-                    if (distance < minGapM) { overlapsExisting = true; break; }
+            // ความยาวต้องพอสมควรและอยู่ในโซน
+            if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
+                isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
+              const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
+              
+              // กันซ้อนกับท่อเดิม/ที่สร้างระหว่างรอบนี้ และห้ามทับท่อต้นแบบ
+              const minGapM = 0.6;
+              const templateGapM = Math.max(1.5, spacingEst * 0.8); // เพิ่มระยะห่างจากท่อต้นแบบ
+              const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
+              
+              // ตรวจสอบระยะห่างจากทุกจุดของท่อที่สร้างไปยังท่อต้นแบบ
+              const distStartToTemplate = pointToPolylineDistance(start, template.coordinates || []);
+              const distEndToTemplate = pointToPolylineDistance(end, template.coordinates || []);
+              const minDistToTemplate = Math.min(distToTemplate, distStartToTemplate, distEndToTemplate);
+              
+              if (minDistToTemplate >= templateGapM) { // ใกล้ท่อต้นแบบเกินไป ไม่สร้างซ้ำแนวเดียวกัน
+                const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
+                let overlapsExisting = false;
+                if (!overlapsGenerated) {
+                  for (const p of already) {
+                    if (!p.coordinates || p.coordinates.length < 2) continue;
+                    for (let i = 0; i < p.coordinates.length - 1; i++) {
+                      const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
+                      if (distance < minGapM) { overlapsExisting = true; break; }
+                    }
+                    if (overlapsExisting) break;
                   }
-                  if (overlapsExisting) break;
+                }
+                const lengthM = calculateDistance([start, end]);
+                if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
+                  generated.push({ id: `lateral-row-${Date.now()}-${generated.length}-right`, type: 'lateral', coordinates: [start, end], length: lengthM });
                 }
               }
-              const lengthM = calculateDistance([start, end]);
-              if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
-                generated.push({ id: `lateral-row-${Date.now()}-${generated.length}-left`, type: 'lateral', coordinates: [start, end], length: lengthM });
+            }
+          }
+        }
+        
+        // สร้างท่อฝั่งซ้าย (inward)
+        if (inward.length > 0) {
+          const endX = inward[0].xy.x; // ค่าต่ำสุดด้านใน
+          if (Math.abs(endX - anchorX) >= 0.5) { // สั้นเกินไป
+            const startXY = unrotateXY({ x: anchorX, y: row.y });
+            const endXY = unrotateXY({ x: endX, y: row.y });
+            const start = fromXYm(startXY);
+            const end = fromXYm(endXY);
+            
+            // ความยาวต้องพอสมควรและอยู่ในโซน
+            if (isPointInPolygonEnhanced([start.lat, start.lng], zone.coordinates) && 
+                isPointInPolygonEnhanced([end.lat, end.lng], zone.coordinates)) {
+              const mid = { lat: (start.lat + end.lat) / 2, lng: (start.lng + end.lng) / 2 };
+              
+              // กันซ้อนกับท่อเดิม/ที่สร้างระหว่างรอบนี้ และห้ามทับท่อต้นแบบ
+              const minGapM = 0.6;
+              const templateGapM = Math.max(1.5, spacingEst * 0.8); // เพิ่มระยะห่างจากท่อต้นแบบ
+              const distToTemplate = pointToPolylineDistance(mid, template.coordinates || []);
+              
+              // ตรวจสอบระยะห่างจากทุกจุดของท่อที่สร้างไปยังท่อต้นแบบ
+              const distStartToTemplate = pointToPolylineDistance(start, template.coordinates || []);
+              const distEndToTemplate = pointToPolylineDistance(end, template.coordinates || []);
+              const minDistToTemplate = Math.min(distToTemplate, distStartToTemplate, distEndToTemplate);
+              
+              if (minDistToTemplate >= templateGapM) { // ใกล้ท่อต้นแบบเกินไป ไม่สร้างซ้ำแนวเดียวกัน
+                const overlapsGenerated = generated.some(g => pointToPolylineDistance(mid, g.coordinates || []) < minGapM);
+                let overlapsExisting = false;
+                if (!overlapsGenerated) {
+                  for (const p of already) {
+                    if (!p.coordinates || p.coordinates.length < 2) continue;
+                    for (let i = 0; i < p.coordinates.length - 1; i++) {
+                      const { distance } = getClosestPointOnSegment(mid, p.coordinates[i], p.coordinates[i + 1]);
+                      if (distance < minGapM) { overlapsExisting = true; break; }
+                    }
+                    if (overlapsExisting) break;
+                  }
+                }
+                const lengthM = calculateDistance([start, end]);
+                if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
+                  generated.push({ id: `lateral-row-${Date.now()}-${generated.length}-left`, type: 'lateral', coordinates: [start, end], length: lengthM });
+                }
               }
             }
           }
@@ -4084,87 +4846,9 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     const newThreshold = p.length || calculateDistance(p.coordinates);
     if (confirm(t('Use this lateral as new reference?'))) {
       setLateralReference({ pipeId, length: newThreshold, flowLpm: totalFlow });
-      if (confirm(t('ตัดท่อเส้นอื่นๆ ที่ยาวเกินความยาวอ้างอิงใหม่ด้วยหรือไม่?'))) {
-        const others = pipeManager.pipes.filter(pp => pp.type === 'lateral' && pp.id !== p.id && pp.coordinates && (pp.length ?? calculateDistance(pp.coordinates)) > newThreshold);
-        for (const q of others) {
-          const qCoords = q.coordinates as Coordinate[];
-          const qSegLens: number[] = [];
-          for (let i = 0; i < qCoords.length - 1; i++) qSegLens.push(calculateDistance([qCoords[i], qCoords[i + 1]]));
-          const getChainageQ = (point: Coordinate) => {
-            let best = { segIndex: -1, proj: null as Coordinate | null, perp: Infinity, along: 0 };
-            for (let i = 0; i < qCoords.length - 1; i++) {
-              const a = qCoords[i]; const b = qCoords[i + 1];
-              const { point: proj, distance } = getClosestPointOnSegment(point, a, b);
-              if (distance < (best.perp)) {
-                const along = calculateDistance([a, proj as Coordinate]);
-                best = { segIndex: i, proj: proj as Coordinate, perp: distance, along };
-              }
-            }
-            const distBefore = qSegLens.slice(0, Math.max(0, best.segIndex)).reduce((s, v) => s + v, 0);
-            return { chain: distBefore + best.along, segIndex: best.segIndex, proj: best.proj as Coordinate };
-          };
-          const qConnectedPoints = pipeManager.findNearbyConnectedIrrigationPoints(qCoords, fieldData.irrigationPositions, 2);
-          const qConnected = [...qConnectedPoints.sprinklers, ...qConnectedPoints.dripTapes, ...qConnectedPoints.waterJets, ...qConnectedPoints.pivots];
-          let qBest: { chain: number; segIndex: number; proj: Coordinate } | null = null;
-          for (const s of qConnected) {
-            const ch = getChainageQ(s);
-            if (ch.chain <= newThreshold && (!qBest || ch.chain > qBest.chain)) qBest = ch;
-          }
-          let qEnd: Coordinate | null = null; let qSegIdx = -1;
-          if (qBest) { qEnd = qBest.proj; qSegIdx = qBest.segIndex; }
-          else {
-            let accLen2 = 0; let found2 = false;
-            for (let i = 0; i < qCoords.length - 1 && !found2; i++) {
-              const a = qCoords[i]; const b = qCoords[i + 1];
-              const segL = qSegLens[i];
-              if (accLen2 + segL >= newThreshold) {
-                const remain = newThreshold - accLen2;
-                const tRatio = remain / segL;
-                qEnd = { lat: a.lat + (b.lat - a.lat) * tRatio, lng: a.lng + (b.lng - a.lng) * tRatio };
-                qSegIdx = i;
-                found2 = true;
-              } else {
-                accLen2 += segL;
-              }
-            }
-          }
-          if (qEnd && qSegIdx >= 0) {
-            const newQ = [...qCoords.slice(0, qSegIdx + 1), qEnd];
-            pipeManager.updatePipe(q.id, { coordinates: newQ, length: calculateDistance(newQ) });
-          }
-        }
-      }
     }
   }, [pipeManager.pipes, fieldData.irrigationSettings, fieldData.irrigationPositions.sprinklers, pipeManager, t]);
 
-  // ฟังก์ชันช่วยตัดท่อย่อยให้มีความยาวไม่เกินค่าที่กำหนด (เมตร)
-  const trimLateralToLength = useCallback((pipeId: string, maxLengthM: number) => {
-    const p = pipeManager.pipes.find(pp => pp.id === pipeId && pp.type === 'lateral');
-    if (!p || !p.coordinates || p.coordinates.length < 2) return;
-    const coords = p.coordinates as Coordinate[];
-    const segLens: number[] = [];
-    for (let i = 0; i < coords.length - 1; i++) segLens.push(calculateDistance([coords[i], coords[i + 1]]));
-    let acc = 0; let end: Coordinate | null = null; let segIdx = -1;
-    for (let i = 0; i < segLens.length; i++) {
-      const L = segLens[i];
-      if (acc + L >= maxLengthM) {
-        const tRatio = (maxLengthM - acc) / L;
-        const a = coords[i]; const b = coords[i + 1];
-        end = { lat: a.lat + (b.lat - a.lat) * tRatio, lng: a.lng + (b.lng - a.lng) * tRatio };
-        segIdx = i; break;
-      }
-      acc += L;
-    }
-    if (!end) return;
-    const newCoords = [...coords.slice(0, segIdx + 1), end];
-    pipeManager.updatePipe(pipeId, { coordinates: newCoords, length: calculateDistance(newCoords) });
-  }, [pipeManager]);
-
-  // ตัดท่อเส้นเดียวให้เท่าความยาวที่แนะนำ (ตาม reference)
-  const handleTrimToRecommended = useCallback((pipeId: string) => {
-    if (!lateralReference) return;
-    trimLateralToLength(pipeId, lateralReference.length);
-  }, [lateralReference, trimLateralToLength]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleSelectWarningPipe = useCallback((pipeId: string, e?: React.MouseEvent) => {
@@ -5157,13 +5841,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                               >
                                 {t('Accept as reference')}
                               </button>
-                              <button
-                                className="px-1.5 py-0.5 text-[10px] rounded bg-green-500 text-white border border-green-300 hover:bg-green-400"
-                                onClick={() => handleTrimToRecommended(w.pipeId)}
-                                title={t('Trim this pipe to the recommended length')}
-                              >
-                                {t('Trim to recommended')}
-                              </button>
                             </div>
                           </div>
                         ))}
@@ -5320,6 +5997,22 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           </div>
         </div>
       </div>
+
+      {/* Notification Modal */}
+      <NotificationModal
+        isOpen={notificationModal.isOpen}
+        onClose={() => setNotificationModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={notificationModal.onConfirm || undefined}
+        onCancel={notificationModal.onCancel || undefined}
+        title={notificationModal.title}
+        message={notificationModal.message}
+        warningMessage={notificationModal.warningMessage}
+        type={notificationModal.type}
+        showConfirmButton={!!notificationModal.onConfirm}
+        confirmText={t('ยืนยัน')}
+        cancelText={t('ยกเลิก')}
+        showColorOptions={notificationModal.showColorOptions}
+      />
     </>
   );
 }
