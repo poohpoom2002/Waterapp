@@ -1,14 +1,10 @@
 // resources/js/utils/cropData.ts
 
-<<<<<<< HEAD
 import {
     cropTranslations,
     categoryTranslations,
     irrigationNeedsTranslations,
 } from '../../contexts/translations/cropts';
-=======
-import { cropTranslations, categoryTranslations, irrigationNeedsTranslations } from '../../contexts/translations/cropts';
->>>>>>> origin/main
 
 export interface Crop {
     value: string;
@@ -25,12 +21,7 @@ export interface Crop {
     price: number; // Price (THB/kg)
 }
 
-<<<<<<< HEAD
-export interface TranslatedCrop
-    extends Omit<Crop, 'name' | 'description' | 'category' | 'irrigationNeeds'> {
-=======
 export interface TranslatedCrop extends Omit<Crop, 'name' | 'description' | 'category' | 'irrigationNeeds'> {
->>>>>>> origin/main
     name: string;
     description: string;
     category: string;
@@ -183,12 +174,7 @@ export const cropTypes: Crop[] = [
         value: 'pineapple',
         name: 'Pineapple',
         icon: '🍍',
-<<<<<<< HEAD
-        description:
-            'A tropical fruit crop with high economic value, suitable for both fresh consumption and processing.',
-=======
         description: 'A tropical fruit crop with high economic value, suitable for both fresh consumption and processing.',
->>>>>>> origin/main
         category: 'industrial',
         irrigationNeeds: 'medium',
         growthPeriod: 540, // 18 months from planting to first harvest
@@ -252,14 +238,10 @@ export function getCropByValue(value: string): Crop | undefined {
 }
 
 // Find a crop by its value with translation
-<<<<<<< HEAD
 export function getTranslatedCropByValue(
     value: string,
     language: 'en' | 'th' = 'en'
 ): TranslatedCrop | undefined {
-=======
-export function getTranslatedCropByValue(value: string, language: 'en' | 'th' = 'en'): TranslatedCrop | undefined {
->>>>>>> origin/main
     const crop = getCropByValue(value);
     if (!crop) return undefined;
 
@@ -280,11 +262,7 @@ export function getTranslatedCropByValue(value: string, language: 'en' | 'th' = 
 
 // Get all crops with translation
 export function getTranslatedCrops(language: 'en' | 'th' = 'en'): TranslatedCrop[] {
-<<<<<<< HEAD
     return cropTypes.map((crop) => {
-=======
-    return cropTypes.map(crop => {
->>>>>>> origin/main
         const translation = cropTranslations[language][crop.value];
         const categoryTranslation = categoryTranslations[language][crop.category];
         const irrigationTranslation = irrigationNeedsTranslations[language][crop.irrigationNeeds];
@@ -308,11 +286,6 @@ export function searchCrops(term: string, language: 'en' | 'th' = 'en'): Crop[] 
         const translation = cropTranslations[language][crop.value];
         const translatedName = translation?.name || crop.name;
         const translatedDescription = translation?.description || crop.description;
-<<<<<<< HEAD
-
-=======
-        
->>>>>>> origin/main
         return (
             translatedName.toLowerCase().includes(lower) ||
             translatedDescription.toLowerCase().includes(lower) ||
@@ -323,25 +296,18 @@ export function searchCrops(term: string, language: 'en' | 'th' = 'en'): Crop[] 
 }
 
 // Search translated crops
-<<<<<<< HEAD
 export function searchTranslatedCrops(
     term: string,
     language: 'en' | 'th' = 'en'
 ): TranslatedCrop[] {
     const matchingCrops = searchCrops(term, language);
     return matchingCrops.map((crop) => {
-=======
-export function searchTranslatedCrops(term: string, language: 'en' | 'th' = 'en'): TranslatedCrop[] {
-    const matchingCrops = searchCrops(term, language);
-    return matchingCrops.map(crop => {
->>>>>>> origin/main
         const translated = getTranslatedCropByValue(crop.value, language);
         return translated!;
     });
 }
 
 // Get crops by category with translation
-<<<<<<< HEAD
 export function getCropsByCategory(
     category: 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed',
     language: 'en' | 'th' = 'en'
@@ -360,18 +326,3 @@ export function getAvailableCategories(
         name: categoryTranslations[language][category] || category,
     }));
 }
-=======
-export function getCropsByCategory(category: 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed', language: 'en' | 'th' = 'en'): TranslatedCrop[] {
-    const categoryQrops = cropTypes.filter(crop => crop.category === category);
-    return categoryQrops.map(crop => getTranslatedCropByValue(crop.value, language)!);
-}
-
-// Get available categories with translation
-export function getAvailableCategories(language: 'en' | 'th' = 'en'): Array<{key: string, name: string}> {
-    const categories = Array.from(new Set(cropTypes.map(crop => crop.category)));
-    return categories.map(category => ({
-        key: category,
-        name: categoryTranslations[language][category] || category
-    }));
-}
->>>>>>> origin/main
