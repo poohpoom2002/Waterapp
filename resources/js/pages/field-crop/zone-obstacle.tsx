@@ -2033,6 +2033,41 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 														{fieldData.obstacles.length} {t('items')}
 													</span>
 												</div>
+												{fieldData.zones.length > 0 && (
+													<>
+														<div className="border-t border-gray-600 pt-2 mt-2">
+															<div className="text-xs font-semibold text-blue-300 mb-2">
+																🌱 {t('Plant Coverage')}:
+															</div>
+															<div className="flex justify-between text-gray-400">
+																<span>{t('Covered Plants')}:</span>
+																<span className="text-green-400">
+																	{plantCoverageStats.coveredPlants} {t('points')}
+																</span>
+															</div>
+															<div className="flex justify-between text-gray-400">
+																<span>{t('Border Plants')}:</span>
+																<span className="text-yellow-400">
+																	{plantCoverageStats.borderPlants} {t('points')}
+																</span>
+															</div>
+															<div className="flex justify-between text-gray-400">
+																<span>{t('Uncovered Plants')}:</span>
+																<span className="text-red-400">
+																	{plantCoverageStats.uncoveredPlants} {t('points')}
+																</span>
+															</div>
+															<div className="flex justify-between text-gray-400">
+																<span>{t('Coverage')}:</span>
+																<span className={`font-semibold ${plantCoverageStats.coveragePercentage >= 90 ? 'text-green-400' :
+																	plantCoverageStats.coveragePercentage >= 70 ? 'text-yellow-400' : 'text-red-400'
+																	}`}>
+																	{plantCoverageStats.coveragePercentage.toFixed(1)}%
+																</span>
+															</div>
+														</div>
+													</>
+												)}
 											</div>
 										</div>
 									)}
@@ -2631,49 +2666,16 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 									}}
 								/>
 								<div className="absolute top-4 right-4 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-3 text-xs">
-									<div className="text-white space-y-1">
-										<div>Map Center: {fieldData.mapCenter.lat.toFixed(4)}, {fieldData.mapCenter.lng.toFixed(4)}</div>
-										<div>Map Zoom: {fieldData.mapZoom}</div>
-										<div>Main Area: {fieldData.mainArea.length} points</div>
-										<div>Plant Points: {fieldData.plantPoints.length} points</div>
-										<div>Combined Points: {createCombinedPoints().length} points (plants + all irrigation equipment)</div>
-										<div>Covered Plants: {plantCoverageStats.coveredPlants + plantCoverageStats.borderPlants} points</div>
-										<div>Zones: {fieldData.zones.length} items</div>
-										<div>Obstacles: {fieldData.obstacles.length} items</div>
-										<div>Irrigation: {fieldData.selectedIrrigationType || 'none'}</div>
-										<div>Equipment: 🚿{fieldData.irrigationPositions.sprinklers.length} 🔄{fieldData.irrigationPositions.pivots.length} 💧{fieldData.irrigationPositions.dripTapes.length} 🌊{fieldData.irrigationPositions.waterJets.length}</div>
-										{fieldData.totalWaterRequirement > 0 && (
-											<div className="border-t border-gray-400 pt-2 mt-2">
-												<div>Target Water/Zone: {defaultWaterPerZone.toFixed(1)} ลิตร/ครั้ง</div>
-											</div>
-										)}
-										{zoneEditingState.isDrawing && (
-											<div className="border-t border-purple-400 pt-2 mt-2 text-purple-300">
-												<div>🖊️ Drawing Mode: Click to draw zone</div>
-												<div>Press ESC to cancel</div>
-												<div className="flex items-center space-x-2 mt-1">
-													<div
-														className="w-3 h-3 rounded border"
-														style={{ backgroundColor: getNextZoneColor(fieldData.zones) }}
-													></div>
-													<span className="text-xs">Next zone color</span>
-												</div>
-											</div>
-										)}
-										{zoneEditingState.currentEdit && (
-											<div className="border-t border-blue-400 pt-2 mt-2 text-blue-300">
-												<div>✏️ Edit Mode: Drag points to reshape</div>
-												<div>✂️ Overlap cutting: Active</div>
-												<div>Press ESC to finish</div>
-											</div>
-										)}
+									<div className="text-white flex gap-2">
+										<span>Lat: {fieldData.mapCenter.lat.toFixed(4)}</span>
+										<span>Lng: {fieldData.mapCenter.lng.toFixed(4)}</span>
 									</div>
+								</div>
 								</div>
 							</div>
 						</div>
 					</div>
 				</div>
-			</div>
 		</>
 	);
 }

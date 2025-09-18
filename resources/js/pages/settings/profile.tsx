@@ -31,14 +31,17 @@ export default function Profile({
     mustVerifyEmail: boolean;
     status?: string;
 }) {
-    // Defensive usePage call with error handling
-    let auth;
-    try {
-        auth = usePage<SharedData>().props.auth;
-    } catch (error) {
-        console.warn('Inertia context not available in settings Profile, using fallback values');
-        auth = { user: { name: '', email: '', email_verified_at: null } };
-    }
+    // Always call usePage hook unconditionally
+    const page = usePage<SharedData>();
+    
+    // Safely access auth with fallback
+    const auth = page?.props?.auth || { 
+        user: { 
+            name: '', 
+            email: '', 
+            email_verified_at: null 
+        } 
+    };
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<
         Required<ProfileForm>

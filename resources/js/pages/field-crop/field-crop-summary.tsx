@@ -337,58 +337,80 @@ const GoogleMapsDisplay = ({
                 }
             });
 
-            // Draw connection points for lateral pipes
+            // สร้างจุดเชื่อมต่อทั้งหมด (lateral-to-submain และ submain-to-main)
+            const allConnectionPoints: Array<{
+                id: string;
+                position: Coordinate;
+                connectedLaterals: string[];
+                submainId: string;
+                type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+            }> = [];
+
+            // สร้างจุดเชื่อมต่อของท่อย่อยกับท่อเมนย่อย
             const lateralPipes = pipes.filter(p => p.type === 'lateral');
             const submainPipes = pipes.filter(p => p.type === 'submain');
             
             if (lateralPipes.length > 0 && submainPipes.length > 0) {
-                const connectionPoints = createLateralConnectionPoints(lateralPipes, submainPipes);
-                connectionPoints.forEach(connectionPoint => {
-                    let icon;
-                    let title;
-                    
-                    if (connectionPoint.type === 'junction') {
-                        icon = {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            scale: 8,
-                            fillColor: '#FF6B35',
-                            fillOpacity: 1,
-                            strokeColor: '#FFFFFF',
-                            strokeWeight: 2,
-                        };
-                        title = `จุดเชื่อมต่อ (${connectionPoint.connectedLaterals.length} ท่อ)`;
-                    } else if (connectionPoint.type === 'crossing') {
-                        icon = {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            scale: 7,
-                            fillColor: '#9C27B0',
-                            fillOpacity: 1,
-                            strokeColor: '#FFFFFF',
-                            strokeWeight: 2,
-                        };
-                        title = `จุดข้ามท่อเมนย่อย (${connectionPoint.connectedLaterals.length} ท่อ)`;
-                    } else {
-                        icon = {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            scale: 6,
-                            fillColor: '#4CAF50',
-                            fillOpacity: 1,
-                            strokeColor: '#FFFFFF',
-                            strokeWeight: 1,
-                        };
-                        title = 'จุดเชื่อมต่อท่อย่อย';
-                    }
-                    
-                    new google.maps.Marker({
-                        position: connectionPoint.position,
-                        map: map,
-                        icon: icon,
-                        title: title,
-                        zIndex: 1001,
-                        optimized: false
-                    });
-                });
+                const lateralConnectionPoints = createLateralConnectionPoints(lateralPipes, submainPipes);
+                allConnectionPoints.push(...lateralConnectionPoints);
             }
+
+            // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
+            const submainToMainConnectionPoints = createSubmainToMainConnectionPoints(pipes);
+            allConnectionPoints.push(...submainToMainConnectionPoints);
+
+            // แสดงจุดเชื่อมต่อทั้งหมด
+            allConnectionPoints.forEach(connectionPoint => {
+                let color = '#FFD700'; // default yellow
+                let size = 8;
+                let title = 'จุดเชื่อมต่อท่อย่อย';
+                
+                if (connectionPoint.type === 'junction') {
+                    color = '#FFD700'; // สีเหลือง
+                    size = 8;
+                    title = `จุดเชื่อมต่อ (${connectionPoint.connectedLaterals.length} ท่อ)`;
+                } else if (connectionPoint.type === 'crossing') {
+                    color = '#4CAF50'; // สีเขียว
+                    size = 7;
+                    title = `จุดข้ามท่อเมนย่อย (${connectionPoint.connectedLaterals.length} ท่อ)`;
+                } else if (connectionPoint.type === 'l_shape') {
+                    color = '#F44336'; // สีแดง
+                    size = 8;
+                    title = 'จุดเชื่อมต่อรูปตัว L (ปลายท่อเมน)';
+                } else if (connectionPoint.type === 't_shape') {
+                    color = '#2196F3'; // สีน้ำเงิน
+                    size = 8;
+                    title = 'จุดเชื่อมต่อรูปตัว T (ผ่านปลายท่อเมน)';
+                } else if (connectionPoint.type === 'cross_shape') {
+                    color = '#9C27B0'; // สีม่วง
+                    size = 8;
+                    title = 'จุดเชื่อมต่อรูป + (ผ่านเส้นท่อเมน)';
+                } else {
+                    color = '#FFD700'; // สีเหลือง
+                    size = 6;
+                    title = 'จุดเชื่อมต่อท่อย่อย';
+                }
+                
+                const icon = {
+                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+                            <circle cx="${size/2}" cy="${size/2}" r="${size/2-1}" fill="${color}" stroke="#FFFFFF" stroke-width="1"/>
+                        </svg>
+                    `),
+                    scaledSize: new google.maps.Size(size, size),
+                    anchor: new google.maps.Point(size/2, size/2)
+                };
+                
+                new google.maps.Marker({
+                    position: connectionPoint.position,
+                    map: map,
+                    icon: icon,
+                    title: title,
+                    zIndex: 650, // ใช้ zIndex เดียวกับจุดสปริงเกลอร์
+                    optimized: true,
+                    clickable: false
+                });
+            });
 
             // Draw equipment (pumps)
             if (Array.isArray(equipment) && equipment.length > 0) {
@@ -1234,20 +1256,41 @@ const normalizeIrrigationType = (type: string): string => {
     return typeMapping[normalizedType] || normalizedType;
 };
 
+// ฟังก์ชันตรวจสอบว่าจุดอยู่ในโซนหรือไม่
+const isPointInPolygonEnhanced = (point: [number, number], polygon: Coordinate[]): boolean => {
+    if (!polygon || polygon.length < 3) return false;
+    
+    const [lat, lng] = point;
+    let inside = false;
+    
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].lng;
+        const yi = polygon[i].lat;
+        const xj = polygon[j].lng;
+        const yj = polygon[j].lat;
+        
+        if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+            inside = !inside;
+        }
+    }
+    
+    return inside;
+};
+
 // ฟังก์ชันสร้างจุดเชื่อมต่อของท่อย่อยที่ต่อกับท่อเมนย่อย
 const createLateralConnectionPoints = (lateralPipes: Pipe[], submainPipes: Pipe[]): Array<{
     id: string;
     position: Coordinate;
     connectedLaterals: string[];
     submainId: string;
-    type: 'single' | 'junction' | 'crossing';
+    type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
 }> => {
     const connectionPoints: Array<{
         id: string;
         position: Coordinate;
         connectedLaterals: string[];
         submainId: string;
-        type: 'single' | 'junction' | 'crossing';
+        type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
     }> = [];
 
     // ฟังก์ชันคำนวณระยะห่างระหว่างจุด
@@ -1434,6 +1477,359 @@ const createLateralConnectionPoints = (lateralPipes: Pipe[], submainPipes: Pipe[
         }
     });
     
+    return connectionPoints;
+};
+
+// ฟังก์ชันสร้างจุดเชื่อมต่อระหว่างท่อเมนย่อยกับท่อเมน (L, T, + shapes)
+const createSubmainToMainConnectionPoints = (pipes: Pipe[]): Array<{
+    id: string;
+    position: Coordinate;
+    connectedLaterals: string[];
+    submainId: string;
+    type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+}> => {
+    const connectionPoints: Array<{
+        id: string;
+        position: Coordinate;
+        connectedLaterals: string[];
+        submainId: string;
+        type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+    }> = [];
+
+    const mainPipes = pipes.filter(p => p.type === 'main');
+    const submainPipes = pipes.filter(p => p.type === 'submain');
+
+    if (mainPipes.length === 0 || submainPipes.length === 0) {
+        return connectionPoints;
+    }
+
+    // ฟังก์ชันคำนวณระยะห่างระหว่างจุด
+    const calculateDistanceBetweenPoints = (p1: Coordinate, p2: Coordinate): number => {
+        const R = 6371e3; // Earth's radius in meters
+        const φ1 = p1.lat * Math.PI / 180;
+        const φ2 = p2.lat * Math.PI / 180;
+        const Δφ = (p2.lat - p1.lat) * Math.PI / 180;
+        const Δλ = (p2.lng - p1.lng) * Math.PI / 180;
+
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+        return R * c;
+    };
+
+    // ฟังก์ชันหาจุดที่ใกล้ที่สุดบนเส้น
+    const getClosestPointOnSegment = (point: Coordinate, segStart: Coordinate, segEnd: Coordinate): { point: Coordinate; distance: number } => {
+        const A = point.lat - segStart.lat;
+        const B = point.lng - segStart.lng;
+        const C = segEnd.lat - segStart.lat;
+        const D = segEnd.lng - segStart.lng;
+
+        const dot = A * C + B * D;
+        const lenSq = C * C + D * D;
+        let param = -1;
+        if (lenSq !== 0) param = dot / lenSq;
+
+        let xx, yy;
+        if (param < 0) {
+            xx = segStart.lat;
+            yy = segStart.lng;
+        } else if (param > 1) {
+            xx = segEnd.lat;
+            yy = segEnd.lng;
+        } else {
+            xx = segStart.lat + param * C;
+            yy = segStart.lng + param * D;
+        }
+
+        const dx = point.lat - xx;
+        const dy = point.lng - yy;
+        return {
+            point: { lat: xx, lng: yy },
+            distance: Math.sqrt(dx * dx + dy * dy) * 111000 // Approximate conversion to meters
+        };
+    };
+
+    // ฟังก์ชันหาจุดตัดของเส้นสองเส้น
+    const getLineIntersection = (p1: Coordinate, p2: Coordinate, p3: Coordinate, p4: Coordinate): Coordinate | null => {
+        const x1 = p1.lng, y1 = p1.lat;
+        const x2 = p2.lng, y2 = p2.lat;
+        const x3 = p3.lng, y3 = p3.lat;
+        const x4 = p4.lng, y4 = p4.lat;
+
+        const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if (Math.abs(denom) < 1e-10) return null; // เส้นขนาน
+
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+        const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+            return {
+                lat: y1 + t * (y2 - y1),
+                lng: x1 + t * (x2 - x1)
+            };
+        }
+
+        return null;
+    };
+
+    submainPipes.forEach(submain => {
+        if (!submain.coordinates || submain.coordinates.length < 2) return;
+
+        const submainStart = submain.coordinates[0];
+        const submainEnd = submain.coordinates[submain.coordinates.length - 1];
+
+        mainPipes.forEach(main => {
+            if (!main.coordinates || main.coordinates.length < 2) return;
+
+            const mainStart = main.coordinates[0];
+            const mainEnd = main.coordinates[main.coordinates.length - 1];
+            const threshold = 2; // 2 meters
+
+            // L-shape: submain end near main end
+            const submainStartToMainStart = calculateDistanceBetweenPoints(submainStart, mainStart);
+            const submainStartToMainEnd = calculateDistanceBetweenPoints(submainStart, mainEnd);
+            const submainEndToMainStart = calculateDistanceBetweenPoints(submainEnd, mainStart);
+            const submainEndToMainEnd = calculateDistanceBetweenPoints(submainEnd, mainEnd);
+
+            if (submainStartToMainStart < threshold) {
+                const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, mainStart) < 1);
+                if (!existingPoint) {
+                    connectionPoints.push({
+                        id: `l-shape-start-${submain.id}-${Date.now()}`,
+                        position: mainStart,
+                        connectedLaterals: [String(submain.id)],
+                        submainId: String(submain.id),
+                        type: 'l_shape'
+                    });
+                }
+            }
+
+            if (submainStartToMainEnd < threshold) {
+                const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, mainEnd) < 1);
+                if (!existingPoint) {
+                    connectionPoints.push({
+                        id: `l-shape-end-${submain.id}-${Date.now()}`,
+                        position: mainEnd,
+                        connectedLaterals: [String(submain.id)],
+                        submainId: String(submain.id),
+                        type: 'l_shape'
+                    });
+                }
+            }
+
+            if (submainEndToMainStart < threshold) {
+                const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, mainStart) < 1);
+                if (!existingPoint) {
+                    connectionPoints.push({
+                        id: `l-shape-start-${submain.id}-${Date.now()}`,
+                        position: mainStart,
+                        connectedLaterals: [String(submain.id)],
+                        submainId: String(submain.id),
+                        type: 'l_shape'
+                    });
+                }
+            }
+
+            if (submainEndToMainEnd < threshold) {
+                const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, mainEnd) < 1);
+                if (!existingPoint) {
+                    connectionPoints.push({
+                        id: `l-shape-end-${submain.id}-${Date.now()}`,
+                        position: mainEnd,
+                        connectedLaterals: [String(submain.id)],
+                        submainId: String(submain.id),
+                        type: 'l_shape'
+                    });
+                }
+            }
+
+            // T-shape: submain intersects main near main end (actual intersection)
+            for (let i = 0; i < main.coordinates.length - 1; i++) {
+                const intersection = getLineIntersection(submainStart, submainEnd, main.coordinates[i], main.coordinates[i + 1]);
+                if (intersection) {
+                    const isAtMainStart = calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
+                    const isAtMainEnd = calculateDistanceBetweenPoints(intersection, mainEnd) < threshold;
+
+                    if (isAtMainStart) {
+                        // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
+                        const isLShape = submainStartToMainStart < threshold || submainEndToMainStart < threshold;
+                        if (!isLShape) {
+                            const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, mainStart) < 1);
+                            if (!existingPoint) {
+                                connectionPoints.push({
+                                    id: `t-shape-start-${submain.id}-${Date.now()}`,
+                                    position: mainStart,
+                                    connectedLaterals: [String(submain.id)],
+                                    submainId: String(submain.id),
+                                    type: 't_shape'
+                                });
+                            }
+                        }
+                    }
+
+                    if (isAtMainEnd) {
+                        // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
+                        const isLShape = submainStartToMainEnd < threshold || submainEndToMainEnd < threshold;
+                        if (!isLShape) {
+                            const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, mainEnd) < 1);
+                            if (!existingPoint) {
+                                connectionPoints.push({
+                                    id: `t-shape-end-${submain.id}-${Date.now()}`,
+                                    position: mainEnd,
+                                    connectedLaterals: [String(submain.id)],
+                                    submainId: String(submain.id),
+                                    type: 't_shape'
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // T-shape (Auto-snap): submain is very close to main near main end (no actual intersection)
+            for (let i = 0; i < main.coordinates.length - 1; i++) {
+                const { point: closestPointOnMain, distance: distanceToMain } = getClosestPointOnSegment(submainStart, main.coordinates[i], main.coordinates[i + 1]);
+                const { point: closestPointOnMain2, distance: distanceToMain2 } = getClosestPointOnSegment(submainEnd, main.coordinates[i], main.coordinates[i + 1]);
+
+                if (distanceToMain < threshold || distanceToMain2 < threshold) {
+                    const closestPoint = distanceToMain < distanceToMain2 ? closestPointOnMain : closestPointOnMain2;
+                    const isNearMainStart = calculateDistanceBetweenPoints(closestPoint, mainStart) < threshold;
+                    const isNearMainEnd = calculateDistanceBetweenPoints(closestPoint, mainEnd) < threshold;
+
+                    if (isNearMainStart) {
+                        // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
+                        const isLShape = submainStartToMainStart < threshold || submainEndToMainStart < threshold;
+                        if (!isLShape) {
+                            const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, mainStart) < 1);
+                            if (!existingPoint) {
+                                connectionPoints.push({
+                                    id: `t-shape-snap-start-${submain.id}-${Date.now()}`,
+                                    position: mainStart,
+                                    connectedLaterals: [String(submain.id)],
+                                    submainId: String(submain.id),
+                                    type: 't_shape'
+                                });
+                            }
+                        }
+                    }
+
+                    if (isNearMainEnd) {
+                        // ตรวจสอบว่าไม่ใช่ L-shape ก่อน
+                        const isLShape = submainStartToMainEnd < threshold || submainEndToMainEnd < threshold;
+                        if (!isLShape) {
+                            const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, mainEnd) < 1);
+                            if (!existingPoint) {
+                                connectionPoints.push({
+                                    id: `t-shape-snap-end-${submain.id}-${Date.now()}`,
+                                    position: mainEnd,
+                                    connectedLaterals: [String(submain.id)],
+                                    submainId: String(submain.id),
+                                    type: 't_shape'
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // T-shape (Additional): submain passes through main but not at ends
+            for (let i = 0; i < main.coordinates.length - 1; i++) {
+                const intersection = getLineIntersection(submainStart, submainEnd, main.coordinates[i], main.coordinates[i + 1]);
+                if (intersection) {
+                    const isAtMainStart = calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
+                    const isAtMainEnd = calculateDistanceBetweenPoints(intersection, mainEnd) < threshold;
+                    
+                    // ถ้าตัดกันแต่ไม่ใช่ที่ปลาย และไม่ใช่ + shape
+                    if (!isAtMainStart && !isAtMainEnd) {
+                        // ตรวจสอบว่า submain ผ่าน main ใกล้ปลาย main หรือไม่
+                        const distanceToStart = calculateDistanceBetweenPoints(intersection, mainStart);
+                        const distanceToEnd = calculateDistanceBetweenPoints(intersection, mainEnd);
+                        const mainLength = calculateDistanceBetweenPoints(mainStart, mainEnd);
+                        
+                        // ถ้าอยู่ใกล้ปลาย main (ภายใน 30% ของความยาว main)
+                        if (distanceToStart < mainLength * 0.3 || distanceToEnd < mainLength * 0.3) {
+                            const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, intersection) < 1);
+                            if (!existingPoint) {
+                                connectionPoints.push({
+                                    id: `t-shape-through-${submain.id}-${i}-${Date.now()}`,
+                                    position: intersection,
+                                    connectedLaterals: [String(submain.id)],
+                                    submainId: String(submain.id),
+                                    type: 't_shape'
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // + shape (actual intersection)
+            for (let i = 0; i < main.coordinates.length - 1; i++) {
+                const intersection = getLineIntersection(submainStart, submainEnd, main.coordinates[i], main.coordinates[i + 1]);
+                if (intersection) {
+                    const isAtMainStart = calculateDistanceBetweenPoints(intersection, mainStart) < threshold;
+                    const isAtMainEnd = calculateDistanceBetweenPoints(intersection, mainEnd) < threshold;
+
+                    if (!isAtMainStart && !isAtMainEnd) {
+                        // ตรวจสอบว่าไม่ใช่ T-shape (ไม่ใกล้ปลาย main)
+                        const distanceToStart = calculateDistanceBetweenPoints(intersection, mainStart);
+                        const distanceToEnd = calculateDistanceBetweenPoints(intersection, mainEnd);
+                        const mainLength = calculateDistanceBetweenPoints(mainStart, mainEnd);
+                        
+                        // ถ้าไม่ใกล้ปลาย main (เกิน 30% ของความยาว main) ให้เป็น + shape
+                        if (distanceToStart >= mainLength * 0.3 && distanceToEnd >= mainLength * 0.3) {
+                            const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, intersection) < 1);
+                            if (!existingPoint) {
+                                connectionPoints.push({
+                                    id: `cross-shape-${submain.id}-${i}-${Date.now()}`,
+                                    position: intersection,
+                                    connectedLaterals: [String(submain.id)],
+                                    submainId: String(submain.id),
+                                    type: 'cross_shape'
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // + shape (Auto-snap)
+            for (let i = 0; i < main.coordinates.length - 1; i++) {
+                const { point: closestPointOnMain, distance: distanceToMain } = getClosestPointOnSegment(submainStart, main.coordinates[i], main.coordinates[i + 1]);
+                const { point: closestPointOnMain2, distance: distanceToMain2 } = getClosestPointOnSegment(submainEnd, main.coordinates[i], main.coordinates[i + 1]);
+
+                if (distanceToMain < threshold || distanceToMain2 < threshold) {
+                    const closestPoint = distanceToMain < distanceToMain2 ? closestPointOnMain : closestPointOnMain2;
+                    const isNearMainStart = calculateDistanceBetweenPoints(closestPoint, mainStart) < threshold;
+                    const isNearMainEnd = calculateDistanceBetweenPoints(closestPoint, mainEnd) < threshold;
+
+                    if (!isNearMainStart && !isNearMainEnd) {
+                        // ตรวจสอบว่าไม่ใช่ T-shape (ไม่ใกล้ปลาย main)
+                        const distanceToStart = calculateDistanceBetweenPoints(closestPoint, mainStart);
+                        const distanceToEnd = calculateDistanceBetweenPoints(closestPoint, mainEnd);
+                        const mainLength = calculateDistanceBetweenPoints(mainStart, mainEnd);
+                        
+                        // ถ้าไม่ใกล้ปลาย main (เกิน 30% ของความยาว main) ให้เป็น + shape
+                        if (distanceToStart >= mainLength * 0.3 && distanceToEnd >= mainLength * 0.3) {
+                            const existingPoint = connectionPoints.find(cp => calculateDistanceBetweenPoints(cp.position, closestPoint) < 1);
+                            if (!existingPoint) {
+                                connectionPoints.push({
+                                    id: `cross-shape-snap-${submain.id}-${i}-${Date.now()}`,
+                                    position: closestPoint,
+                                    connectedLaterals: [String(submain.id)],
+                                    submainId: String(submain.id),
+                                    type: 'cross_shape'
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+
     return connectionPoints;
 };
 
@@ -2372,8 +2768,17 @@ const buildZoneConnectivityLongestFlows = (
     // Flow from lateral sprinklers
     const perSprinkler = flowSettings?.sprinkler_system?.flow ?? 0;
     
+    // Debug logging for flow settings
+    if (perSprinkler === 0) {
+        console.log(`🔍 Flow settings debug:`, {
+            flowSettings,
+            perSprinkler,
+            sprinklerSystemFlow: flowSettings?.sprinkler_system?.flow
+        });
+    }
+    
     // ฟังก์ชันสำหรับหาสปริงเกลอร์ที่เชื่อมต่อกับท่อย่อยแบบโหมดระหว่างแถว
-    const findNearbyConnectedSprinklersBetweenRows = (coordinates: Coordinate[], sprinklers: Coordinate[], halfWidthMeters: number = 1.5): Coordinate[] => {
+    const findNearbyConnectedSprinklersBetweenRows = (coordinates: Coordinate[], sprinklers: Coordinate[]): Coordinate[] => {
         if (coordinates.length < 2 || sprinklers.length === 0) return [];
         
         // 1) คำนวณระยะห่างจากแต่ละสปริงเกลอร์ไปยังท่อย่อย
@@ -2394,20 +2799,30 @@ const buildZoneConnectivityLongestFlows = (
         
         if (pointDistances.length === 0) return [];
         
-        // 2) ประมาณการ half-spacing จากข้อมูลที่มี
-        const distances = pointDistances.map(pd => pd.dist).filter(d => d > 0);
-        if (distances.length === 0) return [];
+        // 2) หาสปริงเกลอร์ที่อยู่ใกล้ท่อย่อยมากที่สุดเพื่อกำหนดแถว
+        const sortedDistances = pointDistances.sort((a, b) => a.dist - b.dist);
+        const minDistance = sortedDistances[0].dist;
         
-        const estHalf = Math.min(...distances);
-        const maxConsiderDistance = Math.max(halfWidthMeters * 2, 3.0);
-        const halfSpacing = Math.max(halfWidthMeters, Math.min(estHalf, maxConsiderDistance));
-        const tol = Math.max(0.6, halfSpacing * 0.35);
-        
-        // 3) เลือกหัวที่มีระยะใกล้กับ half-spacing (ทั้งสองฝั่ง)
+        // 3) หาสปริงเกลอร์ที่อยู่ในระยะห่างที่เหมาะสมจากท่อย่อย (ทั้งสองฝั่ง)
+        // ใช้ระยะห่างที่ใกล้ที่สุดเป็นฐานในการหาสปริงเกลอร์ทั้งสองแถว
+        const tolerance = Math.max(0.5, minDistance * 0.4);
         const selected: Coordinate[] = [];
-        for (const pd of pointDistances) {
-            if (Math.abs(pd.dist - halfSpacing) <= tol) selected.push(pd.sprinkler);
+        
+        // หาสปริงเกลอร์ที่อยู่ในระยะห่างที่ใกล้กับ minDistance (แถวแรก)
+        for (const pd of sortedDistances) {
+            if (Math.abs(pd.dist - minDistance) <= tolerance) {
+                selected.push(pd.sprinkler);
+            }
         }
+        
+        // หาสปริงเกลอร์ที่อยู่ในระยะห่างที่ใกล้กับ minDistance * 2 (แถวที่สอง)
+        const secondRowDistance = minDistance * 2;
+        for (const pd of sortedDistances) {
+            if (Math.abs(pd.dist - secondRowDistance) <= tolerance) {
+                selected.push(pd.sprinkler);
+            }
+        }
+        
         return selected;
     };
     
@@ -2448,7 +2863,7 @@ const buildZoneConnectivityLongestFlows = (
             
             if (isBetweenRows) {
                 // ใช้การคำนวณแบบโหมดระหว่างแถว
-                const connectedSprinklers = findNearbyConnectedSprinklersBetweenRows(lat.coordinates, sprinklerPoints, 1.5);
+                const connectedSprinklers = findNearbyConnectedSprinklersBetweenRows(lat.coordinates, sprinklerPoints);
                 return connectedSprinklers.length;
             } else {
                 // ใช้การคำนวณแบบปกติ
@@ -2500,7 +2915,7 @@ const buildZoneConnectivityLongestFlows = (
                     
                     if (isBetweenRows) {
                         // สำหรับโหมดระหว่างแถว: คำนวณสปริงเกลอร์ทั้งสองแถวที่ท่อย่อยลากผ่าน
-                        const connectedSprinklers = findNearbyConnectedSprinklersBetweenRows(latLongest.coordinates, sprinklerPoints, 1.5);
+                        const connectedSprinklers = findNearbyConnectedSprinklersBetweenRows(latLongest.coordinates, sprinklerPoints);
                         
                         // หาสปริงเกลอร์ที่อยู่ใกล้ท่อย่อยมากที่สุดเพื่อกำหนดแถว
                         const closestSprinklers = sprinklerPoints
@@ -2539,7 +2954,9 @@ const buildZoneConnectivityLongestFlows = (
                                     const point = turf.point([sprinkler.lng, sprinkler.lat]);
                                     const dKm = pointToLineDistance(point, line as unknown as GeoFeature<GeoLineString>, { units: 'kilometers' });
                                     const dist = dKm * 1000;
-                                    return Math.abs(dist - avgDistance) <= tolerance;
+                                    // หาสปริงเกลอร์ในแถวขวา (ระยะห่างประมาณ 2 เท่าของ avgDistance)
+                                    const rightRowDistance = avgDistance * 2;
+                                    return Math.abs(dist - rightRowDistance) <= tolerance;
                                 } catch {
                                     return false;
                                 }
@@ -2549,27 +2966,16 @@ const buildZoneConnectivityLongestFlows = (
                             latLongestUnits = leftRowSprinklers.length + rightRowSprinklers.length;
                             
                             // Debug logging สำหรับโหมดระหว่างแถว
-                            if (DEBUG_SUMMARY_LOGS) {
-                                console.log(`🌾 Zone ${zone.id}: Between rows mode detected`);
-                                console.log(`📏 Min distance: ${minDistance.toFixed(2)}m, Avg distance: ${avgDistance.toFixed(2)}m`);
-                                console.log(`🚿 Left row sprinklers: ${leftRowSprinklers.length}, Right row sprinklers: ${rightRowSprinklers.length}`);
-                                console.log(`💧 Total units: ${latLongestUnits}, Flow: ${latLongestFlow.toFixed(2)} L/min`);
-                            }
+                            console.log(`🌾 Zone ${zone.id}: Between rows mode - ${latLongestUnits} units, ${(latLongestUnits * perSprinkler).toFixed(2)} L/min`);
                         } else {
                             // ถ้าไม่สามารถหาสปริงเกลอร์ทั้งสองแถวได้ ใช้วิธีเดิม
                             latLongestUnits = connectedSprinklers.length;
                             
-                            if (DEBUG_SUMMARY_LOGS) {
-                                console.log(`🌾 Zone ${zone.id}: Between rows mode (fallback), Units: ${latLongestUnits}`);
-                            }
                         }
                     } else {
                         // สำหรับโหมดปกติ
                         latLongestUnits = lateralUnits(latLongest);
                         
-                        if (DEBUG_SUMMARY_LOGS) {
-                            console.log(`🌾 Zone ${zone.id}: Normal mode, Units: ${latLongestUnits}`);
-                        }
                     }
                 }
             }
@@ -2594,22 +3000,53 @@ const buildZoneConnectivityLongestFlows = (
     });
     
     const computeSubFlow = (sid: string): { latCount: number; flow: number } => {
-        // Use connection points count instead of lateral count
-        const latCount = connectionPointsBySubmain[sid] || 0;
-        
         // Calculate flow based on connected laterals
         const latIds = Object.entries(latToSub)
             .filter(([, subId]) => subId === sid)
             .map(([latId]) => latId);
         
+        // Use actual connected laterals count instead of connection points
+        const latCount = latIds.length;
+        
         let totalFlow = 0;
+        const debugInfo: {
+            latCount: number;
+            latIds: string[];
+            perSprinkler: number;
+            totalFlow: number;
+            lateralDetails: Array<{
+                lid: string;
+                found: boolean;
+                hasLine?: boolean;
+                sprinklerPoints?: number;
+                distances?: number;
+                minDistance?: number;
+                isBetweenRows?: boolean;
+                connectedSprinklers?: number;
+                lateralUnits?: number;
+                lateralFlow?: number;
+            }>;
+        } = {
+            latCount,
+            latIds,
+            perSprinkler,
+            totalFlow: 0,
+            lateralDetails: []
+        };
+        
         latIds.forEach((lid) => {
             const lp = lats.find((p) => String(p.id) === lid);
-            if (!lp) return;
+            if (!lp) {
+                debugInfo.lateralDetails.push({ lid, found: false });
+                return;
+            }
             
             // ตรวจสอบว่าเป็นท่อย่อยแบบโหมดระหว่างแถวหรือไม่
             const line = toLine(lp);
-            if (!line) return;
+            if (!line) {
+                debugInfo.lateralDetails.push({ lid, found: true, hasLine: false });
+                return;
+            }
             
             const sprinklerPoints = irrigationPoints
                 .filter((pt) => {
@@ -2618,7 +3055,10 @@ const buildZoneConnectivityLongestFlows = (
                 })
                 .map(pt => ({ lat: pt.lat, lng: pt.lng }));
             
-            if (sprinklerPoints.length === 0) return;
+            if (sprinklerPoints.length === 0) {
+                debugInfo.lateralDetails.push({ lid, found: true, hasLine: true, sprinklerPoints: 0 });
+                return;
+            }
             
             // คำนวณระยะห่างจากสปริงเกลอร์ไปยังท่อย่อย
             const distances = sprinklerPoints.map(sprinkler => {
@@ -2631,28 +3071,63 @@ const buildZoneConnectivityLongestFlows = (
                 }
             }).filter(d => d < Infinity);
             
-            if (distances.length === 0) return;
+            if (distances.length === 0) {
+                debugInfo.lateralDetails.push({ lid, found: true, hasLine: true, sprinklerPoints: sprinklerPoints.length, distances: 0 });
+                return;
+            }
             
             const minDistance = Math.min(...distances);
             const isBetweenRows = minDistance > 1.5 && minDistance < 5.0;
             
+            let lateralFlow = 0;
             if (isBetweenRows) {
                 // สำหรับโหมดระหว่างแถว: คำนวณสปริงเกลอร์ทั้งสองแถวที่ท่อย่อยลากผ่าน
-                const connectedSprinklers = findNearbyConnectedSprinklersBetweenRows(lp.coordinates, sprinklerPoints, 1.5);
-                totalFlow += connectedSprinklers.length * perSprinkler;
+                const connectedSprinklers = findNearbyConnectedSprinklersBetweenRows(lp.coordinates, sprinklerPoints);
+                lateralFlow = connectedSprinklers.length * perSprinkler;
+                debugInfo.lateralDetails.push({ 
+                    lid, 
+                    found: true, 
+                    hasLine: true, 
+                    sprinklerPoints: sprinklerPoints.length, 
+                    distances: distances.length,
+                    minDistance,
+                    isBetweenRows,
+                    connectedSprinklers: connectedSprinklers.length,
+                    lateralFlow
+                });
             } else {
                 // สำหรับโหมดปกติ: คำนวณสปริงเกลอร์ที่เชื่อมต่อโดยตรง
                 const n = lateralUnits(lp);
-                totalFlow += n * perSprinkler;
+                lateralFlow = n * perSprinkler;
+                debugInfo.lateralDetails.push({ 
+                    lid, 
+                    found: true, 
+                    hasLine: true, 
+                    sprinklerPoints: sprinklerPoints.length, 
+                    distances: distances.length,
+                    minDistance,
+                    isBetweenRows,
+                    lateralUnits: n,
+                    lateralFlow
+                });
             }
+            
+            totalFlow += lateralFlow;
         });
+        
+        debugInfo.totalFlow = totalFlow;
+        
+        // Debug logging for troubleshooting
+        if (totalFlow === 0 && latIds.length > 0) {
+            console.log(`🔍 Submain ${sid} flow calculation debug:`, debugInfo);
+        }
         
         return { latCount, flow: totalFlow };
     };
     const subLongestStats = subLongest ? computeSubFlow(String(subLongest.id)) : { latCount: 0, flow: 0 };
 
     // Main highest-flow selection (among mains connected to any submains in this zone)
-    // For each main: flow = (max submain flow among its submains) × (# of connected submains)
+    // For each main: รวมอัตราการไหลของท่อเมนย่อยที่เชื่อมกับท่อเมนมารวมกัน
     const connectedMainIds = Array.from(new Set(Object.values(subToMain)));
     const connectedMains = mainsAll.filter((m) => connectedMainIds.includes(String(m.id)));
     const mainIdToSubIds: Record<string, Array<string>> = {};
@@ -2671,14 +3146,21 @@ const buildZoneConnectivityLongestFlows = (
         const subIds = mainIdToSubIds[mid] || [];
         const subCount = subIds.length;
         if (subCount === 0) return;
-        let bestSubFlow = 0;
+        
+        // รวมอัตราการไหลของท่อเมนย่อยที่เชื่อมกับท่อเมนมารวมกัน
+        let totalMainFlow = 0;
         subIds.forEach((sid) => {
-            const f = computeSubFlow(sid).flow;
-            if (f > bestSubFlow) bestSubFlow = f;
+            const subFlow = computeSubFlow(sid).flow;
+            totalMainFlow += subFlow;
         });
-        const flowAtMain = bestSubFlow * subCount;
-        if (flowAtMain > bestMainFlow) {
-            bestMainFlow = flowAtMain;
+        
+        // Debug logging for troubleshooting
+        if (totalMainFlow === 0 && subIds.length > 0) {
+            console.log(`🔍 Main ${m.id} flow calculation debug:`, { mainId: m.id, subCount, totalMainFlow });
+        }
+        
+        if (totalMainFlow > bestMainFlow) {
+            bestMainFlow = totalMainFlow;
             bestMainId = m.id;
             bestMainSubCount = subCount;
         }
@@ -2697,6 +3179,13 @@ const buildZoneConnectivityLongestFlows = (
             bestMainSubCount = (mainIdToSubIds[mid] || []).length;
         }
     }
+
+    // Debug logging for final results
+    console.log(`🔍 Zone ${zone.id} final flow calculation:`, {
+        main: { flowLMin: bestMainFlow },
+        submain: { flowLMin: subLongestStats.flow },
+        lateral: { flowLMin: latLongestFlow }
+    });
 
     return {
         main: { longestId: bestMainId, connectedSubmains: bestMainSubCount, flowLMin: bestMainFlow },
@@ -3257,13 +3746,52 @@ export default function FieldCropSummary() {
             const fromProps = (summaryData as Partial<FieldCropSummaryProps> | null)?.irrigationSettings as unknown as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }> | undefined;
             if (fromProps && typeof fromProps === 'object') return fromProps;
             const data = localStorage.getItem('fieldCropData');
-            if (!data) return {} as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>;
+            if (!data) {
+                // Return default flow settings if no data found
+                return {
+                    sprinkler_system: { flow: 30, coverageRadius: 5 }, // Default 30 L/min for sprinklers
+                    pivot: { flow: 50, coverageRadius: 10 }, // Default 50 L/min for pivots
+                    water_jet_tape: { flow: 20, coverageRadius: 3 }, // Default 20 L/min for water jet tape
+                    drip_tape: { flow: 10, coverageRadius: 1 } // Default 10 L/min for drip tape
+                } as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>;
+            }
             const parsed = JSON.parse(data) as { irrigationSettings?: Record<string, { flow?: number; coverageRadius?: number; pressure?: number }> } | null;
-            return parsed?.irrigationSettings || ({} as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>);
+            const settings = parsed?.irrigationSettings || {};
+            
+            // Ensure default flow values if not set
+            if (!settings.sprinkler_system?.flow) {
+                settings.sprinkler_system = { ...settings.sprinkler_system, flow: 30 };
+            }
+            if (!settings.pivot?.flow) {
+                settings.pivot = { ...settings.pivot, flow: 50 };
+            }
+            if (!settings.water_jet_tape?.flow) {
+                settings.water_jet_tape = { ...settings.water_jet_tape, flow: 20 };
+            }
+            if (!settings.drip_tape?.flow) {
+                settings.drip_tape = { ...settings.drip_tape, flow: 10 };
+            }
+            
+            return settings as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>;
         } catch {
-            return {} as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>;
+            // Return default flow settings on error
+            return {
+                sprinkler_system: { flow: 30, coverageRadius: 5 },
+                pivot: { flow: 50, coverageRadius: 10 },
+                water_jet_tape: { flow: 20, coverageRadius: 3 },
+                drip_tape: { flow: 10, coverageRadius: 1 }
+            } as Record<string, { flow?: number; coverageRadius?: number; pressure?: number }>;
         }
     }, [summaryData]);
+
+    // Debug logging for irrigation settings
+    useEffect(() => {
+        console.log('🔍 Irrigation Settings Debug:', {
+            sprinklerFlow: irrigationSettingsData?.sprinkler_system?.flow,
+            actualPipes: actualPipes.length,
+            actualIrrigationPoints: actualIrrigationPoints.length
+        });
+    }, [irrigationSettingsData, actualPipes, actualIrrigationPoints]);
 
     // Build global pipe network connectivity & flow summary
     const pipeNetworkSummary = useMemo(() => {
@@ -4282,6 +4810,142 @@ export default function FieldCropSummary() {
                                             </div>
                                         </div>
                                     </div>
+                                    
+                                    {/* Connection Points Summary */}
+                                    <div className="mb-3">
+                                        <h3 className="mb-2 text-sm font-semibold text-yellow-400 print:text-xs print:text-black">
+                                            🔗 {t('Connection Points')}
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {(() => {
+                                                // สร้างจุดเชื่อมต่อทั้งหมดเพื่อนับจำนวน
+                                                const allConnectionPoints: Array<{
+                                                    id: string;
+                                                    position: Coordinate;
+                                                    connectedLaterals: string[];
+                                                    submainId: string;
+                                                    type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+                                                }> = [];
+
+                                                // สร้างจุดเชื่อมต่อของท่อย่อยกับท่อเมนย่อย
+                                                const lateralPipes = actualPipes.filter(p => p.type === 'lateral');
+                                                const submainPipes = actualPipes.filter(p => p.type === 'submain');
+                                                
+                                                if (lateralPipes.length > 0 && submainPipes.length > 0) {
+                                                    const lateralConnectionPoints = createLateralConnectionPoints(lateralPipes, submainPipes);
+                                                    allConnectionPoints.push(...lateralConnectionPoints);
+                                                }
+
+                                                // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
+                                                const submainToMainConnectionPoints = createSubmainToMainConnectionPoints(actualPipes);
+                                                allConnectionPoints.push(...submainToMainConnectionPoints);
+
+                                                // นับจำนวนจุดเชื่อมต่อแต่ละสี
+                                                const connectionCounts = {
+                                                    red: allConnectionPoints.filter(cp => cp.type === 'l_shape').length,
+                                                    blue: allConnectionPoints.filter(cp => cp.type === 't_shape').length,
+                                                    purple: allConnectionPoints.filter(cp => cp.type === 'cross_shape').length,
+                                                    yellow: allConnectionPoints.filter(cp => cp.type === 'junction' || cp.type === 'single').length,
+                                                    green: allConnectionPoints.filter(cp => cp.type === 'crossing').length
+                                                };
+
+                                                const totalConnectionPoints = Object.values(connectionCounts).reduce((sum, count) => sum + count, 0);
+
+                                                return (
+                                                    <div className="space-y-2">
+                                                        {/* สรุปจำนวนจุดเชื่อมต่อทั้งหมด */}
+                                                        <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                            <div className="text-center">
+                                                                <span className="text-sm font-bold text-yellow-300 print:text-black">
+                                                                    {totalConnectionPoints} {t('Connection Points')}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* แสดงจำนวนจุดเชื่อมต่อแต่ละสี */}
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            {/* สีแดง - L-shape */}
+                                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-3 h-3 rounded-full bg-red-500 border border-white"></div>
+                                                                        <span className="text-xs text-gray-300 print:text-gray-700">
+                                                                            {t('L-shape')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-red-400 print:text-black">
+                                                                        {connectionCounts.red}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* สีน้ำเงิน - T-shape */}
+                                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-3 h-3 rounded-full bg-blue-500 border border-white"></div>
+                                                                        <span className="text-xs text-gray-300 print:text-gray-700">
+                                                                            {t('T-shape')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-blue-400 print:text-black">
+                                                                        {connectionCounts.blue}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* สีม่วง - + shape */}
+                                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-3 h-3 rounded-full bg-purple-500 border border-white"></div>
+                                                                        <span className="text-xs text-gray-300 print:text-gray-700">
+                                                                            {t('+ shape')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-purple-400 print:text-black">
+                                                                        {connectionCounts.purple}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* สีเหลือง - Junction/Single */}
+                                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-3 h-3 rounded-full bg-yellow-500 border border-white"></div>
+                                                                        <span className="text-xs text-gray-300 print:text-gray-700">
+                                                                            {t('Junction')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-yellow-400 print:text-black">
+                                                                        {connectionCounts.yellow}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* สีเขียว - Crossing */}
+                                                            <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-3 h-3 rounded-full bg-green-500 border border-white"></div>
+                                                                        <span className="text-xs text-gray-300 print:text-gray-700">
+                                                                            {t('Crossing')}
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-xs font-bold text-green-400 print:text-black">
+                                                                        {connectionCounts.green}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+
+
                                     <div className="mb-3">
                                         <h3 className="mb-2 text-sm font-semibold text-orange-400 print:text-xs print:text-black">
                                             ⚙️ {t('Equipment')}
@@ -4508,6 +5172,33 @@ export default function FieldCropSummary() {
                                         🎯 {t('Zone Details & Irrigation Systems (liters per irrigation)')}
                                     </h2>
                                     <div className="space-y-3 print:space-y-2">
+                                        {(() => {
+                                            // คำนวณและแสดงผลรวมการไหลของทุกโซนทีเดียว
+                                            const allZoneFlows = actualZones.map(zone => {
+                                                try {
+                                                    const zFlows = buildZoneConnectivityLongestFlows(zone, actualPipes, actualIrrigationPoints, irrigationSettingsData || {});
+                                                    return {
+                                                        zoneId: zone.id,
+                                                        zoneName: zone.name,
+                                                        mainFlow: zFlows.main.flowLMin,
+                                                        submainFlow: zFlows.submain.flowLMin,
+                                                        lateralFlow: zFlows.lateral.flowLMin
+                                                    };
+                                                } catch {
+                                                    return {
+                                                        zoneId: zone.id,
+                                                        zoneName: zone.name,
+                                                        mainFlow: 0,
+                                                        submainFlow: 0,
+                                                        lateralFlow: 0
+                                                    };
+                                                }
+                                            });
+                                            
+                                            console.log('🔍 All Zone Flow Calculations:', allZoneFlows);
+                                            
+                                            return null;
+                                        })()}
                                         {actualZones.map((zone) => {
                                             const summary = calculatedZoneSummaries[zone.id];
                                             const assignedCrop = zoneAssignments[zone.id]
@@ -4790,7 +5481,9 @@ export default function FieldCropSummary() {
                                                                             let zFlows = zeroFlows;
                                                                             try {
                                                                                 zFlows = buildZoneConnectivityLongestFlows(zone, actualPipes, actualIrrigationPoints, irrigationSettingsData || {});
-                                                                            } catch {
+                                                                                
+                                                                            } catch (error) {
+                                                                                console.error(`❌ Error calculating flows for zone ${zone.id}:`, error);
                                                                                 // Keep zeroFlows fallback so the header still renders
                                                                             }
                                                                             const header = (
@@ -4974,6 +5667,147 @@ export default function FieldCropSummary() {
                                                                                 </span>
                                                                             </div>
                                                                         </div>
+
+                                                                        {/* Connection Points in Zone */}
+                                                                        {(() => {
+                                                                            // สร้างจุดเชื่อมต่อทั้งหมดเพื่อนับจำนวนในโซนนี้
+                                                                            const allConnectionPoints: Array<{
+                                                                                id: string;
+                                                                                position: Coordinate;
+                                                                                connectedLaterals: string[];
+                                                                                submainId: string;
+                                                                                type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+                                                                            }> = [];
+
+                                                                            // สร้างจุดเชื่อมต่อของท่อย่อยกับท่อเมนย่อย
+                                                                            const lateralPipes = actualPipes.filter(p => p.type === 'lateral');
+                                                                            const submainPipes = actualPipes.filter(p => p.type === 'submain');
+                                                                            
+                                                                            if (lateralPipes.length > 0 && submainPipes.length > 0) {
+                                                                                const lateralConnectionPoints = createLateralConnectionPoints(lateralPipes, submainPipes);
+                                                                                allConnectionPoints.push(...lateralConnectionPoints);
+                                                                            }
+
+                                                                            // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
+                                                                            const submainToMainConnectionPoints = createSubmainToMainConnectionPoints(actualPipes);
+                                                                            allConnectionPoints.push(...submainToMainConnectionPoints);
+
+                                                                            // กรองจุดเชื่อมต่อที่อยู่ในโซนนี้
+                                                                            const zoneConnectionPoints = allConnectionPoints.filter(cp => {
+                                                                                return isPointInPolygonEnhanced([cp.position.lat, cp.position.lng], zone.coordinates);
+                                                                            });
+
+                                                                            // นับจำนวนจุดเชื่อมต่อแต่ละสีในโซนนี้
+                                                                            const zoneConnectionCounts = {
+                                                                                red: zoneConnectionPoints.filter(cp => cp.type === 'l_shape').length,
+                                                                                blue: zoneConnectionPoints.filter(cp => cp.type === 't_shape').length,
+                                                                                purple: zoneConnectionPoints.filter(cp => cp.type === 'cross_shape').length,
+                                                                                yellow: zoneConnectionPoints.filter(cp => cp.type === 'junction' || cp.type === 'single').length,
+                                                                                green: zoneConnectionPoints.filter(cp => cp.type === 'crossing').length
+                                                                            };
+
+                                                                            const totalZoneConnectionPoints = Object.values(zoneConnectionCounts).reduce((sum, count) => sum + count, 0);
+
+                                                                            // ถ้าไม่มีจุดเชื่อมต่อในโซนนี้ ให้ข้าม
+                                                                            if (totalZoneConnectionPoints === 0) return null;
+
+                                                                            return (
+                                                                                <div className="mt-3 rounded-lg bg-purple-900/30 p-3 print:border print:bg-purple-50">
+                                                                                    <h4 className="mb-2 text-sm font-semibold text-purple-300 print:text-purple-800">
+                                                                                        🔗 {t('Connection Points in Zone')}
+                                                                                    </h4>
+                                                                                    
+                                                                                    {/* แสดงจำนวนรวม */}
+                                                                                    <div className="mb-2 text-center">
+                                                                                        <span className="text-sm font-bold text-purple-200 print:text-purple-900">
+                                                                                            {totalZoneConnectionPoints} {t('connection points')}
+                                                                                        </span>
+                                                                                    </div>
+
+                                                                                    {/* แสดงจำนวนจุดเชื่อมต่อแต่ละสีในโซนนี้ */}
+                                                                                    <div className="grid grid-cols-5 gap-1">
+                                                                                        {/* สีแดง */}
+                                                                                        <div className="rounded bg-gray-600 p-1 text-center print:border">
+                                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                                <div className="w-2 h-2 rounded-full bg-red-500 border border-white"></div>
+                                                                                                <span className="text-xs font-bold text-red-400 print:text-black">
+                                                                                                    {zoneConnectionCounts.red}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {/* สีน้ำเงิน */}
+                                                                                        <div className="rounded bg-gray-600 p-1 text-center print:border">
+                                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                                <div className="w-2 h-2 rounded-full bg-blue-500 border border-white"></div>
+                                                                                                <span className="text-xs font-bold text-blue-400 print:text-black">
+                                                                                                    {zoneConnectionCounts.blue}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {/* สีม่วง */}
+                                                                                        <div className="rounded bg-gray-600 p-1 text-center print:border">
+                                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                                <div className="w-2 h-2 rounded-full bg-purple-500 border border-white"></div>
+                                                                                                <span className="text-xs font-bold text-purple-400 print:text-black">
+                                                                                                    {zoneConnectionCounts.purple}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {/* สีเหลือง */}
+                                                                                        <div className="rounded bg-gray-600 p-1 text-center print:border">
+                                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                                <div className="w-2 h-2 rounded-full bg-yellow-500 border border-white"></div>
+                                                                                                <span className="text-xs font-bold text-yellow-400 print:text-black">
+                                                                                                    {zoneConnectionCounts.yellow}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        {/* สีเขียว */}
+                                                                                        <div className="rounded bg-gray-600 p-1 text-center print:border">
+                                                                                            <div className="flex flex-col items-center gap-1">
+                                                                                                <div className="w-2 h-2 rounded-full bg-green-500 border border-white"></div>
+                                                                                                <span className="text-xs font-bold text-green-400 print:text-black">
+                                                                                                    {zoneConnectionCounts.green}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    {/* แสดงรายละเอียดเพิ่มเติม */}
+                                                                                    <div className="mt-2 text-xs text-purple-200 print:text-purple-700">
+                                                                                        {zoneConnectionCounts.red > 0 && (
+                                                                                            <span className="mr-2">
+                                                                                                {t('L-shape')}: {zoneConnectionCounts.red}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {zoneConnectionCounts.blue > 0 && (
+                                                                                            <span className="mr-2">
+                                                                                                {t('T-shape')}: {zoneConnectionCounts.blue}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {zoneConnectionCounts.purple > 0 && (
+                                                                                            <span className="mr-2">
+                                                                                                {t('+ shape')}: {zoneConnectionCounts.purple}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {zoneConnectionCounts.yellow > 0 && (
+                                                                                            <span className="mr-2">
+                                                                                                {t('Junction')}: {zoneConnectionCounts.yellow}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        {zoneConnectionCounts.green > 0 && (
+                                                                                            <span className="mr-2">
+                                                                                                {t('Crossing')}: {zoneConnectionCounts.green}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
                                                                     </div>
                                                                 </div>
                                                             </div>
