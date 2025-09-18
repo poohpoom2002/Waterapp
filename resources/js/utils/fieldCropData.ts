@@ -16,7 +16,7 @@ interface EnhancedPipeStats {
 
 export interface FieldCropData {
     area: {
-        size: number; 
+        size: number;
         sizeInRai: number;
         coordinates: any[];
     };
@@ -31,13 +31,13 @@ export interface FieldCropData {
             cropType?: string;
             totalPlantingPoints: number;
             sprinklerCount: number;
-            totalWaterRequirementPerDay: number; 
+            totalWaterRequirementPerDay: number;
             pipeStats: {
                 main: EnhancedPipeStats;
                 submain: EnhancedPipeStats;
                 lateral: EnhancedPipeStats;
                 combined: {
-                    longestPath: number; 
+                    longestPath: number;
                     totalLength: number;
                     totalCount: number;
                 };
@@ -73,7 +73,17 @@ export interface FieldCropData {
         };
         points: any[];
         lines: any[];
-        settings?: Record<string, { flow?: number; coverageRadius?: number; pressure?: number; emitterSpacing?: number; placement?: string; side?: string }>;
+        settings?: Record<
+            string,
+            {
+                flow?: number;
+                coverageRadius?: number;
+                pressure?: number;
+                emitterSpacing?: number;
+                placement?: string;
+                side?: string;
+            }
+        >;
     };
     crops: {
         selectedCrops: string[];
@@ -81,7 +91,7 @@ export interface FieldCropData {
     };
     summary: {
         totalPlantingPoints: number;
-        totalWaterRequirementPerDay: number; 
+        totalWaterRequirementPerDay: number;
         totalEstimatedYield: number;
         totalEstimatedIncome: number;
         irrigationEfficiency: number;
@@ -93,7 +103,7 @@ export const calculateEnhancedPipeLength = (coordinates: any[]): number => {
 
     try {
         let totalLength = 0;
-        
+
         for (let i = 0; i < coordinates.length - 1; i++) {
             const point1 = coordinates[i];
             const point2 = coordinates[i + 1];
@@ -101,8 +111,12 @@ export const calculateEnhancedPipeLength = (coordinates: any[]): number => {
             if (Array.isArray(point1) && Array.isArray(point2)) {
                 [lat1, lng1] = point1.length === 2 ? point1 : [point1[0], point1[1]];
                 [lat2, lng2] = point2.length === 2 ? point2 : [point2[0], point2[1]];
-            } else if (point1?.lat !== undefined && point1?.lng !== undefined && 
-                       point2?.lat !== undefined && point2?.lng !== undefined) {
+            } else if (
+                point1?.lat !== undefined &&
+                point1?.lng !== undefined &&
+                point2?.lat !== undefined &&
+                point2?.lng !== undefined
+            ) {
                 lat1 = point1.lat;
                 lng1 = point1.lng;
                 lat2 = point2.lat;
@@ -117,19 +131,22 @@ export const calculateEnhancedPipeLength = (coordinates: any[]): number => {
                 continue;
             }
 
-            const R = 6371000; 
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLng = (lng2 - lng1) * Math.PI / 180;
-            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                     Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const R = 6371000;
+            const dLat = ((lat2 - lat1) * Math.PI) / 180;
+            const dLng = ((lng2 - lng1) * Math.PI) / 180;
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos((lat1 * Math.PI) / 180) *
+                    Math.cos((lat2 * Math.PI) / 180) *
+                    Math.sin(dLng / 2) *
+                    Math.sin(dLng / 2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             const distance = R * c;
 
             totalLength += distance;
         }
 
-        return Math.round(totalLength * 100) / 100; 
+        return Math.round(totalLength * 100) / 100;
     } catch (error) {
         console.error('Error calculating pipe length:', error);
         return 0;
@@ -137,8 +154,13 @@ export const calculateEnhancedPipeLength = (coordinates: any[]): number => {
 };
 
 export const calculateEnhancedPipeStats = (pipes: any[], pipeType: string): EnhancedPipeStats => {
-    const typePipes = pipes.filter(pipe => {
-        if (!pipe || !pipe.coordinates || !Array.isArray(pipe.coordinates) || pipe.coordinates.length < 2) {
+    const typePipes = pipes.filter((pipe) => {
+        if (
+            !pipe ||
+            !pipe.coordinates ||
+            !Array.isArray(pipe.coordinates) ||
+            pipe.coordinates.length < 2
+        ) {
             return false;
         }
 
@@ -152,21 +174,21 @@ export const calculateEnhancedPipeStats = (pipes: any[], pipeType: string): Enha
             longest: 0,
             totalLength: 0,
             averageLength: 0,
-            details: []
+            details: [],
         };
     }
 
-    const pipeDetails = typePipes.map(pipe => {
+    const pipeDetails = typePipes.map((pipe) => {
         const length = calculateEnhancedPipeLength(pipe.coordinates);
         return {
             id: pipe.id,
             length: length,
             type: pipeType,
-            zoneId: pipe.zoneId
+            zoneId: pipe.zoneId,
         };
     });
 
-    const lengths = pipeDetails.map(detail => detail.length);
+    const lengths = pipeDetails.map((detail) => detail.length);
     const totalLength = lengths.reduce((sum, length) => sum + length, 0);
     const longestLength = Math.max(...lengths, 0);
     const averageLength = totalLength / lengths.length;
@@ -176,7 +198,7 @@ export const calculateEnhancedPipeStats = (pipes: any[], pipeType: string): Enha
         longest: Math.round(longestLength * 100) / 100,
         totalLength: Math.round(totalLength * 100) / 100,
         averageLength: Math.round(averageLength * 100) / 100,
-        details: pipeDetails
+        details: pipeDetails,
     };
 };
 
@@ -191,42 +213,57 @@ export const identifyPipeTypeEnhanced = (pipe: any): string => {
     const colorMappings = [
         { colors: ['blue', '#2563eb', '#3b82f6', 'rgb(37, 99, 235)'], type: 'main' },
         { colors: ['green', '#16a34a', '#22c55e', 'rgb(22, 163, 74)'], type: 'submain' },
-        { colors: ['orange', 'purple', '#ea580c', '#8b5cf6', 'rgb(234, 88, 12)', 'rgb(139, 92, 246)'], type: 'lateral' },
-        { colors: ['yellow', '#eab308', '#fbbf24', 'rgb(234, 179, 8)'], type: 'lateral' }
+        {
+            colors: [
+                'orange',
+                'purple',
+                '#ea580c',
+                '#8b5cf6',
+                'rgb(234, 88, 12)',
+                'rgb(139, 92, 246)',
+            ],
+            type: 'lateral',
+        },
+        { colors: ['yellow', '#eab308', '#fbbf24', 'rgb(234, 179, 8)'], type: 'lateral' },
     ];
 
     const pipeColor = (pipe.color || pipe.pathOptions?.color || '').toLowerCase();
-    
+
     for (const mapping of colorMappings) {
-        if (mapping.colors.some(color => pipeColor.includes(color))) {
+        if (mapping.colors.some((color) => pipeColor.includes(color))) {
             return mapping.type;
         }
     }
 
     if (pipe.coordinates && pipe.coordinates.length >= 2) {
         const length = calculateEnhancedPipeLength(pipe.coordinates);
-        
-        if (length > 200) return 'main';      
-        if (length > 100) return 'submain';   
-        return 'lateral';                     
+
+        if (length > 200) return 'main';
+        if (length > 100) return 'submain';
+        return 'lateral';
     }
 
     return 'lateral';
 };
 
 export const calculateEnhancedZonePipeStats = (pipes: any[], zoneId: string, zones: any[]) => {
-    const currentZone = zones.find(zone => zone.id.toString() === zoneId);
+    const currentZone = zones.find((zone) => zone.id.toString() === zoneId);
     if (!currentZone) {
         return {
             main: { count: 0, longest: 0, totalLength: 0, averageLength: 0, details: [] },
             submain: { count: 0, longest: 0, totalLength: 0, averageLength: 0, details: [] },
             lateral: { count: 0, longest: 0, totalLength: 0, averageLength: 0, details: [] },
-            combined: { longestPath: 0, totalLength: 0, totalCount: 0 }
+            combined: { longestPath: 0, totalLength: 0, totalCount: 0 },
         };
     }
 
-    const zonePipes = pipes.filter(pipe => {
-        if (!pipe || !pipe.coordinates || !Array.isArray(pipe.coordinates) || pipe.coordinates.length < 2) {
+    const zonePipes = pipes.filter((pipe) => {
+        if (
+            !pipe ||
+            !pipe.coordinates ||
+            !Array.isArray(pipe.coordinates) ||
+            pipe.coordinates.length < 2
+        ) {
             return false;
         }
 
@@ -250,8 +287,8 @@ export const calculateEnhancedZonePipeStats = (pipes: any[], zoneId: string, zon
         combined: {
             longestPath: Math.round(longestPath * 100) / 100,
             totalLength: Math.round(totalLength * 100) / 100,
-            totalCount: totalCount
-        }
+            totalCount: totalCount,
+        },
     };
     return result;
 };
@@ -276,7 +313,7 @@ export const isPipeInZoneEnhanced = (pipe: any, zone: any): boolean => {
 
         for (const point of testPoints) {
             let lat: number, lng: number;
-            
+
             if (Array.isArray(point) && point.length >= 2) {
                 [lat, lng] = point;
             } else if (point && typeof point.lat === 'number' && typeof point.lng === 'number') {
@@ -302,14 +339,16 @@ export const isPointInPolygonEnhanced = (point: [number, number], polygon: any[]
     const [lat, lng] = point;
     let inside = false;
 
-    const polygonPoints = polygon.map(coord => {
-        if (Array.isArray(coord) && coord.length >= 2) {
-            return [coord[0], coord[1]];
-        } else if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
-            return [coord.lat, coord.lng];
-        }
-        return null;
-    }).filter(p => p !== null);
+    const polygonPoints = polygon
+        .map((coord) => {
+            if (Array.isArray(coord) && coord.length >= 2) {
+                return [coord[0], coord[1]];
+            } else if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
+                return [coord.lat, coord.lng];
+            }
+            return null;
+        })
+        .filter((p) => p !== null);
 
     if (polygonPoints.length < 3) return false;
 
@@ -317,7 +356,7 @@ export const isPointInPolygonEnhanced = (point: [number, number], polygon: any[]
         const [xi, yi] = polygonPoints[i];
         const [xj, yj] = polygonPoints[j];
 
-        if (((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi)) {
+        if (yi > lng !== yj > lng && lat < ((xj - xi) * (lng - yi)) / (yj - yi) + xi) {
             inside = !inside;
         }
     }
@@ -328,8 +367,12 @@ export const isPointInPolygonEnhanced = (point: [number, number], polygon: any[]
 export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => {
     const zones = Array.isArray(summaryData.zones) ? summaryData.zones : [];
     const pipes = Array.isArray(summaryData.pipes) ? summaryData.pipes : [];
-    const irrigationPoints = Array.isArray(summaryData.irrigationPoints) ? summaryData.irrigationPoints : [];
-    const irrigationLines = Array.isArray(summaryData.irrigationLines) ? summaryData.irrigationLines : [];
+    const irrigationPoints = Array.isArray(summaryData.irrigationPoints)
+        ? summaryData.irrigationPoints
+        : [];
+    const irrigationLines = Array.isArray(summaryData.irrigationLines)
+        ? summaryData.irrigationLines
+        : [];
     const mainPipeStats = calculateEnhancedPipeStats(pipes, 'main');
     const submainPipeStats = calculateEnhancedPipeStats(pipes, 'submain');
     const lateralPipeStats = calculateEnhancedPipeStats(pipes, 'lateral');
@@ -340,18 +383,19 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
         const crop = assignedCropValue ? getCropByValueEnhanced(assignedCropValue) : null;
         let totalPlantingPoints = 0;
         let sprinklerCount = 0;
-        let waterRequirementPerDay = 0; 
+        let waterRequirementPerDay = 0;
         if (crop && zoneArea > 0) {
-            const rowSpacing = (summaryData.rowSpacing?.[assignedCropValue] || crop.rowSpacing / 100);
-            const plantSpacing = (summaryData.plantSpacing?.[assignedCropValue] || crop.plantSpacing / 100);
-            
+            const rowSpacing = summaryData.rowSpacing?.[assignedCropValue] || crop.rowSpacing / 100;
+            const plantSpacing =
+                summaryData.plantSpacing?.[assignedCropValue] || crop.plantSpacing / 100;
+
             if (rowSpacing > 0 && plantSpacing > 0) {
                 const plantsPerSquareMeter = (1 / rowSpacing) * (1 / plantSpacing);
                 totalPlantingPoints = Math.floor(zoneArea * plantsPerSquareMeter);
             }
             sprinklerCount = irrigationPoints.filter((point: any) => {
                 if (!point || (!point.lat && !point.position)) return false;
-                
+
                 let pointCoords: [number, number];
                 if (point.lat && point.lng) {
                     pointCoords = [point.lat, point.lng];
@@ -366,22 +410,23 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
             if (sprinklerCount > totalPlantingPoints) {
                 totalPlantingPoints = sprinklerCount;
             }
-            const avgIrrigationTimeHours = 0.5; 
-            waterRequirementPerDay = totalPlantingPoints * crop.waterRequirement * (avgIrrigationTimeHours * 60);
+            const avgIrrigationTimeHours = 0.5;
+            waterRequirementPerDay =
+                totalPlantingPoints * crop.waterRequirement * (avgIrrigationTimeHours * 60);
         }
 
         return {
             id: zone.id,
             name: zone.name,
             area: zoneArea,
-            plantCount: totalPlantingPoints, 
+            plantCount: totalPlantingPoints,
             sprinklerCount: Math.max(sprinklerCount, 1),
             areaInRai: zoneArea / 1600,
             coordinates: zone.coordinates,
             cropType: assignedCropValue,
             totalPlantingPoints: totalPlantingPoints,
-            totalWaterRequirementPerDay: waterRequirementPerDay, 
-            pipeStats: zonePipeStats
+            totalWaterRequirementPerDay: waterRequirementPerDay,
+            pipeStats: zonePipeStats,
         };
     });
 
@@ -389,7 +434,7 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
         sprinkler: 0,
         dripTape: 0,
         pivot: 0,
-        waterJetTape: 0
+        waterJetTape: 0,
     } as { sprinkler: number; dripTape: number; pivot: number; waterJetTape: number };
 
     irrigationPoints.forEach((point: any) => {
@@ -411,19 +456,25 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
         else if (normalizedType === 'water_jet_tape') irrigationByType.waterJetTape++;
     });
 
-    const totalPlantingPoints = enhancedZones.reduce((sum, zone) => sum + zone.totalPlantingPoints, 0);
-    const totalWaterRequirementPerDay = enhancedZones.reduce((sum, zone) => sum + zone.totalWaterRequirementPerDay, 0); 
+    const totalPlantingPoints = enhancedZones.reduce(
+        (sum, zone) => sum + zone.totalPlantingPoints,
+        0
+    );
+    const totalWaterRequirementPerDay = enhancedZones.reduce(
+        (sum, zone) => sum + zone.totalWaterRequirementPerDay,
+        0
+    );
     const totalArea = summaryData.fieldAreaSize || 0;
 
     return {
         area: {
             size: totalArea,
             sizeInRai: totalArea / 1600,
-            coordinates: summaryData.mainField?.coordinates || []
+            coordinates: summaryData.mainField?.coordinates || [],
         },
         zones: {
             count: enhancedZones.length,
-            info: enhancedZones
+            info: enhancedZones,
         },
         pipes: {
             stats: {
@@ -431,38 +482,43 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
                 submain: submainPipeStats,
                 lateral: lateralPipeStats,
                 overall: {
-                    longestCombined: mainPipeStats.longest + submainPipeStats.longest + lateralPipeStats.longest,
-                    totalLength: mainPipeStats.totalLength + submainPipeStats.totalLength + lateralPipeStats.totalLength,
-                    totalCount: mainPipeStats.count + submainPipeStats.count + lateralPipeStats.count
-                }
+                    longestCombined:
+                        mainPipeStats.longest + submainPipeStats.longest + lateralPipeStats.longest,
+                    totalLength:
+                        mainPipeStats.totalLength +
+                        submainPipeStats.totalLength +
+                        lateralPipeStats.totalLength,
+                    totalCount:
+                        mainPipeStats.count + submainPipeStats.count + lateralPipeStats.count,
+                },
             },
             details: pipes.map((pipe: any) => ({
                 id: pipe.id,
                 type: identifyPipeTypeEnhanced(pipe),
                 coordinates: pipe.coordinates,
                 length: calculateEnhancedPipeLength(pipe.coordinates),
-                zoneId: pipe.zoneId
-            }))
+                zoneId: pipe.zoneId,
+            })),
         },
         irrigation: {
             totalCount: irrigationPoints.length + irrigationLines.length,
             byType: irrigationByType,
             points: irrigationPoints,
             lines: irrigationLines,
-            settings: (summaryData.irrigationSettings || {})
+            settings: summaryData.irrigationSettings || {},
         },
         crops: {
             selectedCrops: summaryData.selectedCrops || [],
-            zoneAssignments: summaryData.zoneAssignments || {}
+            zoneAssignments: summaryData.zoneAssignments || {},
         },
         summary: {
             totalPlantingPoints: totalPlantingPoints,
-            totalWaterRequirementPerDay: totalWaterRequirementPerDay, 
+            totalWaterRequirementPerDay: totalWaterRequirementPerDay,
             totalEstimatedYield: enhancedZones.reduce((sum, zone) => {
                 const crop = zone.cropType ? getCropByValueEnhanced(zone.cropType) : null;
                 if (crop) {
                     const areaInRai = zone.area / 1600;
-                    return sum + (areaInRai * crop.yield);
+                    return sum + areaInRai * crop.yield;
                 }
                 return sum;
             }, 0),
@@ -471,12 +527,13 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
                 if (crop) {
                     const areaInRai = zone.area / 1600;
                     const cropYield = areaInRai * crop.yield;
-                    return sum + (cropYield * crop.price);
+                    return sum + cropYield * crop.price;
                 }
                 return sum;
             }, 0),
-            irrigationEfficiency: totalPlantingPoints > 0 ? (totalWaterRequirementPerDay / totalPlantingPoints) : 0
-        }
+            irrigationEfficiency:
+                totalPlantingPoints > 0 ? totalWaterRequirementPerDay / totalPlantingPoints : 0,
+        },
     };
 };
 
@@ -484,14 +541,20 @@ export const calculateZoneAreaEnhanced = (coordinates: any[]): number => {
     if (!coordinates || coordinates.length < 3) return 0;
 
     try {
-        const points = coordinates.map(coord => {
-            if (Array.isArray(coord) && coord.length >= 2) {
-                return [parseFloat(coord[0]), parseFloat(coord[1])];
-            } else if (coord && typeof coord.lat === 'number' && typeof coord.lng === 'number') {
-                return [coord.lat, coord.lng];
-            }
-            return null;
-        }).filter(point => point !== null);
+        const points = coordinates
+            .map((coord) => {
+                if (Array.isArray(coord) && coord.length >= 2) {
+                    return [parseFloat(coord[0]), parseFloat(coord[1])];
+                } else if (
+                    coord &&
+                    typeof coord.lat === 'number' &&
+                    typeof coord.lng === 'number'
+                ) {
+                    return [coord.lat, coord.lng];
+                }
+                return null;
+            })
+            .filter((point) => point !== null);
 
         if (points.length < 3) return 0;
 
@@ -506,7 +569,7 @@ export const calculateZoneAreaEnhanced = (coordinates: any[]): number => {
 
         area = Math.abs(area) / 2;
 
-        const metersPerDegree = 111320; 
+        const metersPerDegree = 111320;
         const areaInSquareMeters = area * metersPerDegree * metersPerDegree;
 
         return Math.round(areaInSquareMeters);
@@ -518,117 +581,118 @@ export const calculateZoneAreaEnhanced = (coordinates: any[]): number => {
 
 export const normalizeIrrigationTypeEnhanced = (type: string): string => {
     if (!type) return 'unknown';
-    
+
     const normalizedType = type.toLowerCase().trim();
     const typeMapping: { [key: string]: string } = {
-        'sprinkler': 'sprinkler',
+        sprinkler: 'sprinkler',
         'sprinkler-system': 'sprinkler',
         // Map legacy mini/micro variants to sprinkler
         'mini-sprinkler': 'sprinkler',
-        'mini_sprinkler': 'sprinkler',
-        'minisprinkler': 'sprinkler',
+        mini_sprinkler: 'sprinkler',
+        minisprinkler: 'sprinkler',
         'micro-spray': 'sprinkler',
-        'micro_spray': 'sprinkler',
-        'microspray': 'sprinkler',
-        'micro': 'sprinkler',
-        'drip': 'drip_tape',
+        micro_spray: 'sprinkler',
+        microspray: 'sprinkler',
+        micro: 'sprinkler',
+        drip: 'drip_tape',
         'drip-tape': 'drip_tape',
-        'drip_tape': 'drip_tape',
+        drip_tape: 'drip_tape',
         'drip-irrigation': 'drip_tape',
-        'pivot': 'pivot',
-        'center_pivot': 'pivot',
-        'water_jet_tape': 'water_jet_tape',
-        'water-jet-tape': 'water_jet_tape'
+        pivot: 'pivot',
+        center_pivot: 'pivot',
+        water_jet_tape: 'water_jet_tape',
+        'water-jet-tape': 'water_jet_tape',
     };
-    
+
     return typeMapping[normalizedType] || normalizedType;
 };
 
 export const getCropByValueEnhanced = (cropValue: string): any => {
     try {
         const cropMap: { [key: string]: any } = {
-            'rice': {
+            rice: {
                 name: 'Rice',
                 yield: 650,
                 price: 12,
-                waterRequirement: 4.2, 
+                waterRequirement: 4.2,
                 rowSpacing: 25,
                 plantSpacing: 25,
                 category: 'cereal',
                 irrigationNeeds: 'high',
-                growthPeriod: 120
+                growthPeriod: 120,
             },
-            'corn': {
+            corn: {
                 name: 'Field Corn',
                 yield: 750,
                 price: 9.5,
-                waterRequirement: 2.5, 
+                waterRequirement: 2.5,
                 rowSpacing: 75,
                 plantSpacing: 25,
                 category: 'cereal',
                 irrigationNeeds: 'medium',
-                growthPeriod: 115
+                growthPeriod: 115,
             },
-            'cassava': {
+            cassava: {
                 name: 'Cassava',
                 yield: 3500,
                 price: 3.0,
-                waterRequirement: 1.5, 
+                waterRequirement: 1.5,
                 rowSpacing: 100,
                 plantSpacing: 80,
                 category: 'root',
                 irrigationNeeds: 'low',
-                growthPeriod: 300
+                growthPeriod: 300,
             },
-            'sugarcane': {
+            sugarcane: {
                 name: 'Sugarcane',
                 yield: 12000,
                 price: 1.2,
-                waterRequirement: 3.5, 
+                waterRequirement: 3.5,
                 rowSpacing: 150,
                 plantSpacing: 50,
                 category: 'industrial',
                 irrigationNeeds: 'high',
-                growthPeriod: 365
+                growthPeriod: 365,
             },
-            'soybean': {
+            soybean: {
                 name: 'Soybean',
                 yield: 280,
                 price: 18,
-                waterRequirement: 2.8, 
+                waterRequirement: 2.8,
                 rowSpacing: 50,
                 plantSpacing: 20,
                 category: 'legume',
                 irrigationNeeds: 'medium',
-                growthPeriod: 95
+                growthPeriod: 95,
+            },
+        };
+
+        return (
+            cropMap[cropValue] || {
+                name: 'Unknown Crop',
+                yield: 1000,
+                price: 50,
+                waterRequirement: 2.0,
+                rowSpacing: 50,
+                plantSpacing: 50,
+                category: 'general',
+                irrigationNeeds: 'medium',
+                growthPeriod: 120,
             }
-        };
-        
-        return cropMap[cropValue] || {
-            name: 'Unknown Crop',
-            yield: 1000,
-            price: 50,
-            waterRequirement: 2.0, 
-            rowSpacing: 50,
-            plantSpacing: 50,
-            category: 'general',
-            irrigationNeeds: 'medium',
-            growthPeriod: 120
-        };
-        
+        );
     } catch (error) {
         console.error('Error getting crop data:', error);
-        
+
         return {
             name: 'Default Crop',
             yield: 1000,
             price: 50,
-            waterRequirement: 2.0, 
+            waterRequirement: 2.0,
             rowSpacing: 50,
             plantSpacing: 50,
             category: 'general',
             irrigationNeeds: 'medium',
-            growthPeriod: 120
+            growthPeriod: 120,
         };
     }
 };
@@ -659,10 +723,10 @@ export const migrateToEnhancedFieldCropData = (): FieldCropData | null => {
         const oldData = localStorage.getItem('fieldMapData');
         if (oldData) {
             const parsedOldData = JSON.parse(oldData);
-            
+
             const enhancedData = calculateEnhancedFieldStats(parsedOldData);
             saveEnhancedFieldCropData(enhancedData);
-            
+
             return enhancedData;
         }
     } catch (error) {

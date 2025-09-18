@@ -116,19 +116,21 @@ export default function ChooseIrrigationMethod() {
     };
 
     return (
-        <div className="h-screen bg-gray-900 text-white overflow-hidden">
+        <div className="h-screen overflow-hidden bg-gray-900 text-white">
             {/* Fixed Navbar */}
-            <div className="fixed top-0 left-0 right-0 z-50">
+            <div className="fixed left-0 right-0 top-0 z-50">
                 <Navbar />
             </div>
 
             {/* Main Content with top padding to account for fixed navbar */}
-            <div className="pt-16 h-full overflow-y-auto">
+            <div className="h-full overflow-y-auto pt-16">
                 <div className="flex min-h-full flex-col items-center justify-center p-4">
                     <div className="w-full max-w-4xl">
                         {/* Header */}
                         <div className="mb-10 text-center">
-                            <h1 className="text-3xl font-bold text-white">{t('เลือกระบบการให้น้ำ')}</h1>
+                            <h1 className="text-3xl font-bold text-white">
+                                {t('เลือกระบบการให้น้ำ')}
+                            </h1>
                             <p className="text-md mt-2 text-gray-400">
                                 {t('โปรดเลือกวิธีการให้น้ำที่เหมาะสมกับความต้องการของคุณ')}
                             </p>
@@ -141,7 +143,9 @@ export default function ChooseIrrigationMethod() {
                                 <span>→</span>
                                 <span className="text-green-400">✓ {t('ออกแบบพื้นที่')}</span>
                                 <span>→</span>
-                                <span className="font-medium text-blue-400">{t('เลือกระบบน้ำ')}</span>
+                                <span className="font-medium text-blue-400">
+                                    {t('เลือกระบบน้ำ')}
+                                </span>
                                 <span>→</span>
                                 <span>{t('ออกแบบระบบน้ำ')}</span>
                             </div>
@@ -155,7 +159,9 @@ export default function ChooseIrrigationMethod() {
                                 </h3>
                                 {crops && (
                                     <div className="mb-2">
-                                        <span className="text-sm text-gray-400">{t('พืชที่เลือก')}: </span>
+                                        <span className="text-sm text-gray-400">
+                                            {t('พืชที่เลือก')}:{' '}
+                                        </span>
                                         <div className="mt-1 flex flex-wrap gap-1">
                                             {crops.split(',').map((crop, index) => (
                                                 <span
@@ -170,10 +176,15 @@ export default function ChooseIrrigationMethod() {
                                 )}
                                 {shapes && (
                                     <div className="text-sm text-gray-400">
-                                        ✓ {(() => {
+                                        ✓{' '}
+                                        {(() => {
                                             try {
-                                                const count = JSON.parse(decodeURIComponent(shapes)).length;
-                                                return t('มีแบบโรงเรือนที่วาดไว้แล้ว ({count} องค์ประกอบ)').replace('{count}', count.toString());
+                                                const count = JSON.parse(
+                                                    decodeURIComponent(shapes)
+                                                ).length;
+                                                return t(
+                                                    'มีแบบโรงเรือนที่วาดไว้แล้ว ({count} องค์ประกอบ)'
+                                                ).replace('{count}', count.toString());
                                             } catch {
                                                 return t('ข้อมูลผิดพลาด');
                                             }
@@ -209,7 +220,9 @@ export default function ChooseIrrigationMethod() {
                                     >
                                         <div className="mb-4 text-5xl">{option.icon}</div>
                                         <h3 className="mb-2 text-lg font-bold">{option.name}</h3>
-                                        <p className="text-sm text-gray-400">{option.description}</p>
+                                        <p className="text-sm text-gray-400">
+                                            {option.description}
+                                        </p>
 
                                         {/* Development message overlay */}
                                         {option.disabled && option.developmentMessage && (
@@ -234,20 +247,26 @@ export default function ChooseIrrigationMethod() {
                             <div className="mx-auto mt-8 max-w-2xl rounded-lg border border-blue-600 bg-blue-900/30 p-4">
                                 <div className="flex items-center space-x-3">
                                     <span className="text-2xl">
-                                        {irrigationOptions.find((opt) => opt.id === selectedMethod)?.icon}
+                                        {
+                                            irrigationOptions.find(
+                                                (opt) => opt.id === selectedMethod
+                                            )?.icon
+                                        }
                                     </span>
                                     <div>
                                         <h4 className="font-medium text-blue-300">
                                             {t('เลือก')}:{' '}
                                             {
-                                                irrigationOptions.find((opt) => opt.id === selectedMethod)
-                                                    ?.name
+                                                irrigationOptions.find(
+                                                    (opt) => opt.id === selectedMethod
+                                                )?.name
                                             }
                                         </h4>
                                         <p className="text-sm text-blue-200">
                                             {
-                                                irrigationOptions.find((opt) => opt.id === selectedMethod)
-                                                    ?.description
+                                                irrigationOptions.find(
+                                                    (opt) => opt.id === selectedMethod
+                                                )?.description
                                             }
                                         </p>
                                     </div>

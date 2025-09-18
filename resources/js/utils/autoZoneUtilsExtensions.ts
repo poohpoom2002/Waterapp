@@ -11,31 +11,39 @@ export const updateEditedZone = (
 ): IrrigationZone[] => {
     // หาต้นไม้ที่อยู่ในโซนที่แก้ไขแล้ว
     const plantsInEditedZone = findPlantsInPolygon(allPlants, editedZone.coordinates);
-    
+
     // อัปเดตข้อมูลโซนที่แก้ไข
     const updatedEditedZone: IrrigationZone = {
         ...editedZone,
         plants: plantsInEditedZone,
-        totalWaterNeed: plantsInEditedZone.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0)
+        totalWaterNeed: plantsInEditedZone.reduce(
+            (sum, plant) => sum + plant.plantData.waterNeed,
+            0
+        ),
     };
 
     // อัปเดต zoneId ของต้นไม้ทั้งหมด
-    const updatedPlants = allPlants.map(plant => {
-        const newZoneId = plantsInEditedZone.find(p => p.id === plant.id) ? editedZone.id : plant.zoneId;
+    const updatedPlants = allPlants.map((plant) => {
+        const newZoneId = plantsInEditedZone.find((p) => p.id === plant.id)
+            ? editedZone.id
+            : plant.zoneId;
         return { ...plant, zoneId: newZoneId };
     });
 
     // อัปเดตโซนอื่นๆ เพื่อให้ข้อมูลต้นไม้ตรงกัน
-    const updatedZones = zones.map(zone => {
+    const updatedZones = zones.map((zone) => {
         if (zone.id === editedZone.id) {
             return updatedEditedZone;
         } else {
             // อัปเดตโซนอื่นๆ โดยเอาเฉพาะต้นไม้ที่ยังอยู่ในโซนนั้นๆ
-            const plantsInThisZone = updatedPlants.filter(plant => plant.zoneId === zone.id);
+            const plantsInThisZone = updatedPlants.filter((plant) => plant.zoneId === zone.id);
             return {
                 ...zone,
                 plants: plantsInThisZone,
-                totalWaterNeed: plantsInThisZone.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0)
+                totalWaterNeed: plantsInThisZone.reduce(
+                    (sum, plant) => sum + plant.plantData.waterNeed,
+                    0
+                ),
             };
         }
     });
@@ -48,21 +56,24 @@ export const recalculateAllZones = (
     zones: IrrigationZone[],
     allPlants: PlantLocation[]
 ): IrrigationZone[] => {
-
-    
-    const updatedZones = zones.map(zone => {
+    const updatedZones = zones.map((zone) => {
         // หาต้นไม้ที่อยู่ในโซนนี้
         const plantsInZone = findPlantsInPolygon(allPlants, zone.coordinates);
-        
+
         // คำนวณความต้องการน้ำรวม
-        const totalWaterNeed = plantsInZone.reduce((sum, plant) => sum + plant.plantData.waterNeed, 0);
-        
-        console.log(`📊 Zone ${zone.name}: ${plantsInZone.length} plants, ${totalWaterNeed.toFixed(2)} L/min water need`);
-        
+        const totalWaterNeed = plantsInZone.reduce(
+            (sum, plant) => sum + plant.plantData.waterNeed,
+            0
+        );
+
+        console.log(
+            `📊 Zone ${zone.name}: ${plantsInZone.length} plants, ${totalWaterNeed.toFixed(2)} L/min water need`
+        );
+
         return {
             ...zone,
             plants: plantsInZone,
-            totalWaterNeed: totalWaterNeed
+            totalWaterNeed: totalWaterNeed,
         };
     });
 
@@ -89,7 +100,7 @@ export const validateEditedZone = (
     }
 
     // ตรวจสอบการทับซ้อนกับโซนอื่นๆ
-    const otherZones = allZones.filter(zone => zone.id !== editedZone.id);
+    const otherZones = allZones.filter((zone) => zone.id !== editedZone.id);
     for (const otherZone of otherZones) {
         if (checkPolygonIntersection(editedZone.coordinates, otherZone.coordinates)) {
             warnings.push(`โซน ${editedZone.name} ทับซ้อนกับโซน ${otherZone.name}`);
@@ -109,13 +120,13 @@ export const validateEditedZone = (
     return {
         isValid: errors.length === 0,
         errors,
-        warnings
+        warnings,
     };
 };
 
 // Helper function สำหรับตรวจสอบว่าพอลิกอนอยู่ในพื้นที่หลักหรือไม่
 const isPolygonWithinMainArea = (polygon: Coordinate[], mainArea: Coordinate[]): boolean => {
-    return polygon.every(point => isPointInPolygon(point, mainArea));
+    return polygon.every((point) => isPointInPolygon(point, mainArea));
 };
 
 // สร้างสถิติการแก้ไขโซน
@@ -131,40 +142,42 @@ export const generateZoneEditStats = (
 } => {
     const modifiedZones = editedZones.filter((editedZone, index) => {
         const originalZone = originalZones[index];
-        return originalZone && (
-            JSON.stringify(editedZone.coordinates) !== JSON.stringify(originalZone.coordinates) ||
-            editedZone.plants.length !== originalZone.plants.length
+        return (
+            originalZone &&
+            (JSON.stringify(editedZone.coordinates) !== JSON.stringify(originalZone.coordinates) ||
+                editedZone.plants.length !== originalZone.plants.length)
         );
     }).length;
 
     const totalPlants = editedZones.reduce((sum, zone) => sum + zone.plants.length, 0);
     const totalWaterNeed = editedZones.reduce((sum, zone) => sum + zone.totalWaterNeed, 0);
-    
+
     // คำนวณการปรับปรุงของการกระจายน้ำ
-    const originalWaterNeeds = originalZones.map(z => z.totalWaterNeed);
-    const editedWaterNeeds = editedZones.map(z => z.totalWaterNeed);
-    
+    const originalWaterNeeds = originalZones.map((z) => z.totalWaterNeed);
+    const editedWaterNeeds = editedZones.map((z) => z.totalWaterNeed);
+
     const originalVariance = calculateWaterNeedVariance(originalWaterNeeds);
     const editedVariance = calculateWaterNeedVariance(editedWaterNeeds);
-    
-    const balanceImprovement = originalVariance > 0 ? 
-        ((originalVariance - editedVariance) / originalVariance) * 100 : 0;
+
+    const balanceImprovement =
+        originalVariance > 0 ? ((originalVariance - editedVariance) / originalVariance) * 100 : 0;
 
     return {
         totalZones: editedZones.length,
         modifiedZones,
         totalPlants,
         totalWaterNeed,
-        balanceImprovement
+        balanceImprovement,
     };
 };
 
 // คำนวณความแปรปรวนของความต้องการน้ำ
 const calculateWaterNeedVariance = (waterNeeds: number[]): number => {
     if (waterNeeds.length === 0) return 0;
-    
+
     const mean = waterNeeds.reduce((sum, need) => sum + need, 0) / waterNeeds.length;
-    const variance = waterNeeds.reduce((sum, need) => sum + Math.pow(need - mean, 2), 0) / waterNeeds.length;
-    
+    const variance =
+        waterNeeds.reduce((sum, need) => sum + Math.pow(need - mean, 2), 0) / waterNeeds.length;
+
     return variance;
 };

@@ -64,13 +64,14 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
             if (pipeCalculationsStr) {
                 const pipeCalculations = JSON.parse(pipeCalculationsStr);
-                
+
                 const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
                 const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
                 const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
                 const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
 
-                const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                const totalHeadLoss =
+                    branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
                 return {
                     branch: branchHeadLoss,
@@ -86,16 +87,19 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
         // ลองดึงข้อมูลจาก horticulture pipe calculations
         try {
-            const horticulturePipeCalculationsStr = localStorage.getItem('horticulture_pipe_calculations');
+            const horticulturePipeCalculationsStr = localStorage.getItem(
+                'horticulture_pipe_calculations'
+            );
             if (horticulturePipeCalculationsStr) {
                 const horticulturePipeCalculations = JSON.parse(horticulturePipeCalculationsStr);
-                
+
                 const branchHeadLoss = horticulturePipeCalculations.branch?.headLoss || 0;
                 const secondaryHeadLoss = horticulturePipeCalculations.secondary?.headLoss || 0;
                 const mainHeadLoss = horticulturePipeCalculations.main?.headLoss || 0;
                 const emitterHeadLoss = horticulturePipeCalculations.emitter?.headLoss || 0;
 
-                const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                const totalHeadLoss =
+                    branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
                 return {
                     branch: branchHeadLoss,
@@ -108,7 +112,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         } catch (error) {
             console.error('Error loading horticulture pipe calculations from localStorage:', error);
         }
-        
+
         // Fallback: ใช้ข้อมูลจาก auto-selected pipes
         const branchHeadLoss = actualBranchPipe?.headLoss || 0;
         const secondaryHeadLoss = actualSecondaryPipe?.headLoss || 0;
@@ -136,7 +140,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
         // ฟังการเปลี่ยนแปลงใน localStorage
         window.addEventListener('storage', handleStorageChange);
-        
+
         // อัปเดตค่าเมื่อ component mount หรือเมื่อมีการเปลี่ยนแปลง
         const interval = setInterval(() => {
             const newHeadLoss = getActualPipeHeadLoss();
@@ -201,7 +205,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     // คำนวณ Head Loss หัวฉีด จาก แรงดัน(บาร์) * 10
     const calculateSprinklerHeadLoss = () => {
         let sprinklerPressureBar = 0;
-        
+
         if (projectMode === 'horticulture') {
             // สำหรับ horticulture mode ใช้ข้อมูลจาก horticultureSystemData
             try {
@@ -214,12 +218,21 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         // fallback ใช้ค่าจาก selectedSprinkler
                         if (selectedSprinkler && selectedSprinkler.pressureBar) {
                             if (Array.isArray(selectedSprinkler.pressureBar)) {
-                                sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                            } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                                sprinklerPressureBar =
+                                    (selectedSprinkler.pressureBar[0] +
+                                        selectedSprinkler.pressureBar[1]) /
+                                    2;
+                            } else if (
+                                typeof selectedSprinkler.pressureBar === 'string' &&
+                                selectedSprinkler.pressureBar.includes('-')
+                            ) {
                                 const parts = selectedSprinkler.pressureBar.split('-');
-                                sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                                sprinklerPressureBar =
+                                    (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                             } else {
-                                sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                                sprinklerPressureBar = parseFloat(
+                                    String(selectedSprinkler.pressureBar)
+                                );
                             }
                         } else {
                             sprinklerPressureBar = 2.5; // default
@@ -229,12 +242,21 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     // fallback ใช้ค่าจาก selectedSprinkler
                     if (selectedSprinkler && selectedSprinkler.pressureBar) {
                         if (Array.isArray(selectedSprinkler.pressureBar)) {
-                            sprinklerPressureBar = (selectedSprinkler.pressureBar[0] + selectedSprinkler.pressureBar[1]) / 2;
-                        } else if (typeof selectedSprinkler.pressureBar === 'string' && selectedSprinkler.pressureBar.includes('-')) {
+                            sprinklerPressureBar =
+                                (selectedSprinkler.pressureBar[0] +
+                                    selectedSprinkler.pressureBar[1]) /
+                                2;
+                        } else if (
+                            typeof selectedSprinkler.pressureBar === 'string' &&
+                            selectedSprinkler.pressureBar.includes('-')
+                        ) {
                             const parts = selectedSprinkler.pressureBar.split('-');
-                            sprinklerPressureBar = (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
+                            sprinklerPressureBar =
+                                (parseFloat(parts[0]) + parseFloat(parts[1])) / 2;
                         } else {
-                            sprinklerPressureBar = parseFloat(String(selectedSprinkler.pressureBar));
+                            sprinklerPressureBar = parseFloat(
+                                String(selectedSprinkler.pressureBar)
+                            );
                         }
                     } else {
                         sprinklerPressureBar = 2.5; // default
@@ -264,7 +286,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 sprinklerPressureBar = 2.5; // default
             }
         }
-        
+
         return sprinklerPressureBar * 10; // แรงดัน(บาร์) * 10
     };
 
@@ -339,13 +361,15 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     waterNeed: zone.totalWaterRequirementPerDay || 0,
                     cropType: zone.cropType,
                     estimatedYield: 0,
-                    estimatedIncome: 0
+                    estimatedIncome: 0,
                 };
             }
         }
-        
+
         if (projectMode === 'greenhouse' && greenhouseData && activeZone) {
-            const plot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+            const plot = greenhouseData.summary.plotStats.find(
+                (p: any) => p.plotId === activeZone.id
+            );
             if (plot) {
                 return {
                     name: plot.plotName,
@@ -359,15 +383,17 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             }
         }
 
-        return activeZone ? {
-            name: activeZone.name,
-            area: activeZone.area,
-            itemCount: activeZone.plantCount,
-            waterNeed: activeZone.totalWaterNeed || 0,
-            cropType: activeZone.plantData?.name,
-            estimatedYield: 0,
-            estimatedIncome: 0,
-        } : null;
+        return activeZone
+            ? {
+                  name: activeZone.name,
+                  area: activeZone.area,
+                  itemCount: activeZone.plantCount,
+                  waterNeed: activeZone.totalWaterNeed || 0,
+                  cropType: activeZone.plantData?.name,
+                  estimatedYield: 0,
+                  estimatedIncome: 0,
+              }
+            : null;
     };
 
     const currentZoneData = getCurrentZoneData();
@@ -395,7 +421,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         else if (hasLowVelocity && !hasOptimalVelocity) performance.velocityStatus = 'warning';
 
         const headLossRatio = results.headLossValidation?.ratio || 0;
-        const actualHeadLossRatio = actualHeadLoss.total > 0 ? (actualHeadLoss.total / (input.staticHeadM + pressureInfo.pressure)) * 100 : 0;
+        const actualHeadLossRatio =
+            actualHeadLoss.total > 0
+                ? (actualHeadLoss.total / (input.staticHeadM + pressureInfo.pressure)) * 100
+                : 0;
         if (actualHeadLossRatio > 25) performance.headLossStatus = 'critical';
         else if (actualHeadLossRatio > 20) performance.headLossStatus = 'warning';
 
@@ -468,7 +497,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 totalEstimatedIncome: fieldCropData.summary.totalEstimatedIncome,
             };
         }
-        
+
         if (projectMode === 'greenhouse' && greenhouseData) {
             return {
                 totalArea: greenhouseData.summary.totalPlotArea,
@@ -490,14 +519,19 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             {projectSummaryData && (
                 <div className="rounded-lg bg-blue-900 p-4">
                     <h3 className="mb-3 text-lg font-bold text-blue-300">
-                        📊 {t('สรุปโครงการทั้งหมด')} 
-                        {projectMode === 'field-crop' ? t(' (พืชไร่)') : 
-                         projectMode === 'greenhouse' ? t(' (โรงเรือน)') : ''}
+                        📊 {t('สรุปโครงการทั้งหมด')}
+                        {projectMode === 'field-crop'
+                            ? t(' (พืชไร่)')
+                            : projectMode === 'greenhouse'
+                              ? t(' (โรงเรือน)')
+                              : ''}
                     </h3>
                     <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
                         <div>
                             <p className="text-blue-200">{t('พื้นที่รวม:')}</p>
-                            <p className="font-bold text-white">{formatArea(projectSummaryData.totalArea)}</p>
+                            <p className="font-bold text-white">
+                                {formatArea(projectSummaryData.totalArea)}
+                            </p>
                         </div>
                         <div>
                             <p className="text-blue-200">
@@ -506,7 +540,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             <p className="font-bold text-white">{projectSummaryData.totalZones}</p>
                         </div>
                         <div>
-                            <p className="text-blue-200">{t('จำนวน')}{getItemName()}{t('รวม:')}</p>
+                            <p className="text-blue-200">
+                                {t('จำนวน')}
+                                {getItemName()}
+                                {t('รวม:')}
+                            </p>
                             <p className="font-bold text-white">
                                 {(projectSummaryData.totalItems || 0).toLocaleString()}
                             </p>
@@ -514,19 +552,24 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <div>
                             <p className="text-blue-200">{t('น้ำรวม:')}</p>
                             <p className="font-bold text-white">
-                                {(projectSummaryData.totalWaterNeed || 0).toLocaleString()} {t('ลิตร')}
+                                {(projectSummaryData.totalWaterNeed || 0).toLocaleString()}{' '}
+                                {t('ลิตร')}
                                 {'/ครั้ง'}
                             </p>
                         </div>
                     </div>
 
-                    {((projectSummaryData.totalEstimatedYield || 0) > 0 || (projectSummaryData.totalEstimatedIncome || 0) > 0) && (
+                    {((projectSummaryData.totalEstimatedYield || 0) > 0 ||
+                        (projectSummaryData.totalEstimatedIncome || 0) > 0) && (
                         <div className="mt-3 grid grid-cols-2 gap-4 border-t border-blue-700 pt-3">
                             {(projectSummaryData.totalEstimatedYield || 0) > 0 && (
                                 <div>
                                     <p className="text-blue-200">{t('ผลผลิตรวม:')}</p>
                                     <p className="font-bold text-green-300">
-                                        {(projectSummaryData.totalEstimatedYield || 0).toLocaleString()} {t('กก.')}
+                                        {(
+                                            projectSummaryData.totalEstimatedYield || 0
+                                        ).toLocaleString()}{' '}
+                                        {t('กก.')}
                                     </p>
                                 </div>
                             )}
@@ -534,7 +577,10 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 <div>
                                     <p className="text-blue-200">{t('รายได้รวม:')}</p>
                                     <p className="font-bold text-green-300">
-                                        {(projectSummaryData.totalEstimatedIncome || 0).toLocaleString()} {t('บาท')}
+                                        {(
+                                            projectSummaryData.totalEstimatedIncome || 0
+                                        ).toLocaleString()}{' '}
+                                        {t('บาท')}
                                     </p>
                                 </div>
                             )}
@@ -563,9 +609,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 } else {
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);
                                 }
-                            })()} {t('LPM')}
+                            })()}{' '}
+                            {t('LPM')}
                         </p>
-                        {currentZoneData && <p className="text-xs text-blue-100">({currentZoneData.name})</p>}
+                        {currentZoneData && (
+                            <p className="text-xs text-blue-100">({currentZoneData.name})</p>
+                        )}
                     </div>
                     <div className="text-center">
                         <p className="text-green-200">{t('Head Loss ท่อ')}</p>
@@ -578,8 +627,8 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             {systemPerformance.headLossStatus === 'good'
                                 ? t('เหมาะสม')
                                 : systemPerformance.headLossStatus === 'warning'
-                                    ? t('ค่อนข้างสูง')
-                                    : t('สูงเกินไป')}
+                                  ? t('ค่อนข้างสูง')
+                                  : t('สูงเกินไป')}
                         </p>
                     </div>
                     <div className="text-center">
@@ -587,9 +636,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p className="text-xl font-bold text-yellow-400">
                             {sprinklerHeadLoss.toFixed(1)} m
                         </p>
-                        <p className="text-xs text-yellow-100">
-                            {t('จากสูตร: แรงดัน(บาร์) × 10')}
-                        </p>
+                        <p className="text-xs text-yellow-100">{t('จากสูตร: แรงดัน(บาร์) × 10')}</p>
                     </div>
                     {showPump && (
                         <div className="text-center">
@@ -607,13 +654,16 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     )}
                     <div className="text-center">
                         <p className="text-pink-200">
-                            {t('จำนวน')}{getEquipmentName()}
+                            {t('จำนวน')}
+                            {getEquipmentName()}
                         </p>
                         <p className="text-xl font-bold text-green-300">
                             {results.totalSprinklers} {t('หัว')}
                         </p>
                         {currentZoneData && (
-                            <p className="text-xs text-pink-100">({t('ในโซน')} {currentZoneData.name})</p>
+                            <p className="text-xs text-pink-100">
+                                ({t('ในโซน')} {currentZoneData.name})
+                            </p>
                         )}
                     </div>
                 </div>
@@ -636,34 +686,55 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-blue-300">💧 {t('ความต้องการน้ำทั้งโซน')}</h3>
+                        <h3 className="mb-2 font-medium text-blue-300">
+                            💧 {t('ความต้องการน้ำทั้งโซน')}
+                        </h3>
                         <p className="text-lg font-bold">
-                            {results.totalWaterRequiredLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
+                            {results.totalWaterRequiredLPM.toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                            })}{' '}
+                            {t('ลิตร/นาที')}
                         </p>
-                        <div className="mt-1 text-sm text-gray-300 space-y-1">
+                        <div className="mt-1 space-y-1 text-sm text-gray-300">
+                            <p>{t('ความต้องการน้ำทั้งโซน:')}</p>
                             <p>
-                                {t('ความต้องการน้ำทั้งโซน:')} 
+                                {input.waterPerTreeLiters.toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 2,
+                                })}{' '}
+                                {t('ลิตร/นาที')} {t('(จาก input)')}
                             </p>
                             <p>
-                            {input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')} {t('(จาก input)')}
-                            </p>
-                            <p>
-                                {t('หัวฉีดละ')} {results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
+                                {t('หัวฉีดละ')}{' '}
+                                {results.waterPerSprinklerLPM.toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 2,
+                                })}{' '}
+                                {t('ลิตร/นาที')}
                             </p>
                             <p className="text-xs text-blue-300">
-                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
+                                {t('ค่าจาก input โดยตรง:')}{' '}
+                                {input.waterPerTreeLiters.toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 2,
+                                })}{' '}
+                                {t('ลิตร/นาที')}
                             </p>
                         </div>
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
                         <h3 className="mb-2 font-medium text-purple-300">
-                            💦 {t('น้ำต่อหัว')}{getEquipmentName()}
+                            💦 {t('น้ำต่อหัว')}
+                            {getEquipmentName()}
                         </h3>
                         <p className="text-lg font-bold">
                             {(() => {
                                 if (projectMode === 'garden' && gardenStats && activeZone) {
-                                    const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
+                                    const currentZone = gardenStats.zones.find(
+                                        (z: any) => z.zoneId === activeZone.id
+                                    );
                                     if (currentZone) {
                                         return `${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                                     }
@@ -671,15 +742,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 return `${results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                             })()}
                         </p>
-                        <div className="text-sm text-gray-300 space-y-1 mt-2">
-                            
+                        <div className="mt-2 space-y-1 text-sm text-gray-300">
                             <p className="text-xs text-blue-300">
-                                {projectMode === 'garden' && gardenStats && activeZone ? (() => {
-                                    const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
-                                    return currentZone ? 
-                                        `${t('ค่าจาก garden zone:')} ${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}` :
-                                        `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                })() : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
+                                {projectMode === 'garden' && gardenStats && activeZone
+                                    ? (() => {
+                                          const currentZone = gardenStats.zones.find(
+                                              (z: any) => z.zoneId === activeZone.id
+                                          );
+                                          return currentZone
+                                              ? `${t('ค่าจาก garden zone:')} ${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`
+                                              : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                      })()
+                                    : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
                             </p>
                         </div>
                         {selectedSprinkler && (
@@ -687,9 +761,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 <p className="text-xs text-purple-200">{selectedSprinkler.name}</p>
                                 {selectedSprinkler.pressureBar && (
                                     <p className="text-xs text-gray-400">
-                                        {t('แรงดัน:')} {Array.isArray(selectedSprinkler.pressureBar) 
-                                            ? `${selectedSprinkler.pressureBar[0]}-${selectedSprinkler.pressureBar[1]}` 
-                                            : selectedSprinkler.pressureBar} {t('บาร์')}
+                                        {t('แรงดัน:')}{' '}
+                                        {Array.isArray(selectedSprinkler.pressureBar)
+                                            ? `${selectedSprinkler.pressureBar[0]}-${selectedSprinkler.pressureBar[1]}`
+                                            : selectedSprinkler.pressureBar}{' '}
+                                        {t('บาร์')}
                                     </p>
                                 )}
                             </div>
@@ -700,27 +776,41 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-yellow-300">⚡ {t('อัตราการไหลแต่ละท่อ')}</h3>
+                        <h3 className="mb-2 font-medium text-yellow-300">
+                            ⚡ {t('อัตราการไหลแต่ละท่อ')}
+                        </h3>
                         <div className="text-sm">
                             <p>
-                                {t('ท่อย่อย:')} {' '}
+                                {t('ท่อย่อย:')}{' '}
                                 <span className="font-bold text-purple-300">
-                                    {results.flows.branch.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('LPM')}
+                                    {results.flows.branch.toLocaleString(undefined, {
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 2,
+                                    })}{' '}
+                                    {t('LPM')}
                                 </span>
                             </p>
                             {results.hasValidSecondaryPipe && (
                                 <p>
-                                    {t('ท่อรอง:')} {' '}
+                                    {t('ท่อรอง:')}{' '}
                                     <span className="font-bold text-orange-300">
-                                        {results.flows.secondary.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('LPM')}
+                                        {results.flows.secondary.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 2,
+                                        })}{' '}
+                                        {t('LPM')}
                                     </span>
                                 </p>
                             )}
                             {results.hasValidMainPipe && (
                                 <p>
-                                    {t('ท่อหลัก:')} {' '}
+                                    {t('ท่อหลัก:')}{' '}
                                     <span className="font-bold text-cyan-300">
-                                        {results.flows.main.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('LPM')}
+                                        {results.flows.main.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 2,
+                                        })}{' '}
+                                        {t('LPM')}
                                     </span>
                                 </p>
                             )}
@@ -729,26 +819,40 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-red-300">📉 {t('Head Loss รายละเอียด')}</h3>
-                        <div className="text-sm space-y-1">
-                        <div className="flex justify-between">
+                        <h3 className="mb-2 font-medium text-red-300">
+                            📉 {t('Head Loss รายละเอียด')}
+                        </h3>
+                        <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
                                 <span>{t('หัวฉีด:')}</span>
                                 <span className="font-bold text-gray-50">
-                                    {sprinklerHeadLoss.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
+                                    {sprinklerHeadLoss.toLocaleString(undefined, {
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 3,
+                                    })}{' '}
+                                    m
                                 </span>
                             </div>
                             <div className="flex justify-between">
                                 <span>{t('ท่อย่อย:')}</span>
                                 <span className="font-bold text-gray-50">
-                                    {actualHeadLoss.branch.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
+                                    {actualHeadLoss.branch.toLocaleString(undefined, {
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 3,
+                                    })}{' '}
+                                    m
                                 </span>
                             </div>
-                            
+
                             {results.hasValidSecondaryPipe && actualHeadLoss.secondary > 0 && (
                                 <div className="flex justify-between">
                                     <span>{t('ท่อรอง:')}</span>
                                     <span className="font-bold text-gray-50">
-                                        {actualHeadLoss.secondary.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
+                                        {actualHeadLoss.secondary.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 3,
+                                        })}{' '}
+                                        m
                                     </span>
                                 </div>
                             )}
@@ -756,7 +860,11 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 <div className="flex justify-between">
                                     <span>{t('ท่อหลัก:')}</span>
                                     <span className="font-bold text-gray-50">
-                                        {actualHeadLoss.main.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
+                                        {actualHeadLoss.main.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 3,
+                                        })}{' '}
+                                        m
                                     </span>
                                 </div>
                             )}
@@ -764,132 +872,184 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 <div className="flex justify-between">
                                     <span>{t('ท่อย่อยแยก:')}</span>
                                     <span className="font-bold text-gray-50">
-                                        {actualHeadLoss.emitter.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 3 })} m
+                                        {actualHeadLoss.emitter.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 3,
+                                        })}{' '}
+                                        m
                                     </span>
                                 </div>
                             )}
-                            <div className="border-t border-gray-500 pt-1 mt-1">
+                            <div className="mt-1 border-t border-gray-500 pt-1">
                                 <div className="flex justify-between">
                                     <span className="font-medium">{t('รวม:')}</span>
                                     <span
                                         className={`font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
                                     >
-                                        {(actualHeadLoss.total + sprinklerHeadLoss).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} m
+                                        {(actualHeadLoss.total + sprinklerHeadLoss).toLocaleString(
+                                            undefined,
+                                            { minimumFractionDigits: 0, maximumFractionDigits: 2 }
+                                        )}{' '}
+                                        m
                                     </span>
                                 </div>
                             </div>
                         </div>
-                        <hr className="border-gray-500 mt-1" />
+                        <hr className="mt-1 border-gray-500" />
                     </div>
 
                     <div className="rounded bg-gray-600 p-4">
-                        <h3 className="mb-2 font-medium text-cyan-300">🌊 {t('ความเร็วน้ำ')} ({t('m/s')})</h3>
-                        <div className="text-sm space-y-1">
-                            <div className="flex justify-between items-center">
+                        <h3 className="mb-2 font-medium text-cyan-300">
+                            🌊 {t('ความเร็วน้ำ')} ({t('m/s')})
+                        </h3>
+                        <div className="space-y-1 text-sm">
+                            <div className="flex items-center justify-between">
                                 <span>{t('ย่อย:')}</span>
                                 <div className="flex items-center gap-2">
                                     <span
-                                        className={`font-bold ${results.velocity.branch > 2.5
+                                        className={`font-bold ${
+                                            results.velocity.branch > 2.5
                                                 ? 'text-red-400'
                                                 : results.velocity.branch < 0.3
-                                                    ? 'text-blue-400'
-                                                    : results.velocity.branch > 0.8 && results.velocity.branch <= 2.0
-                                                        ? 'text-green-400'
-                                                        : 'text-yellow-400'
-                                            }`}
+                                                  ? 'text-blue-400'
+                                                  : results.velocity.branch > 0.8 &&
+                                                      results.velocity.branch <= 2.0
+                                                    ? 'text-green-400'
+                                                    : 'text-yellow-400'
+                                        }`}
                                     >
-                                        {results.velocity.branch.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                        {results.velocity.branch.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 2,
+                                        })}
                                     </span>
                                     <span className="text-xs">
-                                        ({results.flows.branch.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LPM)
+                                        (
+                                        {results.flows.branch.toLocaleString(undefined, {
+                                            minimumFractionDigits: 0,
+                                            maximumFractionDigits: 0,
+                                        })}{' '}
+                                        LPM)
                                     </span>
                                 </div>
                             </div>
                             {results.hasValidSecondaryPipe && (
-                                <div className="flex justify-between items-center">
+                                <div className="flex items-center justify-between">
                                     <span>{t('รอง:')}</span>
                                     <div className="flex items-center gap-2">
                                         <span
-                                            className={`font-bold ${results.velocity.secondary > 2.5
+                                            className={`font-bold ${
+                                                results.velocity.secondary > 2.5
                                                     ? 'text-red-400'
                                                     : results.velocity.secondary < 0.3
-                                                        ? 'text-blue-400'
-                                                        : results.velocity.secondary > 0.8 && results.velocity.secondary <= 2.0
-                                                            ? 'text-green-400'
-                                                            : 'text-yellow-400'
-                                                }`}
+                                                      ? 'text-blue-400'
+                                                      : results.velocity.secondary > 0.8 &&
+                                                          results.velocity.secondary <= 2.0
+                                                        ? 'text-green-400'
+                                                        : 'text-yellow-400'
+                                            }`}
                                         >
-                                            {results.velocity.secondary.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                            {results.velocity.secondary.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            })}
                                         </span>
                                         <span className="text-xs">
-                                                ({results.flows.secondary.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LPM)
+                                            (
+                                            {results.flows.secondary.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 0,
+                                            })}{' '}
+                                            LPM)
                                         </span>
                                     </div>
                                 </div>
                             )}
                             {results.hasValidMainPipe && (
-                                <div className="flex justify-between items-center">
+                                <div className="flex items-center justify-between">
                                     <span>{t('หลัก:')}</span>
                                     <div className="flex items-center gap-2">
                                         <span
-                                            className={`font-bold ${results.velocity.main > 2.5
+                                            className={`font-bold ${
+                                                results.velocity.main > 2.5
                                                     ? 'text-red-400'
                                                     : results.velocity.main < 0.3
-                                                        ? 'text-blue-400'
-                                                        : results.velocity.main > 0.8 && results.velocity.main <= 2.0
-                                                            ? 'text-green-400'
-                                                            : 'text-yellow-400'
-                                                }`}
+                                                      ? 'text-blue-400'
+                                                      : results.velocity.main > 0.8 &&
+                                                          results.velocity.main <= 2.0
+                                                        ? 'text-green-400'
+                                                        : 'text-yellow-400'
+                                            }`}
                                         >
-                                            {results.velocity.main.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                            {results.velocity.main.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            })}
                                         </span>
                                         <span className="text-xs">
-                                            ({results.flows.main.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LPM)
+                                            (
+                                            {results.flows.main.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 0,
+                                            })}{' '}
+                                            LPM)
                                         </span>
                                     </div>
                                 </div>
                             )}
                             {results.hasValidEmitterPipe && (
-                                <div className="flex justify-between items-center">
+                                <div className="flex items-center justify-between">
                                     <span>{t('ย่อยแยก:')}</span>
                                     <div className="flex items-center gap-2">
                                         <span
-                                            className={`font-bold ${(results.velocity.emitter || 0) > 2.5
+                                            className={`font-bold ${
+                                                (results.velocity.emitter || 0) > 2.5
                                                     ? 'text-red-400'
                                                     : (results.velocity.emitter || 0) < 0.3
-                                                        ? 'text-blue-400'
-                                                        : (results.velocity.emitter || 0) > 0.8 && (results.velocity.emitter || 0) <= 2.0
-                                                            ? 'text-green-400'
-                                                            : 'text-yellow-400'
-                                                }`}
+                                                      ? 'text-blue-400'
+                                                      : (results.velocity.emitter || 0) > 0.8 &&
+                                                          (results.velocity.emitter || 0) <= 2.0
+                                                        ? 'text-green-400'
+                                                        : 'text-yellow-400'
+                                            }`}
                                         >
-                                            {results.velocity.emitter?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 }) || '0.00'}
+                                            {results.velocity.emitter?.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            }) || '0.00'}
                                         </span>
                                         <span className="text-xs">
-                                            ({(results.flows.emitter || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} LPM)
+                                            (
+                                            {(results.flows.emitter || 0).toLocaleString(
+                                                undefined,
+                                                {
+                                                    minimumFractionDigits: 0,
+                                                    maximumFractionDigits: 0,
+                                                }
+                                            )}{' '}
+                                            LPM)
                                         </span>
                                     </div>
                                 </div>
                             )}
                         </div>
                         <div className="mt-2 border-t border-gray-500 pt-2">
-                            <p className="text-xs text-gray-400">{t('แนะนำ:')} 0.8-2.0 {t('m/s')}</p>
-                            <p className="text-xs text-cyan-200 flex items-center gap-1">
+                            <p className="text-xs text-gray-400">
+                                {t('แนะนำ:')} 0.8-2.0 {t('m/s')}
+                            </p>
+                            <p className="flex items-center gap-1 text-xs text-cyan-200">
                                 <span>{t('สถานะ:')}</span>
                                 <span>{getStatusIcon(systemPerformance.velocityStatus)}</span>
                                 <span>
                                     {systemPerformance.velocityStatus === 'good'
                                         ? t('เหมาะสม')
                                         : systemPerformance.velocityStatus === 'warning'
-                                            ? t('ควรปรับ')
-                                            : t('ต้องปรับ')}
+                                          ? t('ควรปรับ')
+                                          : t('ต้องปรับ')}
                                 </span>
                             </p>
                         </div>
                     </div>
-
-                    
-
                 </div>
             </div>
         </div>

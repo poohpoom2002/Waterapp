@@ -7,16 +7,16 @@
 export const getImageUrl = (relativePath: string | null | undefined): string => {
     // ถ้าไม่มี path รูปภาพมา, เป็นค่าว่าง, หรือไม่ใช่ string ให้ส่งรูป placeholder กลับไปแทน
     if (!relativePath || typeof relativePath !== 'string' || relativePath.trim() === '') {
-      // คุณต้องสร้างไฟล์รูปเปล่าๆ ไว้ที่ public/images/no-image.jpg เพื่อให้ path นี้ถูกต้อง
-      return '/images/no-image.jpg';
+        // คุณต้องสร้างไฟล์รูปเปล่าๆ ไว้ที่ public/images/no-image.jpg เพื่อให้ path นี้ถูกต้อง
+        return '/images/no-image.jpg';
     }
-  
+
     // ตรวจสอบว่า path ที่ได้มาเป็น URL เต็มๆ อยู่แล้วหรือไม่ (เผื่อกรณีข้อมูลเก่า)
     if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
-      return relativePath;
+        return relativePath;
     }
-  
+
     // นำ URL หลักจาก .env.local มาต่อกับ path ของรูปภาพ
     const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
     return `${baseUrl}${relativePath}`;
-  };
+};

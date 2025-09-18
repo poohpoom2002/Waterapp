@@ -1461,19 +1461,34 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                             </div>
                                             <div className="text-xs">
                                                 <div className="text-purple-300">
-                                                    {t('ท่อ')}: {statistics.summary.junctionStatistics.pipeJunctions}
+                                                    {t('ท่อ')}:{' '}
+                                                    {
+                                                        statistics.summary.junctionStatistics
+                                                            .pipeJunctions
+                                                    }
                                                 </div>
                                                 <div className="text-purple-300">
-                                                    {t('หัวฉีด')}: {statistics.summary.junctionStatistics.sprinklerJunctions}
+                                                    {t('หัวฉีด')}:{' '}
+                                                    {
+                                                        statistics.summary.junctionStatistics
+                                                            .sprinklerJunctions
+                                                    }
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    {Object.keys(statistics.summary.junctionStatistics.junctionsByWays).length > 0 && (
+                                    {Object.keys(
+                                        statistics.summary.junctionStatistics.junctionsByWays
+                                    ).length > 0 && (
                                         <div className="mt-2 border-t border-gray-600 pt-2">
-                                            <div className="text-xs text-gray-500 mb-1">{t('จำนวนทางแยก:')}</div>
+                                            <div className="mb-1 text-xs text-gray-500">
+                                                {t('จำนวนทางแยก:')}
+                                            </div>
                                             <div className="grid grid-cols-3 gap-1 text-xs">
-                                                {Object.entries(statistics.summary.junctionStatistics.junctionsByWays).map(([ways, count]) => (
+                                                {Object.entries(
+                                                    statistics.summary.junctionStatistics
+                                                        .junctionsByWays
+                                                ).map(([ways, count]) => (
                                                     <div key={ways} className="text-purple-300">
                                                         {ways}-{t('ทาง')}: {count}
                                                     </div>
@@ -1588,7 +1603,7 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 <div className="mb-2 text-gray-400">
                                                     {t('ระบบท่อ:')}
                                                 </div>
-                                                
+
                                                 {/* ความยาวท่อ */}
                                                 <div className="mb-2">
                                                     <div className="flex justify-between text-xs">
@@ -1620,13 +1635,13 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                             {t('อัตราการใช้น้ำท่อ:')}
                                                         </span>
                                                         <span className="font-medium text-cyan-400">
-                                                            {zone.sprinklerCount > 0 && zone.sprinklerFlowRate > 0
+                                                            {zone.sprinklerCount > 0 &&
+                                                            zone.sprinklerFlowRate > 0
                                                                 ? `${(zone.sprinklerFlowRate * zone.sprinklerCount).toFixed(1)} ${t('ล./นาที')}`
                                                                 : '-'}
                                                         </span>
                                                     </div>
                                                 </div>
-
 
                                                 {/* ท่อที่ยาวที่สุด */}
                                                 <div className="text-xs">
@@ -1641,8 +1656,6 @@ export default function HomeGardenSummary({ data: propsData }: HomeGardenSummary
                                                 </div>
                                             </div>
                                         )}
-
-
                                     </div>
                                 </div>
                             ))}

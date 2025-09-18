@@ -26,12 +26,15 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
     // คำนวณระยะทางระหว่างสองจุด
     const calculateDistance = (point1: Coordinate, point2: Coordinate): number => {
         const R = 6371000; // รัศมีโลกเป็นเมตร
-        const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-        const dLng = (point2.lng - point1.lng) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
-                Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        const dLat = ((point2.lat - point1.lat) * Math.PI) / 180;
+        const dLng = ((point2.lng - point1.lng) * Math.PI) / 180;
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((point1.lat * Math.PI) / 180) *
+                Math.cos((point2.lat * Math.PI) / 180) *
+                Math.sin(dLng / 2) *
+                Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     };
 
@@ -51,14 +54,14 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
     useEffect(() => {
         // ล้าง listeners และ cleanup functions เก่าก่อน
-        listenersRef.current.forEach(listener => {
+        listenersRef.current.forEach((listener) => {
             if (listener) {
                 google.maps.event.removeListener(listener);
             }
         });
         listenersRef.current = [];
-        
-        cleanupFunctionsRef.current.forEach(cleanup => cleanup());
+
+        cleanupFunctionsRef.current.forEach((cleanup) => cleanup());
         cleanupFunctionsRef.current = [];
 
         if (!map || !isActive || !editMode) {
@@ -76,83 +79,91 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
 
         // รอให้ map โหลดเสร็จก่อน
         const setupListeners = () => {
-            
             const mapContainer = map.getDiv();
             let isMouseDown = false;
             let mouseDownPos = { x: 0, y: 0 };
             let isDragging = false;
-            
+
             // ตรวจจับ mousedown
             const mouseDownListener = (e: MouseEvent) => {
                 isMouseDown = true;
                 mouseDownPos = { x: e.clientX, y: e.clientY };
                 isDragging = false;
             };
-            
+
             // ตรวจจับ mousemove เพื่อดูว่าเป็น drag หรือไม่
             const mouseMoveListener = (e: MouseEvent) => {
                 if (isMouseDown) {
                     const deltaX = Math.abs(e.clientX - mouseDownPos.x);
                     const deltaY = Math.abs(e.clientY - mouseDownPos.y);
                     const threshold = 5; // pixel threshold
-                    
+
                     if (deltaX > threshold || deltaY > threshold) {
                         isDragging = true;
                     }
                 }
             };
-            
+
             // ตรวจจับ mouseup/click
             const mouseUpListener = (e: MouseEvent) => {
-                
                 if (isMouseDown && !isDragging) {
                     // ตรวจสอบว่าไม่ได้คลิกบนปุ่มเครื่องมือหรือ UI elements
                     const target = e.target as HTMLElement;
-                    
+
                     // ตรวจสอบหลายๆ เงื่อนไขเพื่อให้แน่ใจว่าคลิกบนแผนที่จริงๆ
-                    const isClickOnControls = target.closest('.gmnoprint') ||
-                                            target.closest('[role="button"]') ||
-                                            target.closest('[data-control-width]') ||
-                                            target.closest('[jsaction]') ||
-                                            target.closest('.gm-bundled-control') ||
-                                            target.closest('.gm-control-active') ||
-                                            target.style.cursor === 'pointer' ||
-                                            target.parentElement?.style.cursor === 'pointer';
-                    
+                    const isClickOnControls =
+                        target.closest('.gmnoprint') ||
+                        target.closest('[role="button"]') ||
+                        target.closest('[data-control-width]') ||
+                        target.closest('[jsaction]') ||
+                        target.closest('.gm-bundled-control') ||
+                        target.closest('.gm-control-active') ||
+                        target.style.cursor === 'pointer' ||
+                        target.parentElement?.style.cursor === 'pointer';
+
                     // ตรวจสอบว่าอยู่ในพื้นที่แผนที่จริง
                     const rect = mapContainer.getBoundingClientRect();
-                    const isInMainMapArea = e.clientX >= rect.left + 50 && // เผื่อขอบซ้าย
-                                          e.clientX <= rect.right - 50 && // เผื่อขอบขวา
-                                          e.clientY >= rect.top + 50 &&   // เผื่อขอบบน
-                                          e.clientY <= rect.bottom - 50;  // เผื่อขอบล่าง
-                    
+                    const isInMainMapArea =
+                        e.clientX >= rect.left + 50 && // เผื่อขอบซ้าย
+                        e.clientX <= rect.right - 50 && // เผื่อขอบขวา
+                        e.clientY >= rect.top + 50 && // เผื่อขอบบน
+                        e.clientY <= rect.bottom - 50; // เผื่อขอบล่าง
+
                     if (isClickOnControls || !isInMainMapArea) {
                         isMouseDown = false;
                         isDragging = false;
                         return;
                     }
-                    
+
                     // ตรวจสอบว่าอยู่ในโหมดที่ควรวัดระยะหรือไม่
-                    const drawingModes = ['mainArea', 'zone', 'exclusion', 'mainPipe', 'subMainPipe'];
+                    const drawingModes = [
+                        'mainArea',
+                        'zone',
+                        'exclusion',
+                        'mainPipe',
+                        'subMainPipe',
+                    ];
                     if (!drawingModes.includes(editMode || '')) {
                         return;
                     }
-                    
+
                     // แปลง DOM coordinates เป็น lat/lng
                     const bounds = map.getBounds();
                     if (bounds) {
                         const rect = mapContainer.getBoundingClientRect();
                         const x = e.clientX - rect.left;
                         const y = e.clientY - rect.top;
-                        
+
                         const ne = bounds.getNorthEast();
                         const sw = bounds.getSouthWest();
-                        
-                        const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / mapContainer.offsetWidth);
-                        const lat = ne.lat() - (ne.lat() - sw.lat()) * (y / mapContainer.offsetHeight);
-                        
+
+                        const lng =
+                            sw.lng() + (ne.lng() - sw.lng()) * (x / mapContainer.offsetWidth);
+                        const lat =
+                            ne.lat() - (ne.lat() - sw.lat()) * (y / mapContainer.offsetHeight);
+
                         const clickedPoint = { lat, lng };
-                        
+
                         if (!startPoint) {
                             setStartPoint(clickedPoint);
                             startPointRef.current = clickedPoint;
@@ -171,17 +182,17 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                         }
                     }
                 }
-                
+
                 // รีเซ็ตสถานะ
                 isMouseDown = false;
                 isDragging = false;
             };
-            
+
             // เพิ่ม event listeners
             mapContainer.addEventListener('mousedown', mouseDownListener, true);
             mapContainer.addEventListener('mousemove', mouseMoveListener, true);
             mapContainer.addEventListener('mouseup', mouseUpListener, true);
-            
+
             const cleanupListeners = () => {
                 mapContainer.removeEventListener('mousedown', mouseDownListener, true);
                 mapContainer.removeEventListener('mousemove', mouseMoveListener, true);
@@ -190,19 +201,23 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
             cleanupFunctionsRef.current.push(cleanupListeners);
 
             // ฟัง event เมื่อวาดเสร็จจาก Drawing Manager
-            const drawingCompleteListener = google.maps.event.addListener(map, 'overlaycomplete', () => {
-                // รีเซ็ตการวัดระยะเมื่อวาดเสร็จ
-                setStartPoint(null);
-                startPointRef.current = null;
-                if (polylineRef.current) {
-                    polylineRef.current.setMap(null);
-                    polylineRef.current = null;
+            const drawingCompleteListener = google.maps.event.addListener(
+                map,
+                'overlaycomplete',
+                () => {
+                    // รีเซ็ตการวัดระยะเมื่อวาดเสร็จ
+                    setStartPoint(null);
+                    startPointRef.current = null;
+                    if (polylineRef.current) {
+                        polylineRef.current.setMap(null);
+                        polylineRef.current = null;
+                    }
+                    if (labelMarkerRef.current) {
+                        labelMarkerRef.current.setMap(null);
+                        labelMarkerRef.current = null;
+                    }
                 }
-                if (labelMarkerRef.current) {
-                    labelMarkerRef.current.setMap(null);
-                    labelMarkerRef.current = null;
-                }
-            });
+            );
             listenersRef.current.push(drawingCompleteListener);
 
             // ฟัง event เมื่อมีการ click ที่ทำให้เสร็จสิ้นการวาด (เช่น double click)
@@ -239,7 +254,7 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                 }
             };
             document.addEventListener('keydown', keydownListener);
-            
+
             const keyboardCleanup = () => {
                 document.removeEventListener('keydown', keydownListener);
             };
@@ -248,41 +263,44 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
             // ใช้ DOM mousemove แทนเพราะ Google Maps mousemove ไม่ทำงาน
             const mapDiv = map.getDiv();
             let frameId: number | null = null;
-            
+
             const handleMouseMove = (e: MouseEvent) => {
                 if (!startPointRef.current) return;
-                
+
                 // ใช้ requestAnimationFrame เพื่อ throttle การอัพเดท
                 if (frameId) return;
-                
+
                 frameId = requestAnimationFrame(() => {
                     frameId = null;
-                    
+
                     try {
                         // แปลง mouse position เป็น lat/lng
                         const bounds = map.getBounds();
                         if (!bounds) return;
-                        
+
                         const rect = mapDiv.getBoundingClientRect();
                         const x = e.clientX - rect.left;
                         const y = e.clientY - rect.top;
-                        
+
                         const ne = bounds.getNorthEast();
                         const sw = bounds.getSouthWest();
-                        
+
                         const lng = sw.lng() + (ne.lng() - sw.lng()) * (x / mapDiv.offsetWidth);
                         const lat = ne.lat() - (ne.lat() - sw.lat()) * (y / mapDiv.offsetHeight);
-                        
+
                         const currentPoint = { lat, lng };
-                        
+
                         if (!startPointRef.current) return;
-                        
+
                         const distance = calculateDistance(startPointRef.current, currentPoint);
 
                         // วาดเส้นวัดระยะจากจุดเริ่มถึงตำแหน่งเมาส์
                         const path = [
-                            new google.maps.LatLng(startPointRef.current.lat, startPointRef.current.lng),
-                            new google.maps.LatLng(currentPoint.lat, currentPoint.lng)
+                            new google.maps.LatLng(
+                                startPointRef.current.lat,
+                                startPointRef.current.lng
+                            ),
+                            new google.maps.LatLng(currentPoint.lat, currentPoint.lng),
                         ];
 
                         if (!polylineRef.current) {
@@ -338,9 +356,9 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
                     }
                 });
             };
-            
+
             mapDiv.addEventListener('mousemove', handleMouseMove);
-            
+
             const mouseMoveCleanup = () => {
                 if (frameId) {
                     cancelAnimationFrame(frameId);
@@ -356,17 +374,17 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
         return () => {
             clearTimeout(timeoutId);
             // ล้าง listeners
-            listenersRef.current.forEach(listener => {
+            listenersRef.current.forEach((listener) => {
                 if (listener) {
                     google.maps.event.removeListener(listener);
                 }
             });
             listenersRef.current = [];
-            
+
             // ล้าง cleanup functions
-            cleanupFunctionsRef.current.forEach(cleanup => cleanup());
+            cleanupFunctionsRef.current.forEach((cleanup) => cleanup());
             cleanupFunctionsRef.current = [];
-            
+
             // ล้าง Marker และ Polyline
             if (labelMarkerRef.current) {
                 labelMarkerRef.current.setMap(null);
@@ -396,4 +414,4 @@ const DistanceMeasurementOverlay: React.FC<DistanceMeasurementOverlayProps> = ({
     return null;
 };
 
-export default DistanceMeasurementOverlay; 
+export default DistanceMeasurementOverlay;

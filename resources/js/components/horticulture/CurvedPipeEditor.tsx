@@ -29,12 +29,12 @@ interface CurvedPipeEditorProps {
 
 // ฟังก์ชันสร้าง PE pipe curve แบบเหมาะสม
 const createPEPipeCurve = (
-    anchorPoints: Coordinate[], 
-    tension: number = 0.3, 
+    anchorPoints: Coordinate[],
+    tension: number = 0.3,
     segments: number = 50
 ): Coordinate[] => {
     if (anchorPoints.length < 2) return anchorPoints;
-    
+
     if (anchorPoints.length === 2) {
         const points: Coordinate[] = [];
         for (let i = 0; i <= segments; i++) {
@@ -45,26 +45,26 @@ const createPEPipeCurve = (
         }
         return points;
     }
-    
+
     const allPoints: Coordinate[] = [];
     allPoints.push(anchorPoints[0]);
-    
+
     for (let i = 0; i < anchorPoints.length - 1; i++) {
         const p0 = i === 0 ? anchorPoints[0] : anchorPoints[i - 1];
         const p1 = anchorPoints[i];
         const p2 = anchorPoints[i + 1];
         const p3 = i === anchorPoints.length - 2 ? anchorPoints[i + 1] : anchorPoints[i + 2];
-        
+
         const segmentPoints = createCardinalSplineSegment(p0, p1, p2, p3, tension, segments);
         allPoints.push(...segmentPoints.slice(1));
     }
-    
+
     // รักษาจุดปลายท่อ
     if (allPoints.length > 0) {
         allPoints[0] = { ...anchorPoints[0] };
         allPoints[allPoints.length - 1] = { ...anchorPoints[anchorPoints.length - 1] };
     }
-    
+
     return allPoints;
 };
 
@@ -82,31 +82,31 @@ const createCardinalSplineSegment = (
 ): Coordinate[] => {
     const points: Coordinate[] = [];
     const s = (1 - tension) / 2;
-    
+
     for (let i = 0; i <= segments; i++) {
         const t = i / segments;
         const t2 = t * t;
         const t3 = t2 * t;
-        
+
         // Cardinal spline basis functions
         const h1 = 2 * t3 - 3 * t2 + 1;
         const h2 = -2 * t3 + 3 * t2;
         const h3 = t3 - 2 * t2 + t;
         const h4 = t3 - t2;
-        
+
         // Tangent vectors
         const m1_lat = s * (p2.lat - p0.lat);
         const m1_lng = s * (p2.lng - p0.lng);
         const m2_lat = s * (p3.lat - p1.lat);
         const m2_lng = s * (p3.lng - p1.lng);
-        
+
         // Calculate point
         const lat = h1 * p1.lat + h2 * p2.lat + h3 * m1_lat + h4 * m2_lat;
         const lng = h1 * p1.lng + h2 * p2.lng + h3 * m1_lng + h4 * m2_lng;
-        
+
         points.push({ lat, lng });
     }
-    
+
     return points;
 };
 
@@ -132,7 +132,7 @@ const extractAnchorPoints = (coordinates: Coordinate[], maxPoints: number = 8): 
         anchorPoints.push(coordinates[i]);
     }
     anchorPoints.push(coordinates[coordinates.length - 1]);
-    
+
     return anchorPoints;
 };
 
@@ -141,10 +141,10 @@ const extractAnchorPoints = (coordinates: Coordinate[], maxPoints: number = 8): 
 
 // Copy ฟังก์ชันจาก CurvedPipeDrawingManager เพื่อให้ใช้อัลกอริทึมเดียวกัน
 const calculateCornerRadius = (
-    angle: number, 
+    angle: number,
     tension: number = 0.3,
-    minRadius: number = 0.000025, // ~2.5 เมตร 
-    maxRadius: number = 0.000085  // ~8.5 เมตร
+    minRadius: number = 0.000025, // ~2.5 เมตร
+    maxRadius: number = 0.000085 // ~8.5 เมตร
 ): number => {
     const absAngle = Math.abs(angle);
     if (absAngle < 0.12) return 0; // เกณฑ์มุมขั้นต่ำ - โค้งได้ง่ายขึ้น
@@ -158,10 +158,10 @@ const createCircularCorner = (
     corner: Coordinate,
     next: Coordinate,
     radius: number
-): { 
-    tangent1: Coordinate; 
-    tangent2: Coordinate; 
-    center: Coordinate; 
+): {
+    tangent1: Coordinate;
+    tangent2: Coordinate;
+    center: Coordinate;
     startAngle: number;
     endAngle: number;
     arc: Coordinate[];
@@ -169,83 +169,85 @@ const createCircularCorner = (
     radiusLine2: Coordinate[];
 } | null => {
     if (radius <= 0) return null;
-    
+
     // สร้างเวกเตอร์ทิศทาง - วิธีเดิมที่ทำงานได้ดี
     const v1 = {
         lat: prev.lat - corner.lat,
-        lng: prev.lng - corner.lng
+        lng: prev.lng - corner.lng,
     };
     const v2 = {
         lat: next.lat - corner.lat,
-        lng: next.lng - corner.lng
+        lng: next.lng - corner.lng,
     };
-    
+
     const len1 = Math.sqrt(v1.lat * v1.lat + v1.lng * v1.lng);
     const len2 = Math.sqrt(v2.lat * v2.lat + v2.lng * v2.lng);
-    
+
     if (len1 === 0 || len2 === 0) return null;
-    
+
     // Normalize vectors
-    v1.lat /= len1; v1.lng /= len1;
-    v2.lat /= len2; v2.lng /= len2;
-    
+    v1.lat /= len1;
+    v1.lng /= len1;
+    v2.lat /= len2;
+    v2.lng /= len2;
+
     const dot = v1.lat * v2.lat + v1.lng * v2.lng;
     const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
-    
+
     if (angle < 0.1 || angle > Math.PI - 0.1) return null;
-    
+
     const halfAngle = angle / 2;
     const tangentDistance = radius / Math.tan(halfAngle);
-    
+
     const tangent1 = {
         lat: corner.lat + v1.lat * tangentDistance,
-        lng: corner.lng + v1.lng * tangentDistance
+        lng: corner.lng + v1.lng * tangentDistance,
     };
-    
+
     const tangent2 = {
         lat: corner.lat + v2.lat * tangentDistance,
-        lng: corner.lng + v2.lng * tangentDistance
+        lng: corner.lng + v2.lng * tangentDistance,
     };
-    
+
     // หาจุดศูนย์กลาง
     const bisector = {
         lat: (v1.lat + v2.lat) / 2,
-        lng: (v1.lng + v2.lng) / 2
+        lng: (v1.lng + v2.lng) / 2,
     };
-    
+
     const bisectorLen = Math.sqrt(bisector.lat * bisector.lat + bisector.lng * bisector.lng);
     if (bisectorLen === 0) return null;
-    
+
     bisector.lat /= bisectorLen;
     bisector.lng /= bisectorLen;
-    
+
     const centerDistance = radius / Math.sin(halfAngle);
     const center = {
         lat: corner.lat + bisector.lat * centerDistance,
-        lng: corner.lng + bisector.lng * centerDistance
+        lng: corner.lng + bisector.lng * centerDistance,
     };
-    
+
     // สร้างส่วนโค้งแบบง่าย
     const startAngle = Math.atan2(tangent1.lat - center.lat, tangent1.lng - center.lng);
     const endAngle = Math.atan2(tangent2.lat - center.lat, tangent2.lng - center.lng);
-    
+
     const arcSegments = Math.max(5, Math.floor(Math.abs(angle) * 10));
     const arc: Coordinate[] = [];
-    
+
     let deltaAngle = endAngle - startAngle;
     if (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
     if (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
-    
+
     for (let i = 0; i <= arcSegments; i++) {
         const t = i / arcSegments;
         const currentAngle = startAngle + deltaAngle * t;
-        
+
         arc.push({
             lat: center.lat + radius * Math.sin(currentAngle),
-            lng: center.lng + radius * Math.cos(currentAngle)
+            lng: center.lng + radius * Math.cos(currentAngle),
         });
     }
-    
+
     const radiusLine1: Coordinate[] = [center, tangent1];
     const radiusLine2: Coordinate[] = [center, tangent2];
 
@@ -257,7 +259,7 @@ const createCircularCorner = (
         endAngle,
         arc,
         radiusLine1,
-        radiusLine2
+        radiusLine2,
     };
 };
 
@@ -267,46 +269,46 @@ const createPEPipeWithCircularCorners = (
     segments: number = 50
 ): Coordinate[] => {
     if (anchorPoints.length < 2) return anchorPoints;
-    
+
     if (anchorPoints.length === 2) {
         const points: Coordinate[] = [];
         for (let i = 0; i <= segments; i++) {
             const t = i / segments;
             points.push({
                 lat: anchorPoints[0].lat + t * (anchorPoints[1].lat - anchorPoints[0].lat),
-                lng: anchorPoints[0].lng + t * (anchorPoints[1].lng - anchorPoints[0].lng)
+                lng: anchorPoints[0].lng + t * (anchorPoints[1].lng - anchorPoints[0].lng),
             });
         }
         return points;
     }
-    
+
     const path: Coordinate[] = [];
-    
+
     for (let i = 0; i < anchorPoints.length; i++) {
         const current = anchorPoints[i];
         const prev = i > 0 ? anchorPoints[i - 1] : null;
         const next = i < anchorPoints.length - 1 ? anchorPoints[i + 1] : null;
-        
+
         if (i === 0) {
             // จุดเริ่มต้น - เก็บไว้เป็นจุดแรก
             path.push(current);
         } else if (i === anchorPoints.length - 1) {
-            // จุดสุดท้าย - เก็บไว้เป็นจุดสุดท้าย  
+            // จุดสุดท้าย - เก็บไว้เป็นจุดสุดท้าย
             path.push(current);
         } else {
             // จุดกลาง - สร้างโค้งแบบที่ไม่ทำให้ท่อล้ม
             const angle = calculateCornerAngle(prev!, current, next!);
             const radius = calculateCornerRadius(angle, tension);
             const cornerData = createCircularCorner(prev!, current, next!, radius);
-            
+
             if (cornerData && radius > 0 && Math.abs(angle) > 0.15) {
                 // เส้นตรงจากจุดก่อนหน้าไปยัง tangent1 (รักษาทิศทางเส้นตรงเดิม)
                 path.push(cornerData.tangent1);
-                
+
                 // ส่วนโค้งที่จุดมุม
                 path.push(...cornerData.arc);
-                
-                // เส้นตรงจาก tangent2 ไปยังจุดถัดไป (รักษาทิศทางเส้นตรงเดิม) 
+
+                // เส้นตรงจาก tangent2 ไปยังจุดถัดไป (รักษาทิศทางเส้นตรงเดิม)
                 path.push(cornerData.tangent2);
             } else {
                 // มุมไม่ชัดพอ ให้เป็นเส้นตรงผ่าน
@@ -314,17 +316,17 @@ const createPEPipeWithCircularCorners = (
             }
         }
     }
-    
+
     if (path.length > 0) {
         path[0] = { ...anchorPoints[0] };
         path[path.length - 1] = { ...anchorPoints[anchorPoints.length - 1] };
     }
-    
+
     return path;
 };
 
 const createSmoothCurvePreservingEnds = (
-    anchorPoints: Coordinate[], 
+    anchorPoints: Coordinate[],
     tension: number = 0.3,
     segments: number = 50
 ): Coordinate[] => {
@@ -335,10 +337,10 @@ const createSmoothCurvePreservingEnds = (
 const calculateCornerAngle = (p1: Coordinate, corner: Coordinate, p3: Coordinate): number => {
     const v1 = { x: p1.lat - corner.lat, y: p1.lng - corner.lng };
     const v2 = { x: p3.lat - corner.lat, y: p3.lng - corner.lng };
-    
+
     const dot = v1.x * v2.x + v1.y * v2.y;
     const cross = v1.x * v2.y - v1.y * v2.x;
-    
+
     return Math.atan2(cross, dot);
 };
 
@@ -351,282 +353,317 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
     strokeWeight = 3,
     editMode = false,
     tension = 0.3,
-    showVisualFeedback = true
+    showVisualFeedback = true,
 }) => {
     const polylineRefs = useRef<Map<string, google.maps.Polyline>>(new Map());
     const anchorMarkerRefs = useRef<Map<string, google.maps.Marker[]>>(new Map());
-    const originalEndPointsRef = useRef<Map<string, { first: Coordinate, last: Coordinate }>>(new Map());
+    const originalEndPointsRef = useRef<Map<string, { first: Coordinate; last: Coordinate }>>(
+        new Map()
+    );
     const [editingPipeId, setEditingPipeId] = useState<string | null>(null);
-    
+
     // เพิ่ม refs สำหรับเส้นไกด์เรียลไทม์
     const realTimeGuideRefs = useRef<Map<string, google.maps.Polyline[]>>(new Map());
     const [isDragging, setIsDragging] = useState<boolean>(false);
-    const [dragMarkerInfo, setDragMarkerInfo] = useState<{ pipeId: string, markerIndex: number } | null>(null);
+    const [dragMarkerInfo, setDragMarkerInfo] = useState<{
+        pipeId: string;
+        markerIndex: number;
+    } | null>(null);
 
     // ฟังก์ชันสำหรับแสดงเส้นไกด์เรียลไทม์
-    const showRealTimeGuides = useCallback((pipeId: string, markerIndex: number, currentPosition: Coordinate) => {
-        if (!map || !showVisualFeedback || !editMode) return;
-        
-        const pipe = pipes.find(p => p.id === pipeId);
-        if (!pipe || !pipe.isEditing) return;
-        
-        // ตรวจสอบความถูกต้องของ markerIndex
-        if (markerIndex < 0 || markerIndex >= pipe.anchorPoints.length) return;
-        
-        // ล้างเส้นไกด์เก่า
-        const existingGuides = realTimeGuideRefs.current.get(pipeId) || [];
-        existingGuides.forEach(guide => guide.setMap(null));
-        
-        const guides: google.maps.Polyline[] = [];
-        
-        // คำนวณเส้นไกด์สำหรับมุมโค้ง
-        const anchorPoints = [...pipe.anchorPoints];
-        anchorPoints[markerIndex] = currentPosition;
-        
-        // สร้างเส้นไกด์แสดงรัศมีโค้ง
-        if (markerIndex > 0 && markerIndex < anchorPoints.length - 1) {
-            const prevPoint = anchorPoints[markerIndex - 1];
-            const nextPoint = anchorPoints[markerIndex + 1];
-            
-            // ตรวจสอบว่า prevPoint และ nextPoint มีอยู่จริง
-            if (!prevPoint || !nextPoint || !pipe.anchorPoints[markerIndex]) return;
-            
-            try {
-                // คำนวณรัศมีจากระยะลาง - ใช้วิธีง่ายๆ
-                const dragDistance = Math.sqrt(
-                    Math.pow(currentPosition.lat - pipe.anchorPoints[markerIndex].lat, 2) +
-                    Math.pow(currentPosition.lng - pipe.anchorPoints[markerIndex].lng, 2)
-                );
-                
-                // ปรับความโค้งให้เหมาะสม - ลางนิดเดียวได้โค้งนิดเดียว แต่เห็นชัดเจน
-                const radius = Math.max(0.000004, Math.min(0.000015, dragDistance * 0.25));
-                
-                // สร้าง circular corner preview
-                const cornerResult = createCircularCorner(prevPoint, currentPosition, nextPoint, radius);
-                
-                if (cornerResult && cornerResult.arc && cornerResult.arc.length > 0) {
-                    // สร้างท่อโค้งตามความต้องการ: เส้นตรง -> โค้ง -> เส้นตรง
-                    const realPipePath: Coordinate[] = [];
-                    
-                    // เส้นตรงจาก prevPoint ไปยัง tangent1
-                    realPipePath.push(prevPoint);
-                    realPipePath.push(cornerResult.tangent1);
-                    
-                    // ส่วนโค้ง
-                    realPipePath.push(...cornerResult.arc);
-                    
-                    // เส้นตรงจาก tangent2 ไปยัง nextPoint
-                    realPipePath.push(cornerResult.tangent2);
-                    realPipePath.push(nextPoint);
-                    
-                    // สร้างเส้นไกด์ท่อโค้งที่เห็นชัดมาก
-                    const pipeGuide = new google.maps.Polyline({
-                        path: realPipePath.map(coord => ({ lat: coord.lat, lng: coord.lng })),
-                        geodesic: false,
-                        strokeColor: '#00FF00', // เขียวสดใส
-                        strokeOpacity: 1.0, // ทึบสนิท
-                        strokeWeight: 6, // หนามาก
-                        map: map,
-                        zIndex: 2000, // zIndex สูงสุด
-                        clickable: false
-                    });
-                    
-                    guides.push(pipeGuide);
+    const showRealTimeGuides = useCallback(
+        (pipeId: string, markerIndex: number, currentPosition: Coordinate) => {
+            if (!map || !showVisualFeedback || !editMode) return;
+
+            const pipe = pipes.find((p) => p.id === pipeId);
+            if (!pipe || !pipe.isEditing) return;
+
+            // ตรวจสอบความถูกต้องของ markerIndex
+            if (markerIndex < 0 || markerIndex >= pipe.anchorPoints.length) return;
+
+            // ล้างเส้นไกด์เก่า
+            const existingGuides = realTimeGuideRefs.current.get(pipeId) || [];
+            existingGuides.forEach((guide) => guide.setMap(null));
+
+            const guides: google.maps.Polyline[] = [];
+
+            // คำนวณเส้นไกด์สำหรับมุมโค้ง
+            const anchorPoints = [...pipe.anchorPoints];
+            anchorPoints[markerIndex] = currentPosition;
+
+            // สร้างเส้นไกด์แสดงรัศมีโค้ง
+            if (markerIndex > 0 && markerIndex < anchorPoints.length - 1) {
+                const prevPoint = anchorPoints[markerIndex - 1];
+                const nextPoint = anchorPoints[markerIndex + 1];
+
+                // ตรวจสอบว่า prevPoint และ nextPoint มีอยู่จริง
+                if (!prevPoint || !nextPoint || !pipe.anchorPoints[markerIndex]) return;
+
+                try {
+                    // คำนวณรัศมีจากระยะลาง - ใช้วิธีง่ายๆ
+                    const dragDistance = Math.sqrt(
+                        Math.pow(currentPosition.lat - pipe.anchorPoints[markerIndex].lat, 2) +
+                            Math.pow(currentPosition.lng - pipe.anchorPoints[markerIndex].lng, 2)
+                    );
+
+                    // ปรับความโค้งให้เหมาะสม - ลางนิดเดียวได้โค้งนิดเดียว แต่เห็นชัดเจน
+                    const radius = Math.max(0.000004, Math.min(0.000015, dragDistance * 0.25));
+
+                    // สร้าง circular corner preview
+                    const cornerResult = createCircularCorner(
+                        prevPoint,
+                        currentPosition,
+                        nextPoint,
+                        radius
+                    );
+
+                    if (cornerResult && cornerResult.arc && cornerResult.arc.length > 0) {
+                        // สร้างท่อโค้งตามความต้องการ: เส้นตรง -> โค้ง -> เส้นตรง
+                        const realPipePath: Coordinate[] = [];
+
+                        // เส้นตรงจาก prevPoint ไปยัง tangent1
+                        realPipePath.push(prevPoint);
+                        realPipePath.push(cornerResult.tangent1);
+
+                        // ส่วนโค้ง
+                        realPipePath.push(...cornerResult.arc);
+
+                        // เส้นตรงจาก tangent2 ไปยัง nextPoint
+                        realPipePath.push(cornerResult.tangent2);
+                        realPipePath.push(nextPoint);
+
+                        // สร้างเส้นไกด์ท่อโค้งที่เห็นชัดมาก
+                        const pipeGuide = new google.maps.Polyline({
+                            path: realPipePath.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
+                            geodesic: false,
+                            strokeColor: '#00FF00', // เขียวสดใส
+                            strokeOpacity: 1.0, // ทึบสนิท
+                            strokeWeight: 6, // หนามาก
+                            map: map,
+                            zIndex: 2000, // zIndex สูงสุด
+                            clickable: false,
+                        });
+
+                        guides.push(pipeGuide);
+                    }
+                } catch (error) {
+                    console.warn('Error creating real-time guides:', error);
+                    // ไม่ทำอะไรเพิ่มเติมเพื่อป้องกัน crash
                 }
-            } catch (error) {
-                console.warn('Error creating real-time guides:', error);
-                // ไม่ทำอะไรเพิ่มเติมเพื่อป้องกัน crash
             }
-        }
-        
-        realTimeGuideRefs.current.set(pipeId, guides);
-    }, [map, pipes, showVisualFeedback]);
-    
+
+            realTimeGuideRefs.current.set(pipeId, guides);
+        },
+        [map, pipes, showVisualFeedback]
+    );
+
     // ฟังก์ชันสำหรับซ่อนเส้นไกด์
     const hideRealTimeGuides = useCallback((pipeId: string) => {
         const guides = realTimeGuideRefs.current.get(pipeId) || [];
-        guides.forEach(guide => guide.setMap(null));
+        guides.forEach((guide) => guide.setMap(null));
         realTimeGuideRefs.current.delete(pipeId);
     }, []);
 
-    const createAnchorMarker = useCallback((
-        position: Coordinate, 
-        pipeId: string, 
-        index: number
-    ): google.maps.Marker => {
-        if (!map) throw new Error('Map not available');
-        
-        const pipe = pipes.find(p => p.id === pipeId);
-        const isEndPoint = pipe && (index === 0 || index === pipe.anchorPoints.length - 1);
-        
-        const marker = new google.maps.Marker({
-            position: { lat: position.lat, lng: position.lng },
-            map,
-            draggable: !isEndPoint,
-            clickable: !isEndPoint,
-            icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 6,
-                fillColor: '#ef4444',
-                fillOpacity: 1,
-                strokeColor: '#ffffff',
-                strokeWeight: 2,
-            },
-            title: isEndPoint ? `ปลายท่อ ${index === 0 ? 'เริ่มต้น' : 'สิ้นสุด'} (ไม่สามารถลากได้)` : `จุดควบคุม ${index + 1}`,
-            zIndex: 1001,
-            visible: editMode
-        });
+    const createAnchorMarker = useCallback(
+        (position: Coordinate, pipeId: string, index: number): google.maps.Marker => {
+            if (!map) throw new Error('Map not available');
 
-        marker.addListener('dragstart', () => {
-            if (isEndPoint) {
-                marker.setDraggable(false);
-                return;
-            }
-            
-            // เริ่มการแสดงเส้นไกด์เรียลไทม์
-            setIsDragging(true);
-            setDragMarkerInfo({ pipeId, markerIndex: index });
-        });
+            const pipe = pipes.find((p) => p.id === pipeId);
+            const isEndPoint = pipe && (index === 0 || index === pipe.anchorPoints.length - 1);
 
-        // เพิ่ม drag event สำหรับการแสดงเส้นไกด์เรียลไทม์
-        marker.addListener('drag', () => {
-            const currentPosition = marker.getPosition();
-            if (currentPosition && !isEndPoint && showVisualFeedback) {
-                const dragPosition = {
-                    lat: currentPosition.lat(),
-                    lng: currentPosition.lng()
-                };
-                showRealTimeGuides(pipeId, index, dragPosition);
-            }
-        });
+            const marker = new google.maps.Marker({
+                position: { lat: position.lat, lng: position.lng },
+                map,
+                draggable: !isEndPoint,
+                clickable: !isEndPoint,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 6,
+                    fillColor: '#ef4444',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                },
+                title: isEndPoint
+                    ? `ปลายท่อ ${index === 0 ? 'เริ่มต้น' : 'สิ้นสุด'} (ไม่สามารถลากได้)`
+                    : `จุดควบคุม ${index + 1}`,
+                zIndex: 1001,
+                visible: editMode,
+            });
 
-        marker.addListener('dragend', () => {
-            // ซ่อนเส้นไกด์เรียลไทม์
-            setIsDragging(false);
-            setDragMarkerInfo(null);
-            hideRealTimeGuides(pipeId);
-            
-            const newPosition = marker.getPosition();
-            
-            if (newPosition && !isEndPoint) {
-                const pipe = pipes.find(p => p.id === pipeId);
-                if (pipe) {
-                    const updatedAnchorPoints = [...pipe.anchorPoints];
-                    updatedAnchorPoints[index] = {
-                        lat: newPosition.lat(),
-                        lng: newPosition.lng()
+            marker.addListener('dragstart', () => {
+                if (isEndPoint) {
+                    marker.setDraggable(false);
+                    return;
+                }
+
+                // เริ่มการแสดงเส้นไกด์เรียลไทม์
+                setIsDragging(true);
+                setDragMarkerInfo({ pipeId, markerIndex: index });
+            });
+
+            // เพิ่ม drag event สำหรับการแสดงเส้นไกด์เรียลไทม์
+            marker.addListener('drag', () => {
+                const currentPosition = marker.getPosition();
+                if (currentPosition && !isEndPoint && showVisualFeedback) {
+                    const dragPosition = {
+                        lat: currentPosition.lat(),
+                        lng: currentPosition.lng(),
                     };
-                    
-                    // รักษาจุดปลายท่อให้คงที่ (วิธีง่ายๆ)
-                    if (updatedAnchorPoints.length > 0) {
-                        const originalEndPoints = originalEndPointsRef.current.get(pipeId);
-                        const originalFirst = originalEndPoints?.first || { lat: pipe.anchorPoints[0].lat, lng: pipe.anchorPoints[0].lng };
-                        const originalLast = originalEndPoints?.last || { 
-                            lat: pipe.anchorPoints[pipe.anchorPoints.length - 1].lat, 
-                            lng: pipe.anchorPoints[pipe.anchorPoints.length - 1].lng 
+                    showRealTimeGuides(pipeId, index, dragPosition);
+                }
+            });
+
+            marker.addListener('dragend', () => {
+                // ซ่อนเส้นไกด์เรียลไทม์
+                setIsDragging(false);
+                setDragMarkerInfo(null);
+                hideRealTimeGuides(pipeId);
+
+                const newPosition = marker.getPosition();
+
+                if (newPosition && !isEndPoint) {
+                    const pipe = pipes.find((p) => p.id === pipeId);
+                    if (pipe) {
+                        const updatedAnchorPoints = [...pipe.anchorPoints];
+                        updatedAnchorPoints[index] = {
+                            lat: newPosition.lat(),
+                            lng: newPosition.lng(),
                         };
-                        
-                        if (!originalEndPoints) {
-                            originalEndPointsRef.current.set(pipeId, { first: originalFirst, last: originalLast });
+
+                        // รักษาจุดปลายท่อให้คงที่ (วิธีง่ายๆ)
+                        if (updatedAnchorPoints.length > 0) {
+                            const originalEndPoints = originalEndPointsRef.current.get(pipeId);
+                            const originalFirst = originalEndPoints?.first || {
+                                lat: pipe.anchorPoints[0].lat,
+                                lng: pipe.anchorPoints[0].lng,
+                            };
+                            const originalLast = originalEndPoints?.last || {
+                                lat: pipe.anchorPoints[pipe.anchorPoints.length - 1].lat,
+                                lng: pipe.anchorPoints[pipe.anchorPoints.length - 1].lng,
+                            };
+
+                            if (!originalEndPoints) {
+                                originalEndPointsRef.current.set(pipeId, {
+                                    first: originalFirst,
+                                    last: originalLast,
+                                });
+                            }
+
+                            // บังคับให้จุดปลายคงที่
+                            updatedAnchorPoints[0] = originalFirst;
+                            updatedAnchorPoints[updatedAnchorPoints.length - 1] = originalLast;
                         }
-                        
-                        // บังคับให้จุดปลายคงที่
-                        updatedAnchorPoints[0] = originalFirst;
-                        updatedAnchorPoints[updatedAnchorPoints.length - 1] = originalLast;
+
+                        // สร้างท่อใหม่ด้วยการตั้งค่าที่เพิ่มความโค้ง
+                        const newCoordinates = createPEPipeWithCircularCorners(
+                            updatedAnchorPoints,
+                            0.25,
+                            25
+                        );
+                        onPipeUpdate(pipeId, newCoordinates);
                     }
-                    
-                    // สร้างท่อใหม่ด้วยการตั้งค่าที่เพิ่มความโค้ง
-                    const newCoordinates = createPEPipeWithCircularCorners(updatedAnchorPoints, 0.25, 25);
+                } else if (newPosition && isEndPoint) {
+                    // จุดปลายไม่สามารถเลื่อนได้
+                    marker.setPosition({ lat: position.lat, lng: position.lng });
+                }
+            });
+
+            marker.addListener('dblclick', () => {
+                const pipe = pipes.find((p) => p.id === pipeId);
+                if (pipe && pipe.anchorPoints.length > 2 && !isEndPoint) {
+                    const updatedAnchorPoints = pipe.anchorPoints.filter((_, i) => i !== index);
+                    const newCoordinates = createSmoothCurvePreservingEnds(updatedAnchorPoints, 50);
                     onPipeUpdate(pipeId, newCoordinates);
                 }
-            } else if (newPosition && isEndPoint) {
-                // จุดปลายไม่สามารถเลื่อนได้
-                marker.setPosition({ lat: position.lat, lng: position.lng });
+            });
+
+            return marker;
+        },
+        [
+            map,
+            pipes,
+            onPipeUpdate,
+            editMode,
+            showRealTimeGuides,
+            hideRealTimeGuides,
+            showVisualFeedback,
+        ]
+    );
+
+    const createPolyline = useCallback(
+        (pipe: EditablePipe): google.maps.Polyline => {
+            if (!map) throw new Error('Map not available');
+
+            // กำหนดสีตามประเภทท่อ
+            let pipeColor = strokeColor;
+            if (!pipe.isEditing) {
+                if (pipe.type === 'mainPipe') {
+                    pipeColor = '#FF0000'; // สีแดงสำหรับท่อเมน
+                } else if (pipe.type === 'subMainPipe') {
+                    pipeColor = '#8B5CF6'; // สีม่วงสำหรับท่อเมนรอง
+                }
             }
-        });
 
-        marker.addListener('dblclick', () => {
-            const pipe = pipes.find(p => p.id === pipeId);
-            if (pipe && pipe.anchorPoints.length > 2 && !isEndPoint) {
-                const updatedAnchorPoints = pipe.anchorPoints.filter((_, i) => i !== index);
-                const newCoordinates = createSmoothCurvePreservingEnds(updatedAnchorPoints, 50);
-                onPipeUpdate(pipeId, newCoordinates);
-            }
-        });
+            const polyline = new google.maps.Polyline({
+                path: pipe.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
+                geodesic: true,
+                strokeColor: pipe.isEditing ? '#ef4444' : pipeColor,
+                strokeOpacity: pipe.isEditing ? 1 : 0.8,
+                strokeWeight: pipe.isEditing ? strokeWeight + 2 : strokeWeight,
+                map: map,
+                zIndex: pipe.isEditing ? 1000 : 999,
+                clickable: true,
+            });
 
-        return marker;
-    }, [map, pipes, onPipeUpdate, editMode, showRealTimeGuides, hideRealTimeGuides, showVisualFeedback]);
+            polyline.addListener('click', (event: google.maps.MapMouseEvent) => {
+                if (editMode && event.latLng) {
+                    togglePipeEditing(pipe.id);
+                }
+            });
 
-    const createPolyline = useCallback((pipe: EditablePipe): google.maps.Polyline => {
-        if (!map) throw new Error('Map not available');
-        
-        // กำหนดสีตามประเภทท่อ
-        let pipeColor = strokeColor;
-        if (!pipe.isEditing) {
-            if (pipe.type === 'mainPipe') {
-                pipeColor = '#FF0000'; // สีแดงสำหรับท่อเมน
-            } else if (pipe.type === 'subMainPipe') {
-                pipeColor = '#8B5CF6'; // สีม่วงสำหรับท่อเมนรอง
-            }
-        }
+            polyline.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
+                if (editMode && pipe.isEditing && event.latLng) {
+                    const newPoint = {
+                        lat: event.latLng.lat(),
+                        lng: event.latLng.lng(),
+                    };
 
-        const polyline = new google.maps.Polyline({
-            path: pipe.coordinates.map(coord => ({ lat: coord.lat, lng: coord.lng })),
-            geodesic: true,
-            strokeColor: pipe.isEditing ? '#ef4444' : pipeColor,
-            strokeOpacity: pipe.isEditing ? 1 : 0.8,
-            strokeWeight: pipe.isEditing ? strokeWeight + 2 : strokeWeight,
-            map: map,
-            zIndex: pipe.isEditing ? 1000 : 999,
-            clickable: true
-        });
+                    const insertIndex = findBestInsertPosition(newPoint, pipe.anchorPoints);
+                    const updatedAnchorPoints = [...pipe.anchorPoints];
+                    updatedAnchorPoints.splice(insertIndex, 0, newPoint);
 
-        polyline.addListener('click', (event: google.maps.MapMouseEvent) => {
-            if (editMode && event.latLng) {
-                togglePipeEditing(pipe.id);
-            }
-        });
+                    const newCoordinates = createSmoothCurvePreservingEnds(updatedAnchorPoints, 50);
+                    onPipeUpdate(pipe.id, newCoordinates);
+                }
+            });
 
-        polyline.addListener('rightclick', (event: google.maps.MapMouseEvent) => {
-            if (editMode && pipe.isEditing && event.latLng) {
-                const newPoint = {
-                    lat: event.latLng.lat(),
-                    lng: event.latLng.lng()
-                };
-                
-                const insertIndex = findBestInsertPosition(newPoint, pipe.anchorPoints);
-                const updatedAnchorPoints = [...pipe.anchorPoints];
-                updatedAnchorPoints.splice(insertIndex, 0, newPoint);
-                
-                const newCoordinates = createSmoothCurvePreservingEnds(updatedAnchorPoints, 50);
-                onPipeUpdate(pipe.id, newCoordinates);
-            }
-        });
-
-        return polyline;
-    }, [map, strokeColor, strokeWeight, editMode, onPipeUpdate]);
+            return polyline;
+        },
+        [map, strokeColor, strokeWeight, editMode, onPipeUpdate]
+    );
 
     const findBestInsertPosition = (newPoint: Coordinate, anchorPoints: Coordinate[]): number => {
         let minDistance = Infinity;
         let bestIndex = 1;
-        
+
         for (let i = 1; i < anchorPoints.length - 1; i++) {
             const distance = distanceFromPointToLineSegment(
                 newPoint,
                 anchorPoints[i],
                 anchorPoints[i + 1]
             );
-            
+
             if (distance < minDistance) {
                 minDistance = distance;
                 bestIndex = i + 1;
             }
         }
-        
+
         if (anchorPoints.length <= 2) {
             return 1;
         }
-        
+
         return bestIndex;
     };
 
@@ -664,37 +701,40 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
         return Math.sqrt(dx * dx + dy * dy);
     };
 
-    const togglePipeEditing = useCallback((pipeId: string) => {
-        const pipe = pipes.find(p => p.id === pipeId);
-        if (!pipe) return;
+    const togglePipeEditing = useCallback(
+        (pipeId: string) => {
+            const pipe = pipes.find((p) => p.id === pipeId);
+            if (!pipe) return;
 
-        const newEditingState = !pipe.isEditing;
-        
-        if (newEditingState) {
-            setEditingPipeId(pipeId);
-            pipes.forEach(p => {
-                if (p.id !== pipeId && p.isEditing) {
-                    onEditingChange(p.id, false);
-                }
-            });
-        } else {
-            setEditingPipeId(null);
-            originalEndPointsRef.current.delete(pipeId);
-        }
-        
-        onEditingChange(pipeId, newEditingState);
-    }, [pipes, onEditingChange]);
+            const newEditingState = !pipe.isEditing;
+
+            if (newEditingState) {
+                setEditingPipeId(pipeId);
+                pipes.forEach((p) => {
+                    if (p.id !== pipeId && p.isEditing) {
+                        onEditingChange(p.id, false);
+                    }
+                });
+            } else {
+                setEditingPipeId(null);
+                originalEndPointsRef.current.delete(pipeId);
+            }
+
+            onEditingChange(pipeId, newEditingState);
+        },
+        [pipes, onEditingChange]
+    );
 
     const updatePolylines = useCallback(() => {
         if (!map) return;
 
-        polylineRefs.current.forEach(polyline => polyline.setMap(null));
+        polylineRefs.current.forEach((polyline) => polyline.setMap(null));
         polylineRefs.current.clear();
 
-        pipes.forEach(pipe => {
+        pipes.forEach((pipe) => {
             const polyline = createPolyline(pipe);
             polylineRefs.current.set(pipe.id, polyline);
-            
+
             if (pipe.isEditing && editMode) {
                 const markers = anchorMarkerRefs.current.get(pipe.id);
                 if (markers) {
@@ -703,19 +743,20 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
                         if (isEndPoint) {
                             const originalEndPoints = originalEndPointsRef.current.get(pipe.id);
                             let originalPoint: Coordinate;
-                            
+
                             if (originalEndPoints) {
-                                originalPoint = index === 0 ? originalEndPoints.first : originalEndPoints.last;
+                                originalPoint =
+                                    index === 0 ? originalEndPoints.first : originalEndPoints.last;
                             } else {
                                 originalPoint = pipe.anchorPoints[index];
                                 if (!originalEndPointsRef.current.has(pipe.id)) {
                                     originalEndPointsRef.current.set(pipe.id, {
                                         first: pipe.anchorPoints[0],
-                                        last: pipe.anchorPoints[pipe.anchorPoints.length - 1]
+                                        last: pipe.anchorPoints[pipe.anchorPoints.length - 1],
                                     });
                                 }
                             }
-                            
+
                             marker.setPosition({ lat: originalPoint.lat, lng: originalPoint.lng });
                             marker.setDraggable(false);
                         }
@@ -727,11 +768,11 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
 
     const updateAnchorMarkers = useCallback(() => {
         if (!map) return;
-        anchorMarkerRefs.current.forEach(markers => {
-            markers.forEach(marker => marker.setMap(null));
+        anchorMarkerRefs.current.forEach((markers) => {
+            markers.forEach((marker) => marker.setMap(null));
         });
         anchorMarkerRefs.current.clear();
-        pipes.forEach(pipe => {
+        pipes.forEach((pipe) => {
             if (pipe.isEditing && editMode) {
                 const markers = pipe.anchorPoints.map((point, index) => {
                     const marker = createAnchorMarker(point, pipe.id, index);
@@ -739,19 +780,20 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
                     if (isEndPoint) {
                         const originalEndPoints = originalEndPointsRef.current.get(pipe.id);
                         let originalPoint: Coordinate;
-                        
+
                         if (originalEndPoints) {
-                            originalPoint = index === 0 ? originalEndPoints.first : originalEndPoints.last;
+                            originalPoint =
+                                index === 0 ? originalEndPoints.first : originalEndPoints.last;
                         } else {
                             originalPoint = point;
                             if (!originalEndPointsRef.current.has(pipe.id)) {
                                 originalEndPointsRef.current.set(pipe.id, {
                                     first: pipe.anchorPoints[0],
-                                    last: pipe.anchorPoints[pipe.anchorPoints.length - 1]
+                                    last: pipe.anchorPoints[pipe.anchorPoints.length - 1],
                                 });
                             }
                         }
-                        
+
                         marker.setPosition({ lat: originalPoint.lat, lng: originalPoint.lng });
                         marker.setDraggable(false);
                         marker.setClickable(false);
@@ -772,8 +814,8 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
     }, [updateAnchorMarkers]);
 
     useEffect(() => {
-        anchorMarkerRefs.current.forEach(markers => {
-            markers.forEach(marker => marker.setVisible(editMode));
+        anchorMarkerRefs.current.forEach((markers) => {
+            markers.forEach((marker) => marker.setVisible(editMode));
         });
     }, [editMode]);
 
@@ -782,7 +824,7 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
         if (!editMode) {
             // ล้างเส้นไกด์ทั้งหมดเมื่อออกจากโหมดการแก้ไข
             realTimeGuideRefs.current.forEach((guides) => {
-                guides.forEach(guide => guide.setMap(null));
+                guides.forEach((guide) => guide.setMap(null));
             });
             realTimeGuideRefs.current.clear();
             setIsDragging(false);
@@ -793,12 +835,12 @@ const CurvedPipeEditor: React.FC<CurvedPipeEditorProps> = ({
     useEffect(() => {
         return () => {
             // ทำความสะอาดเมื่อ component ถูก unmount
-            polylineRefs.current.forEach(polyline => polyline.setMap(null));
-            anchorMarkerRefs.current.forEach(markers => {
-                markers.forEach(marker => marker.setMap(null));
+            polylineRefs.current.forEach((polyline) => polyline.setMap(null));
+            anchorMarkerRefs.current.forEach((markers) => {
+                markers.forEach((marker) => marker.setMap(null));
             });
             realTimeGuideRefs.current.forEach((guides) => {
-                guides.forEach(guide => guide.setMap(null));
+                guides.forEach((guide) => guide.setMap(null));
             });
         };
     }, []);

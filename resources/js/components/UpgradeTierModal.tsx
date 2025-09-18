@@ -121,9 +121,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                 {/* Header */}
                 <div className="mb-8 flex items-center justify-between">
                     <div>
-                        <h2 className="mb-2 text-3xl font-bold text-white">
-                            Upgrade Your Plan
-                        </h2>
+                        <h2 className="mb-2 text-3xl font-bold text-white">Upgrade Your Plan</h2>
                         <p className="text-gray-400">
                             Choose the perfect plan for your irrigation needs
                         </p>
@@ -155,10 +153,11 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                         <span className="text-2xl">🆓</span>
                         <div>
                             <div className="text-xl font-bold text-white">
-                                {tiers.find(t => t.id === currentTier)?.name || 'Free'}
+                                {tiers.find((t) => t.id === currentTier)?.name || 'Free'}
                             </div>
                             <div className="text-sm text-gray-400">
-                                {tiers.find(t => t.id === currentTier)?.monthlyTokens || 100} tokens per month
+                                {tiers.find((t) => t.id === currentTier)?.monthlyTokens || 100}{' '}
+                                tokens per month
                             </div>
                         </div>
                     </div>
@@ -178,7 +177,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                             return (
                                 <div
                                     key={tier.id}
-                                    className={`relative rounded-lg border-2 p-6 transition-all cursor-pointer ${
+                                    className={`relative cursor-pointer rounded-lg border-2 p-6 transition-all ${
                                         isSelected
                                             ? `${colors.border} bg-gray-800`
                                             : 'border-gray-700 bg-gray-800 hover:border-gray-600'
@@ -186,16 +185,16 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                                     onClick={() => !isCurrentTier && setSelectedTier(tier.id)}
                                 >
                                     {tier.popular && (
-                                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                                            <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
+                                            <span className="whitespace-nowrap rounded-full bg-green-500 px-2 py-1 text-xs font-medium text-white">
                                                 Most Popular
                                             </span>
                                         </div>
                                     )}
 
                                     {isCurrentTier && (
-                                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                                            <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
+                                            <span className="whitespace-nowrap rounded-full bg-blue-500 px-2 py-1 text-xs font-medium text-white">
                                                 Current Plan
                                             </span>
                                         </div>
@@ -220,9 +219,12 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
 
                                         <div className="space-y-2 text-left">
                                             {tier.features.map((feature, index) => (
-                                                <div key={index} className="flex items-center gap-2 text-sm text-gray-300">
+                                                <div
+                                                    key={index}
+                                                    className="flex items-center gap-2 text-sm text-gray-300"
+                                                >
                                                     <svg
-                                                        className="h-4 w-4 text-green-400 flex-shrink-0"
+                                                        className="h-4 w-4 flex-shrink-0 text-green-400"
                                                         fill="none"
                                                         stroke="currentColor"
                                                         viewBox="0 0 24 24"
@@ -242,7 +244,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                                         {isCurrentTier ? (
                                             <button
                                                 disabled
-                                                className="mt-6 w-full rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed"
+                                                className="mt-6 w-full cursor-not-allowed rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-gray-400"
                                             >
                                                 Current Plan
                                             </button>
@@ -271,7 +273,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                         <h3 className="mb-4 text-xl font-semibold text-white">Billing Period</h3>
                         <div className="flex gap-4">
                             {[1, 3, 6, 12].map((months) => {
-                                const tier = tiers.find(t => t.id === selectedTier);
+                                const tier = tiers.find((t) => t.id === selectedTier);
                                 const totalPrice = getTotalPrice(tier!, months);
                                 const discount = getDiscount(tier!, months);
                                 const finalPrice = totalPrice - discount;
@@ -289,9 +291,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                                         <div className="text-lg font-bold text-white">
                                             {months} {months === 1 ? 'Month' : 'Months'}
                                         </div>
-                                        <div className="text-sm text-gray-400">
-                                            ฿{finalPrice}
-                                        </div>
+                                        <div className="text-sm text-gray-400">฿{finalPrice}</div>
                                         {discount > 0 && (
                                             <div className="text-xs text-green-400">
                                                 Save ฿{discount}
@@ -311,20 +311,46 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                         <div className="space-y-2">
                             <div className="flex justify-between text-gray-300">
                                 <span>
-                                    {tiers.find(t => t.id === selectedTier)?.name} Plan ({selectedMonths} {selectedMonths === 1 ? 'month' : 'months'})
+                                    {tiers.find((t) => t.id === selectedTier)?.name} Plan (
+                                    {selectedMonths} {selectedMonths === 1 ? 'month' : 'months'})
                                 </span>
-                                <span>฿{getTotalPrice(tiers.find(t => t.id === selectedTier)!, selectedMonths)}</span>
+                                <span>
+                                    ฿
+                                    {getTotalPrice(
+                                        tiers.find((t) => t.id === selectedTier)!,
+                                        selectedMonths
+                                    )}
+                                </span>
                             </div>
-                            {getDiscount(tiers.find(t => t.id === selectedTier)!, selectedMonths) > 0 && (
+                            {getDiscount(
+                                tiers.find((t) => t.id === selectedTier)!,
+                                selectedMonths
+                            ) > 0 && (
                                 <div className="flex justify-between text-green-400">
                                     <span>Multi-month discount (10%)</span>
-                                    <span>-฿{getDiscount(tiers.find(t => t.id === selectedTier)!, selectedMonths)}</span>
+                                    <span>
+                                        -฿
+                                        {getDiscount(
+                                            tiers.find((t) => t.id === selectedTier)!,
+                                            selectedMonths
+                                        )}
+                                    </span>
                                 </div>
                             )}
                             <div className="border-t border-gray-700 pt-2">
                                 <div className="flex justify-between text-lg font-bold text-white">
                                     <span>Total</span>
-                                    <span>฿{getTotalPrice(tiers.find(t => t.id === selectedTier)!, selectedMonths) - getDiscount(tiers.find(t => t.id === selectedTier)!, selectedMonths)}</span>
+                                    <span>
+                                        ฿
+                                        {getTotalPrice(
+                                            tiers.find((t) => t.id === selectedTier)!,
+                                            selectedMonths
+                                        ) -
+                                            getDiscount(
+                                                tiers.find((t) => t.id === selectedTier)!,
+                                                selectedMonths
+                                            )}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -344,7 +370,7 @@ const UpgradeTierModal: React.FC<UpgradeTierModalProps> = ({
                             onClick={handleUpgrade}
                             className="rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-700"
                         >
-                            Upgrade to {tiers.find(t => t.id === selectedTier)?.name}
+                            Upgrade to {tiers.find((t) => t.id === selectedTier)?.name}
                         </button>
                     )}
                 </div>

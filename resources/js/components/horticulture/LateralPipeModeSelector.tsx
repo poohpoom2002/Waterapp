@@ -1,9 +1,6 @@
 // components/horticulture/LateralPipeModeSelector.tsx
 import React from 'react';
-import { 
-    FaWater, 
-    FaTimes,
-} from 'react-icons/fa';
+import { FaWater, FaTimes } from 'react-icons/fa';
 
 interface LateralPipeModeSelectorProps {
     isVisible: boolean;
@@ -16,22 +13,22 @@ const LateralPipeModeSelector: React.FC<LateralPipeModeSelectorProps> = ({
     isVisible,
     onModeSelect,
     onCancel,
-    t
+    t,
 }) => {
     if (!isVisible) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]">
-            <div className="bg-gray-800 rounded-lg shadow-2xl border border-gray-200 p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black bg-opacity-50">
+            <div className="mx-4 w-full max-w-md rounded-lg border border-gray-200 bg-gray-800 p-6 shadow-2xl">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <div className="mb-6 flex items-center justify-between">
+                    <h3 className="flex items-center gap-2 text-xl font-bold text-white">
                         <FaWater className="text-blue-600" />
                         {t('เลือกโหมดการวางท่อย่อย') || 'เลือกโหมดการวางท่อย่อย'}
                     </h3>
                     <button
                         onClick={onCancel}
-                        className="text-white hover:text-gray-600 transition-colors"
+                        className="text-white transition-colors hover:text-gray-600"
                         title={t('ปิด') || 'ปิด'}
                     >
                         <FaTimes size={20} />
@@ -39,22 +36,22 @@ const LateralPipeModeSelector: React.FC<LateralPipeModeSelectorProps> = ({
                 </div>
 
                 {/* Mode Options */}
-                <div className="space-y-4 mb-6">
+                <div className="mb-6 space-y-4">
                     {/* Mode A: Over Plants */}
                     <button
                         onClick={() => onModeSelect('over_plants')}
-                        className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 hover:bg-green-500 transition-all text-left group"
+                        className="group w-full rounded-lg border-2 border-gray-200 p-4 text-left transition-all hover:border-blue-300 hover:bg-green-500"
                     >
                         <div className="flex items-center gap-4">
-                            <div className="flex-shrink-0 w-32 h-32 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors overflow-hidden">
+                            <div className="flex h-32 w-32 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-blue-100 transition-colors group-hover:bg-blue-200">
                                 <img
                                     src="/images/over_plants.png"
                                     alt={t('วางทับแนวต้นไม้') || 'วางทับแนวต้นไม้'}
-                                    className="object-contain w-full h-full"
+                                    className="h-full w-full object-contain"
                                 />
                             </div>
-                            <div className="flex-1 flex items-center">
-                                <h4 className="font-semibold text-white text-lg">
+                            <div className="flex flex-1 items-center">
+                                <h4 className="text-lg font-semibold text-white">
                                     {t('วางทับแนวต้นไม้') || 'วางทับแนวต้นไม้'}
                                 </h4>
                             </div>
@@ -64,18 +61,18 @@ const LateralPipeModeSelector: React.FC<LateralPipeModeSelectorProps> = ({
                     {/* Mode B: Between Plants */}
                     <button
                         onClick={() => onModeSelect('between_plants')}
-                        className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-500 transition-all text-left group"
+                        className="group w-full rounded-lg border-2 border-gray-200 p-4 text-left transition-all hover:border-green-300 hover:bg-green-500"
                     >
                         <div className="flex items-center gap-4">
-                            <div className="flex-shrink-0 w-32 h-32 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors overflow-hidden">
+                            <div className="flex h-32 w-32 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-green-100 transition-colors group-hover:bg-green-200">
                                 <img
                                     src="/images/between_plants.png"
                                     alt={t('วางระหว่างแนวต้นไม้') || 'วางระหว่างแนวต้นไม้'}
-                                    className="object-contain w-full h-full"
+                                    className="h-full w-full object-contain"
                                 />
                             </div>
-                            <div className="flex-1 flex items-center">
-                                <h4 className="font-semibold text-white text-lg">
+                            <div className="flex flex-1 items-center">
+                                <h4 className="text-lg font-semibold text-white">
                                     {t('วางระหว่างแนวต้นไม้') || 'วางระหว่างแนวต้นไม้'}
                                 </h4>
                             </div>
@@ -87,7 +84,7 @@ const LateralPipeModeSelector: React.FC<LateralPipeModeSelectorProps> = ({
                 <div className="mt-6">
                     <button
                         onClick={onCancel}
-                        className="w-full py-2 px-4 bg-gray-100 text-gray-700 rounded-md font-medium hover:bg-gray-200 transition-colors"
+                        className="w-full rounded-md bg-gray-100 px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-200"
                     >
                         {t('ยกเลิก') || 'ยกเลิก'}
                     </button>

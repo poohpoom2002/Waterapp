@@ -199,7 +199,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 if (gardenStatsStr) {
                     const gardenStats = JSON.parse(gardenStatsStr);
                     if (gardenStats.zones) {
-                        const currentZoneStats = gardenStats.zones.find((zone: any) => zone.zoneId === activeZoneId);
+                        const currentZoneStats = gardenStats.zones.find(
+                            (zone: any) => zone.zoneId === activeZoneId
+                        );
                         setGardenZoneStats(currentZoneStats);
                     }
                 }
@@ -211,20 +213,23 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     }, [projectMode, activeZoneId]);
 
     // Get pipe type name function
-    const getPipeTypeName = useCallback((pipeType: PipeType) => {
-        switch (pipeType) {
-            case 'branch':
-                return t('ท่อย่อย');
-            case 'secondary':
-                return t('ท่อเมนรอง');
-            case 'main':
-                return t('ท่อเมนหลัก');
-            case 'emitter':
-                return t('ท่อย่อยแยก');
-            default:
-                return '';
-        }
-    }, [t]);
+    const getPipeTypeName = useCallback(
+        (pipeType: PipeType) => {
+            switch (pipeType) {
+                case 'branch':
+                    return t('ท่อย่อย');
+                case 'secondary':
+                    return t('ท่อเมนรอง');
+                case 'main':
+                    return t('ท่อเมนหลัก');
+                case 'emitter':
+                    return t('ท่อย่อยแยก');
+                default:
+                    return '';
+            }
+        },
+        [t]
+    );
 
     // Load available pipes based on selected pipe type and pressure class
     useEffect(() => {
@@ -288,177 +293,226 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     }, [selectedPipeType, pipeType, sprinklerPressure]);
 
     // Filter pipes based on hierarchy (emitter < branch < secondary < main)
-    const getFilteredPipesByHierarchy = useCallback((pipes: any[]): any[] => {
-        if (!selectedPipeSizes || Object.keys(selectedPipeSizes).length === 0) {
-            return pipes; // ไม่มีข้อมูล hierarchy ก็ใช้ท่อทั้งหมด
-        }
-
-        return pipes.filter(pipe => {
-            const currentSize = pipe.sizeMM;
-            
-            switch (pipeType) {
-                case 'emitter':
-                    // ท่อย่อยแยก: ต้องเล็กกว่าท่อย่อย (ถ้ามี)
-                    if (selectedPipeSizes.branch) {
-                        return currentSize < selectedPipeSizes.branch;
-                    }
-                    // ถ้าไม่มีท่อย่อย ให้เล็กกว่าเมนรอง (ถ้ามี)
-                    if (selectedPipeSizes.secondary) {
-                        return currentSize < selectedPipeSizes.secondary;
-                    }
-                    // ถ้าไม่มีเมนรอง ให้เล็กกว่าเมนหลัก (ถ้ามี)
-                    if (selectedPipeSizes.main) {
-                        return currentSize < selectedPipeSizes.main;
-                    }
-                    return true;
-
-                case 'branch':
-                    // ท่อย่อย: ต้องเล็กกว่าเมนรอง (ถ้ามี)
-                    if (selectedPipeSizes.secondary) {
-                        return currentSize < selectedPipeSizes.secondary;
-                    }
-                    // ถ้าไม่มีเมนรอง ให้เล็กกว่าเมนหลัก (ถ้ามี)
-                    if (selectedPipeSizes.main) {
-                        return currentSize < selectedPipeSizes.main;
-                    }
-                    // ต้องใหญ่กว่าท่อย่อยแยก (ถ้ามี)
-                    if (selectedPipeSizes.emitter) {
-                        return currentSize > selectedPipeSizes.emitter;
-                    }
-                    return true;
-
-                case 'secondary':
-                    // ท่อเมนรอง: ต้องเล็กกว่าเมนหลัก (ถ้ามี)
-                    if (selectedPipeSizes.main) {
-                        return currentSize < selectedPipeSizes.main;
-                    }
-                    // ต้องใหญ่กว่าท่อย่อย (ถ้ามี)
-                    if (selectedPipeSizes.branch) {
-                        return currentSize > selectedPipeSizes.branch;
-                    }
-                    // ต้องใหญ่กว่าท่อย่อยแยก (ถ้ามี)
-                    if (selectedPipeSizes.emitter) {
-                        return currentSize > selectedPipeSizes.emitter;
-                    }
-                    return true;
-
-                case 'main':
-                    // ท่อเมนหลัก: ต้องใหญ่กว่าเมนรอง (ถ้ามี)
-                    if (selectedPipeSizes.secondary) {
-                        return currentSize > selectedPipeSizes.secondary;
-                    }
-                    // ต้องใหญ่กว่าท่อย่อย (ถ้ามี)
-                    if (selectedPipeSizes.branch) {
-                        return currentSize > selectedPipeSizes.branch;
-                    }
-                    // ต้องใหญ่กว่าท่อย่อยแยก (ถ้ามี)
-                    if (selectedPipeSizes.emitter) {
-                        return currentSize > selectedPipeSizes.emitter;
-                    }
-                    return true;
-
-                default:
-                    return true;
+    const getFilteredPipesByHierarchy = useCallback(
+        (pipes: any[]): any[] => {
+            if (!selectedPipeSizes || Object.keys(selectedPipeSizes).length === 0) {
+                return pipes; // ไม่มีข้อมูล hierarchy ก็ใช้ท่อทั้งหมด
             }
-        });
-    }, [selectedPipeSizes, pipeType]);
+
+            return pipes.filter((pipe) => {
+                const currentSize = pipe.sizeMM;
+
+                switch (pipeType) {
+                    case 'emitter':
+                        // ท่อย่อยแยก: ต้องเล็กกว่าท่อย่อย (ถ้ามี)
+                        if (selectedPipeSizes.branch) {
+                            return currentSize < selectedPipeSizes.branch;
+                        }
+                        // ถ้าไม่มีท่อย่อย ให้เล็กกว่าเมนรอง (ถ้ามี)
+                        if (selectedPipeSizes.secondary) {
+                            return currentSize < selectedPipeSizes.secondary;
+                        }
+                        // ถ้าไม่มีเมนรอง ให้เล็กกว่าเมนหลัก (ถ้ามี)
+                        if (selectedPipeSizes.main) {
+                            return currentSize < selectedPipeSizes.main;
+                        }
+                        return true;
+
+                    case 'branch':
+                        // ท่อย่อย: ต้องเล็กกว่าเมนรอง (ถ้ามี)
+                        if (selectedPipeSizes.secondary) {
+                            return currentSize < selectedPipeSizes.secondary;
+                        }
+                        // ถ้าไม่มีเมนรอง ให้เล็กกว่าเมนหลัก (ถ้ามี)
+                        if (selectedPipeSizes.main) {
+                            return currentSize < selectedPipeSizes.main;
+                        }
+                        // ต้องใหญ่กว่าท่อย่อยแยก (ถ้ามี)
+                        if (selectedPipeSizes.emitter) {
+                            return currentSize > selectedPipeSizes.emitter;
+                        }
+                        return true;
+
+                    case 'secondary':
+                        // ท่อเมนรอง: ต้องเล็กกว่าเมนหลัก (ถ้ามี)
+                        if (selectedPipeSizes.main) {
+                            return currentSize < selectedPipeSizes.main;
+                        }
+                        // ต้องใหญ่กว่าท่อย่อย (ถ้ามี)
+                        if (selectedPipeSizes.branch) {
+                            return currentSize > selectedPipeSizes.branch;
+                        }
+                        // ต้องใหญ่กว่าท่อย่อยแยก (ถ้ามี)
+                        if (selectedPipeSizes.emitter) {
+                            return currentSize > selectedPipeSizes.emitter;
+                        }
+                        return true;
+
+                    case 'main':
+                        // ท่อเมนหลัก: ต้องใหญ่กว่าเมนรอง (ถ้ามี)
+                        if (selectedPipeSizes.secondary) {
+                            return currentSize > selectedPipeSizes.secondary;
+                        }
+                        // ต้องใหญ่กว่าท่อย่อย (ถ้ามี)
+                        if (selectedPipeSizes.branch) {
+                            return currentSize > selectedPipeSizes.branch;
+                        }
+                        // ต้องใหญ่กว่าท่อย่อยแยก (ถ้ามี)
+                        if (selectedPipeSizes.emitter) {
+                            return currentSize > selectedPipeSizes.emitter;
+                        }
+                        return true;
+
+                    default:
+                        return true;
+                }
+            });
+        },
+        [selectedPipeSizes, pipeType]
+    );
 
     // Auto-select best pipe when available pipes change (only if not manually selected)
     useEffect(() => {
-        if (availablePipes.length > 0 && currentZoneBestPipe && sprinklerPressure && !isManuallySelected) {
+        if (
+            availablePipes.length > 0 &&
+            currentZoneBestPipe &&
+            sprinklerPressure &&
+            !isManuallySelected
+        ) {
             // 🎯 HIERARCHY FIRST - เข้มงวด 100%
             const hierarchyFilteredPipes = getFilteredPipesByHierarchy(availablePipes);
-            
+
             if (hierarchyFilteredPipes.length === 0) {
                 // ❌ ถ้าไม่มีท่อที่ผ่านการกรอง hierarchy --> ไม่เลือกเลย!
-                
+
                 // ไม่เลือกท่อใดเลยถ้าไม่เข้า hierarchy
                 return;
             }
 
             const pipesToSelect = hierarchyFilteredPipes; // ใช้เฉพาะท่อที่เข้า hierarchy เท่านั้น!
-            
+
             // 🚨 CRITICAL: Real-time Cross-Validation ระหว่าง Components
             const validateCrossComponentHierarchy = (candidatePipe: any): boolean => {
                 const candidateSize = candidatePipe.sizeMM;
-                
-                
+
                 let violationFound = false;
                 const violationMessages: string[] = [];
-                
+
                 switch (pipeType) {
                     case 'main':
                         // 🚨 เมนหลัก: ต้องใหญ่กว่าทุกประเภท
-                        if (selectedPipeSizes.secondary && candidateSize <= selectedPipeSizes.secondary) {
+                        if (
+                            selectedPipeSizes.secondary &&
+                            candidateSize <= selectedPipeSizes.secondary
+                        ) {
                             violationFound = true;
-                            violationMessages.push(`❌ MAIN (${candidateSize}mm) ≤ SECONDARY (${selectedPipeSizes.secondary}mm)`);
+                            violationMessages.push(
+                                `❌ MAIN (${candidateSize}mm) ≤ SECONDARY (${selectedPipeSizes.secondary}mm)`
+                            );
                         }
                         if (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) {
                             violationFound = true;
-                            violationMessages.push(`❌ MAIN (${candidateSize}mm) ≤ BRANCH (${selectedPipeSizes.branch}mm)`);
+                            violationMessages.push(
+                                `❌ MAIN (${candidateSize}mm) ≤ BRANCH (${selectedPipeSizes.branch}mm)`
+                            );
                         }
-                        if (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter) {
+                        if (
+                            selectedPipeSizes.emitter &&
+                            candidateSize <= selectedPipeSizes.emitter
+                        ) {
                             violationFound = true;
-                            violationMessages.push(`❌ MAIN (${candidateSize}mm) ≤ EMITTER (${selectedPipeSizes.emitter}mm)`);
+                            violationMessages.push(
+                                `❌ MAIN (${candidateSize}mm) ≤ EMITTER (${selectedPipeSizes.emitter}mm)`
+                            );
                         }
                         break;
-                        
+
                     case 'secondary':
                         // 🚨 เมนรอง: ต้องเล็กกว่าเมนหลัก และใหญ่กว่าท่อย่อย
                         if (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) {
                             violationFound = true;
-                            violationMessages.push(`❌ SECONDARY (${candidateSize}mm) ≥ MAIN (${selectedPipeSizes.main}mm)`);
+                            violationMessages.push(
+                                `❌ SECONDARY (${candidateSize}mm) ≥ MAIN (${selectedPipeSizes.main}mm)`
+                            );
                         }
                         if (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) {
                             violationFound = true;
-                            violationMessages.push(`❌ SECONDARY (${candidateSize}mm) ≤ BRANCH (${selectedPipeSizes.branch}mm)`);
+                            violationMessages.push(
+                                `❌ SECONDARY (${candidateSize}mm) ≤ BRANCH (${selectedPipeSizes.branch}mm)`
+                            );
                         }
-                        if (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter) {
+                        if (
+                            selectedPipeSizes.emitter &&
+                            candidateSize <= selectedPipeSizes.emitter
+                        ) {
                             violationFound = true;
-                            violationMessages.push(`❌ SECONDARY (${candidateSize}mm) ≤ EMITTER (${selectedPipeSizes.emitter}mm)`);
+                            violationMessages.push(
+                                `❌ SECONDARY (${candidateSize}mm) ≤ EMITTER (${selectedPipeSizes.emitter}mm)`
+                            );
                         }
                         break;
-                        
+
                     case 'branch':
                         // 🚨 ท่อย่อย: ต้องเล็กกว่าเมน และใหญ่กว่าย่อยแยก
                         if (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) {
                             violationFound = true;
-                            violationMessages.push(`❌ BRANCH (${candidateSize}mm) ≥ MAIN (${selectedPipeSizes.main}mm)`);
+                            violationMessages.push(
+                                `❌ BRANCH (${candidateSize}mm) ≥ MAIN (${selectedPipeSizes.main}mm)`
+                            );
                         }
-                        if (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) {
+                        if (
+                            selectedPipeSizes.secondary &&
+                            candidateSize >= selectedPipeSizes.secondary
+                        ) {
                             violationFound = true;
-                            violationMessages.push(`❌ BRANCH (${candidateSize}mm) ≥ SECONDARY (${selectedPipeSizes.secondary}mm)`);
+                            violationMessages.push(
+                                `❌ BRANCH (${candidateSize}mm) ≥ SECONDARY (${selectedPipeSizes.secondary}mm)`
+                            );
                         }
-                        if (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter) {
+                        if (
+                            selectedPipeSizes.emitter &&
+                            candidateSize <= selectedPipeSizes.emitter
+                        ) {
                             violationFound = true;
-                            violationMessages.push(`❌ BRANCH (${candidateSize}mm) ≤ EMITTER (${selectedPipeSizes.emitter}mm)`);
+                            violationMessages.push(
+                                `❌ BRANCH (${candidateSize}mm) ≤ EMITTER (${selectedPipeSizes.emitter}mm)`
+                            );
                         }
                         break;
-                        
+
                     case 'emitter':
                         // 🚨 ท่อย่อยแยก: ต้องเล็กกว่าทุกประเภท
                         if (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) {
                             violationFound = true;
-                            violationMessages.push(`❌ EMITTER (${candidateSize}mm) ≥ MAIN (${selectedPipeSizes.main}mm)`);
+                            violationMessages.push(
+                                `❌ EMITTER (${candidateSize}mm) ≥ MAIN (${selectedPipeSizes.main}mm)`
+                            );
                         }
-                        if (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) {
+                        if (
+                            selectedPipeSizes.secondary &&
+                            candidateSize >= selectedPipeSizes.secondary
+                        ) {
                             violationFound = true;
-                            violationMessages.push(`❌ EMITTER (${candidateSize}mm) ≥ SECONDARY (${selectedPipeSizes.secondary}mm)`);
+                            violationMessages.push(
+                                `❌ EMITTER (${candidateSize}mm) ≥ SECONDARY (${selectedPipeSizes.secondary}mm)`
+                            );
                         }
                         if (selectedPipeSizes.branch && candidateSize >= selectedPipeSizes.branch) {
                             violationFound = true;
-                            violationMessages.push(`❌ EMITTER (${candidateSize}mm) ≥ BRANCH (${selectedPipeSizes.branch}mm)`);
+                            violationMessages.push(
+                                `❌ EMITTER (${candidateSize}mm) ≥ BRANCH (${selectedPipeSizes.branch}mm)`
+                            );
                         }
                         break;
                 }
-                
+
                 if (violationFound) {
                     return false;
                 } else {
                     return true;
                 }
             };
-            
+
             // ใช้ฟังก์ชันใหม่เพื่อเลือกท่อตามเกณฑ์ head20Percent
             const bestPipe = selectBestPipeByHeadLoss(
                 pipesToSelect,
@@ -471,7 +525,6 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
             // 🚨 CRITICAL: Cross-Component Hierarchy Validation ก่อนเลือก
             if (bestPipe) {
-                
                 if (validateCrossComponentHierarchy(bestPipe)) {
                     if (!selectedPipe || selectedPipe.id !== bestPipe.id) {
                         onPipeChange(bestPipe);
@@ -479,7 +532,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 } else {
                     // 🔍 ลองหาท่ออื่นที่เข้าหลัก Cross-Component Hierarchy
                     const alternativePipes = pipesToSelect.filter(validateCrossComponentHierarchy);
-                    
+
                     if (alternativePipes.length > 0) {
                         const alternativeBest = selectBestPipeByHeadLoss(
                             alternativePipes,
@@ -489,11 +542,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             selectedPipeSizes,
                             sprinklerPressure.head20PercentM
                         );
-                        if (alternativeBest && (!selectedPipe || selectedPipe.id !== alternativeBest.id)) {
+                        if (
+                            alternativeBest &&
+                            (!selectedPipe || selectedPipe.id !== alternativeBest.id)
+                        ) {
                             onPipeChange(alternativeBest);
                         }
                     } else {
-                        
                         // ไม่เลือกท่อใดเลยถ้าไม่มีทางเลือกที่เข้า hierarchy
                         // onPipeChange(null); // อาจจะต้องส่งสัญญาณให้ parent รู้ว่าเลือกไม่ได้
                     }
@@ -532,17 +587,20 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             // เก็บข้อมูล calculation สำหรับทุก mode
             if (calc) {
                 try {
-                    const storageKey = projectMode === 'garden' ? 'garden_pipe_calculations' : 'horticulture_pipe_calculations';
+                    const storageKey =
+                        projectMode === 'garden'
+                            ? 'garden_pipe_calculations'
+                            : 'horticulture_pipe_calculations';
                     const existingCalcStr = localStorage.getItem(storageKey);
                     const existingCalc = existingCalcStr ? JSON.parse(existingCalcStr) : {};
-                    
+
                     existingCalc[pipeType] = {
                         headLoss: calc.headLoss,
                         pipeLength: calc.pipeLength,
                         flowRate: calc.flowRate,
-                        calculatedAt: new Date().toISOString()
+                        calculatedAt: new Date().toISOString(),
                     };
-                    
+
                     localStorage.setItem(storageKey, JSON.stringify(existingCalc));
                 } catch (error) {
                     console.error(`Error saving ${projectMode} pipe calculations:`, error);
@@ -561,7 +619,14 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             }
             setWarnings(newWarnings);
         }
-    }, [selectedPipe, currentZoneBestPipe, selectedPipeType, pipeType, sprinklerPressure, projectMode]);
+    }, [
+        selectedPipe,
+        currentZoneBestPipe,
+        selectedPipeType,
+        pipeType,
+        sprinklerPressure,
+        projectMode,
+    ]);
 
     const pipeTypeOptions = [
         { value: 'PE', label: 'PE' },
@@ -572,46 +637,54 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     // const pressureClassOptions = ... (removed)
 
     const pipeOptions = availablePipes
-        .filter(pipe => {
+        .filter((pipe) => {
             // 🚨 CRITICAL: ใช้ Cross-Component Hierarchy Validation ใน dropdown
             // สร้าง temporary validation function สำหรับ pipe นี้
             const tempValidation = (candidatePipe: any): boolean => {
                 const candidateSize = candidatePipe.sizeMM;
-                
+
                 switch (pipeType) {
                     case 'main':
                         // เมนหลัก: ต้องใหญ่กว่าทุกประเภทที่เลือกไปแล้ว
                         return !(
-                            (selectedPipeSizes.secondary && candidateSize <= selectedPipeSizes.secondary) ||
-                            (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                            (selectedPipeSizes.secondary &&
+                                candidateSize <= selectedPipeSizes.secondary) ||
+                            (selectedPipeSizes.branch &&
+                                candidateSize <= selectedPipeSizes.branch) ||
+                            (selectedPipeSizes.emitter &&
+                                candidateSize <= selectedPipeSizes.emitter)
                         );
                     case 'secondary':
                         // เมนรอง: ต้องเล็กกว่าเมนหลัก และใหญ่กว่าท่อย่อย
                         return !(
                             (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                            (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                            (selectedPipeSizes.branch &&
+                                candidateSize <= selectedPipeSizes.branch) ||
+                            (selectedPipeSizes.emitter &&
+                                candidateSize <= selectedPipeSizes.emitter)
                         );
                     case 'branch':
                         // ท่อย่อย: ต้องเล็กกว่าเมน และใหญ่กว่าย่อยแยก
                         return !(
                             (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                            (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
-                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                            (selectedPipeSizes.secondary &&
+                                candidateSize >= selectedPipeSizes.secondary) ||
+                            (selectedPipeSizes.emitter &&
+                                candidateSize <= selectedPipeSizes.emitter)
                         );
                     case 'emitter':
                         // ท่อย่อยแยก: ต้องเล็กกว่าทุกประเภท
                         return !(
                             (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                            (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
+                            (selectedPipeSizes.secondary &&
+                                candidateSize >= selectedPipeSizes.secondary) ||
                             (selectedPipeSizes.branch && candidateSize >= selectedPipeSizes.branch)
                         );
                     default:
                         return true;
                 }
             };
-            
+
             return tempValidation(pipe);
         })
         .map((pipe) => {
@@ -643,26 +716,34 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 switch (pipeType) {
                     case 'main':
                         return !(
-                            (selectedPipeSizes.secondary && candidateSize <= selectedPipeSizes.secondary) ||
-                            (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                            (selectedPipeSizes.secondary &&
+                                candidateSize <= selectedPipeSizes.secondary) ||
+                            (selectedPipeSizes.branch &&
+                                candidateSize <= selectedPipeSizes.branch) ||
+                            (selectedPipeSizes.emitter &&
+                                candidateSize <= selectedPipeSizes.emitter)
                         );
                     case 'secondary':
                         return !(
                             (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                            (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                            (selectedPipeSizes.branch &&
+                                candidateSize <= selectedPipeSizes.branch) ||
+                            (selectedPipeSizes.emitter &&
+                                candidateSize <= selectedPipeSizes.emitter)
                         );
                     case 'branch':
                         return !(
                             (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                            (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
-                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                            (selectedPipeSizes.secondary &&
+                                candidateSize >= selectedPipeSizes.secondary) ||
+                            (selectedPipeSizes.emitter &&
+                                candidateSize <= selectedPipeSizes.emitter)
                         );
                     case 'emitter':
                         return !(
                             (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                            (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
+                            (selectedPipeSizes.secondary &&
+                                candidateSize >= selectedPipeSizes.secondary) ||
                             (selectedPipeSizes.branch && candidateSize >= selectedPipeSizes.branch)
                         );
                     default:
@@ -686,19 +767,19 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 isHierarchyCompliant: isHierarchyCompliant,
                 // เพิ่ม hierarchy status สำหรับ SearchableDropdown
                 isRecommended: isHierarchyCompliant && diffFrom19 <= 0.5, // เข้า hierarchy + head loss ดี
-                isGoodChoice: isHierarchyCompliant && diffFrom19 <= 1.0,   // เข้า hierarchy + head loss พอใช้
-                isUsable: isHierarchyCompliant,                           // เข้า hierarchy แต่ head loss ไม่ดีมาก
+                isGoodChoice: isHierarchyCompliant && diffFrom19 <= 1.0, // เข้า hierarchy + head loss พอใช้
+                isUsable: isHierarchyCompliant, // เข้า hierarchy แต่ head loss ไม่ดีมาก
                 // ถ้าไม่เข้า hierarchy จะไม่ถูกแสดงใน dropdown อีกต่อไปแล้ว (เนื่องจากถูก filter ออก)
             };
         })
         .sort((a, b) => {
             // 🎯 HIERARCHY FIRST SORTING
-            
+
             // 1. เรียง Hierarchy Compliance ก่อน (ท่อที่เข้า hierarchy ขึ้นก่อน)
             if (a.isHierarchyCompliant !== b.isHierarchyCompliant) {
                 return a.isHierarchyCompliant ? -1 : 1; // hierarchy compliant ขึ้นก่อน (-1 = ขึ้นก่อน)
             }
-            
+
             // 2. ถ้า hierarchy เหมือนกัน --> เรียงตาม Head Loss (ใกล้ 1.9 ม.)
             return a.diffFrom19 - b.diffFrom19;
         });
@@ -734,7 +815,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             <div>
                 <div className="mb-2 flex flex-row items-center justify-between gap-4">
                     <div>
-                        <h3 className={`m-0 p-0 text-2xl font-bold text-${getPipeTypeName(pipeType) === 'ท่อย่อยแยก' ? 'green-800' : getPipeTypeName(pipeType) === 'ท่อย่อย' ? 'yellow-800' : getPipeTypeName(pipeType) === 'ท่อเมนรอง' ? 'purple-800' : 'red-800'}`}>
+                        <h3
+                            className={`m-0 p-0 text-2xl font-bold text-${getPipeTypeName(pipeType) === 'ท่อย่อยแยก' ? 'green-800' : getPipeTypeName(pipeType) === 'ท่อย่อย' ? 'yellow-800' : getPipeTypeName(pipeType) === 'ท่อเมนรอง' ? 'purple-800' : 'red-800'}`}
+                        >
                             {getPipeTypeName(pipeType)}
                         </h3>
                     </div>
@@ -755,24 +838,21 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         <span className="flex items-center gap-2 text-sm">
                             <span className="text-orange-200">ยาว:</span>
                             <span className="font-bold text-white">
-                                {projectMode === 'garden' && gardenZoneStats 
+                                {projectMode === 'garden' && gardenZoneStats
                                     ? `${gardenZoneStats.totalPipeLength.toFixed(1)} ม.`
-                                    : `${currentZoneBestPipe.length.toFixed(1)} ม.`
-                                }
+                                    : `${currentZoneBestPipe.length.toFixed(1)} ม.`}
                             </span>
                             <span className="text-orange-200">| ทางออก:</span>
                             <span className="font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? gardenZoneStats.sprinklerCount
-                                    : currentZoneBestPipe.count
-                                }
+                                    : currentZoneBestPipe.count}
                             </span>
                             <span className="text-orange-200">| ใช้น้ำ:</span>
                             <span className="font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? `${(gardenZoneStats.sprinklerFlowRate * gardenZoneStats.sprinklerCount).toFixed(1)} L/min`
-                                    : `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`
-                                }
+                                    : `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`}
                             </span>
                         </span>
                     </h4>
@@ -781,32 +861,50 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 {/* แสดงข้อมูลลำดับชั้นท่อ */}
                 {selectedPipeSizes && Object.keys(selectedPipeSizes).length > 0 && (
                     <div className="mb-2 rounded bg-purple-900/30 p-2 text-xs">
-                        <div className="flex items-center justify-between mb-1">
+                        <div className="mb-1 flex items-center justify-between">
                             <div className="text-purple-300">📏 ลำดับชั้นท่อปัจจุบัน:</div>
                             {(() => {
                                 // ตรวจสอบว่า selectedPipeSizes มีปัญหา hierarchy หรือไม่
-                                const hasHierarchyIssues = 
-                                    (selectedPipeSizes.main && selectedPipeSizes.secondary && selectedPipeSizes.main <= selectedPipeSizes.secondary) ||
-                                    (selectedPipeSizes.main && selectedPipeSizes.branch && selectedPipeSizes.main <= selectedPipeSizes.branch) ||
-                                    (selectedPipeSizes.main && selectedPipeSizes.emitter && selectedPipeSizes.main <= selectedPipeSizes.emitter) ||
-                                    (selectedPipeSizes.secondary && selectedPipeSizes.branch && selectedPipeSizes.secondary <= selectedPipeSizes.branch) ||
-                                    (selectedPipeSizes.secondary && selectedPipeSizes.emitter && selectedPipeSizes.secondary <= selectedPipeSizes.emitter) ||
-                                    (selectedPipeSizes.branch && selectedPipeSizes.emitter && selectedPipeSizes.branch <= selectedPipeSizes.emitter);
+                                const hasHierarchyIssues =
+                                    (selectedPipeSizes.main &&
+                                        selectedPipeSizes.secondary &&
+                                        selectedPipeSizes.main <= selectedPipeSizes.secondary) ||
+                                    (selectedPipeSizes.main &&
+                                        selectedPipeSizes.branch &&
+                                        selectedPipeSizes.main <= selectedPipeSizes.branch) ||
+                                    (selectedPipeSizes.main &&
+                                        selectedPipeSizes.emitter &&
+                                        selectedPipeSizes.main <= selectedPipeSizes.emitter) ||
+                                    (selectedPipeSizes.secondary &&
+                                        selectedPipeSizes.branch &&
+                                        selectedPipeSizes.secondary <= selectedPipeSizes.branch) ||
+                                    (selectedPipeSizes.secondary &&
+                                        selectedPipeSizes.emitter &&
+                                        selectedPipeSizes.secondary <= selectedPipeSizes.emitter) ||
+                                    (selectedPipeSizes.branch &&
+                                        selectedPipeSizes.emitter &&
+                                        selectedPipeSizes.branch <= selectedPipeSizes.emitter);
 
                                 if (hasHierarchyIssues) {
                                     return (
                                         <button
                                             onClick={() => {
-                                                if (confirm('🔄 ต้องการ Reset การเลือกท่อทั้งหมดและเริ่มใหม่หรือไม่?\n\nระบบจะเลือกท่อให้ใหม่ตามลำดับชั้นที่ถูกต้อง')) {
+                                                if (
+                                                    confirm(
+                                                        '🔄 ต้องการ Reset การเลือกท่อทั้งหมดและเริ่มใหม่หรือไม่?\n\nระบบจะเลือกท่อให้ใหม่ตามลำดับชั้นที่ถูกต้อง'
+                                                    )
+                                                ) {
                                                     // Reset การเลือกท่อทั้งหมด
                                                     setIsManuallySelected(false);
-                                                    
+
                                                     // ส่งสัญญาณให้ parent component reset ท่อทั้งหมด
                                                     // TODO: ต้องเพิ่ม callback function เพื่อ reset selectedPipeSizes
-                                                    alert('⚠️ ฟีเจอร์นี้ต้องการการปรับปรุง callback function ใน parent component');
+                                                    alert(
+                                                        '⚠️ ฟีเจอร์นี้ต้องการการปรับปรุง callback function ใน parent component'
+                                                    );
                                                 }
                                             }}
-                                            className="px-2 py-1 text-xs bg-orange-600 hover:bg-orange-500 text-white rounded"
+                                            className="rounded bg-orange-600 px-2 py-1 text-xs text-white hover:bg-orange-500"
                                             title="Reset การเลือกท่อทั้งหมด"
                                         >
                                             🔄 Reset ทั้งหมด
@@ -818,37 +916,56 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         </div>
                         <div className="text-purple-200">
                             {selectedPipeSizes.main && `เมนหลัก: ${selectedPipeSizes.main}mm`}
-                            {selectedPipeSizes.secondary && ` ${`>`} เมนรอง: ${selectedPipeSizes.secondary}mm`}
-                            {selectedPipeSizes.branch && ` ${`>`} ย่อย: ${selectedPipeSizes.branch}mm`}
-                            {selectedPipeSizes.emitter && ` ${`>`} ย่อยแยก: ${selectedPipeSizes.emitter}mm`}
+                            {selectedPipeSizes.secondary &&
+                                ` ${`>`} เมนรอง: ${selectedPipeSizes.secondary}mm`}
+                            {selectedPipeSizes.branch &&
+                                ` ${`>`} ย่อย: ${selectedPipeSizes.branch}mm`}
+                            {selectedPipeSizes.emitter &&
+                                ` ${`>`} ย่อยแยก: ${selectedPipeSizes.emitter}mm`}
                         </div>
                         <div className="mt-1 text-purple-400">
                             กฎ: {getPipeTypeName(pipeType)} ต้อง{' '}
                             {(() => {
                                 switch (pipeType) {
                                     case 'emitter':
-                                        if (selectedPipeSizes.branch) return `< ${selectedPipeSizes.branch}mm`;
-                                        if (selectedPipeSizes.secondary) return `< ${selectedPipeSizes.secondary}mm`;
-                                        if (selectedPipeSizes.main) return `< ${selectedPipeSizes.main}mm`;
+                                        if (selectedPipeSizes.branch)
+                                            return `< ${selectedPipeSizes.branch}mm`;
+                                        if (selectedPipeSizes.secondary)
+                                            return `< ${selectedPipeSizes.secondary}mm`;
+                                        if (selectedPipeSizes.main)
+                                            return `< ${selectedPipeSizes.main}mm`;
                                         return 'ไม่มีข้อจำกัด';
                                     case 'branch': {
                                         const constraints: string[] = [];
-                                        if (selectedPipeSizes.emitter) constraints.push(`> ${selectedPipeSizes.emitter}mm`);
-                                        if (selectedPipeSizes.secondary) constraints.push(`< ${selectedPipeSizes.secondary}mm`);
-                                        else if (selectedPipeSizes.main) constraints.push(`< ${selectedPipeSizes.main}mm`);
-                                        return constraints.length > 0 ? constraints.join(' และ ') : 'ไม่มีข้อจำกัด';
+                                        if (selectedPipeSizes.emitter)
+                                            constraints.push(`> ${selectedPipeSizes.emitter}mm`);
+                                        if (selectedPipeSizes.secondary)
+                                            constraints.push(`< ${selectedPipeSizes.secondary}mm`);
+                                        else if (selectedPipeSizes.main)
+                                            constraints.push(`< ${selectedPipeSizes.main}mm`);
+                                        return constraints.length > 0
+                                            ? constraints.join(' และ ')
+                                            : 'ไม่มีข้อจำกัด';
                                     }
                                     case 'secondary': {
                                         const secConstraints: string[] = [];
-                                        if (selectedPipeSizes.branch) secConstraints.push(`> ${selectedPipeSizes.branch}mm`);
-                                        else if (selectedPipeSizes.emitter) secConstraints.push(`> ${selectedPipeSizes.emitter}mm`);
-                                        if (selectedPipeSizes.main) secConstraints.push(`< ${selectedPipeSizes.main}mm`);
-                                        return secConstraints.length > 0 ? secConstraints.join(' และ ') : 'ไม่มีข้อจำกัด';
+                                        if (selectedPipeSizes.branch)
+                                            secConstraints.push(`> ${selectedPipeSizes.branch}mm`);
+                                        else if (selectedPipeSizes.emitter)
+                                            secConstraints.push(`> ${selectedPipeSizes.emitter}mm`);
+                                        if (selectedPipeSizes.main)
+                                            secConstraints.push(`< ${selectedPipeSizes.main}mm`);
+                                        return secConstraints.length > 0
+                                            ? secConstraints.join(' และ ')
+                                            : 'ไม่มีข้อจำกัด';
                                     }
                                     case 'main':
-                                        if (selectedPipeSizes.secondary) return `> ${selectedPipeSizes.secondary}mm`;
-                                        if (selectedPipeSizes.branch) return `> ${selectedPipeSizes.branch}mm`;
-                                        if (selectedPipeSizes.emitter) return `> ${selectedPipeSizes.emitter}mm`;
+                                        if (selectedPipeSizes.secondary)
+                                            return `> ${selectedPipeSizes.secondary}mm`;
+                                        if (selectedPipeSizes.branch)
+                                            return `> ${selectedPipeSizes.branch}mm`;
+                                        if (selectedPipeSizes.emitter)
+                                            return `> ${selectedPipeSizes.emitter}mm`;
                                         return 'ไม่มีข้อจำกัด';
                                     default:
                                         return 'ไม่มีข้อจำกัด';
@@ -881,38 +998,68 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                     onClick={() => {
                                         setIsManuallySelected(false); // Reset to auto-selection
                                         // Auto-select best pipe again
-                                        if (availablePipes.length > 0 && currentZoneBestPipe && sprinklerPressure) {
-                                            const hierarchyFilteredPipes = availablePipes.filter(pipe => {
-                                                const candidateSize = pipe.sizeMM;
-                                                switch (pipeType) {
-                                                    case 'main':
-                                                        return !(
-                                                            (selectedPipeSizes.secondary && candidateSize <= selectedPipeSizes.secondary) ||
-                                                            (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                                                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
-                                                        );
-                                                    case 'secondary':
-                                                        return !(
-                                                            (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                            (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                                                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
-                                                        );
-                                                    case 'branch':
-                                                        return !(
-                                                            (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                            (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
-                                                            (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
-                                                        );
-                                                    case 'emitter':
-                                                        return !(
-                                                            (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                            (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
-                                                            (selectedPipeSizes.branch && candidateSize >= selectedPipeSizes.branch)
-                                                        );
-                                                    default:
-                                                        return true;
+                                        if (
+                                            availablePipes.length > 0 &&
+                                            currentZoneBestPipe &&
+                                            sprinklerPressure
+                                        ) {
+                                            const hierarchyFilteredPipes = availablePipes.filter(
+                                                (pipe) => {
+                                                    const candidateSize = pipe.sizeMM;
+                                                    switch (pipeType) {
+                                                        case 'main':
+                                                            return !(
+                                                                (selectedPipeSizes.secondary &&
+                                                                    candidateSize <=
+                                                                        selectedPipeSizes.secondary) ||
+                                                                (selectedPipeSizes.branch &&
+                                                                    candidateSize <=
+                                                                        selectedPipeSizes.branch) ||
+                                                                (selectedPipeSizes.emitter &&
+                                                                    candidateSize <=
+                                                                        selectedPipeSizes.emitter)
+                                                            );
+                                                        case 'secondary':
+                                                            return !(
+                                                                (selectedPipeSizes.main &&
+                                                                    candidateSize >=
+                                                                        selectedPipeSizes.main) ||
+                                                                (selectedPipeSizes.branch &&
+                                                                    candidateSize <=
+                                                                        selectedPipeSizes.branch) ||
+                                                                (selectedPipeSizes.emitter &&
+                                                                    candidateSize <=
+                                                                        selectedPipeSizes.emitter)
+                                                            );
+                                                        case 'branch':
+                                                            return !(
+                                                                (selectedPipeSizes.main &&
+                                                                    candidateSize >=
+                                                                        selectedPipeSizes.main) ||
+                                                                (selectedPipeSizes.secondary &&
+                                                                    candidateSize >=
+                                                                        selectedPipeSizes.secondary) ||
+                                                                (selectedPipeSizes.emitter &&
+                                                                    candidateSize <=
+                                                                        selectedPipeSizes.emitter)
+                                                            );
+                                                        case 'emitter':
+                                                            return !(
+                                                                (selectedPipeSizes.main &&
+                                                                    candidateSize >=
+                                                                        selectedPipeSizes.main) ||
+                                                                (selectedPipeSizes.secondary &&
+                                                                    candidateSize >=
+                                                                        selectedPipeSizes.secondary) ||
+                                                                (selectedPipeSizes.branch &&
+                                                                    candidateSize >=
+                                                                        selectedPipeSizes.branch)
+                                                            );
+                                                        default:
+                                                            return true;
+                                                    }
                                                 }
-                                            });
+                                            );
                                             const pipesToSelect = hierarchyFilteredPipes; // Strict: เฉพาะที่เข้า cross-component hierarchy!
                                             const bestPipe = selectBestPipeByHeadLoss(
                                                 pipesToSelect,
@@ -943,48 +1090,70 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             {(() => {
                                 const totalAvailable = availablePipes.length;
                                 // คำนวณจำนวนท่อที่ผ่าน Cross-Component Hierarchy
-                                const hierarchyFiltered = availablePipes.filter(pipe => {
+                                const hierarchyFiltered = availablePipes.filter((pipe) => {
                                     const candidateSize = pipe.sizeMM;
                                     switch (pipeType) {
                                         case 'main':
                                             return !(
-                                                (selectedPipeSizes.secondary && candidateSize <= selectedPipeSizes.secondary) ||
-                                                (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                                                (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                                                (selectedPipeSizes.secondary &&
+                                                    candidateSize <= selectedPipeSizes.secondary) ||
+                                                (selectedPipeSizes.branch &&
+                                                    candidateSize <= selectedPipeSizes.branch) ||
+                                                (selectedPipeSizes.emitter &&
+                                                    candidateSize <= selectedPipeSizes.emitter)
                                             );
                                         case 'secondary':
                                             return !(
-                                                (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                                                (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                                                (selectedPipeSizes.main &&
+                                                    candidateSize >= selectedPipeSizes.main) ||
+                                                (selectedPipeSizes.branch &&
+                                                    candidateSize <= selectedPipeSizes.branch) ||
+                                                (selectedPipeSizes.emitter &&
+                                                    candidateSize <= selectedPipeSizes.emitter)
                                             );
                                         case 'branch':
                                             return !(
-                                                (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
-                                                (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
+                                                (selectedPipeSizes.main &&
+                                                    candidateSize >= selectedPipeSizes.main) ||
+                                                (selectedPipeSizes.secondary &&
+                                                    candidateSize >= selectedPipeSizes.secondary) ||
+                                                (selectedPipeSizes.emitter &&
+                                                    candidateSize <= selectedPipeSizes.emitter)
                                             );
                                         case 'emitter':
                                             return !(
-                                                (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
-                                                (selectedPipeSizes.branch && candidateSize >= selectedPipeSizes.branch)
+                                                (selectedPipeSizes.main &&
+                                                    candidateSize >= selectedPipeSizes.main) ||
+                                                (selectedPipeSizes.secondary &&
+                                                    candidateSize >= selectedPipeSizes.secondary) ||
+                                                (selectedPipeSizes.branch &&
+                                                    candidateSize >= selectedPipeSizes.branch)
                                             );
                                         default:
                                             return true;
                                     }
                                 }).length;
-                                
+
                                 if (totalAvailable === 0) {
                                     return (
                                         <div className="space-y-2">
-                                            <div className="bg-red-100 border border-red-300 rounded p-2">
-                                                <p className="font-medium text-red-700">❌ ไม่มีท่อในฐานข้อมูล:</p>
-                                                <ul className="mt-1 text-xs text-red-600 list-disc list-inside">
+                                            <div className="rounded border border-red-300 bg-red-100 p-2">
+                                                <p className="font-medium text-red-700">
+                                                    ❌ ไม่มีท่อในฐานข้อมูล:
+                                                </p>
+                                                <ul className="mt-1 list-inside list-disc text-xs text-red-600">
                                                     <li>ไม่มีท่อประเภท {selectedPipeType}</li>
-                                                    <li>หรือไม่มีท่อที่มีแรงดัน ≥ {sprinklerPressure?.pressureBar.toFixed(1)} บาร์</li>
-                                                    {(pipeType === 'branch' || pipeType === 'emitter') && (
-                                                        <li>หรือขนาดท่อเกิน 32mm ({getPipeTypeName(pipeType)}: ≤32mm)</li>
+                                                    <li>
+                                                        หรือไม่มีท่อที่มีแรงดัน ≥{' '}
+                                                        {sprinklerPressure?.pressureBar.toFixed(1)}{' '}
+                                                        บาร์
+                                                    </li>
+                                                    {(pipeType === 'branch' ||
+                                                        pipeType === 'emitter') && (
+                                                        <li>
+                                                            หรือขนาดท่อเกิน 32mm (
+                                                            {getPipeTypeName(pipeType)}: ≤32mm)
+                                                        </li>
                                                     )}
                                                 </ul>
                                             </div>
@@ -993,25 +1162,50 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                 } else if (hierarchyFiltered === 0) {
                                     return (
                                         <div className="space-y-3">
-                                            <div className="bg-orange-100 border border-orange-300 rounded p-3">
-                                                <p className="font-semibold text-orange-700">⛔ Hierarchy Violation!</p>
-                                                <p className="text-orange-600 mt-1">
-                                                    มีท่อ <span className="font-bold">{totalAvailable}</span> รายการ แต่<span className="font-bold text-red-600"> ไม่เข้ากับลำดับชั้นท่อ</span>
+                                            <div className="rounded border border-orange-300 bg-orange-100 p-3">
+                                                <p className="font-semibold text-orange-700">
+                                                    ⛔ Hierarchy Violation!
                                                 </p>
-                                                
-                                                <div className="mt-2 p-2 bg-orange-50 rounded border text-xs">
-                                                    <p className="font-medium text-orange-800">📋 กฎลำดับชั้น:</p>
-                                                    <p className="text-orange-700 mt-1">
-                                                        เมนหลัก {`>`} เมนรอง {`>`} ย่อย {`>`} ย่อยแยก
+                                                <p className="mt-1 text-orange-600">
+                                                    มีท่อ{' '}
+                                                    <span className="font-bold">
+                                                        {totalAvailable}
+                                                    </span>{' '}
+                                                    รายการ แต่
+                                                    <span className="font-bold text-red-600">
+                                                        {' '}
+                                                        ไม่เข้ากับลำดับชั้นท่อ
+                                                    </span>
+                                                </p>
+
+                                                <div className="mt-2 rounded border bg-orange-50 p-2 text-xs">
+                                                    <p className="font-medium text-orange-800">
+                                                        📋 กฎลำดับชั้น:
+                                                    </p>
+                                                    <p className="mt-1 text-orange-700">
+                                                        เมนหลัก {`>`} เมนรอง {`>`} ย่อย {`>`}{' '}
+                                                        ย่อยแยก
                                                     </p>
                                                 </div>
-                                                
-                                                <div className="mt-2 p-2 bg-red-50 rounded border text-xs">
-                                                    <p className="font-medium text-red-700">🎯 วิธีแก้ไข:</p>
-                                                    <ul className="mt-1 text-red-600 list-disc list-inside space-y-1">
-                                                        <li>เลือก<strong>ท่ออื่น</strong>ในประเภทที่มีปัญหา hierarchy</li>
-                                                        <li>หรือใช้ปุ่ม <strong>"🔄 Reset ทั้งหมด"</strong> ด้านบน</li>
-                                                        <li><strong>ลำดับความสำคัญ:</strong> Hierarchy {`>`} Head Loss</li>
+
+                                                <div className="mt-2 rounded border bg-red-50 p-2 text-xs">
+                                                    <p className="font-medium text-red-700">
+                                                        🎯 วิธีแก้ไข:
+                                                    </p>
+                                                    <ul className="mt-1 list-inside list-disc space-y-1 text-red-600">
+                                                        <li>
+                                                            เลือก<strong>ท่ออื่น</strong>
+                                                            ในประเภทที่มีปัญหา hierarchy
+                                                        </li>
+                                                        <li>
+                                                            หรือใช้ปุ่ม{' '}
+                                                            <strong>"🔄 Reset ทั้งหมด"</strong>{' '}
+                                                            ด้านบน
+                                                        </li>
+                                                        <li>
+                                                            <strong>ลำดับความสำคัญ:</strong>{' '}
+                                                            Hierarchy {`>`} Head Loss
+                                                        </li>
                                                     </ul>
                                                 </div>
                                             </div>
@@ -1141,109 +1335,205 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 {/* แสดงการตรวจสอบ Hierarchy */}
                 {selectedPipe && selectedPipeSizes && Object.keys(selectedPipeSizes).length > 0 && (
                     <div className="mt-4 rounded bg-blue-800/50 p-3">
-                        <h4 className="mb-2 text-sm font-medium text-blue-300">🔍 ตรวจสอบ Hierarchy</h4>
+                        <h4 className="mb-2 text-sm font-medium text-blue-300">
+                            🔍 ตรวจสอบ Hierarchy
+                        </h4>
                         {(() => {
                             const currentSize = selectedPipe.sizeMM;
                             const violations: string[] = [];
-                            
+
                             switch (pipeType) {
                                 case 'main':
-                                    if (selectedPipeSizes.secondary && currentSize <= selectedPipeSizes.secondary) {
-                                        violations.push(`⛔ เมนหลัก (${currentSize}mm) ≤ เมนรอง (${selectedPipeSizes.secondary}mm)`);
+                                    if (
+                                        selectedPipeSizes.secondary &&
+                                        currentSize <= selectedPipeSizes.secondary
+                                    ) {
+                                        violations.push(
+                                            `⛔ เมนหลัก (${currentSize}mm) ≤ เมนรอง (${selectedPipeSizes.secondary}mm)`
+                                        );
                                     }
-                                    if (selectedPipeSizes.branch && currentSize <= selectedPipeSizes.branch) {
-                                        violations.push(`⛔ เมนหลัก (${currentSize}mm) ≤ ท่อย่อย (${selectedPipeSizes.branch}mm)`);
+                                    if (
+                                        selectedPipeSizes.branch &&
+                                        currentSize <= selectedPipeSizes.branch
+                                    ) {
+                                        violations.push(
+                                            `⛔ เมนหลัก (${currentSize}mm) ≤ ท่อย่อย (${selectedPipeSizes.branch}mm)`
+                                        );
                                     }
-                                    if (selectedPipeSizes.emitter && currentSize <= selectedPipeSizes.emitter) {
-                                        violations.push(`⛔ เมนหลัก (${currentSize}mm) ≤ ท่อย่อยแยก (${selectedPipeSizes.emitter}mm)`);
+                                    if (
+                                        selectedPipeSizes.emitter &&
+                                        currentSize <= selectedPipeSizes.emitter
+                                    ) {
+                                        violations.push(
+                                            `⛔ เมนหลัก (${currentSize}mm) ≤ ท่อย่อยแยก (${selectedPipeSizes.emitter}mm)`
+                                        );
                                     }
                                     break;
                                 case 'secondary':
-                                    if (selectedPipeSizes.main && currentSize >= selectedPipeSizes.main) {
-                                        violations.push(`⛔ เมนรอง (${currentSize}mm) ≥ เมนหลัก (${selectedPipeSizes.main}mm)`);
+                                    if (
+                                        selectedPipeSizes.main &&
+                                        currentSize >= selectedPipeSizes.main
+                                    ) {
+                                        violations.push(
+                                            `⛔ เมนรอง (${currentSize}mm) ≥ เมนหลัก (${selectedPipeSizes.main}mm)`
+                                        );
                                     }
-                                    if (selectedPipeSizes.branch && currentSize <= selectedPipeSizes.branch) {
-                                        violations.push(`⛔ เมนรอง (${currentSize}mm) ≤ ท่อย่อย (${selectedPipeSizes.branch}mm)`);
+                                    if (
+                                        selectedPipeSizes.branch &&
+                                        currentSize <= selectedPipeSizes.branch
+                                    ) {
+                                        violations.push(
+                                            `⛔ เมนรอง (${currentSize}mm) ≤ ท่อย่อย (${selectedPipeSizes.branch}mm)`
+                                        );
                                     }
-                                    if (selectedPipeSizes.emitter && currentSize <= selectedPipeSizes.emitter) {
-                                        violations.push(`⛔ เมนรอง (${currentSize}mm) ≤ ท่อย่อยแยก (${selectedPipeSizes.emitter}mm)`);
+                                    if (
+                                        selectedPipeSizes.emitter &&
+                                        currentSize <= selectedPipeSizes.emitter
+                                    ) {
+                                        violations.push(
+                                            `⛔ เมนรอง (${currentSize}mm) ≤ ท่อย่อยแยก (${selectedPipeSizes.emitter}mm)`
+                                        );
                                     }
                                     break;
                                 case 'branch':
-                                    if (selectedPipeSizes.main && currentSize >= selectedPipeSizes.main) {
-                                        violations.push(`⛔ ท่อย่อย (${currentSize}mm) ≥ เมนหลัก (${selectedPipeSizes.main}mm)`);
+                                    if (
+                                        selectedPipeSizes.main &&
+                                        currentSize >= selectedPipeSizes.main
+                                    ) {
+                                        violations.push(
+                                            `⛔ ท่อย่อย (${currentSize}mm) ≥ เมนหลัก (${selectedPipeSizes.main}mm)`
+                                        );
                                     }
-                                    if (selectedPipeSizes.secondary && currentSize >= selectedPipeSizes.secondary) {
-                                        violations.push(`⛔ ท่อย่อย (${currentSize}mm) ≥ เมนรอง (${selectedPipeSizes.secondary}mm)`);
+                                    if (
+                                        selectedPipeSizes.secondary &&
+                                        currentSize >= selectedPipeSizes.secondary
+                                    ) {
+                                        violations.push(
+                                            `⛔ ท่อย่อย (${currentSize}mm) ≥ เมนรอง (${selectedPipeSizes.secondary}mm)`
+                                        );
                                     }
-                                    if (selectedPipeSizes.emitter && currentSize <= selectedPipeSizes.emitter) {
-                                        violations.push(`⛔ ท่อย่อย (${currentSize}mm) ≤ ท่อย่อยแยก (${selectedPipeSizes.emitter}mm)`);
+                                    if (
+                                        selectedPipeSizes.emitter &&
+                                        currentSize <= selectedPipeSizes.emitter
+                                    ) {
+                                        violations.push(
+                                            `⛔ ท่อย่อย (${currentSize}mm) ≤ ท่อย่อยแยก (${selectedPipeSizes.emitter}mm)`
+                                        );
                                     }
                                     break;
                                 case 'emitter':
-                                    if (selectedPipeSizes.main && currentSize >= selectedPipeSizes.main) {
-                                        violations.push(`⛔ ท่อย่อยแยก (${currentSize}mm) ≥ เมนหลัก (${selectedPipeSizes.main}mm)`);
+                                    if (
+                                        selectedPipeSizes.main &&
+                                        currentSize >= selectedPipeSizes.main
+                                    ) {
+                                        violations.push(
+                                            `⛔ ท่อย่อยแยก (${currentSize}mm) ≥ เมนหลัก (${selectedPipeSizes.main}mm)`
+                                        );
                                     }
-                                    if (selectedPipeSizes.secondary && currentSize >= selectedPipeSizes.secondary) {
-                                        violations.push(`⛔ ท่อย่อยแยก (${currentSize}mm) ≥ เมนรอง (${selectedPipeSizes.secondary}mm)`);
+                                    if (
+                                        selectedPipeSizes.secondary &&
+                                        currentSize >= selectedPipeSizes.secondary
+                                    ) {
+                                        violations.push(
+                                            `⛔ ท่อย่อยแยก (${currentSize}mm) ≥ เมนรอง (${selectedPipeSizes.secondary}mm)`
+                                        );
                                     }
-                                    if (selectedPipeSizes.branch && currentSize >= selectedPipeSizes.branch) {
-                                        violations.push(`⛔ ท่อย่อยแยก (${currentSize}mm) ≥ ท่อย่อย (${selectedPipeSizes.branch}mm)`);
+                                    if (
+                                        selectedPipeSizes.branch &&
+                                        currentSize >= selectedPipeSizes.branch
+                                    ) {
+                                        violations.push(
+                                            `⛔ ท่อย่อยแยก (${currentSize}mm) ≥ ท่อย่อย (${selectedPipeSizes.branch}mm)`
+                                        );
                                     }
                                     break;
                             }
-                            
+
                             if (violations.length > 0) {
                                 return (
                                     <div className="space-y-1">
-                                        <div className="text-xs text-red-300 font-medium">❌ Hierarchy Violations:</div>
+                                        <div className="text-xs font-medium text-red-300">
+                                            ❌ Hierarchy Violations:
+                                        </div>
                                         {violations.map((violation, idx) => (
-                                            <div key={idx} className="text-xs text-red-200 bg-red-900/30 rounded px-2 py-1">
+                                            <div
+                                                key={idx}
+                                                className="rounded bg-red-900/30 px-2 py-1 text-xs text-red-200"
+                                            >
                                                 {violation}
                                             </div>
                                         ))}
                                         <div className="mt-2 flex items-center justify-between">
                                             <div className="text-xs text-yellow-300">
-                                                💡 กรุณาเลือกท่อใหม่ให้เข้าหลัก: เมนหลัก {`>`} เมนรอง {`>`} ย่อย {`>`} ย่อยแยก
+                                                💡 กรุณาเลือกท่อใหม่ให้เข้าหลัก: เมนหลัก {`>`}{' '}
+                                                เมนรอง {`>`} ย่อย {`>`} ย่อยแยก
                                             </div>
                                             <button
                                                 onClick={() => {
                                                     setIsManuallySelected(false);
-                                                    
+
                                                     // Force re-evaluation with strict Cross-Component hierarchy
-                                                    const hierarchyFilteredPipes = availablePipes.filter(pipe => {
-                                                        const candidateSize = pipe.sizeMM;
-                                                        switch (pipeType) {
-                                                            case 'main':
-                                                                return !(
-                                                                    (selectedPipeSizes.secondary && candidateSize <= selectedPipeSizes.secondary) ||
-                                                                    (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                                                                    (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
-                                                                );
-                                                            case 'secondary':
-                                                                return !(
-                                                                    (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                                    (selectedPipeSizes.branch && candidateSize <= selectedPipeSizes.branch) ||
-                                                                    (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
-                                                                );
-                                                            case 'branch':
-                                                                return !(
-                                                                    (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                                    (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
-                                                                    (selectedPipeSizes.emitter && candidateSize <= selectedPipeSizes.emitter)
-                                                                );
-                                                            case 'emitter':
-                                                                return !(
-                                                                    (selectedPipeSizes.main && candidateSize >= selectedPipeSizes.main) ||
-                                                                    (selectedPipeSizes.secondary && candidateSize >= selectedPipeSizes.secondary) ||
-                                                                    (selectedPipeSizes.branch && candidateSize >= selectedPipeSizes.branch)
-                                                                );
-                                                            default:
-                                                                return true;
-                                                        }
-                                                    });
-                                                    
-                                                    if (hierarchyFilteredPipes.length > 0 && sprinklerPressure) {
+                                                    const hierarchyFilteredPipes =
+                                                        availablePipes.filter((pipe) => {
+                                                            const candidateSize = pipe.sizeMM;
+                                                            switch (pipeType) {
+                                                                case 'main':
+                                                                    return !(
+                                                                        (selectedPipeSizes.secondary &&
+                                                                            candidateSize <=
+                                                                                selectedPipeSizes.secondary) ||
+                                                                        (selectedPipeSizes.branch &&
+                                                                            candidateSize <=
+                                                                                selectedPipeSizes.branch) ||
+                                                                        (selectedPipeSizes.emitter &&
+                                                                            candidateSize <=
+                                                                                selectedPipeSizes.emitter)
+                                                                    );
+                                                                case 'secondary':
+                                                                    return !(
+                                                                        (selectedPipeSizes.main &&
+                                                                            candidateSize >=
+                                                                                selectedPipeSizes.main) ||
+                                                                        (selectedPipeSizes.branch &&
+                                                                            candidateSize <=
+                                                                                selectedPipeSizes.branch) ||
+                                                                        (selectedPipeSizes.emitter &&
+                                                                            candidateSize <=
+                                                                                selectedPipeSizes.emitter)
+                                                                    );
+                                                                case 'branch':
+                                                                    return !(
+                                                                        (selectedPipeSizes.main &&
+                                                                            candidateSize >=
+                                                                                selectedPipeSizes.main) ||
+                                                                        (selectedPipeSizes.secondary &&
+                                                                            candidateSize >=
+                                                                                selectedPipeSizes.secondary) ||
+                                                                        (selectedPipeSizes.emitter &&
+                                                                            candidateSize <=
+                                                                                selectedPipeSizes.emitter)
+                                                                    );
+                                                                case 'emitter':
+                                                                    return !(
+                                                                        (selectedPipeSizes.main &&
+                                                                            candidateSize >=
+                                                                                selectedPipeSizes.main) ||
+                                                                        (selectedPipeSizes.secondary &&
+                                                                            candidateSize >=
+                                                                                selectedPipeSizes.secondary) ||
+                                                                        (selectedPipeSizes.branch &&
+                                                                            candidateSize >=
+                                                                                selectedPipeSizes.branch)
+                                                                    );
+                                                                default:
+                                                                    return true;
+                                                            }
+                                                        });
+
+                                                    if (
+                                                        hierarchyFilteredPipes.length > 0 &&
+                                                        sprinklerPressure
+                                                    ) {
                                                         const bestPipe = selectBestPipeByHeadLoss(
                                                             hierarchyFilteredPipes,
                                                             pipeType,
@@ -1252,13 +1542,16 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                                             selectedPipeSizes,
                                                             sprinklerPressure.head20PercentM
                                                         );
-                                                        
-                                                        if (bestPipe && bestPipe.id !== selectedPipe?.id) {
+
+                                                        if (
+                                                            bestPipe &&
+                                                            bestPipe.id !== selectedPipe?.id
+                                                        ) {
                                                             onPipeChange(bestPipe);
                                                         }
                                                     }
                                                 }}
-                                                className="px-2 py-1 text-xs bg-yellow-600 hover:bg-yellow-500 text-white rounded"
+                                                className="rounded bg-yellow-600 px-2 py-1 text-xs text-white hover:bg-yellow-500"
                                                 title="ลองแก้ไข Hierarchy อัตโนมัติ"
                                             >
                                                 🔧 แก้ไข
@@ -1269,7 +1562,8 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             } else {
                                 return (
                                     <div className="text-xs text-green-300">
-                                        ✅ Hierarchy ถูกต้อง: {getPipeTypeName(pipeType)} ({currentSize}mm)
+                                        ✅ Hierarchy ถูกต้อง: {getPipeTypeName(pipeType)} (
+                                        {currentSize}mm)
                                     </div>
                                 );
                             }
@@ -1313,51 +1607,51 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <div className="flex-1">
                                 <div className="grid grid-cols-12 gap-3 text-sm">
                                     <div className="col-span-8">
-                                    <div className="col-span-8">
-                                        <p className="font-medium text-lg mb-1 text-white">
-                                            {selectedPipe.name || selectedPipe.productCode}
-                                        </p>
-                                    </div>
-                                    
-                                    <div className="col-span-8 flex flex-wrap items-end gap-6">
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-400">ขนาด:</span>
-                                            <span className="font-medium text-white">
-                                                {selectedPipe.sizeMM} mm.{' '}
-                                                {selectedPipe.sizeInch &&
-                                                    `(${selectedPipe.sizeInch})`}
-                                            </span>
+                                        <div className="col-span-8">
+                                            <p className="mb-1 text-lg font-medium text-white">
+                                                {selectedPipe.name || selectedPipe.productCode}
+                                            </p>
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-400">แรงดัน:</span>
-                                            <span className="font-medium text-white">
-                                                PN{selectedPipe.pn || 'N/A'}
-                                            </span>
+
+                                        <div className="col-span-8 flex flex-wrap items-end gap-6">
+                                            <div className="flex flex-col">
+                                                <span className="text-gray-400">ขนาด:</span>
+                                                <span className="font-medium text-white">
+                                                    {selectedPipe.sizeMM} mm.{' '}
+                                                    {selectedPipe.sizeInch &&
+                                                        `(${selectedPipe.sizeInch})`}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-gray-400">แรงดัน:</span>
+                                                <span className="font-medium text-white">
+                                                    PN{selectedPipe.pn || 'N/A'}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-gray-400">ยาว/ม้วน:</span>
+                                                <span className="font-medium text-white">
+                                                    {selectedPipe.lengthM}ม.
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-gray-400">ราคา/ม้วน:</span>
+                                                <span className="font-medium text-green-400">
+                                                    {selectedPipe.price?.toLocaleString()} บาท
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-400">ยาว/ม้วน:</span>
-                                            <span className="font-medium text-white">
-                                                {selectedPipe.lengthM}ม.
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-gray-400">ราคา/ม้วน:</span>
-                                            <span className="font-medium text-green-400">
-                                                {selectedPipe.price?.toLocaleString()} บาท
-                                            </span>
-                                        </div>
-                                    </div>
-                                    {/* แสดงข้อมูลเพิ่มเติมถ้ามี */}
-                                {selectedPipe.brand && (
-                                    <div className="mt-2 text-xs text-gray-400">
-                                        ยี่ห้อ: {selectedPipe.brand}
-                                    </div>
-                                )}
-                                {selectedPipe.description && (
-                                    <div className="mt-1 text-xs text-gray-400">
-                                        {selectedPipe.description}
-                                    </div>
-                                )}
+                                        {/* แสดงข้อมูลเพิ่มเติมถ้ามี */}
+                                        {selectedPipe.brand && (
+                                            <div className="mt-2 text-xs text-gray-400">
+                                                ยี่ห้อ: {selectedPipe.brand}
+                                            </div>
+                                        )}
+                                        {selectedPipe.description && (
+                                            <div className="mt-1 text-xs text-gray-400">
+                                                {selectedPipe.description}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="col-span-4 flex items-center justify-center">
                                         {/* รูปภาพท่อ */}
@@ -1374,8 +1668,6 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                         )}
                                     </div>
                                 </div>
-
-                                
                             </div>
                         </div>
                     </div>

@@ -33,14 +33,14 @@ export default function Profile({
 }) {
     // Always call usePage hook unconditionally
     const page = usePage<SharedData>();
-    
+
     // Safely access auth with fallback
-    const auth = page?.props?.auth || { 
-        user: { 
-            name: '', 
-            email: '', 
-            email_verified_at: null 
-        } 
+    const auth = page?.props?.auth || {
+        user: {
+            name: '',
+            email: '',
+            email_verified_at: null,
+        },
     };
 
     const { data, setData, patch, errors, processing, recentlySuccessful } = useForm<
