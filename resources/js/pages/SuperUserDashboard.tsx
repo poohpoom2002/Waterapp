@@ -720,6 +720,20 @@ export default function SuperUserDashboard() {
                     t={t}
                 />
             )}
+
+            {/* Edit User Modal */}
+            {showEditUserModal && selectedUser && (
+                <EditUserModal
+                    isOpen={showEditUserModal}
+                    onClose={() => {
+                        setShowEditUserModal(false);
+                        setSelectedUser(null);
+                    }}
+                    onUpdate={handleUpdateUser}
+                    user={selectedUser}
+                    t={t}
+                />
+            )}
         </div>
     );
 }
@@ -1021,6 +1035,143 @@ const CreateUserModal = ({
                             className="rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
                         >
                             {t('create')}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// Edit User Modal Component
+const EditUserModal = ({
+    isOpen,
+    onClose,
+    onUpdate,
+    user,
+    t,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onUpdate: (userId: number, userData: Partial<User>) => void;
+    user: User;
+    t: (key: string) => string;
+}) => {
+    const [userName, setUserName] = useState(user.name);
+    const [userEmail, setUserEmail] = useState(user.email);
+    const [userPassword, setUserPassword] = useState('');
+    const [isSuperUser, setIsSuperUser] = useState(user.is_super_user);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!userName.trim() || !userEmail.trim()) return;
+
+        const updateData: Partial<User> = {
+            name: userName.trim(),
+            email: userEmail.trim(),
+            is_super_user: isSuperUser,
+        };
+
+        // Only include password if it's provided
+        if (userPassword.trim()) {
+            (updateData as any).password = userPassword;
+        }
+
+        onUpdate(user.id, updateData);
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
+            <div className="relative z-[10000] mx-4 w-full max-w-md rounded-lg bg-gray-800 p-6">
+                <div className="mb-4 flex items-center justify-between">
+                    <h2 className="text-xl font-semibold text-white">{t('edit_user')}</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <svg
+                            className="h-6 w-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M6 18L18 6M6 6l12 12"
+                            />
+                        </svg>
+                    </button>
+                </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
+                            {t('name')}
+                        </label>
+                        <input
+                            type="text"
+                            value={userName}
+                            onChange={(e) => setUserName(e.target.value)}
+                            className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                            placeholder={t('enter_name')}
+                            autoFocus
+                            required
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
+                            {t('email')}
+                        </label>
+                        <input
+                            type="email"
+                            value={userEmail}
+                            onChange={(e) => setUserEmail(e.target.value)}
+                            className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                            placeholder={t('enter_email')}
+                            required
+                        />
+                    </div>
+                    <div className="mb-4">
+                        <label className="mb-2 block text-sm font-medium text-gray-300">
+                            {t('password')} ({t('optional')})
+                        </label>
+                        <input
+                            type="password"
+                            value={userPassword}
+                            onChange={(e) => setUserPassword(e.target.value)}
+                            className="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none"
+                            placeholder={t('enter_new_password')}
+                            minLength={8}
+                        />
+                        <p className="mt-1 text-xs text-gray-400">
+                            {t('leave_blank_to_keep_current_password')}
+                        </p>
+                    </div>
+                    <div className="mb-6">
+                        <label className="flex items-center">
+                            <input
+                                type="checkbox"
+                                checked={isSuperUser}
+                                onChange={(e) => setIsSuperUser(e.target.checked)}
+                                className="mr-2 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-300">{t('make_super_user')}</span>
+                        </label>
+                    </div>
+                    <div className="flex justify-end space-x-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="rounded px-4 py-2 text-gray-300 transition-colors hover:bg-gray-700 hover:text-white"
+                        >
+                            {t('cancel')}
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={!userName.trim() || !userEmail.trim()}
+                            className="rounded bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {t('update')}
                         </button>
                     </div>
                 </form>
