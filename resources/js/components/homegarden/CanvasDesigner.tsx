@@ -2767,4 +2767,3 @@ const CanvasDesigner: React.FC<CanvasDesignerProps> = ({
 };
 
 export default CanvasDesigner;
-

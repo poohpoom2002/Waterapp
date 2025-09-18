@@ -133,6 +133,7 @@ export const homeGardenTranslations = {
         กรุณารอสักครู่: 'Please wait a moment',
         'กำลังเตรียม...': 'Preparing...',
         คำนวณอุปกรณ์: 'Calculate Equipment',
+        บันทึกร่าง: 'Save Draft',
         สรุปผลการออกแบบระบบน้ำ: 'Water System Design Summary',
         วันที่: 'Date',
         เวลา: 'Time',

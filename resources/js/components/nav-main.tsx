@@ -9,7 +9,15 @@ import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 
 export function NavMain({ items = [] }: { items: NavItem[] }) {
-    const page = usePage();
+    // Defensive usePage call with error handling
+    let page;
+    try {
+        page = usePage();
+    } catch (error) {
+        console.warn('Inertia context not available in NavMain, using fallback values');
+        page = { url: '' };
+    }
+
     return (
         <SidebarGroup className="px-2 py-0">
             <SidebarGroupLabel>Platform</SidebarGroupLabel>

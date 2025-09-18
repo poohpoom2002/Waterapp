@@ -509,7 +509,9 @@ function clipCircleToPolygonGPS(
 
     // Always use MASKED_CIRCLE for GPS mode to ensure strict zone boundaries
     // This ensures the circle is always clipped to the zone boundary
-    console.log('🎭 GPS Circle intersects polygon - using MASKED_CIRCLE for strict zone boundaries');
+    console.log(
+        '🎭 GPS Circle intersects polygon - using MASKED_CIRCLE for strict zone boundaries'
+    );
     return 'MASKED_CIRCLE';
 }
 
@@ -830,10 +832,12 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
 
     try {
         let pipes: Pipe[] = [];
-        
+
         // Create unified trunk system with single main line from water source
-        const sourcePos = isCanvasMode ? (waterSource.canvasPosition || waterSource.position) : waterSource.position;
-        
+        const sourcePos = isCanvasMode
+            ? waterSource.canvasPosition || waterSource.position
+            : waterSource.position;
+
         pipes = createUnifiedTrunkSystem(
             waterSource,
             sprinklers,
@@ -847,15 +851,14 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
         // Fallback: if no pipes produced (e.g., no valid zones in map mode),
         // connect each sprinkler to the water source with a simple L-shaped path
         if (!pipes || pipes.length === 0) {
-
             const sourcePos = isCanvasMode
-                ? (waterSource.canvasPosition || waterSource.position)
+                ? waterSource.canvasPosition || waterSource.position
                 : waterSource.position;
 
             const fallback: Pipe[] = [];
             sprinklers.forEach((sprinkler, sIdx) => {
                 const sprPos = isCanvasMode
-                    ? (sprinkler.canvasPosition || sprinkler.position)
+                    ? sprinkler.canvasPosition || sprinkler.position
                     : sprinkler.position;
                 if (!sprPos) return;
 
@@ -884,9 +887,11 @@ export function generateSmartPipeNetwork(options: SmartPipeNetworkOptions): Pipe
         const originalPipeCount = pipes.length;
         pipes = removeDuplicatePipes(pipes, isCanvasMode ? 2.0 : 0.00002);
         const finalPipeCount = pipes.length;
-        
+
         if (originalPipeCount !== finalPipeCount) {
-            console.log(`Removed ${originalPipeCount - finalPipeCount} duplicate pipes. Final count: ${finalPipeCount}`);
+            console.log(
+                `Removed ${originalPipeCount - finalPipeCount} duplicate pipes. Final count: ${finalPipeCount}`
+            );
         }
 
         return pipes;
@@ -953,8 +958,12 @@ export function addCustomPipe(
         return null;
     }
 
-    const fromPos = isCanvasMode ? (fromSprinkler.canvasPosition || fromSprinkler.position) : fromSprinkler.position;
-    const toPos = isCanvasMode ? (toSprinkler.canvasPosition || toSprinkler.position) : toSprinkler.position;
+    const fromPos = isCanvasMode
+        ? fromSprinkler.canvasPosition || fromSprinkler.position
+        : fromSprinkler.position;
+    const toPos = isCanvasMode
+        ? toSprinkler.canvasPosition || toSprinkler.position
+        : toSprinkler.position;
 
     if (!fromPos || !toPos) {
         return null;
@@ -993,14 +1002,16 @@ export function addPipeFromSprinklerToPipe(
         return null;
     }
 
-    const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+    const sprinklerPos = isCanvasMode
+        ? sprinkler.canvasPosition || sprinkler.position
+        : sprinkler.position;
     if (!sprinklerPos) {
         return null;
     }
 
     // Find the closest point on the pipe to connect to
-    const pipeStart = isCanvasMode ? (targetPipe.canvasStart || targetPipe.start) : targetPipe.start;
-    const pipeEnd = isCanvasMode ? (targetPipe.canvasEnd || targetPipe.end) : targetPipe.end;
+    const pipeStart = isCanvasMode ? targetPipe.canvasStart || targetPipe.start : targetPipe.start;
+    const pipeEnd = isCanvasMode ? targetPipe.canvasEnd || targetPipe.end : targetPipe.end;
 
     if (!pipeStart || !pipeEnd) {
         return null;
@@ -1070,8 +1081,11 @@ function getCoordValue(coord: Coordinate | CanvasCoordinate, axis: 'x' | 'y'): n
 }
 
 // Helper function to check if coordinates are of the same type
-function isSameCoordType(coord1: Coordinate | CanvasCoordinate, coord2: Coordinate | CanvasCoordinate): boolean {
-    return ('lat' in coord1) === ('lat' in coord2);
+function isSameCoordType(
+    coord1: Coordinate | CanvasCoordinate,
+    coord2: Coordinate | CanvasCoordinate
+): boolean {
+    return 'lat' in coord1 === 'lat' in coord2;
 }
 
 // Helper function to safely cast coordinates
@@ -1311,11 +1325,12 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
 
     // คำนวณความยาวท่อรวมจากท่อทั้งหมด (ไม่ใช่เฉพาะท่อที่เชื่อมต่อ)
     const totalPipeLength = pipes.reduce((sum, pipe) => {
-        const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
-            ? Math.max(0, pipe.length)
-            : (pipe.canvasStart && pipe.canvasEnd && isCanvasMode)
-                ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
-                : (pipe.start && pipe.end)
+        const length =
+            typeof pipe.length === 'number' && !isNaN(pipe.length)
+                ? Math.max(0, pipe.length)
+                : pipe.canvasStart && pipe.canvasEnd && isCanvasMode
+                  ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                  : pipe.start && pipe.end
                     ? calculateDistance(pipe.start, pipe.end)
                     : 0;
         return sum + length;
@@ -1338,15 +1353,16 @@ export function calculateStatistics(data: GardenPlannerData): GardenStatistics {
                 : 0;
 
         const zoneSprinklers = sprinklers.filter((s) => s.zoneId === zone.id);
-        
+
         // คำนวณความยาวท่อในโซนนี้จากท่อทั้งหมด
         const zonePipes = pipes.filter((p) => p.zoneId === zone.id);
         const zonePipeLength = zonePipes.reduce((sum, pipe) => {
-            const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
-                ? Math.max(0, pipe.length)
-                : (pipe.canvasStart && pipe.canvasEnd && isCanvasMode)
-                    ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
-                    : (pipe.start && pipe.end)
+            const length =
+                typeof pipe.length === 'number' && !isNaN(pipe.length)
+                    ? Math.max(0, pipe.length)
+                    : pipe.canvasStart && pipe.canvasEnd && isCanvasMode
+                      ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                      : pipe.start && pipe.end
                         ? calculateDistance(pipe.start, pipe.end)
                         : 0;
             return sum + length;
@@ -1446,15 +1462,16 @@ export function computeLongestPathFromSource(options: PathComputeOptions): numbe
         if (!s || !e) continue;
         const a = addNode(s);
         const b = addNode(e);
-        const w = typeof p.length === 'number' && !isNaN(p.length)
-            ? Math.max(0, p.length)
-            : calculateDistance(s, e, isCanvasMode ? scale : undefined);
+        const w =
+            typeof p.length === 'number' && !isNaN(p.length)
+                ? Math.max(0, p.length)
+                : calculateDistance(s, e, isCanvasMode ? scale : undefined);
         addEdge(a, b, w);
     }
 
     // Ensure water source and sprinklers are snapped to nearest nodes
     const srcCoord = isCanvasMode
-        ? (waterSource.canvasPosition || waterSource.position)
+        ? waterSource.canvasPosition || waterSource.position
         : waterSource.position;
     const srcIndex = addNode(srcCoord);
 
@@ -1533,7 +1550,7 @@ function computeConnectedPipeLengths(options: PathComputeOptions): {
     const getPipeEnd = (p: Pipe) => (isCanvasMode ? p.canvasEnd || p.end : p.end);
 
     const srcCoord = isCanvasMode
-        ? (waterSource.canvasPosition || waterSource.position)
+        ? waterSource.canvasPosition || waterSource.position
         : waterSource.position;
     const srcIndex = addNode(srcCoord);
 
@@ -1548,9 +1565,10 @@ function computeConnectedPipeLengths(options: PathComputeOptions): {
         }
         const a = addNode(s);
         const b = addNode(e);
-        const len = typeof p.length === 'number' && !isNaN(p.length)
-            ? Math.max(0, p.length)
-            : calculateDistance(s, e, isCanvasMode ? scale : undefined);
+        const len =
+            typeof p.length === 'number' && !isNaN(p.length)
+                ? Math.max(0, p.length)
+                : calculateDistance(s, e, isCanvasMode ? scale : undefined);
         pipeNodePairs.push({ a, b, len, zoneId: p.zoneId });
     }
 
@@ -1743,22 +1761,22 @@ function findZoneBoundaryPath(
     scale: number
 ): (Coordinate | CanvasCoordinate)[] {
     const path: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     // Find the closest boundary point to start and end
     const startBoundary = findClosestBoundaryPoint(start, zoneCoordinates, isCanvasMode, scale);
     const endBoundary = findClosestBoundaryPoint(end, zoneCoordinates, isCanvasMode, scale);
-    
+
     if (!startBoundary || !endBoundary) {
         // Fallback to direct connection if boundary points not found
         return [start, end];
     }
-    
+
     // Create L-shaped path: start -> startBoundary -> endBoundary -> end
     path.push(start);
     path.push(startBoundary);
     path.push(endBoundary);
     path.push(end);
-    
+
     return path;
 }
 
@@ -1770,22 +1788,22 @@ function findClosestBoundaryPoint(
 ): Coordinate | CanvasCoordinate | null {
     let closestPoint: Coordinate | CanvasCoordinate | null = null;
     let minDistance = Infinity;
-    
+
     // Check each edge of the zone boundary
     for (let i = 0; i < zoneCoordinates.length; i++) {
         const current = zoneCoordinates[i];
         const next = zoneCoordinates[(i + 1) % zoneCoordinates.length];
-        
+
         // Find the closest point on this edge
         const closestOnEdge = findClosestPointOnLineSegment(point, current, next);
         const distance = calculateDistance(point, closestOnEdge, isCanvasMode ? scale : undefined);
-        
+
         if (distance < minDistance) {
             minDistance = distance;
             closestPoint = closestOnEdge;
         }
     }
-    
+
     return closestPoint;
 }
 
@@ -1800,21 +1818,21 @@ function findClosestPointOnLineSegment(
     const y1 = getCoordValue(lineStart, 'y');
     const x2 = getCoordValue(lineEnd, 'x');
     const y2 = getCoordValue(lineEnd, 'y');
-    
+
     // Calculate the projection of point onto the line segment
     const A = x - x1;
     const B = y - y1;
     const C = x2 - x1;
     const D = y2 - y1;
-    
+
     const dot = A * C + B * D;
     const lenSq = C * C + D * D;
-    
+
     let param = -1;
     if (lenSq !== 0) {
         param = dot / lenSq;
     }
-    
+
     let xx, yy;
     if (param < 0) {
         xx = x1;
@@ -1826,7 +1844,7 @@ function findClosestPointOnLineSegment(
         xx = x1 + param * C;
         yy = y1 + param * D;
     }
-    
+
     // Return the closest point with the same coordinate type
     if ('lat' in point) {
         return { lat: yy, lng: xx } as Coordinate;
@@ -1877,33 +1895,43 @@ function createZoneBasedPipeNetwork(
     imageData?: unknown
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    const sourcePos = isCanvasMode ? (waterSource.canvasPosition || waterSource.position) : waterSource.position;
-    
+    const sourcePos = isCanvasMode
+        ? waterSource.canvasPosition || waterSource.position
+        : waterSource.position;
+
     if (sprinklers.length === 0) {
         return pipes;
     }
-    
+
     // Group sprinklers by zone
     const sprinklersByZone = new Map<string, Sprinkler[]>();
-    sprinklers.forEach(sprinkler => {
+    sprinklers.forEach((sprinkler) => {
         if (!sprinklersByZone.has(sprinkler.zoneId)) {
             sprinklersByZone.set(sprinkler.zoneId, []);
         }
         sprinklersByZone.get(sprinkler.zoneId)!.push(sprinkler);
     });
-    
+
     // Create zone-based routing
     sprinklersByZone.forEach((zoneSprinklers, zoneId) => {
-        const zone = gardenZones.find(z => z.id === zoneId);
+        const zone = gardenZones.find((z) => z.id === zoneId);
         if (!zone) return;
-        
-        const zoneCoords = isCanvasMode ? (zone.canvasCoordinates || zone.coordinates) : zone.coordinates;
+
+        const zoneCoords = isCanvasMode
+            ? zone.canvasCoordinates || zone.coordinates
+            : zone.coordinates;
         if (!zoneCoords || zoneCoords.length < 3) return;
-        
+
         // Create main trunk line from source to zone boundary
         const zoneCenter = calculateZoneCenter(zoneCoords);
-        const trunkPath = findZoneBoundaryPath(sourcePos, zoneCenter, zoneCoords, isCanvasMode, scale);
-        
+        const trunkPath = findZoneBoundaryPath(
+            sourcePos,
+            zoneCenter,
+            zoneCoords,
+            isCanvasMode,
+            scale
+        );
+
         // Create trunk pipe
         if (trunkPath.length >= 2) {
             for (let i = 0; i < trunkPath.length - 1; i++) {
@@ -1920,19 +1948,32 @@ function createZoneBasedPipeNetwork(
                 pipes.push(pipe);
             }
         }
-        
+
         // Create branch pipes to each sprinkler in the zone
         zoneSprinklers.forEach((sprinkler, index) => {
-            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+            const sprinklerPos = isCanvasMode
+                ? sprinkler.canvasPosition || sprinkler.position
+                : sprinkler.position;
             if (!sprinklerPos) return;
-            
+
             // Find the closest point on the trunk line to connect to
-            const connectionPoint = findClosestPointOnTrunk(trunkPath, sprinklerPos, isCanvasMode, scale);
+            const connectionPoint = findClosestPointOnTrunk(
+                trunkPath,
+                sprinklerPos,
+                isCanvasMode,
+                scale
+            );
             if (!connectionPoint) return;
-            
+
             // Create L-shaped path from connection point to sprinkler
-            const branchPath = createLShapedPath(connectionPoint, sprinklerPos, zoneCoords, isCanvasMode, scale);
-            
+            const branchPath = createLShapedPath(
+                connectionPoint,
+                sprinklerPos,
+                zoneCoords,
+                isCanvasMode,
+                scale
+            );
+
             for (let i = 0; i < branchPath.length - 1; i++) {
                 const pipe = createUniformPipe(
                     `branch_${zoneId}_${sprinkler.id}_${i}`,
@@ -1948,21 +1989,24 @@ function createZoneBasedPipeNetwork(
             }
         });
     });
-    
+
     return pipes;
 }
 
-function calculateZoneCenter(coordinates: (Coordinate | CanvasCoordinate)[]): Coordinate | CanvasCoordinate {
-    let sumX = 0, sumY = 0;
-    
-    coordinates.forEach(coord => {
+function calculateZoneCenter(
+    coordinates: (Coordinate | CanvasCoordinate)[]
+): Coordinate | CanvasCoordinate {
+    let sumX = 0,
+        sumY = 0;
+
+    coordinates.forEach((coord) => {
         sumX += getCoordValue(coord, 'x');
         sumY += getCoordValue(coord, 'y');
     });
-    
+
     const centerX = sumX / coordinates.length;
     const centerY = sumY / coordinates.length;
-    
+
     // Return with the same coordinate type as input
     if ('lat' in coordinates[0]) {
         return { lat: centerY, lng: centerX } as Coordinate;
@@ -1979,21 +2023,25 @@ function findClosestPointOnTrunk(
 ): Coordinate | CanvasCoordinate | null {
     let closestPoint: Coordinate | CanvasCoordinate | null = null;
     let minDistance = Infinity;
-    
+
     for (let i = 0; i < trunkPath.length - 1; i++) {
         const closestOnSegment = findClosestPointOnLineSegment(
             point,
             trunkPath[i],
             trunkPath[i + 1]
         );
-        const distance = calculateDistance(point, closestOnSegment, isCanvasMode ? scale : undefined);
-        
+        const distance = calculateDistance(
+            point,
+            closestOnSegment,
+            isCanvasMode ? scale : undefined
+        );
+
         if (distance < minDistance) {
             minDistance = distance;
             closestPoint = closestOnSegment;
         }
     }
-    
+
     return closestPoint;
 }
 
@@ -2005,26 +2053,26 @@ function createLShapedPath(
     scale: number
 ): (Coordinate | CanvasCoordinate)[] {
     const path: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     // Create L-shaped path with 90-degree turns
     const startX = getCoordValue(start, 'x');
     const startY = getCoordValue(start, 'y');
     const endX = getCoordValue(end, 'x');
     const endY = getCoordValue(end, 'y');
-    
+
     // Create intermediate point for L-shape
     let intermediate: Coordinate | CanvasCoordinate;
-    
+
     if ('lat' in start) {
         // For GPS coordinates, use longitude for X and latitude for Y
         intermediate = { lat: startY, lng: endX } as Coordinate;
     } else {
         intermediate = { x: endX, y: startY } as CanvasCoordinate;
     }
-    
+
     // Check if the L-shaped path stays within the zone
     const isInZone = safeIsPointInPolygon(intermediate, zoneCoordinates);
-    
+
     if (isInZone) {
         path.push(start);
         path.push(intermediate);
@@ -2036,9 +2084,9 @@ function createLShapedPath(
         } else {
             intermediate = { x: startX, y: endY } as CanvasCoordinate;
         }
-        
+
         const isInZoneAlt = safeIsPointInPolygon(intermediate, zoneCoordinates);
-        
+
         if (isInZoneAlt) {
             path.push(start);
             path.push(intermediate);
@@ -2049,7 +2097,7 @@ function createLShapedPath(
             path.push(end);
         }
     }
-    
+
     return path;
 }
 
@@ -2064,29 +2112,33 @@ function createEnhancedZoneBasedPipeNetwork(
     imageData?: unknown
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    const sourcePos = isCanvasMode ? (waterSource.canvasPosition || waterSource.position) : waterSource.position;
-    
+    const sourcePos = isCanvasMode
+        ? waterSource.canvasPosition || waterSource.position
+        : waterSource.position;
+
     if (sprinklers.length === 0) {
         return pipes;
     }
-    
+
     // Group sprinklers by zone
     const sprinklersByZone = new Map<string, Sprinkler[]>();
-    sprinklers.forEach(sprinkler => {
+    sprinklers.forEach((sprinkler) => {
         if (!sprinklersByZone.has(sprinkler.zoneId)) {
             sprinklersByZone.set(sprinkler.zoneId, []);
         }
         sprinklersByZone.get(sprinkler.zoneId)!.push(sprinkler);
     });
-    
+
     // Create enhanced zone-based routing with shortest path optimization
     sprinklersByZone.forEach((zoneSprinklers, zoneId) => {
-        const zone = gardenZones.find(z => z.id === zoneId);
+        const zone = gardenZones.find((z) => z.id === zoneId);
         if (!zone) return;
-        
-        const zoneCoords = isCanvasMode ? (zone.canvasCoordinates || zone.coordinates) : zone.coordinates;
+
+        const zoneCoords = isCanvasMode
+            ? zone.canvasCoordinates || zone.coordinates
+            : zone.coordinates;
         if (!zoneCoords || zoneCoords.length < 3) return;
-        
+
         // Create optimized trunk network with shortest path
         const trunkNetwork = createOptimizedTrunkNetwork(
             sourcePos,
@@ -2099,21 +2151,21 @@ function createEnhancedZoneBasedPipeNetwork(
             zoneId
         );
         pipes.push(...trunkNetwork);
-        
-            // Create optimized branch connections with shortest path
-    const branchPipes = createOptimizedBranchConnections(
-        trunkNetwork,
-        zoneSprinklers,
-        zoneCoords,
-        isCanvasMode,
-        scale,
-        canvasData,
-        imageData,
-        zoneId
-    );
-    pipes.push(...branchPipes);
+
+        // Create optimized branch connections with shortest path
+        const branchPipes = createOptimizedBranchConnections(
+            trunkNetwork,
+            zoneSprinklers,
+            zoneCoords,
+            isCanvasMode,
+            scale,
+            canvasData,
+            imageData,
+            zoneId
+        );
+        pipes.push(...branchPipes);
     });
-    
+
     return pipes;
 }
 
@@ -2128,11 +2180,11 @@ function createOptimizedTrunkNetwork(
     zoneId?: string
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     // Find the optimal entry point on zone boundary
     const entryPoint = findOptimalEntryPoint(sourcePos, zoneCoords, isCanvasMode, scale);
     if (!entryPoint) return pipes;
-    
+
     // Create main trunk from source to entry point using shortest path
     const mainTrunkPath = createShortestManhattanPath(sourcePos, entryPoint);
     for (let i = 0; i < mainTrunkPath.length - 1; i++) {
@@ -2148,7 +2200,7 @@ function createOptimizedTrunkNetwork(
         );
         pipes.push(pipe);
     }
-    
+
     // Create boundary-following trunk lines
     const boundaryTrunks = createBoundaryFollowingTrunks(
         entryPoint,
@@ -2161,7 +2213,7 @@ function createOptimizedTrunkNetwork(
         zoneId
     );
     pipes.push(...boundaryTrunks);
-    
+
     return pipes;
 }
 
@@ -2173,22 +2225,26 @@ function findOptimalEntryPoint(
 ): Coordinate | CanvasCoordinate | null {
     let bestPoint: Coordinate | CanvasCoordinate | null = null;
     let minDistance = Infinity;
-    
+
     // Check each boundary edge
     for (let i = 0; i < zoneCoords.length; i++) {
         const current = zoneCoords[i];
         const next = zoneCoords[(i + 1) % zoneCoords.length];
-        
+
         // Find the closest point on this edge
         const closestOnEdge = findClosestPointOnLineSegment(sourcePos, current, next);
-        const distance = calculateDistance(sourcePos, closestOnEdge, isCanvasMode ? scale : undefined);
-        
+        const distance = calculateDistance(
+            sourcePos,
+            closestOnEdge,
+            isCanvasMode ? scale : undefined
+        );
+
         if (distance < minDistance) {
             minDistance = distance;
             bestPoint = closestOnEdge;
         }
     }
-    
+
     return bestPoint;
 }
 
@@ -2197,19 +2253,21 @@ function createShortestManhattanPath(
     end: Coordinate | CanvasCoordinate
 ): (Coordinate | CanvasCoordinate)[] {
     const path: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     const startX = getCoordValue(start, 'x');
     const startY = getCoordValue(start, 'y');
     const endX = getCoordValue(end, 'x');
     const endY = getCoordValue(end, 'y');
-    
+
     // Calculate Manhattan distance for both possible L-shapes
-    const path1Distance = Math.abs(endX - startX) + Math.abs(startY - startY) + Math.abs(endY - startY);
-    const path2Distance = Math.abs(startX - startX) + Math.abs(endY - startY) + Math.abs(endX - startX);
-    
+    const path1Distance =
+        Math.abs(endX - startX) + Math.abs(startY - startY) + Math.abs(endY - startY);
+    const path2Distance =
+        Math.abs(startX - startX) + Math.abs(endY - startY) + Math.abs(endX - startX);
+
     // Choose the shorter path
     let intermediate: Coordinate | CanvasCoordinate;
-    
+
     if (path1Distance <= path2Distance) {
         // Path 1: horizontal first, then vertical
         if ('lat' in start) {
@@ -2225,11 +2283,11 @@ function createShortestManhattanPath(
             intermediate = { x: startX, y: endY } as CanvasCoordinate;
         }
     }
-    
+
     path.push(start);
     path.push(intermediate);
     path.push(end);
-    
+
     return path;
 }
 
@@ -2241,20 +2299,20 @@ function findClosestPointOnAnyTrunk(
 ): Coordinate | CanvasCoordinate | null {
     let closestPoint: Coordinate | CanvasCoordinate | null = null;
     let minDistance = Infinity;
-    
-    trunkNetwork.forEach(pipe => {
+
+    trunkNetwork.forEach((pipe) => {
         const pipeStart = isCanvasMode ? pipe.canvasStart! : pipe.start;
         const pipeEnd = isCanvasMode ? pipe.canvasEnd! : pipe.end;
-        
+
         const closestOnPipe = findClosestPointOnLineSegment(point, pipeStart, pipeEnd);
         const distance = calculateDistance(point, closestOnPipe, isCanvasMode ? scale : undefined);
-        
+
         if (distance < minDistance) {
             minDistance = distance;
             closestPoint = closestOnPipe;
         }
     });
-    
+
     return closestPoint;
 }
 
@@ -2269,10 +2327,16 @@ function createBoundaryFollowingTrunks(
     zoneId?: string
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     // Create trunk lines that follow the zone boundary
-    const boundaryPath = createBoundaryFollowingPath(entryPoint, zoneCoords, zoneSprinklers, isCanvasMode, scale);
-    
+    const boundaryPath = createBoundaryFollowingPath(
+        entryPoint,
+        zoneCoords,
+        zoneSprinklers,
+        isCanvasMode,
+        scale
+    );
+
     for (let i = 0; i < boundaryPath.length - 1; i++) {
         const pipe = createUniformPipe(
             `boundary_trunk_${zoneId}_${i}`,
@@ -2286,7 +2350,7 @@ function createBoundaryFollowingTrunks(
         );
         pipes.push(pipe);
     }
-    
+
     return pipes;
 }
 
@@ -2298,16 +2362,16 @@ function createBoundaryFollowingPath(
     scale: number
 ): (Coordinate | CanvasCoordinate)[] {
     const path: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     // Start from entry point
     path.push(entryPoint);
-    
+
     // Find the edge that contains the entry point
     let entryEdgeIndex = -1;
     for (let i = 0; i < zoneCoords.length; i++) {
         const current = zoneCoords[i];
         const next = zoneCoords[(i + 1) % zoneCoords.length];
-        
+
         const distanceToEdge = calculateDistanceFromPointToLineSegment(
             entryPoint,
             current,
@@ -2315,20 +2379,21 @@ function createBoundaryFollowingPath(
             isCanvasMode,
             scale
         );
-        
-        if (distanceToEdge < 10) { // Within 10 units of the edge
+
+        if (distanceToEdge < 10) {
+            // Within 10 units of the edge
             entryEdgeIndex = i;
             break;
         }
     }
-    
+
     if (entryEdgeIndex === -1) {
         // If entry point is not on any edge, find the closest edge
         let minDistance = Infinity;
         for (let i = 0; i < zoneCoords.length; i++) {
             const current = zoneCoords[i];
             const next = zoneCoords[(i + 1) % zoneCoords.length];
-            
+
             const distance = calculateDistanceFromPointToLineSegment(
                 entryPoint,
                 current,
@@ -2336,25 +2401,35 @@ function createBoundaryFollowingPath(
                 isCanvasMode,
                 scale
             );
-            
+
             if (distance < minDistance) {
                 minDistance = distance;
                 entryEdgeIndex = i;
             }
         }
     }
-    
+
     // Create minimal boundary path - only connect to edges that have sprinklers
-    const edgesWithSprinklers = findEdgesWithSprinklers(zoneCoords, zoneSprinklers, isCanvasMode, scale);
-    
+    const edgesWithSprinklers = findEdgesWithSprinklers(
+        zoneCoords,
+        zoneSprinklers,
+        isCanvasMode,
+        scale
+    );
+
     if (edgesWithSprinklers.length === 0) {
         // No sprinklers near boundaries, create minimal path
         return createMinimalBoundaryPath(entryPoint, zoneCoords, entryEdgeIndex);
     }
-    
+
     // Create path only to edges that have sprinklers
-    const optimizedPath = createOptimizedBoundaryPath(entryPoint, zoneCoords, edgesWithSprinklers, entryEdgeIndex);
-    
+    const optimizedPath = createOptimizedBoundaryPath(
+        entryPoint,
+        zoneCoords,
+        edgesWithSprinklers,
+        entryEdgeIndex
+    );
+
     return optimizedPath;
 }
 
@@ -2365,16 +2440,18 @@ function findEdgesWithSprinklers(
     scale: number
 ): { edgeIndex: number; sprinklers: Sprinkler[] }[] {
     const edgesWithSprinklers: { edgeIndex: number; sprinklers: Sprinkler[] }[] = [];
-    
+
     for (let i = 0; i < zoneCoords.length; i++) {
         const current = zoneCoords[i];
         const next = zoneCoords[(i + 1) % zoneCoords.length];
-        
+
         // Check if there are sprinklers near this edge
-        const edgeSprinklers = zoneSprinklers.filter(sprinkler => {
-            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+        const edgeSprinklers = zoneSprinklers.filter((sprinkler) => {
+            const sprinklerPos = isCanvasMode
+                ? sprinkler.canvasPosition || sprinkler.position
+                : sprinkler.position;
             if (!sprinklerPos) return false;
-            
+
             const distanceToEdge = calculateDistanceFromPointToLineSegment(
                 sprinklerPos,
                 current,
@@ -2382,18 +2459,18 @@ function findEdgesWithSprinklers(
                 isCanvasMode,
                 scale
             );
-            
+
             return distanceToEdge < 50; // Within 50 units of the edge
         });
-        
+
         if (edgeSprinklers.length > 0) {
             edgesWithSprinklers.push({
                 edgeIndex: i,
-                sprinklers: edgeSprinklers
+                sprinklers: edgeSprinklers,
             });
         }
     }
-    
+
     return edgesWithSprinklers;
 }
 
@@ -2403,14 +2480,14 @@ function createMinimalBoundaryPath(
     entryEdgeIndex: number
 ): (Coordinate | CanvasCoordinate)[] {
     const path: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     // Just connect to the nearest corner
     const nearestCorner = findNearestCorner(entryPoint, zoneCoords);
     if (nearestCorner) {
         path.push(entryPoint);
         path.push(nearestCorner);
     }
-    
+
     return path;
 }
 
@@ -2420,15 +2497,15 @@ function findNearestCorner(
 ): Coordinate | CanvasCoordinate | null {
     let nearestCorner: Coordinate | CanvasCoordinate | null = null;
     let minDistance = Infinity;
-    
-    zoneCoords.forEach(corner => {
+
+    zoneCoords.forEach((corner) => {
         const distance = calculateDistance(point, corner);
         if (distance < minDistance) {
             minDistance = distance;
             nearestCorner = corner;
         }
     });
-    
+
     return nearestCorner;
 }
 
@@ -2439,30 +2516,34 @@ function createOptimizedBoundaryPath(
     entryEdgeIndex: number
 ): (Coordinate | CanvasCoordinate)[] {
     const path: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     // Start from entry point
     path.push(entryPoint);
-    
+
     // Find the shortest path to connect all edges with sprinklers
-    const edgeIndices = edgesWithSprinklers.map(edge => edge.edgeIndex);
+    const edgeIndices = edgesWithSprinklers.map((edge) => edge.edgeIndex);
     const optimizedRoute = findShortestRoute(entryEdgeIndex, edgeIndices, zoneCoords.length);
-    
+
     // Create path following the optimized route
     for (let i = 0; i < optimizedRoute.length; i++) {
         const currentEdgeIndex = optimizedRoute[i];
         const current = zoneCoords[currentEdgeIndex];
         const next = zoneCoords[(currentEdgeIndex + 1) % zoneCoords.length];
-        
+
         // Find the best connection point on this edge
-        const edgeData = edgesWithSprinklers.find(edge => edge.edgeIndex === currentEdgeIndex);
+        const edgeData = edgesWithSprinklers.find((edge) => edge.edgeIndex === currentEdgeIndex);
         if (edgeData) {
-            const connectionPoint = findOptimalConnectionPointOnEdge(current, next, edgeData.sprinklers);
+            const connectionPoint = findOptimalConnectionPointOnEdge(
+                current,
+                next,
+                edgeData.sprinklers
+            );
             if (connectionPoint) {
                 path.push(connectionPoint);
             }
         }
     }
-    
+
     return path;
 }
 
@@ -2474,36 +2555,36 @@ function findShortestRoute(
     // Simple greedy approach: visit edges in order of distance from start
     const visited = new Set<number>();
     const route: number[] = [];
-    
+
     let currentEdge = startEdgeIndex;
-    
+
     while (visited.size < targetEdgeIndices.length) {
         visited.add(currentEdge);
         route.push(currentEdge);
-        
+
         // Find the nearest unvisited target edge
         let nearestEdge = -1;
         let minDistance = Infinity;
-        
-        targetEdgeIndices.forEach(targetEdge => {
+
+        targetEdgeIndices.forEach((targetEdge) => {
             if (!visited.has(targetEdge)) {
                 const distance = Math.min(
                     Math.abs(targetEdge - currentEdge),
                     Math.abs(targetEdge - currentEdge + totalEdges),
                     Math.abs(targetEdge - currentEdge - totalEdges)
                 );
-                
+
                 if (distance < minDistance) {
                     minDistance = distance;
                     nearestEdge = targetEdge;
                 }
             }
         });
-        
+
         if (nearestEdge === -1) break;
         currentEdge = nearestEdge;
     }
-    
+
     return route;
 }
 
@@ -2513,12 +2594,13 @@ function findOptimalConnectionPointOnEdge(
     sprinklers: Sprinkler[]
 ): Coordinate | CanvasCoordinate | null {
     if (sprinklers.length === 0) return null;
-    
+
     // Find the center point of all sprinklers near this edge
-    let totalX = 0, totalY = 0;
+    let totalX = 0,
+        totalY = 0;
     let count = 0;
-    
-    sprinklers.forEach(sprinkler => {
+
+    sprinklers.forEach((sprinkler) => {
         const sprinklerPos = sprinkler.canvasPosition || sprinkler.position;
         if (sprinklerPos) {
             totalX += getCoordValue(sprinklerPos, 'x');
@@ -2526,20 +2608,20 @@ function findOptimalConnectionPointOnEdge(
             count++;
         }
     });
-    
+
     if (count === 0) return null;
-    
+
     const centerX = totalX / count;
     const centerY = totalY / count;
-    
+
     // Project the center point onto the edge
     const centerPoint = {
         x: centerX,
-        y: centerY
+        y: centerY,
     };
-    
+
     const projectedPoint = findClosestPointOnLineSegment(centerPoint, edgeStart, edgeEnd);
-    
+
     return projectedPoint;
 }
 
@@ -2554,29 +2636,33 @@ function createMinimalGridPipeNetwork(
     imageData?: unknown
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    const sourcePos = isCanvasMode ? (waterSource.canvasPosition || waterSource.position) : waterSource.position;
-    
+    const sourcePos = isCanvasMode
+        ? waterSource.canvasPosition || waterSource.position
+        : waterSource.position;
+
     if (sprinklers.length === 0) {
         return pipes;
     }
-    
+
     // Group sprinklers by zone
     const sprinklersByZone = new Map<string, Sprinkler[]>();
-    sprinklers.forEach(sprinkler => {
+    sprinklers.forEach((sprinkler) => {
         if (!sprinklersByZone.has(sprinkler.zoneId)) {
             sprinklersByZone.set(sprinkler.zoneId, []);
         }
         sprinklersByZone.get(sprinkler.zoneId)!.push(sprinkler);
     });
-    
+
     // Create minimal grid-based routing for each zone
     sprinklersByZone.forEach((zoneSprinklers, zoneId) => {
-        const zone = gardenZones.find(z => z.id === zoneId);
+        const zone = gardenZones.find((z) => z.id === zoneId);
         if (!zone) return;
-        
-        const zoneCoords = isCanvasMode ? (zone.canvasCoordinates || zone.coordinates) : zone.coordinates;
+
+        const zoneCoords = isCanvasMode
+            ? zone.canvasCoordinates || zone.coordinates
+            : zone.coordinates;
         if (!zoneCoords || zoneCoords.length < 3) return;
-        
+
         // Create minimal grid network
         const gridPipes = createZoneGridNetwork(
             sourcePos,
@@ -2590,7 +2676,7 @@ function createMinimalGridPipeNetwork(
         );
         pipes.push(...gridPipes);
     });
-    
+
     return pipes;
 }
 
@@ -2605,15 +2691,15 @@ function createZoneGridNetwork(
     zoneId?: string
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     // Find zone bounds
     const bounds = calculateZoneBounds(zoneCoords);
     if (!bounds) return pipes;
-    
+
     // Create main trunk from source to zone
     const entryPoint = findOptimalEntryPoint(sourcePos, zoneCoords, isCanvasMode, scale);
     if (!entryPoint) return pipes;
-    
+
     const mainTrunkPath = createShortestManhattanPath(sourcePos, entryPoint);
     for (let i = 0; i < mainTrunkPath.length - 1; i++) {
         const pipe = createUniformPipe(
@@ -2628,7 +2714,7 @@ function createZoneGridNetwork(
         );
         pipes.push(pipe);
     }
-    
+
     // Create minimal grid inside zone (disabled for now to match Canvas/Image straight layout)
     // const gridPipes = createMinimalGrid(
     //     entryPoint,
@@ -2641,7 +2727,7 @@ function createZoneGridNetwork(
     //     zoneId
     // );
     // pipes.push(...gridPipes);
-    
+
     return pipes;
 }
 
@@ -2649,22 +2735,22 @@ function calculateZoneBounds(
     zoneCoords: (Coordinate | CanvasCoordinate)[]
 ): { minX: number; maxX: number; minY: number; maxY: number } | null {
     if (zoneCoords.length === 0) return null;
-    
+
     let minX = getCoordValue(zoneCoords[0], 'x');
     let maxX = minX;
     let minY = getCoordValue(zoneCoords[0], 'y');
     let maxY = minY;
-    
-    zoneCoords.forEach(coord => {
+
+    zoneCoords.forEach((coord) => {
         const x = getCoordValue(coord, 'x');
         const y = getCoordValue(coord, 'y');
-        
+
         minX = Math.min(minX, x);
         maxX = Math.max(maxX, x);
         minY = Math.min(minY, y);
         maxY = Math.max(maxY, y);
     });
-    
+
     return { minX, maxX, minY, maxY };
 }
 
@@ -2679,11 +2765,11 @@ function createMinimalGrid(
     zoneId?: string
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     // Create horizontal and vertical lines based on sprinkler positions
     const horizontalLines = createHorizontalLines(bounds, zoneSprinklers, isCanvasMode, scale);
     const verticalLines = createVerticalLines(bounds, zoneSprinklers, isCanvasMode, scale);
-    
+
     // Create pipes for horizontal lines
     horizontalLines.forEach((line, index) => {
         const pipe = createUniformPipe(
@@ -2698,7 +2784,7 @@ function createMinimalGrid(
         );
         pipes.push(pipe);
     });
-    
+
     // Create pipes for vertical lines
     verticalLines.forEach((line, index) => {
         const pipe = createUniformPipe(
@@ -2713,7 +2799,7 @@ function createMinimalGrid(
         );
         pipes.push(pipe);
     });
-    
+
     return pipes;
 }
 
@@ -2723,17 +2809,18 @@ function createHorizontalLines(
     isCanvasMode: boolean,
     scale: number
 ): { start: Coordinate | CanvasCoordinate; end: Coordinate | CanvasCoordinate }[] {
-    const lines: { start: Coordinate | CanvasCoordinate; end: Coordinate | CanvasCoordinate }[] = [];
-    
+    const lines: { start: Coordinate | CanvasCoordinate; end: Coordinate | CanvasCoordinate }[] =
+        [];
+
     // Find optimal Y positions for horizontal lines
     const yPositions = findOptimalYPositions(zoneSprinklers, bounds, isCanvasMode, scale);
-    
-    yPositions.forEach(y => {
+
+    yPositions.forEach((y) => {
         const start = createCoordinate(bounds.minX, y, isCanvasMode);
         const end = createCoordinate(bounds.maxX, y, isCanvasMode);
         lines.push({ start, end });
     });
-    
+
     return lines;
 }
 
@@ -2743,17 +2830,18 @@ function createVerticalLines(
     isCanvasMode: boolean,
     scale: number
 ): { start: Coordinate | CanvasCoordinate; end: Coordinate | CanvasCoordinate }[] {
-    const lines: { start: Coordinate | CanvasCoordinate; end: Coordinate | CanvasCoordinate }[] = [];
-    
+    const lines: { start: Coordinate | CanvasCoordinate; end: Coordinate | CanvasCoordinate }[] =
+        [];
+
     // Find optimal X positions for vertical lines
     const xPositions = findOptimalXPositions(zoneSprinklers, bounds, isCanvasMode, scale);
-    
-    xPositions.forEach(x => {
+
+    xPositions.forEach((x) => {
         const start = createCoordinate(x, bounds.minY, isCanvasMode);
         const end = createCoordinate(x, bounds.maxY, isCanvasMode);
         lines.push({ start, end });
     });
-    
+
     return lines;
 }
 
@@ -2764,17 +2852,17 @@ function findOptimalYPositions(
     scale: number
 ): number[] {
     const yPositions = new Set<number>();
-    
+
     // Add center line
     const centerY = (bounds.minY + bounds.maxY) / 2;
     yPositions.add(centerY);
-    
+
     // Add lines at 1/3 and 2/3 of the zone height
     const thirdY = bounds.minY + (bounds.maxY - bounds.minY) / 3;
-    const twoThirdsY = bounds.minY + 2 * (bounds.maxY - bounds.minY) / 3;
+    const twoThirdsY = bounds.minY + (2 * (bounds.maxY - bounds.minY)) / 3;
     yPositions.add(thirdY);
     yPositions.add(twoThirdsY);
-    
+
     return Array.from(yPositions).sort((a, b) => a - b);
 }
 
@@ -2785,17 +2873,17 @@ function findOptimalXPositions(
     scale: number
 ): number[] {
     const xPositions = new Set<number>();
-    
+
     // Add center line
     const centerX = (bounds.minX + bounds.maxX) / 2;
     xPositions.add(centerX);
-    
+
     // Add lines at 1/3 and 2/3 of the zone width
     const thirdX = bounds.minX + (bounds.maxX - bounds.minX) / 3;
-    const twoThirdsX = bounds.minX + 2 * (bounds.maxX - bounds.minX) / 3;
+    const twoThirdsX = bounds.minX + (2 * (bounds.maxX - bounds.minX)) / 3;
     xPositions.add(thirdX);
     xPositions.add(twoThirdsX);
-    
+
     return Array.from(xPositions).sort((a, b) => a - b);
 }
 
@@ -2823,30 +2911,38 @@ function createOptimizedBranchConnections(
 ): Pipe[] {
     const pipes: Pipe[] = [];
     const connectedSprinklers = new Set<string>();
-    
+
     // Group sprinklers by alignment (row/column)
     const sprinklerGroups = groupSprinklersByAlignment(zoneSprinklers, isCanvasMode, scale);
-    
+
     sprinklerGroups.forEach((group, groupIndex) => {
         // Filter out already connected sprinklers
-        const unconnectedGroup = group.filter(sprinkler => 
-            !connectedSprinklers.has(sprinkler.id) && 
-            !isSprinklerConnected(sprinkler, pipes, isCanvasMode, 1.0)
+        const unconnectedGroup = group.filter(
+            (sprinkler) =>
+                !connectedSprinklers.has(sprinkler.id) &&
+                !isSprinklerConnected(sprinkler, pipes, isCanvasMode, 1.0)
         );
-        
+
         if (unconnectedGroup.length === 0) return;
-        
+
         if (unconnectedGroup.length === 1) {
             // Single sprinkler - connect directly to trunk
             const sprinkler = unconnectedGroup[0];
-            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+            const sprinklerPos = isCanvasMode
+                ? sprinkler.canvasPosition || sprinkler.position
+                : sprinkler.position;
             if (!sprinklerPos) return;
-            
-            const closestTrunkPoint = findClosestPointOnAnyTrunk(trunkNetwork, sprinklerPos, isCanvasMode, scale);
+
+            const closestTrunkPoint = findClosestPointOnAnyTrunk(
+                trunkNetwork,
+                sprinklerPos,
+                isCanvasMode,
+                scale
+            );
             if (!closestTrunkPoint) return;
-            
+
             const branchPath = createShortestManhattanPath(closestTrunkPoint, sprinklerPos);
-            
+
             for (let i = 0; i < branchPath.length - 1; i++) {
                 const pipe = createUniformPipe(
                     `branch_${zoneId}_${sprinkler.id}_${i}`,
@@ -2874,12 +2970,12 @@ function createOptimizedBranchConnections(
                 groupIndex
             );
             pipes.push(...connectedPipes);
-            
+
             // Mark all sprinklers in this group as connected
-            unconnectedGroup.forEach(sprinkler => connectedSprinklers.add(sprinkler.id));
+            unconnectedGroup.forEach((sprinkler) => connectedSprinklers.add(sprinkler.id));
         }
     });
-    
+
     return pipes;
 }
 
@@ -2891,38 +2987,46 @@ function groupSprinklersByAlignment(
 ): Sprinkler[][] {
     const groups: Sprinkler[][] = [];
     const processed = new Set<string>();
-    
-    sprinklers.forEach(sprinkler => {
+
+    sprinklers.forEach((sprinkler) => {
         if (processed.has(sprinkler.id)) return;
-        
-        const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+
+        const sprinklerPos = isCanvasMode
+            ? sprinkler.canvasPosition || sprinkler.position
+            : sprinkler.position;
         if (!sprinklerPos) return;
-        
+
         const group = [sprinkler];
         processed.add(sprinkler.id);
-        
+
         // Find other sprinklers aligned horizontally or vertically
-        sprinklers.forEach(otherSprinkler => {
+        sprinklers.forEach((otherSprinkler) => {
             if (processed.has(otherSprinkler.id)) return;
-            
-            const otherPos = isCanvasMode ? (otherSprinkler.canvasPosition || otherSprinkler.position) : otherSprinkler.position;
+
+            const otherPos = isCanvasMode
+                ? otherSprinkler.canvasPosition || otherSprinkler.position
+                : otherSprinkler.position;
             if (!otherPos) return;
-            
-            const distance = calculateDistance(sprinklerPos, otherPos, isCanvasMode ? scale : undefined);
+
+            const distance = calculateDistance(
+                sprinklerPos,
+                otherPos,
+                isCanvasMode ? scale : undefined
+            );
             if (distance > 50) return; // Skip if too far apart
-            
+
             // Check if aligned horizontally or vertically
             const isAligned = isAlignedSprinklers(sprinklerPos, otherPos, isCanvasMode, tolerance);
-            
+
             if (isAligned) {
                 group.push(otherSprinkler);
                 processed.add(otherSprinkler.id);
             }
         });
-        
+
         groups.push(group);
     });
-    
+
     return groups;
 }
 
@@ -2935,21 +3039,22 @@ function isAlignedSprinklers(
     if (isCanvasMode) {
         const p1 = pos1 as CanvasCoordinate;
         const p2 = pos2 as CanvasCoordinate;
-        
+
         // Check horizontal alignment (same Y)
         const horizontalDiff = Math.abs(p1.y - p2.y);
         // Check vertical alignment (same X)
         const verticalDiff = Math.abs(p1.x - p2.x);
-        
+
         return horizontalDiff <= tolerance || verticalDiff <= tolerance;
     } else {
         const p1 = pos1 as Coordinate;
         const p2 = pos2 as Coordinate;
-        
+
         // Convert to approximate meter differences
         const latDiffMeters = Math.abs(p1.lat - p2.lat) * 111000;
-        const lngDiffMeters = Math.abs(p1.lng - p2.lng) * 111000 * Math.cos((p1.lat * Math.PI) / 180);
-        
+        const lngDiffMeters =
+            Math.abs(p1.lng - p2.lng) * 111000 * Math.cos((p1.lat * Math.PI) / 180);
+
         return latDiffMeters <= tolerance || lngDiffMeters <= tolerance;
     }
 }
@@ -2965,25 +3070,30 @@ function createConnectedSprinklerLine(
     groupIndex?: number
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     if (sprinklers.length < 2) return pipes;
-    
+
     // Sort sprinklers by position to create logical connection order
     const sortedSprinklers = sortSprinklersForConnection(sprinklers, isCanvasMode);
-    
+
     // Find connection point to trunk from the first sprinkler
-    const firstSprinklerPos = isCanvasMode 
-        ? (sortedSprinklers[0].canvasPosition || sortedSprinklers[0].position) 
+    const firstSprinklerPos = isCanvasMode
+        ? sortedSprinklers[0].canvasPosition || sortedSprinklers[0].position
         : sortedSprinklers[0].position;
-    
+
     if (!firstSprinklerPos) return pipes;
-    
-    const trunkConnectionPoint = findClosestPointOnAnyTrunk(trunkNetwork, firstSprinklerPos, isCanvasMode, scale);
+
+    const trunkConnectionPoint = findClosestPointOnAnyTrunk(
+        trunkNetwork,
+        firstSprinklerPos,
+        isCanvasMode,
+        scale
+    );
     if (!trunkConnectionPoint) return pipes;
-    
+
     // Create main branch from trunk to first sprinkler
     const mainBranchPath = createShortestManhattanPath(trunkConnectionPoint, firstSprinklerPos);
-    
+
     for (let i = 0; i < mainBranchPath.length - 1; i++) {
         const pipe = createUniformPipe(
             `branch_main_${zoneId}_g${groupIndex}_${i}`,
@@ -2997,24 +3107,24 @@ function createConnectedSprinklerLine(
         );
         pipes.push(pipe);
     }
-    
+
     // Connect sprinklers in sequence
     for (let i = 0; i < sortedSprinklers.length - 1; i++) {
         const currentSprinkler = sortedSprinklers[i];
         const nextSprinkler = sortedSprinklers[i + 1];
-        
-        const currentPos = isCanvasMode 
-            ? (currentSprinkler.canvasPosition || currentSprinkler.position) 
+
+        const currentPos = isCanvasMode
+            ? currentSprinkler.canvasPosition || currentSprinkler.position
             : currentSprinkler.position;
-        const nextPos = isCanvasMode 
-            ? (nextSprinkler.canvasPosition || nextSprinkler.position) 
+        const nextPos = isCanvasMode
+            ? nextSprinkler.canvasPosition || nextSprinkler.position
             : nextSprinkler.position;
-            
+
         if (!currentPos || !nextPos) continue;
-        
+
         // Create direct connection between adjacent sprinklers
         const connectionPath = createShortestManhattanPath(currentPos, nextPos);
-        
+
         for (let j = 0; j < connectionPath.length - 1; j++) {
             const pipe = createUniformPipe(
                 `branch_conn_${zoneId}_${currentSprinkler.id}_${nextSprinkler.id}_${j}`,
@@ -3029,25 +3139,22 @@ function createConnectedSprinklerLine(
             pipes.push(pipe);
         }
     }
-    
+
     return pipes;
 }
 
-function sortSprinklersForConnection(
-    sprinklers: Sprinkler[],
-    isCanvasMode: boolean
-): Sprinkler[] {
+function sortSprinklersForConnection(sprinklers: Sprinkler[], isCanvasMode: boolean): Sprinkler[] {
     // Sort by position to create logical connection order (left-to-right, top-to-bottom)
     return [...sprinklers].sort((a, b) => {
-        const posA = isCanvasMode ? (a.canvasPosition || a.position) : a.position;
-        const posB = isCanvasMode ? (b.canvasPosition || b.position) : b.position;
-        
+        const posA = isCanvasMode ? a.canvasPosition || a.position : a.position;
+        const posB = isCanvasMode ? b.canvasPosition || b.position : b.position;
+
         if (!posA || !posB) return 0;
-        
+
         if (isCanvasMode) {
             const pA = posA as CanvasCoordinate;
             const pB = posB as CanvasCoordinate;
-            
+
             // Sort primarily by Y (top to bottom), then by X (left to right)
             const yDiff = pA.y - pB.y;
             if (Math.abs(yDiff) > 2) return yDiff;
@@ -3055,7 +3162,7 @@ function sortSprinklersForConnection(
         } else {
             const pA = posA as Coordinate;
             const pB = posB as Coordinate;
-            
+
             // Sort primarily by latitude (north to south), then by longitude (west to east)
             const latDiff = pB.lat - pA.lat; // Higher latitude first (north to south)
             if (Math.abs(latDiff) > 0.00002) return latDiff;
@@ -3068,25 +3175,25 @@ function sortSprinklersForConnection(
 function removeDuplicatePipes(pipes: Pipe[], tolerance: number = 1.0): Pipe[] {
     const uniquePipes: Pipe[] = [];
     const processedConnections = new Set<string>();
-    
-    pipes.forEach(pipe => {
+
+    pipes.forEach((pipe) => {
         // Create a connection signature based on start and end points
         const start = pipe.canvasStart || pipe.start;
         const end = pipe.canvasEnd || pipe.end;
-        
+
         if (!start || !end) return;
-        
+
         // Use smaller tolerance for better precision in canvas mode
         const actualTolerance = tolerance < 1.0 ? 0.00001 : 0.5;
-        
+
         // Round coordinates to avoid minor floating point differences
         const startKey = `${Math.round(getCoordValue(start, 'x') / actualTolerance)}:${Math.round(getCoordValue(start, 'y') / actualTolerance)}`;
         const endKey = `${Math.round(getCoordValue(end, 'x') / actualTolerance)}:${Math.round(getCoordValue(end, 'y') / actualTolerance)}`;
-        
+
         // Create bidirectional connection signature
         const connection1 = `${startKey}-${endKey}`;
         const connection2 = `${endKey}-${startKey}`;
-        
+
         // Check for overlapping pipes with similar paths
         let isOverlapping = false;
         for (const existingPipe of uniquePipes) {
@@ -3095,14 +3202,18 @@ function removeDuplicatePipes(pipes: Pipe[], tolerance: number = 1.0): Pipe[] {
                 break;
             }
         }
-        
-        if (!processedConnections.has(connection1) && !processedConnections.has(connection2) && !isOverlapping) {
+
+        if (
+            !processedConnections.has(connection1) &&
+            !processedConnections.has(connection2) &&
+            !isOverlapping
+        ) {
             uniquePipes.push(pipe);
             processedConnections.add(connection1);
             processedConnections.add(connection2);
         }
     });
-    
+
     return uniquePipes;
 }
 
@@ -3112,37 +3223,31 @@ function isPipeOverlapping(pipe1: Pipe, pipe2: Pipe, tolerance: number): boolean
     const end1 = pipe1.canvasEnd || pipe1.end;
     const start2 = pipe2.canvasStart || pipe2.start;
     const end2 = pipe2.canvasEnd || pipe2.end;
-    
+
     if (!start1 || !end1 || !start2 || !end2) return false;
-    
+
     // Check if pipes have the same start and end points (allowing for reverse direction)
-    const sameDirection = (
+    const sameDirection =
         Math.abs(getCoordValue(start1, 'x') - getCoordValue(start2, 'x')) < tolerance &&
         Math.abs(getCoordValue(start1, 'y') - getCoordValue(start2, 'y')) < tolerance &&
         Math.abs(getCoordValue(end1, 'x') - getCoordValue(end2, 'x')) < tolerance &&
-        Math.abs(getCoordValue(end1, 'y') - getCoordValue(end2, 'y')) < tolerance
-    );
-    
-    const reverseDirection = (
+        Math.abs(getCoordValue(end1, 'y') - getCoordValue(end2, 'y')) < tolerance;
+
+    const reverseDirection =
         Math.abs(getCoordValue(start1, 'x') - getCoordValue(end2, 'x')) < tolerance &&
         Math.abs(getCoordValue(start1, 'y') - getCoordValue(end2, 'y')) < tolerance &&
         Math.abs(getCoordValue(end1, 'x') - getCoordValue(start2, 'x')) < tolerance &&
-        Math.abs(getCoordValue(end1, 'y') - getCoordValue(start2, 'y')) < tolerance
-    );
-    
-    // Check if one pipe is a subset of another (start and end of pipe1 lie on pipe2)
-    const pipe1OnPipe2 = (
-        isPointOnLineSegment(start1, start2, end2, tolerance) &&
-        isPointOnLineSegment(end1, start2, end2, tolerance)
-    );
-    
-    const pipe2OnPipe1 = (
-        isPointOnLineSegment(start2, start1, end1, tolerance) &&
-        isPointOnLineSegment(end2, start1, end1, tolerance)
-    );
-    
+        Math.abs(getCoordValue(end1, 'y') - getCoordValue(start2, 'y')) < tolerance;
 
-    
+    // Check if one pipe is a subset of another (start and end of pipe1 lie on pipe2)
+    const pipe1OnPipe2 =
+        isPointOnLineSegment(start1, start2, end2, tolerance) &&
+        isPointOnLineSegment(end1, start2, end2, tolerance);
+
+    const pipe2OnPipe1 =
+        isPointOnLineSegment(start2, start1, end1, tolerance) &&
+        isPointOnLineSegment(end2, start1, end1, tolerance);
+
     return sameDirection || reverseDirection || pipe1OnPipe2 || pipe2OnPipe1;
 }
 
@@ -3159,30 +3264,30 @@ function isPointOnLineSegment(
     const y1 = getCoordValue(lineStart, 'y');
     const x2 = getCoordValue(lineEnd, 'x');
     const y2 = getCoordValue(lineEnd, 'y');
-    
+
     // Calculate distance from point to line
     const A = px - x1;
     const B = py - y1;
     const C = x2 - x1;
     const D = y2 - y1;
-    
+
     const dot = A * C + B * D;
     const lenSq = C * C + D * D;
-    
+
     if (lenSq === 0) {
         // Line is a point
         return Math.sqrt(A * A + B * B) < tolerance;
     }
-    
+
     const param = dot / lenSq;
-    
+
     // Check if point is within the line segment
     if (param < 0 || param > 1) return false;
-    
+
     // Calculate closest point on line
     const xx = x1 + param * C;
     const yy = y1 + param * D;
-    
+
     // Check distance
     const dx = px - xx;
     const dy = py - yy;
@@ -3201,13 +3306,13 @@ function createSimplifiedZoneNetwork(
     zoneId?: string
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     if (zoneSprinklers.length === 0) return pipes;
-    
+
     // Find optimal entry point to zone
     const entryPoint = findOptimalEntryPoint(sourcePos, zoneCoords, isCanvasMode, scale);
     if (!entryPoint) return pipes;
-    
+
     // Create main trunk from source to zone
     const mainTrunkPath = createShortestManhattanPath(sourcePos, entryPoint);
     for (let i = 0; i < mainTrunkPath.length - 1; i++) {
@@ -3223,24 +3328,27 @@ function createSimplifiedZoneNetwork(
         );
         pipes.push(pipe);
     }
-    
+
     // Group and connect sprinklers efficiently
     const connectedSprinklers = new Set<string>();
     const sprinklerGroups = groupSprinklersByAlignment(zoneSprinklers, isCanvasMode, scale);
-    
+
     sprinklerGroups.forEach((group, groupIndex) => {
         if (group.length === 1) {
             // Single sprinkler - connect to closest trunk point
             const sprinkler = group[0];
             if (connectedSprinklers.has(sprinkler.id)) return;
-            
-            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+
+            const sprinklerPos = isCanvasMode
+                ? sprinkler.canvasPosition || sprinkler.position
+                : sprinkler.position;
             if (!sprinklerPos) return;
-            
+
             // Connect to entry point or existing trunk
-            const connectionPoint = findClosestPointOnAnyTrunk(pipes, sprinklerPos, isCanvasMode, scale) || entryPoint;
+            const connectionPoint =
+                findClosestPointOnAnyTrunk(pipes, sprinklerPos, isCanvasMode, scale) || entryPoint;
             const branchPath = createShortestManhattanPath(connectionPoint, sprinklerPos);
-            
+
             for (let i = 0; i < branchPath.length - 1; i++) {
                 const pipe = createUniformPipe(
                     `simple_branch_${zoneId}_${sprinkler.id}_${i}`,
@@ -3254,20 +3362,24 @@ function createSimplifiedZoneNetwork(
                 );
                 pipes.push(pipe);
             }
-            
+
             connectedSprinklers.add(sprinkler.id);
         } else {
             // Multiple aligned sprinklers - create efficient line
             const sortedGroup = sortSprinklersForConnection(group, isCanvasMode);
-            
+
             // Connect first sprinkler to trunk
             const firstSprinkler = sortedGroup[0];
             if (!connectedSprinklers.has(firstSprinkler.id)) {
-                const firstPos = isCanvasMode ? (firstSprinkler.canvasPosition || firstSprinkler.position) : firstSprinkler.position;
+                const firstPos = isCanvasMode
+                    ? firstSprinkler.canvasPosition || firstSprinkler.position
+                    : firstSprinkler.position;
                 if (firstPos) {
-                    const connectionPoint = findClosestPointOnAnyTrunk(pipes, firstPos, isCanvasMode, scale) || entryPoint;
+                    const connectionPoint =
+                        findClosestPointOnAnyTrunk(pipes, firstPos, isCanvasMode, scale) ||
+                        entryPoint;
                     const mainBranchPath = createShortestManhattanPath(connectionPoint, firstPos);
-                    
+
                     for (let i = 0; i < mainBranchPath.length - 1; i++) {
                         const pipe = createUniformPipe(
                             `group_main_${zoneId}_g${groupIndex}_${i}`,
@@ -3281,25 +3393,29 @@ function createSimplifiedZoneNetwork(
                         );
                         pipes.push(pipe);
                     }
-                    
+
                     connectedSprinklers.add(firstSprinkler.id);
                 }
             }
-            
+
             // Connect remaining sprinklers in sequence
             for (let i = 0; i < sortedGroup.length - 1; i++) {
                 const currentSprinkler = sortedGroup[i];
                 const nextSprinkler = sortedGroup[i + 1];
-                
+
                 if (connectedSprinklers.has(nextSprinkler.id)) continue;
-                
-                const currentPos = isCanvasMode ? (currentSprinkler.canvasPosition || currentSprinkler.position) : currentSprinkler.position;
-                const nextPos = isCanvasMode ? (nextSprinkler.canvasPosition || nextSprinkler.position) : nextSprinkler.position;
-                
+
+                const currentPos = isCanvasMode
+                    ? currentSprinkler.canvasPosition || currentSprinkler.position
+                    : currentSprinkler.position;
+                const nextPos = isCanvasMode
+                    ? nextSprinkler.canvasPosition || nextSprinkler.position
+                    : nextSprinkler.position;
+
                 if (!currentPos || !nextPos) continue;
-                
+
                 const connectionPath = createShortestManhattanPath(currentPos, nextPos);
-                
+
                 for (let j = 0; j < connectionPath.length - 1; j++) {
                     const pipe = createUniformPipe(
                         `group_link_${zoneId}_${currentSprinkler.id}_${nextSprinkler.id}_${j}`,
@@ -3313,12 +3429,12 @@ function createSimplifiedZoneNetwork(
                     );
                     pipes.push(pipe);
                 }
-                
+
                 connectedSprinklers.add(nextSprinkler.id);
             }
         }
     });
-    
+
     return pipes;
 }
 
@@ -3333,19 +3449,21 @@ function createUnifiedTrunkSystem(
     imageData?: unknown
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    const sourcePos = isCanvasMode ? (waterSource.canvasPosition || waterSource.position) : waterSource.position;
-    
+    const sourcePos = isCanvasMode
+        ? waterSource.canvasPosition || waterSource.position
+        : waterSource.position;
+
     if (sprinklers.length === 0) return pipes;
-    
+
     // Group sprinklers by zone
     const sprinklersByZone = new Map<string, Sprinkler[]>();
-    sprinklers.forEach(sprinkler => {
+    sprinklers.forEach((sprinkler) => {
         if (!sprinklersByZone.has(sprinkler.zoneId)) {
             sprinklersByZone.set(sprinkler.zoneId, []);
         }
         sprinklersByZone.get(sprinkler.zoneId)!.push(sprinkler);
     });
-    
+
     // Find all zone entry points
     const zoneEntryPoints: Array<{
         point: Coordinate | CanvasCoordinate;
@@ -3353,31 +3471,40 @@ function createUnifiedTrunkSystem(
         zoneSprinklers: Sprinkler[];
         zoneCoords: (Coordinate | CanvasCoordinate)[];
     }> = [];
-    
+
     sprinklersByZone.forEach((zoneSprinklers, zoneId) => {
-        const zone = gardenZones.find(z => z.id === zoneId);
+        const zone = gardenZones.find((z) => z.id === zoneId);
         if (!zone) return;
-        
-        const zoneCoords = isCanvasMode ? (zone.canvasCoordinates || zone.coordinates) : zone.coordinates;
+
+        const zoneCoords = isCanvasMode
+            ? zone.canvasCoordinates || zone.coordinates
+            : zone.coordinates;
         if (!zoneCoords || zoneCoords.length < 3) return;
-        
+
         const entryPoint = findOptimalEntryPoint(sourcePos, zoneCoords, isCanvasMode, scale);
         if (entryPoint) {
             zoneEntryPoints.push({
                 point: entryPoint,
                 zoneId,
                 zoneSprinklers,
-                zoneCoords
+                zoneCoords,
             });
         }
     });
-    
+
     if (zoneEntryPoints.length === 0) return pipes;
-    
+
     // Create single main trunk line that connects all zones efficiently
-    const mainTrunk = createMainTrunkLine(sourcePos, zoneEntryPoints, isCanvasMode, scale, canvasData, imageData);
+    const mainTrunk = createMainTrunkLine(
+        sourcePos,
+        zoneEntryPoints,
+        isCanvasMode,
+        scale,
+        canvasData,
+        imageData
+    );
     pipes.push(...mainTrunk);
-    
+
     // Create zone-specific networks that branch from the main trunk
     zoneEntryPoints.forEach(({ point, zoneId, zoneSprinklers, zoneCoords }) => {
         const zonePipes = createZoneBranchNetwork(
@@ -3393,7 +3520,7 @@ function createUnifiedTrunkSystem(
         );
         pipes.push(...zonePipes);
     });
-    
+
     return pipes;
 }
 
@@ -3407,12 +3534,15 @@ function createMainTrunkLine(
     imageData?: unknown
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     if (zoneEntryPoints.length === 0) return pipes;
-    
+
     // Create efficient main trunk path that visits all zone entry points
-    const trunkPath = createOptimalTrunkPath(sourcePos, zoneEntryPoints.map(z => z.point));
-    
+    const trunkPath = createOptimalTrunkPath(
+        sourcePos,
+        zoneEntryPoints.map((z) => z.point)
+    );
+
     // Convert path to pipes
     for (let i = 0; i < trunkPath.length - 1; i++) {
         const pipe = createUniformPipe(
@@ -3427,7 +3557,7 @@ function createMainTrunkLine(
         );
         pipes.push(pipe);
     }
-    
+
     return pipes;
 }
 
@@ -3438,18 +3568,18 @@ function createOptimalTrunkPath(
 ): (Coordinate | CanvasCoordinate)[] {
     if (entryPoints.length === 0) return [sourcePos];
     if (entryPoints.length === 1) return createShortestManhattanPath(sourcePos, entryPoints[0]);
-    
+
     // For multiple zones, create a path that minimizes total distance
     // Start from source, find nearest entry point, then create branching path
     const path = [sourcePos];
     const unvisited = [...entryPoints];
     let currentPos = sourcePos;
-    
+
     while (unvisited.length > 0) {
         // Find nearest unvisited entry point
         let nearestIndex = 0;
         let nearestDistance = calculateDistance(currentPos, unvisited[0]);
-        
+
         for (let i = 1; i < unvisited.length; i++) {
             const distance = calculateDistance(currentPos, unvisited[i]);
             if (distance < nearestDistance) {
@@ -3457,18 +3587,18 @@ function createOptimalTrunkPath(
                 nearestIndex = i;
             }
         }
-        
+
         // Create path to nearest entry point
         const nearestPoint = unvisited[nearestIndex];
         const segmentPath = createShortestManhattanPath(currentPos, nearestPoint);
-        
+
         // Add path segments (skip first point to avoid duplication)
         path.push(...segmentPath.slice(1));
-        
+
         currentPos = nearestPoint;
         unvisited.splice(nearestIndex, 1);
     }
-    
+
     return path;
 }
 
@@ -3485,26 +3615,34 @@ function createZoneBranchNetwork(
     zoneId?: string
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     if (zoneSprinklers.length === 0) return pipes;
-    
+
     // Group sprinklers efficiently and connect them
     const connectedSprinklers = new Set<string>();
     const sprinklerGroups = groupSprinklersByAlignment(zoneSprinklers, isCanvasMode, scale);
-    
+
     sprinklerGroups.forEach((group, groupIndex) => {
         if (group.length === 1) {
             // Single sprinkler - connect to zone entry point or existing trunk
             const sprinkler = group[0];
             if (connectedSprinklers.has(sprinkler.id)) return;
-            
-            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+
+            const sprinklerPos = isCanvasMode
+                ? sprinkler.canvasPosition || sprinkler.position
+                : sprinkler.position;
             if (!sprinklerPos) return;
-            
+
             // Connect to zone entry point or closest point on existing network
-            const connectionPoint = findClosestPointOnAnyTrunk([...mainTrunk, ...pipes], sprinklerPos, isCanvasMode, scale) || zoneEntryPoint;
+            const connectionPoint =
+                findClosestPointOnAnyTrunk(
+                    [...mainTrunk, ...pipes],
+                    sprinklerPos,
+                    isCanvasMode,
+                    scale
+                ) || zoneEntryPoint;
             const branchPath = createShortestManhattanPath(connectionPoint, sprinklerPos);
-            
+
             for (let i = 0; i < branchPath.length - 1; i++) {
                 const pipe = createUniformPipe(
                     `zone_branch_${zoneId}_${sprinkler.id}_${i}`,
@@ -3518,20 +3656,28 @@ function createZoneBranchNetwork(
                 );
                 pipes.push(pipe);
             }
-            
+
             connectedSprinklers.add(sprinkler.id);
         } else {
             // Multiple aligned sprinklers - create efficient line
             const sortedGroup = sortSprinklersForConnection(group, isCanvasMode);
-            
+
             // Connect first sprinkler to trunk/entry point
             const firstSprinkler = sortedGroup[0];
             if (!connectedSprinklers.has(firstSprinkler.id)) {
-                const firstPos = isCanvasMode ? (firstSprinkler.canvasPosition || firstSprinkler.position) : firstSprinkler.position;
+                const firstPos = isCanvasMode
+                    ? firstSprinkler.canvasPosition || firstSprinkler.position
+                    : firstSprinkler.position;
                 if (firstPos) {
-                    const connectionPoint = findClosestPointOnAnyTrunk([...mainTrunk, ...pipes], firstPos, isCanvasMode, scale) || zoneEntryPoint;
+                    const connectionPoint =
+                        findClosestPointOnAnyTrunk(
+                            [...mainTrunk, ...pipes],
+                            firstPos,
+                            isCanvasMode,
+                            scale
+                        ) || zoneEntryPoint;
                     const mainBranchPath = createShortestManhattanPath(connectionPoint, firstPos);
-                    
+
                     for (let i = 0; i < mainBranchPath.length - 1; i++) {
                         const pipe = createUniformPipe(
                             `zone_group_main_${zoneId}_g${groupIndex}_${i}`,
@@ -3545,25 +3691,29 @@ function createZoneBranchNetwork(
                         );
                         pipes.push(pipe);
                     }
-                    
+
                     connectedSprinklers.add(firstSprinkler.id);
                 }
             }
-            
+
             // Connect remaining sprinklers in sequence
             for (let i = 0; i < sortedGroup.length - 1; i++) {
                 const currentSprinkler = sortedGroup[i];
                 const nextSprinkler = sortedGroup[i + 1];
-                
+
                 if (connectedSprinklers.has(nextSprinkler.id)) continue;
-                
-                const currentPos = isCanvasMode ? (currentSprinkler.canvasPosition || currentSprinkler.position) : currentSprinkler.position;
-                const nextPos = isCanvasMode ? (nextSprinkler.canvasPosition || nextSprinkler.position) : nextSprinkler.position;
-                
+
+                const currentPos = isCanvasMode
+                    ? currentSprinkler.canvasPosition || currentSprinkler.position
+                    : currentSprinkler.position;
+                const nextPos = isCanvasMode
+                    ? nextSprinkler.canvasPosition || nextSprinkler.position
+                    : nextSprinkler.position;
+
                 if (!currentPos || !nextPos) continue;
-                
+
                 const connectionPath = createShortestManhattanPath(currentPos, nextPos);
-                
+
                 for (let j = 0; j < connectionPath.length - 1; j++) {
                     const pipe = createUniformPipe(
                         `zone_group_link_${zoneId}_${currentSprinkler.id}_${nextSprinkler.id}_${j}`,
@@ -3577,12 +3727,12 @@ function createZoneBranchNetwork(
                     );
                     pipes.push(pipe);
                 }
-                
+
                 connectedSprinklers.add(nextSprinkler.id);
             }
         }
     });
-    
+
     return pipes;
 }
 
@@ -3593,19 +3743,29 @@ function isSprinklerConnected(
     isCanvasMode: boolean,
     tolerance: number = 1.0
 ): boolean {
-    const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+    const sprinklerPos = isCanvasMode
+        ? sprinkler.canvasPosition || sprinkler.position
+        : sprinkler.position;
     if (!sprinklerPos) return false;
-    
-    return pipes.some(pipe => {
-        const start = isCanvasMode ? (pipe.canvasStart || pipe.start) : pipe.start;
-        const end = isCanvasMode ? (pipe.canvasEnd || pipe.end) : pipe.end;
-        
+
+    return pipes.some((pipe) => {
+        const start = isCanvasMode ? pipe.canvasStart || pipe.start : pipe.start;
+        const end = isCanvasMode ? pipe.canvasEnd || pipe.end : pipe.end;
+
         if (!start || !end) return false;
-        
+
         // Check if sprinkler position matches pipe start or end
-        const distToStart = calculateDistance(sprinklerPos, start, isCanvasMode ? undefined : undefined);
-        const distToEnd = calculateDistance(sprinklerPos, end, isCanvasMode ? undefined : undefined);
-        
+        const distToStart = calculateDistance(
+            sprinklerPos,
+            start,
+            isCanvasMode ? undefined : undefined
+        );
+        const distToEnd = calculateDistance(
+            sprinklerPos,
+            end,
+            isCanvasMode ? undefined : undefined
+        );
+
         return distToStart <= tolerance || distToEnd <= tolerance;
     });
 }
@@ -3621,33 +3781,37 @@ function createOptimizedBoundaryPipeNetwork(
     imageData?: unknown
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    const sourcePos = isCanvasMode ? (waterSource.canvasPosition || waterSource.position) : waterSource.position;
-    
+    const sourcePos = isCanvasMode
+        ? waterSource.canvasPosition || waterSource.position
+        : waterSource.position;
+
     if (sprinklers.length === 0) {
         return pipes;
     }
-    
+
     // Group sprinklers by zone
     const sprinklersByZone = new Map<string, Sprinkler[]>();
-    sprinklers.forEach(sprinkler => {
+    sprinklers.forEach((sprinkler) => {
         if (!sprinklersByZone.has(sprinkler.zoneId)) {
             sprinklersByZone.set(sprinkler.zoneId, []);
         }
         sprinklersByZone.get(sprinkler.zoneId)!.push(sprinkler);
     });
-    
+
     // Create optimized boundary routing for each zone
     sprinklersByZone.forEach((zoneSprinklers, zoneId) => {
-        const zone = gardenZones.find(z => z.id === zoneId);
+        const zone = gardenZones.find((z) => z.id === zoneId);
         const zoneCoords = zone
-            ? (isCanvasMode ? (zone.canvasCoordinates || zone.coordinates) : zone.coordinates)
+            ? isCanvasMode
+                ? zone.canvasCoordinates || zone.coordinates
+                : zone.coordinates
             : null;
 
         if (!zone || !zoneCoords || zoneCoords.length < 3) {
             // Fallback for sprinklers not assigned to a valid zone (e.g., virtual_zone on map mode)
             zoneSprinklers.forEach((sprinkler, idx) => {
                 const sprinklerPos = isCanvasMode
-                    ? (sprinkler.canvasPosition || sprinkler.position)
+                    ? sprinkler.canvasPosition || sprinkler.position
                     : sprinkler.position;
                 if (!sprinklerPos) return;
 
@@ -3682,7 +3846,7 @@ function createOptimizedBoundaryPipeNetwork(
         );
         pipes.push(...zonePipes);
     });
-    
+
     return pipes;
 }
 
@@ -3698,11 +3862,11 @@ function createZoneBoundaryNetwork(
 ): Pipe[] {
     const pipes: Pipe[] = [];
     const mainTrunkPipes: Pipe[] = [];
-    
+
     // Find optimal entry point to zone boundary
     const entryPoint = findOptimalEntryPoint(sourcePos, zoneCoords, isCanvasMode, scale);
     if (!entryPoint) return pipes;
-    
+
     // Create main trunk from source to zone boundary
     const mainTrunkPath = createShortestManhattanPath(sourcePos, entryPoint);
     for (let i = 0; i < mainTrunkPath.length - 1; i++) {
@@ -3719,7 +3883,7 @@ function createZoneBoundaryNetwork(
         mainTrunkPipes.push(pipe);
     }
     pipes.push(...mainTrunkPipes);
-    
+
     // Create optimized boundary routing
     const boundaryPipes = createOptimizedBoundaryRouting(
         entryPoint,
@@ -3761,11 +3925,14 @@ function createOptimizedBoundaryRouting(
     zoneId?: string
 ): Pipe[] {
     const pipes: Pipe[] = [];
-    
+
     // Find edge closest to entry and use it as baseline trunk edge
     const entryEdgeIndex = findEdgeIndex(entryPoint, zoneCoords, isCanvasMode, scale);
     const baseEdgeStart = entryEdgeIndex >= 0 ? zoneCoords[entryEdgeIndex] : zoneCoords[0];
-    const baseEdgeEnd = entryEdgeIndex >= 0 ? zoneCoords[(entryEdgeIndex + 1) % zoneCoords.length] : zoneCoords[1 % zoneCoords.length];
+    const baseEdgeEnd =
+        entryEdgeIndex >= 0
+            ? zoneCoords[(entryEdgeIndex + 1) % zoneCoords.length]
+            : zoneCoords[1 % zoneCoords.length];
 
     // Build trunk along the closest edge only (to mimic straight baseline)
     const { projected: projOnBase } = projectPointParam(entryPoint, baseEdgeStart, baseEdgeEnd);
@@ -3774,7 +3941,7 @@ function createOptimizedBoundaryRouting(
     boundaryPath.push(entryPoint);
     boundaryPath.push(projOnBase);
     boundaryPath.push(baseEdgeEnd);
-    
+
     // Create pipes along the boundary path
     for (let i = 0; i < boundaryPath.length - 1; i++) {
         const pipe = createUniformPipe(
@@ -3802,10 +3969,15 @@ function findOptimalBoundaryPath(
 ): (Coordinate | CanvasCoordinate)[] {
     const path: (Coordinate | CanvasCoordinate)[] = [];
     path.push(entryPoint);
-    
+
     // Find boundary points that need connection
-    const boundaryPoints = findRequiredBoundaryPoints(zoneCoords, zoneSprinklers, isCanvasMode, scale);
-    
+    const boundaryPoints = findRequiredBoundaryPoints(
+        zoneCoords,
+        zoneSprinklers,
+        isCanvasMode,
+        scale
+    );
+
     if (boundaryPoints.length === 0) {
         // No sprinklers near boundary, create minimal path
         const nearestCorner = findNearestCorner(entryPoint, zoneCoords);
@@ -3814,7 +3986,7 @@ function findOptimalBoundaryPath(
         }
         return path;
     }
-    
+
     // Create path that strictly follows zone boundary
     const boundaryRoute = createStrictBoundaryRoute(
         entryPoint,
@@ -3824,7 +3996,7 @@ function findOptimalBoundaryPath(
         scale
     );
     path.push(...boundaryRoute);
-    
+
     return path;
 }
 
@@ -3836,13 +4008,13 @@ function createStrictBoundaryRoute(
     scale: number
 ): (Coordinate | CanvasCoordinate)[] {
     const route: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     if (boundaryPoints.length === 0) return route;
-    
+
     // Find which edge the entry point is on
     const entryEdgeIndex = findEdgeIndex(entryPoint, zoneCoords, isCanvasMode, scale);
     if (entryEdgeIndex === -1) return route;
-    
+
     // Sort boundary points by their position along the boundary
     const sortedPoints = sortPointsAlongBoundary(
         entryPoint,
@@ -3852,15 +4024,15 @@ function createStrictBoundaryRoute(
         isCanvasMode,
         scale
     );
-    
+
     // Create path that follows the boundary strictly
     let currentPoint = entryPoint;
     let currentEdgeIndex = entryEdgeIndex;
-    
+
     for (const targetPoint of sortedPoints) {
         const targetEdgeIndex = findEdgeIndex(targetPoint, zoneCoords, isCanvasMode, scale);
         if (targetEdgeIndex === -1) continue;
-        
+
         // Find path along boundary from current edge to target edge
         const boundaryPath = findBoundaryPathBetweenEdges(
             currentPoint,
@@ -3869,12 +4041,12 @@ function createStrictBoundaryRoute(
             targetEdgeIndex,
             zoneCoords
         );
-        
+
         route.push(...boundaryPath);
         currentPoint = targetPoint;
         currentEdgeIndex = targetEdgeIndex;
     }
-    
+
     return route;
 }
 
@@ -3887,7 +4059,7 @@ function findEdgeIndex(
     for (let i = 0; i < zoneCoords.length; i++) {
         const current = zoneCoords[i];
         const next = zoneCoords[(i + 1) % zoneCoords.length];
-        
+
         const distanceToEdge = calculateDistanceFromPointToLineSegment(
             point,
             current,
@@ -3895,7 +4067,7 @@ function findEdgeIndex(
             isCanvasMode,
             scale
         );
-        
+
         if (distanceToEdge < 10) {
             return i;
         }
@@ -3913,20 +4085,20 @@ function sortPointsAlongBoundary(
 ): (Coordinate | CanvasCoordinate)[] {
     // Sort points by their position along the boundary
     const sortedPoints = [...boundaryPoints];
-    
+
     sortedPoints.sort((a, b) => {
         const edgeA = findEdgeIndex(a, zoneCoords, isCanvasMode, scale);
         const edgeB = findEdgeIndex(b, zoneCoords, isCanvasMode, scale);
-        
+
         if (edgeA === -1 || edgeB === -1) return 0;
-        
+
         // Calculate distance along boundary
         const distanceA = calculateDistanceAlongBoundary(startEdgeIndex, edgeA, zoneCoords);
         const distanceB = calculateDistanceAlongBoundary(startEdgeIndex, edgeB, zoneCoords);
-        
+
         return distanceA - distanceB;
     });
-    
+
     return sortedPoints;
 }
 
@@ -3975,36 +4147,36 @@ function findBoundaryPathBetweenEdges(
     zoneCoords: (Coordinate | CanvasCoordinate)[]
 ): (Coordinate | CanvasCoordinate)[] {
     const path: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     if (startEdgeIndex === endEdgeIndex) {
         // Same edge, direct connection
         path.push(startPoint);
         path.push(endPoint);
         return path;
     }
-    
+
     // Find path along boundary
     let currentEdge = startEdgeIndex;
     let currentPoint = startPoint;
-    
+
     while (currentEdge !== endEdgeIndex) {
         const current = zoneCoords[currentEdge];
         const next = zoneCoords[(currentEdge + 1) % zoneCoords.length];
-        
+
         // Add current edge endpoint
         path.push(currentPoint);
         path.push(next);
-        
+
         currentPoint = next;
         currentEdge = (currentEdge + 1) % zoneCoords.length;
-        
+
         // Prevent infinite loop
         if (currentEdge === startEdgeIndex) break;
     }
-    
+
     // Add final connection to end point
     path.push(endPoint);
-    
+
     return path;
 }
 
@@ -4015,17 +4187,19 @@ function findRequiredBoundaryPoints(
     scale: number
 ): (Coordinate | CanvasCoordinate)[] {
     const boundaryPoints: (Coordinate | CanvasCoordinate)[] = [];
-    
+
     // Find edges that have sprinklers nearby
     for (let i = 0; i < zoneCoords.length; i++) {
         const current = zoneCoords[i];
         const next = zoneCoords[(i + 1) % zoneCoords.length];
-        
+
         // Check if there are sprinklers near this edge
-        const edgeSprinklers = zoneSprinklers.filter(sprinkler => {
-            const sprinklerPos = isCanvasMode ? (sprinkler.canvasPosition || sprinkler.position) : sprinkler.position;
+        const edgeSprinklers = zoneSprinklers.filter((sprinkler) => {
+            const sprinklerPos = isCanvasMode
+                ? sprinkler.canvasPosition || sprinkler.position
+                : sprinkler.position;
             if (!sprinklerPos) return false;
-            
+
             const distanceToEdge = calculateDistanceFromPointToLineSegment(
                 sprinklerPos,
                 current,
@@ -4033,10 +4207,10 @@ function findRequiredBoundaryPoints(
                 isCanvasMode,
                 scale
             );
-            
+
             return distanceToEdge < 50; // Within 50 units of the edge
         });
-        
+
         if (edgeSprinklers.length > 0) {
             // Find optimal connection point on this edge
             const connectionPoint = findOptimalConnectionPointOnEdge(current, next, edgeSprinklers);
@@ -4045,7 +4219,7 @@ function findRequiredBoundaryPoints(
             }
         }
     }
-    
+
     return boundaryPoints;
 }
 
@@ -4066,11 +4240,12 @@ export function calculatePipeStatistics(
 } {
     // คำนวณความยาวท่อรวม
     const totalLength = pipes.reduce((sum, pipe) => {
-        const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
-            ? Math.max(0, pipe.length)
-            : (pipe.canvasStart && pipe.canvasEnd && isCanvasMode)
-                ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
-                : (pipe.start && pipe.end)
+        const length =
+            typeof pipe.length === 'number' && !isNaN(pipe.length)
+                ? Math.max(0, pipe.length)
+                : pipe.canvasStart && pipe.canvasEnd && isCanvasMode
+                  ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                  : pipe.start && pipe.end
                     ? calculateDistance(pipe.start, pipe.end)
                     : 0;
         return sum + length;
@@ -4087,22 +4262,23 @@ export function calculatePipeStatistics(
 
     // คำนวณสถิติตามโซน
     const zoneStats = new Map<string, { length: number; longestPath: number; count: number }>();
-    
+
     // จัดกลุ่มท่อตามโซน
-    pipes.forEach(pipe => {
+    pipes.forEach((pipe) => {
         const zoneId = pipe.zoneId || 'unknown';
-        const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
-            ? Math.max(0, pipe.length)
-            : (pipe.canvasStart && pipe.canvasEnd && isCanvasMode)
-                ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
-                : (pipe.start && pipe.end)
+        const length =
+            typeof pipe.length === 'number' && !isNaN(pipe.length)
+                ? Math.max(0, pipe.length)
+                : pipe.canvasStart && pipe.canvasEnd && isCanvasMode
+                  ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                  : pipe.start && pipe.end
                     ? calculateDistance(pipe.start, pipe.end)
                     : 0;
 
         if (!zoneStats.has(zoneId)) {
             zoneStats.set(zoneId, { length: 0, longestPath: 0, count: 0 });
         }
-        
+
         const stats = zoneStats.get(zoneId)!;
         stats.length += length;
         stats.count += 1;
@@ -4110,9 +4286,9 @@ export function calculatePipeStatistics(
 
     // คำนวณความยาวท่อที่ยาวที่สุดในแต่ละโซน
     zoneStats.forEach((stats, zoneId) => {
-        const zoneSprinklers = sprinklers.filter(s => s.zoneId === zoneId);
-        const zonePipes = pipes.filter(p => p.zoneId === zoneId);
-        
+        const zoneSprinklers = sprinklers.filter((s) => s.zoneId === zoneId);
+        const zonePipes = pipes.filter((p) => p.zoneId === zoneId);
+
         if (zoneSprinklers.length > 0 && zonePipes.length > 0) {
             stats.longestPath = computeLongestPathFromSource({
                 pipes: zonePipes,

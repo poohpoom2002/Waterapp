@@ -250,7 +250,6 @@ const advancedSnapToMainArea = (
                 const snappedPoint = findClosestPointOnLineSegment(coord, longestEdgeStart, longestEdgeEnd);
                 return snappedPoint;
             }
-
         }
 
         return snapPointToMainAreaBoundary(coord, mainArea, 5);
@@ -1044,4 +1043,3 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
 };
 
 export default HorticultureDrawingManager;
-

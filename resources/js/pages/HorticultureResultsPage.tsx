@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -40,10 +41,12 @@ import {
 import { IrrigationZone } from '../utils/irrigationZoneUtils';
 import { 
     findMainToSubMainConnections,
+    findEndToEndConnections,
     findMidConnections,
     findSubMainToLateralStartConnections,
     findLateralSubMainIntersection,
-    findSubMainToMainIntersections
+    findSubMainToMainIntersections,
+    findLateralToSubMainIntersections
 } from '../utils/lateralPipeUtils';
 
 import { 
@@ -55,7 +58,9 @@ import {
     findBestBranchPipeInZone,
     findBestSubMainPipeInZone,
     findBestMainPipeInZone,
-    findMainToSubMainConnectionsInResults
+    findMainToSubMainConnectionsInResults,
+    countConnectionPointsByZone,
+    ConnectionPointStats
 } from '../utils/horticultureProjectStats';
 
 // Helper function to calculate distance between two coordinates
@@ -408,7 +413,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                         map: map,
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
-                            scale: 4, // ลดจาก 8 เป็น 4
+                            scale: 3, // ปรับให้เท่ากับจุดเชื่อมต่ออื่นๆ
                             fillColor: '#FF6B6B',
                             fillOpacity: 1.0,
                             strokeColor: '#FFFFFF',
@@ -444,120 +449,152 @@ const GoogleMapsResultsOverlays: React.FC<{
 
             // Display emitter lines (ท่อย่อยแยก) for this lateral pipe
 
-            if (lateralPipe.emitterLines && lateralPipe.emitterLines.length > 0) {
-                lateralPipe.emitterLines.forEach((emitterLine) => {
-                    const emitterPolyline = new google.maps.Polyline({
-                        path: emitterLine.coordinates.map((coord) => ({
-                            lat: coord.lat,
-                            lng: coord.lng,
-                        })),
-                        strokeColor: '#FFB347', // ใช้สีเดียวกับหน้า Planner
-                        strokeWeight: 2 * pipeSize, // ใช้ขนาดเดียวกับหน้า Planner
-                        strokeOpacity: 0.8, // ใช้ความชัดเดียวกับหน้า Planner
-                    });
-                    emitterPolyline.setMap(map);
-                    overlaysRef.current.polylines.set(`emitter-${emitterLine.id}`, emitterPolyline);
+            // 🚫 ซ่อนจุดปลายท่อแยกย่อย (emitter lines) ตามคำขอของผู้ใช้
+            // if (lateralPipe.emitterLines && lateralPipe.emitterLines.length > 0) {
+            //     lateralPipe.emitterLines.forEach((emitterLine) => {
+            //         const emitterPolyline = new google.maps.Polyline({
+            //             path: emitterLine.coordinates.map((coord) => ({
+            //                 lat: coord.lat,
+            //                 lng: coord.lng,
+            //             })),
+            //             strokeColor: '#FFB347', // ใช้สีเดียวกับหน้า Planner
+            //             strokeWeight: 2 * pipeSize, // ใช้ขนาดเดียวกับหน้า Planner
+            //             strokeOpacity: 0.8, // ใช้ความชัดเดียวกับหน้า Planner
+            //         });
+            //         emitterPolyline.setMap(map);
+            //         overlaysRef.current.polylines.set(`emitter-${emitterLine.id}`, emitterPolyline);
 
-                    // Add small marker at plant connection point
-                    if (emitterLine.coordinates.length > 1) {
-                        const plantConnectionPoint =
-                            emitterLine.coordinates[emitterLine.coordinates.length - 1];
-                        const emitterMarker = new google.maps.Marker({
-                            position: plantConnectionPoint,
-                            map: map,
-                            icon: {
-                                path: google.maps.SymbolPath.CIRCLE,
-                                scale: 2,
-                                fillColor: '#FFB347',
-                                fillOpacity: 1,
-                                strokeColor: '#ffffff',
-                                strokeWeight: 1,
-                            },
-                            title: `Emitter to Plant (${emitterLine.length.toFixed(1)}m)`,
-                        });
-                        overlaysRef.current.markers.set(
-                            `emitter-connection-${emitterLine.id}`,
-                            emitterMarker
-                        );
-                    }
-                });
-            }
+            //         // Add small marker at plant connection point
+            //         if (emitterLine.coordinates.length > 1) {
+            //             const plantConnectionPoint =
+            //                 emitterLine.coordinates[emitterLine.coordinates.length - 1];
+            //             const emitterMarker = new google.maps.Marker({
+            //                 position: plantConnectionPoint,
+            //                 map: map,
+            //                 icon: {
+            //                     path: google.maps.SymbolPath.CIRCLE,
+            //                     scale: 3, // ปรับให้เท่ากับจุดเชื่อมต่ออื่นๆ
+            //                     fillColor: '#FFB347',
+            //                     fillOpacity: 1,
+            //                     strokeColor: '#ffffff',
+            //                     strokeWeight: 1,
+            //                 },
+            //                 title: `Emitter to Plant (${emitterLine.length.toFixed(1)}m)`,
+            //             });
+            //             overlaysRef.current.markers.set(
+            //                 `emitter-connection-${emitterLine.id}`,
+            //                 emitterMarker
+            //             );
+            //         }
+            //     });
+            // }
         });
 
-        // 🔥 เพิ่มการแสดงจุดเชื่อมต่อระหว่างท่อเมนและท่อเมนรอง (ปลาย-ปลาย)
+        // 🔥 แสดงจุดเชื่อมต่อปลาย-ปลาย (End-to-End) - สีแดง
         if (projectData.mainPipes && projectData.subMainPipes) {
+            const endToEndConnections = findEndToEndConnections(
+                projectData.mainPipes,
+                projectData.subMainPipes,
+                projectData.zones,
+                irrigationZones,
+                15 // snapThreshold
+            );
+
+
+            endToEndConnections.forEach((connection, index) => {
+                const connectionMarker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                        connection.connectionPoint.lat,
+                        connection.connectionPoint.lng
+                    ),
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                        fillColor: '#DC2626', // สีแดงสำหรับปลาย-ปลาย
+                        fillOpacity: 1.0,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2, // เพิ่มความหนาของขอบ
+                    },
+                    zIndex: 2001,
+                    title: `จุดเชื่อมต่อปลาย-ปลาย (ท่อเมน ↔ ท่อเมนรอง)`
+                });
+                overlaysRef.current.markers.set(`end-to-end-connection-${index}`, connectionMarker);
+
+                // เพิ่ม info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div class="p-2 min-w-[200px]">
+                            <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย</h4>
+                            <div class="space-y-1 text-sm">
+                                <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
+                                <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
+                            </div>
+                        </div>
+                    `
+                });
+
+                connectionMarker.addListener('click', () => {
+                    infoWindow.open(map, connectionMarker);
+                });
+            });
+
+            // 🔥 แสดงจุดเชื่อมต่อปลายท่อเมนกับระหว่างท่อเมนรอง - สีน้ำเงิน
             const mainToSubMainConnections = findMainToSubMainConnections(
                 projectData.mainPipes,
                 projectData.subMainPipes,
                 projectData.zones,
                 irrigationZones,
-                20 // snapThreshold - ปรับให้สอดคล้องกับหน้า Planner
+                15 // snapThreshold
             );
 
+
             mainToSubMainConnections.forEach((connection, index) => {
-                // 🔥 ตรวจสอบว่าเป็นการเชื่อมปลาย-ปลายหรือไม่
-                const mainPipe = projectData.mainPipes?.find(p => p.id === connection.mainPipeId);
-                const subMainPipe = projectData.subMainPipes?.find(p => p.id === connection.subMainPipeId);
-                
-                if (mainPipe && subMainPipe) {
-                    // ตรวจสอบว่าเป็นการเชื่อมปลาย-ปลาย (main pipe end → submain pipe start)
-                    const mainEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-                    const subMainStart = subMainPipe.coordinates[0];
-                    
-                    const distance = Math.sqrt(
-                        Math.pow(mainEnd.lat - subMainStart.lat, 2) + 
-                        Math.pow(mainEnd.lng - subMainStart.lng, 2)
-                    ) * 111320; // แปลงเป็นเมตร
-                    
-                    // ถ้าระยะห่างน้อยกว่า 20 เมตร = การเชื่อมปลาย-ปลาย
-                    if (distance <= 20) {
-                        const connectionMarker = new google.maps.Marker({
-                            position: new google.maps.LatLng(
-                                connection.connectionPoint.lat,
-                                connection.connectionPoint.lng
-                            ),
-                            map: map,
-                            icon: {
-                                path: google.maps.SymbolPath.CIRCLE,
-                                scale: 5,
-                                fillColor: '#DC2626', // สีแดงสำหรับการเชื่อมปลาย-ปลาย
-                                fillOpacity: 1.0,
-                                strokeColor: '#FFFFFF',
-                                strokeWeight: 2,
-                            },
-                            zIndex: 2001,
-                            title: `จุดเชื่อมต่อท่อเมน → ท่อเมนรอง (ปลาย-ปลาย)`
-                        });
-                        overlaysRef.current.markers.set(`main-submain-end-connection-${index}`, connectionMarker);
+                const connectionMarker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                        connection.connectionPoint.lat,
+                        connection.connectionPoint.lng
+                    ),
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                        fillColor: '#3B82F6', // สีน้ำเงินสำหรับปลายเมน-ระหว่างเมนรอง
+                        fillOpacity: 1.0,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 2, // เพิ่มความหนาของขอบ
+                    },
+                    zIndex: 2001,
+                    title: `จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง`
+                });
+                overlaysRef.current.markers.set(`main-submain-end-connection-${index}`, connectionMarker);
 
-                        // เพิ่ม info window
-                        const infoWindow = new google.maps.InfoWindow({
-                            content: `
-                                <div class="p-2 min-w-[200px]">
-                                    <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย</h4>
-                                    <div class="space-y-1 text-sm">
-                                        <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
-                                        <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
-                                        <p class="text-xs text-gray-600">เชื่อมปลายท่อเมน → เริ่มท่อเมนรอง</p>
-                                    </div>
-                                </div>
-                            `
-                        });
+                // เพิ่ม info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div class="p-2 min-w-[200px]">
+                            <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย</h4>
+                            <div class="space-y-1 text-sm">
+                                <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
+                                <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
+                                <p class="text-xs text-gray-600">เชื่อมปลายท่อเมน → เริ่มท่อเมนรอง</p>
+                            </div>
+                        </div>
+                    `
+                });
 
-                        connectionMarker.addListener('click', () => {
-                            infoWindow.open(map, connectionMarker);
-                        });
-                    }
-                }
+                connectionMarker.addListener('click', () => {
+                    infoWindow.open(map, connectionMarker);
+                });
             });
         }
 
-        // 🔥 เพิ่มการแสดงจุดเชื่อมต่อแบบ Mid-connections (ท่อเมนรองเชื่อมกลางท่อเมน)
+        // 🔥 แสดงจุดเชื่อมต่อแบบ Mid-connections (ท่อเมนรองเชื่อมกลางท่อเมน) - แสดงทุกกรณี
         if (projectData.subMainPipes && projectData.mainPipes) {
             const midConnections = findMidConnections(
                 projectData.subMainPipes,
                 projectData.mainPipes,
-                20, // snapThreshold - ปรับให้สอดคล้องกับหน้า Planner
+                20, // snapThreshold
                 projectData.zones,
                 irrigationZones
             );
@@ -571,11 +608,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4,
-                        fillColor: '#7C3AED', // สีม่วงสำหรับการเชื่อมกลางเส้น
+                        scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                        fillColor: '#8B5CF6', // สีม่วงเข้มสำหรับเมนรอง-กลางเมน
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2,
+                        strokeWeight: 2, // เพิ่มความหนาของขอบ
                     },
                     zIndex: 2004,
                     title: `จุดเชื่อมท่อเมนรอง → กลางท่อเมน`
@@ -602,14 +639,14 @@ const GoogleMapsResultsOverlays: React.FC<{
             });
         }
 
-        // 🔥 เพิ่มการแสดงจุดเชื่อมต่อระหว่างท่อเมนรองและท่อย่อย
+        // 🔥 แสดงจุดเชื่อมต่อระหว่างท่อเมนรองและท่อย่อย - แสดงทุกกรณี
         if (projectData.subMainPipes && lateralPipes) {
             const subMainToLateralConnections = findSubMainToLateralStartConnections(
                 projectData.subMainPipes,
                 lateralPipes,
                 projectData.zones,
                 irrigationZones,
-                20 // snapThreshold - ปรับให้สอดคล้องกับหน้า Planner
+                20 // snapThreshold
             );
 
             subMainToLateralConnections.forEach((connection, index) => {
@@ -621,11 +658,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4,
+                        scale: 3, // ลดขนาดจาก 4 เป็น 3
                         fillColor: '#F59E0B', // สีเหลืองสำหรับการเชื่อมท่อเมนรอง → ท่อย่อย
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2,
+                        strokeWeight: 1.5, // ลดความหนาของขอบ
                     },
                     zIndex: 2002,
                     title: `จุดเชื่อมต่อท่อเมนรอง → ท่อย่อย`
@@ -652,7 +689,7 @@ const GoogleMapsResultsOverlays: React.FC<{
             });
         }
 
-        // 🔥 เพิ่มการแสดงจุดตัดระหว่างท่อเมนรองกับท่อเมน (ท่อเมนรองลากผ่านท่อเมน)
+        // 🔥 แสดงจุดตัดระหว่างท่อเมนรองกับท่อเมน (ท่อเมนรองลากผ่านท่อเมน) - แสดงทุกกรณี
         if (projectData.subMainPipes && projectData.mainPipes) {
             const subMainToMainIntersections = findSubMainToMainIntersections(
                 projectData.subMainPipes,
@@ -670,11 +707,11 @@ const GoogleMapsResultsOverlays: React.FC<{
                     map: map,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
-                        scale: 4,
-                        fillColor: '#7C3AED', // สีม่วงสำหรับการตัดกันของท่อเมนรองกับท่อเมน
+                        scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                        fillColor: '#3B82F6', // สีน้ำเงินสำหรับตัดเมนรอง-เมน
                         fillOpacity: 1.0,
                         strokeColor: '#FFFFFF',
-                        strokeWeight: 2,
+                        strokeWeight: 2, // เพิ่มความหนาของขอบ
                     },
                     zIndex: 2003,
                     title: `จุดตัดท่อเมนรอง ↔ ท่อเมน`
@@ -690,6 +727,56 @@ const GoogleMapsResultsOverlays: React.FC<{
                                 <p><strong>ท่อเมนรอง:</strong> ${intersection.subMainPipeId}</p>
                                 <p><strong>ท่อเมน:</strong> ${intersection.mainPipeId}</p>
                                 <p class="text-xs text-gray-600">ท่อเมนรองลากผ่านท่อเมน</p>
+                            </div>
+                        </div>
+                    `
+                });
+
+                intersectionMarker.addListener('click', () => {
+                    infoWindow.open(map, intersectionMarker);
+                });
+            });
+        }
+
+        // 🔥 เพิ่มการแสดงจุดตัดระหว่างท่อย่อยกับท่อเมนรอง (เมื่อท่อย่อยลากผ่านท่อเมนรอง)
+        if (lateralPipes && projectData.subMainPipes) {
+            const lateralToSubMainIntersections = findLateralToSubMainIntersections(
+                lateralPipes,
+                projectData.subMainPipes,
+                projectData.zones,
+                irrigationZones,
+                20 // snapThreshold
+            );
+
+            lateralToSubMainIntersections.forEach((intersection, index) => {
+                const intersectionMarker = new google.maps.Marker({
+                    position: new google.maps.LatLng(
+                        intersection.intersectionPoint.lat,
+                        intersection.intersectionPoint.lng
+                    ),
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 3, // ขนาดเดียวกับจุดเชื่อมต่ออื่นๆ
+                        fillColor: '#10B981', // สีเขียวอ่อนสำหรับจุดตัดท่อย่อย-เมนรอง
+                        fillOpacity: 1.0,
+                        strokeColor: '#FFFFFF',
+                        strokeWeight: 1.5,
+                    },
+                    zIndex: 2005,
+                    title: `จุดตัดท่อย่อย ↔ ท่อเมนรอง`
+                });
+                overlaysRef.current.markers.set(`lateral-submain-intersection-${index}`, intersectionMarker);
+
+                // เพิ่ม info window
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `
+                        <div class="p-2 min-w-[200px]">
+                            <h4 class="font-bold text-gray-800 mb-2">⚡ จุดตัดท่อย่อย-เมนรอง</h4>
+                            <div class="space-y-1 text-sm">
+                                <p><strong>ท่อย่อย:</strong> ${intersection.lateralPipeId}</p>
+                                <p><strong>ท่อเมนรอง:</strong> ${intersection.subMainPipeId}</p>
+                                <p class="text-xs text-gray-600">ท่อย่อยลากผ่านท่อเมนรอง</p>
                             </div>
                         </div>
                     `
@@ -1018,6 +1105,16 @@ function EnhancedHorticultureResultsPageContent() {
                 const config = loadSprinklerConfig();
                 if (config) {
                     setSprinklerConfig(config);
+                    // Recalculate enhanced stats after loading sprinkler config
+                    const updatedStats = getOverallStats();
+                    setEnhancedStats(updatedStats);
+                    console.log('✅ Sprinkler config loaded and stats updated:', {
+                        config,
+                        updatedStats,
+                        sprinklerFlowRate: updatedStats?.sprinklerFlowRate
+                    });
+                } else {
+                    console.warn('⚠️ No sprinkler config found in localStorage');
                 }
 
                 if (data.mainArea && data.mainArea.length > 0) {
@@ -1280,6 +1377,9 @@ function EnhancedHorticultureResultsPageContent() {
                 });
                 
                 if (enhancedStats && enhancedStats.sprinklerFlowRate && projectData) {
+                    // คำนวณ connection stats
+                    const connectionStats = countConnectionPointsByZone(projectData, irrigationZones);
+                    
                     const horticultureSystemData = {
                         // ข้อมูลระบบหัวฉีด
                         sprinklerConfig: {
@@ -1288,6 +1388,8 @@ function EnhancedHorticultureResultsPageContent() {
                             radiusMeters: enhancedStats.sprinklerFlowRate.radiusMeters,
                             totalFlowRatePerMinute: enhancedStats.sprinklerFlowRate.totalFlowRatePerMinute,
                         },
+                        // ข้อมูลจุดเชื่อมต่อ
+                        connectionStats: connectionStats,
                         // ข้อมูลโซน
                         zones: irrigationZones && irrigationZones.length > 0
                             ? irrigationZones.map((zone: any) => {
@@ -1410,6 +1512,7 @@ function EnhancedHorticultureResultsPageContent() {
                         isMultipleZones: !!(irrigationZones && irrigationZones.length > 0),
                     };
                     
+                    console.log('💾 Saving horticultureSystemData to localStorage:', horticultureSystemData);
                     localStorage.setItem('horticultureSystemData', JSON.stringify(horticultureSystemData));
                 } else {
                     console.warn('Missing data for horticultureSystemData:', {
@@ -1824,6 +1927,110 @@ function EnhancedHorticultureResultsPageContent() {
                                         )}
                                 </div>
                             </div>
+
+                            {/* สถิติจุดเชื่อมต่อ */}
+                            <div className="rounded-lg bg-gray-700 p-4">
+                                <h4 className="mb-3 text-sm font-semibold">
+                                    🔗 {t('สถิติจุดเชื่อมต่อ')}
+                                </h4>
+                                <div className="space-y-3">
+                                    {(() => {
+                                        const connectionStats = countConnectionPointsByZone(projectData, irrigationZones);
+                                        
+                                        
+                                        const totalStats = connectionStats.reduce((acc, zone) => ({
+                                            mainToSubMain: acc.mainToSubMain + zone.mainToSubMain,
+                                            subMainToMainMid: acc.subMainToMainMid + zone.subMainToMainMid,
+                                            subMainToLateral: acc.subMainToLateral + zone.subMainToLateral,
+                                            subMainToMainIntersection: acc.subMainToMainIntersection + zone.subMainToMainIntersection,
+                                            lateralToSubMainIntersection: acc.lateralToSubMainIntersection + zone.lateralToSubMainIntersection,
+                                            total: acc.total + zone.total
+                                        }), {
+                                            mainToSubMain: 0,
+                                            subMainToMainMid: 0,
+                                            subMainToLateral: 0,
+                                            subMainToMainIntersection: 0,
+                                            lateralToSubMainIntersection: 0,
+                                            total: 0
+                                        });
+
+                                        return (
+                                            <>
+                                                {/* สรุปรวมทั้งหมด */}
+                                                <div className="rounded bg-gray-600 p-3">
+                                                    <div className="mb-2 text-xs font-semibold text-yellow-300">
+                                                        📊 {t('สรุปรวมทั้งหมด')}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#DC2626' }}></div>
+                                                            <span>{t('ปลาย-ปลาย')}: {totalStats.mainToSubMain} {t('จุด')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#3B82F6' }}></div>
+                                                            <span>{t('ปลายเมน-ระหว่างเมนรอง')}: {totalStats.subMainToMainMid} {t('จุด')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#8B5CF6' }}></div>
+                                                            <span>{t('เมนรอง-กลางเมน')}: {totalStats.subMainToLateral} {t('จุด')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#F59E0B' }}></div>
+                                                            <span>{t('เมนรอง-ท่อย่อย')}: {totalStats.subMainToMainIntersection} {t('จุด')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: '#10B981' }}></div>
+                                                            <span>{t('ตัดท่อย่อย-เมนรอง')}: {totalStats.lateralToSubMainIntersection} {t('จุด')}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="h-3 w-3 rounded-full bg-white"></div>
+                                                            <span className="font-semibold text-white">{t('รวมทั้งหมด')}: {totalStats.total} {t('จุด')}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* แยกตามโซน */}
+                                                {connectionStats.length > 0 && (
+                                                    <div className="space-y-2">
+                                                        <div className="text-xs font-semibold text-gray-300">
+                                                            {t('แยกตามโซน')}:
+                                                        </div>
+                                                        {connectionStats.map((zoneStats) => (
+                                                            <div key={zoneStats.zoneId} className="rounded bg-gray-600 p-2">
+                                                                <div className="mb-1 text-xs font-semibold text-green-300">
+                                                                    {zoneStats.zoneName}
+                                                                </div>
+                                                                <div className="grid grid-cols-5 gap-1 text-xs">
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#DC2626' }}></div>
+                                                                        <span title="ปลาย-ปลาย">{zoneStats.mainToSubMain}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#3B82F6' }}></div>
+                                                                        <span title="ปลายเมน-ระหว่างเมนรอง">{zoneStats.subMainToMainMid}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#8B5CF6' }}></div>
+                                                                        <span title="เมนรอง-กลางเมน">{zoneStats.subMainToLateral}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#F59E0B' }}></div>
+                                                                        <span title="เมนรอง-ท่อย่อย">{zoneStats.subMainToMainIntersection}</span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: '#10B981' }}></div>
+                                                                        <span title="ตัดท่อย่อย-เมนรอง">{zoneStats.lateralToSubMainIntersection}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="space-y-6">
@@ -2233,7 +2440,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                               );
                                                                                               return bestMain ? (
                                                                                                   <span className="text-gray-100 flex flex-col items-center font-semibold">
-                                                                                                      <p>🔥 ท่อที่ต้องการน้ำมากที่สุด: </p><p>ยาว {formatDistance(bestMain.length)}, {bestMain.count} ทางออก, ใช้น้ำ {bestMain.waterFlowRate.toFixed(1)} L/min</p>
+                                                                                                      <p>🔥 ท่อที่ต้องการน้ำมากที่สุด: </p><p>ยาว {formatDistance(bestMain.length)}, เชื่อม {bestMain.count} ท่อเมนรอง, ใช้น้ำ {bestMain.waterFlowRate.toFixed(1)} L/min</p>
                                                                                           </span>
                                                                                               ) : (
                                                                                                   <span className="text-gray-500">ไม่พบท่อเมนในโซน</span>
@@ -2261,7 +2468,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                               );
                                                                                               return bestSubMain ? (
                                                                                                     <span className="text-gray-100 flex flex-col items-center font-semibold">
-                                                                                                      <p>🔥 ท่อที่ต้องการน้ำมากที่สุด: </p><p>ยาว {formatDistance(bestSubMain.length)}, {bestSubMain.count} ทางออก, ใช้น้ำ {bestSubMain.waterFlowRate.toFixed(1)} L/min</p>
+                                                                                                      <p>🔥 ท่อที่ต้องการน้ำมากที่สุด: </p><p>ยาว {formatDistance(bestSubMain.length)}, เชื่อม {bestSubMain.count} ท่อย่อย, ใช้น้ำ {bestSubMain.waterFlowRate.toFixed(1)} L/min</p>
                                                                                           </span>
                                                                                               ) : (
                                                                                                   <span className="text-gray-500">ไม่พบท่อเมนรองในโซน</span>
@@ -2289,7 +2496,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                               );
                                                                                               return bestBranch ? (
                                                                                                   <span className="text-gray-100 flex flex-col items-center font-semibold">
-                                                                                                      <p>🔥 ท่อที่ต้องการน้ำมากที่สุด: </p><p>ยาว {formatDistance(bestBranch.length)}, {bestBranch.count} ทางออก, ใช้น้ำ {bestBranch.waterFlowRate.toFixed(1)} L/min</p>
+                                                                                                      <p>🔥 ท่อที่ต้องการน้ำมากที่สุด: </p><p>ยาว {formatDistance(bestBranch.length)}, ให้น้ำ {bestBranch.count} ต้นไม้, ใช้น้ำ {bestBranch.waterFlowRate.toFixed(1)} L/min</p>
                                                                                           </span>
                                                                                               ) : (
                                                                                                   <span className="text-gray-500">ไม่พบท่อย่อยในโซน</span>
@@ -2469,7 +2676,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                       );
                                                                                       return bestMain ? (
                                                                                           <span className="text-xs text-orange-400 font-semibold">
-                                                                                              🔥 ต้องการน้ำมากที่สุด: ยาว {formatDistance(bestMain.length)}, {bestMain.count} ทางออก, {bestMain.waterFlowRate.toFixed(1)} L/min
+                                                                                              🔥 ต้องการน้ำมากที่สุด: ยาว {formatDistance(bestMain.length)}, เชื่อม {bestMain.count} ท่อเมนรอง, {bestMain.waterFlowRate.toFixed(1)} L/min
                                                                                           </span>
                                                                                       ) : (
                                                                                           <span className="text-xs text-gray-500">ไม่พบท่อเมนในโซน</span>
@@ -2507,7 +2714,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                       );
                                                                                       return bestSubMain ? (
                                                                                           <span className="text-xs text-orange-400 font-semibold">
-                                                                                              🔥 ต้องการน้ำมากที่สุด: ยาว {formatDistance(bestSubMain.length)}, {bestSubMain.count} ทางออก, {bestSubMain.waterFlowRate.toFixed(1)} L/min
+                                                                                              🔥 ต้องการน้ำมากที่สุด: ยาว {formatDistance(bestSubMain.length)}, เชื่อม {bestSubMain.count} ท่อย่อย, {bestSubMain.waterFlowRate.toFixed(1)} L/min
                                                                                   </span>
                                                                                       ) : (
                                                                                           <span className="text-xs text-gray-500">ไม่พบท่อเมนรองในโซน</span>
@@ -2545,7 +2752,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                       );
                                                                                       return bestBranch ? (
                                                                                           <span className="text-xs text-orange-400 font-semibold">
-                                                                                              🔥 ต้องการน้ำมากที่สุด: ยาว {formatDistance(bestBranch.length)}, {bestBranch.count} ทางออก, {bestBranch.waterFlowRate.toFixed(1)} L/min
+                                                                                              🔥 ต้องการน้ำมากที่สุด: ยาว {formatDistance(bestBranch.length)}, ให้น้ำ {bestBranch.count} ต้นไม้, {bestBranch.waterFlowRate.toFixed(1)} L/min
                                                                                   </span>
                                                                                       ) : (
                                                                                           <span className="text-xs text-gray-500">ไม่พบท่อย่อยในโซน</span>

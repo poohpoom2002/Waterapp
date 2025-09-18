@@ -8,6 +8,7 @@ use App\Http\Controllers\HomeGardenController;
 use App\Http\Controllers\Api\SprinklerController;
 use App\Http\Controllers\Api\EquipmentCategoryController;
 use App\Http\Controllers\Api\EquipmentController;
+use App\Http\Controllers\Api\TokenController;
 use App\Http\Controllers\ProfilePhotoController;
 
 /*
@@ -21,8 +22,8 @@ use App\Http\Controllers\ProfilePhotoController;
 |
 */
 
-// User info endpoint for API (works with both sanctum and web auth)
-Route::middleware(['auth:sanctum,web'])->get('/user', function (Request $request) {
+// User info endpoint for API (works with web auth)
+Route::middleware(['web', 'auth'])->get('/user', function (Request $request) {
     return $request->user();
 });
 
@@ -30,8 +31,8 @@ Route::middleware(['auth:sanctum,web'])->get('/user', function (Request $request
 // 🤖 CHAIYO AI ROUTES (Enhanced Company Representative)
 // ==================================================
 
-// Main ChaiyoAI Chat Endpoint
-Route::post('/ai-chat', [ChaiyoAiChatController::class, 'handleChat']);
+// Main ChaiyoAI Chat Endpoint (consumes 2 tokens per chat)
+Route::post('/ai-chat', [ChaiyoAiChatController::class, 'handleChat'])->middleware('consume.tokens:2');
 
 // ChaiyoAI Management & Info Routes
 Route::prefix('ai')->group(function () {
@@ -92,6 +93,23 @@ Route::prefix('equipments')->group(function () {
 });
 
 // ==================================================
+// 📦 EQUIPMENT SETS ROUTES
+// ==================================================
+
+use App\Http\Controllers\Api\EquipmentSetController;
+
+// Equipment Sets API Resource
+Route::apiResource('equipment-sets', EquipmentSetController::class);
+
+// Equipment Sets additional routes
+Route::prefix('equipment-sets')->group(function () {
+    Route::get('stats', [EquipmentSetController::class, 'stats']);
+    Route::get('by-name/{name}', [EquipmentSetController::class, 'getByName']);
+    Route::post('{equipmentSet}/duplicate', [EquipmentSetController::class, 'duplicate']);
+    Route::patch('{equipmentSet}/toggle-status', [EquipmentSetController::class, 'toggleStatus']);
+});
+
+// ==================================================
 // 📸 IMAGE MANAGEMENT ROUTES (Backward Compatibility)
 // ==================================================
 // เก็บ backward compatibility สำหรับ frontend ที่อาจใช้ /api/images/*
@@ -133,10 +151,10 @@ Route::get('/pipes', fn() => app(EquipmentController::class)->getByCategory('pip
 // ==================================================
 
 // Public Farm & Planner API Routes (No authentication required)
-Route::post('/generate-planting-points', [FarmController::class, 'generatePlantingPoints']);
-Route::post('/generate-pipe-layout', [FarmController::class, 'generatePipeLayout']); 
+Route::post('/generate-planting-points', [FarmController::class, 'generatePlantingPoints'])->middleware('consume.tokens:2'); // Generating planting points costs 2 tokens
+Route::post('/generate-pipe-layout', [FarmController::class, 'generatePipeLayout'])->middleware('consume.tokens:5'); // Generating pipe layouts costs 5 tokens
 Route::get('/plant-types', [FarmController::class, 'getPlantTypes']);
-Route::post('/get-elevation', [FarmController::class, 'getElevation']);
+Route::post('/get-elevation', [FarmController::class, 'getElevation'])->middleware('consume.tokens:1'); // Getting elevation data costs 1 token
 
 // Plant points management (No authentication required for now)
 Route::post('/plant-points/add', [FarmController::class, 'addPlantPoint']);
@@ -147,19 +165,50 @@ Route::post('/plant-points/move', [FarmController::class, 'movePlantPoint']);
 Route::middleware(['web', 'auth'])->group(function () {
     Route::get('/fields', [FarmController::class, 'getFields']);
     Route::get('/fields/{fieldId}', [FarmController::class, 'getField']);
-    Route::post('/save-field', [FarmController::class, 'saveField']);
-    Route::put('/fields/{fieldId}', [FarmController::class, 'updateField']);
+    Route::post('/save-field', [FarmController::class, 'saveField'])->middleware('consume.tokens:3'); // Creating fields costs 3 tokens
+    Route::put('/fields/{fieldId}', [FarmController::class, 'updateField'])->middleware('consume.tokens:1'); // Updating fields costs 1 token
+    Route::put('/fields/{fieldId}/data', [FarmController::class, 'updateFieldData'])->middleware('consume.tokens:1');
     Route::delete('/fields/{fieldId}', [FarmController::class, 'deleteField']);
-
-    // Folder Management API Routes
-    Route::get('/folders', [FarmController::class, 'getFolders']);
-    Route::post('/folders', [FarmController::class, 'createFolder']);
-    Route::put('/folders/{folderId}', [FarmController::class, 'updateFolder']);
-    Route::delete('/folders/{folderId}', [FarmController::class, 'deleteFolder']);
 
     // Field Status Management
     Route::put('/fields/{fieldId}/status', [FarmController::class, 'updateFieldStatus']);
     Route::put('/fields/{fieldId}/folder', [FarmController::class, 'updateFieldFolder']);
+});
+
+// Test route to check if routes are working
+Route::get('/test', function () {
+    return response()->json(['message' => 'API is working']);
+});
+
+// Test folders route with closure
+Route::get('/folders-test', function () {
+    return response()->json([
+        'success' => true,
+        'folders' => [
+            [
+                'id' => 'temp-finished',
+                'name' => 'Finished',
+                'type' => 'finished',
+                'color' => '#10b981',
+                'icon' => '✅',
+                'parent_id' => null,
+                'field_count' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'id' => 'temp-unfinished',
+                'name' => 'Unfinished',
+                'type' => 'unfinished',
+                'color' => '#f59e0b',
+                'icon' => '⏳',
+                'parent_id' => null,
+                'field_count' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]
+    ]);
 });
 
 // ==================================================
@@ -579,6 +628,33 @@ if (app()->environment('local')) {
         });
     });
 }
+
+// ==================================================
+// 🪙 TOKEN SYSTEM ROUTES
+// ==================================================
+
+Route::middleware(['web', 'auth'])->prefix('tokens')->group(function () {
+    // Get current user's token status
+    Route::get('/status', [TokenController::class, 'getTokenStatus']);
+    
+    // Refresh user's tokens (daily refresh)
+    Route::post('/refresh', [TokenController::class, 'refreshTokens']);
+    
+    // Consume tokens for an operation
+    Route::post('/consume', [TokenController::class, 'consumeTokens']);
+    
+    // Check if user has enough tokens
+    Route::post('/check', [TokenController::class, 'checkTokens']);
+    
+    // Admin routes
+    Route::middleware(['web', 'auth'])->group(function () {
+        // Add tokens to user account (admin only)
+        Route::post('/add', [TokenController::class, 'addTokens']);
+        
+        // Get token usage statistics (admin only)
+        Route::get('/stats', [TokenController::class, 'getTokenStats']);
+    });
+});
 
 // ==================================================
 // ⚠️ ERROR HANDLING & FALLBACK ROUTES

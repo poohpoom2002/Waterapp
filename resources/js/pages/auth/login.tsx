@@ -303,7 +303,6 @@
 //     );
 // }
 
-
 import { useForm } from '@inertiajs/react';
 import { LoaderCircle, Shield, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';

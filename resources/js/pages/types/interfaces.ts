@@ -29,6 +29,10 @@ export interface IrrigationInput {
         pipeId: number | null; 
         lengthPerHead: number; 
     };
+    sprinklerEquipmentSet?: {
+        selectedGroupId: number | string | null;
+        selectedItems: SprinklerSetItem[];
+    };
 }
 
 export interface AnalyzedPipe {
@@ -333,4 +337,48 @@ export interface ProjectModeConfig {
     supportsMultiZone: boolean;
     areaUnit: 'rai' | 'sqm';
     itemName: string;
+}
+
+export interface SprinklerSetItem {
+    id: number | string;
+    group_id: number;
+    equipment_id: number;
+    equipment: {
+        id: number;
+        name: string;
+        product_code: string;
+        price: number;
+        image?: string;
+        brand?: string;
+        category?: {
+            id: number;
+            name: string;
+            display_name: string;
+        };
+    };
+    quantity: number;
+    unit_price: number;
+    total_price?: number;
+    sort_order: number;
+}
+
+export interface SprinklerSetGroup {
+    id: number | string;
+    equipment_set_id: number;
+    items: SprinklerSetItem[];
+    total_price?: number;
+    items_count?: number;
+    sort_order: number;
+}
+
+export interface SprinklerEquipmentSet {
+    id: number;
+    name: string;
+    description?: string;
+    groups: SprinklerSetGroup[];
+    total_price?: number;
+    is_active: boolean;
+    user_id?: number;
+    created_at?: string;
+    updated_at?: string;
 }

@@ -116,11 +116,12 @@ function calculateSummary(
 
     // คำนวณความยาวท่อรวมจากท่อทั้งหมด
     const totalPipeLength = pipes.reduce((sum, pipe) => {
-        const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
-            ? Math.max(0, pipe.length)
-            : (pipe.canvasStart && pipe.canvasEnd)
-                ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
-                : (pipe.start && pipe.end)
+        const length =
+            typeof pipe.length === 'number' && !isNaN(pipe.length)
+                ? Math.max(0, pipe.length)
+                : pipe.canvasStart && pipe.canvasEnd
+                  ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                  : pipe.start && pipe.end
                     ? calculateDistance(pipe.start, pipe.end)
                     : 0;
         return sum + length;
@@ -192,11 +193,12 @@ function calculateZoneStatistics(
             // หาท่อในโซนนี้และคำนวณความยาวรวม
             const zonePipes = pipes.filter((p) => p.zoneId === zone.id);
             const totalPipeLength = zonePipes.reduce((sum, pipe) => {
-                const length = typeof pipe.length === 'number' && !isNaN(pipe.length)
-                    ? Math.max(0, pipe.length)
-                    : (pipe.canvasStart && pipe.canvasEnd)
-                        ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
-                        : (pipe.start && pipe.end)
+                const length =
+                    typeof pipe.length === 'number' && !isNaN(pipe.length)
+                        ? Math.max(0, pipe.length)
+                        : pipe.canvasStart && pipe.canvasEnd
+                          ? calculateDistance(pipe.canvasStart, pipe.canvasEnd, scale)
+                          : pipe.start && pipe.end
                             ? calculateDistance(pipe.start, pipe.end)
                             : 0;
                 return sum + length;
@@ -210,7 +212,11 @@ function calculateZoneStatistics(
             );
 
             // คำนวณสถิติข้อต่อทางแยกในโซนนี้
-            const zoneJunctionStatistics = calculateJunctionStatistics(zonePipes, zoneSprinklers, scale);
+            const zoneJunctionStatistics = calculateJunctionStatistics(
+                zonePipes,
+                zoneSprinklers,
+                scale
+            );
 
             return {
                 zoneId: zone.id,
@@ -292,7 +298,7 @@ function findLongestPipeFromSourceInZone(
 
 /**
  * คำนวณข้อต่อทางแยกทั้งหมดในระบบ
- * 
+ *
  * กฎการนับทาง:
  * 1. ทางแยกคือจุดที่ท่อตัดกันหรือเชื่อมต่อกัน
  * 2. หัวฉีดปลายท่อ (เชื่อมต่อกับท่อ 1 ท่อ) = 2 ทาง
@@ -310,12 +316,16 @@ export function calculateJunctionStatistics(
     const processedPositions = new Set<string>();
 
     // รวบรวมจุดปลายท่อทั้งหมด
-    const allPoints: Array<{ position: Coordinate | CanvasCoordinate; pipeId: string; isStart: boolean }> = [];
+    const allPoints: Array<{
+        position: Coordinate | CanvasCoordinate;
+        pipeId: string;
+        isStart: boolean;
+    }> = [];
 
-    pipes.forEach(pipe => {
+    pipes.forEach((pipe) => {
         const start = pipe.canvasStart || pipe.start;
         const end = pipe.canvasEnd || pipe.end;
-        
+
         if (start) {
             allPoints.push({ position: start, pipeId: pipe.id, isStart: true });
         }
@@ -327,30 +337,34 @@ export function calculateJunctionStatistics(
     // จัดกลุ่มจุดที่อยู่ใกล้กัน (ในระยะ tolerance)
     const pointGroups: Array<{
         position: Coordinate | CanvasCoordinate;
-        points: Array<{ position: Coordinate | CanvasCoordinate; pipeId: string; isStart: boolean }>;
+        points: Array<{
+            position: Coordinate | CanvasCoordinate;
+            pipeId: string;
+            isStart: boolean;
+        }>;
     }> = [];
 
-    allPoints.forEach(point => {
+    allPoints.forEach((point) => {
         let foundGroup = false;
-        
+
         for (const group of pointGroups) {
             const distance = calculateDistance(
                 point.position,
                 group.position,
                 isCanvasCoordinate(point.position) ? scale : undefined
             );
-            
+
             if (distance <= tolerance) {
                 group.points.push(point);
                 foundGroup = true;
                 break;
             }
         }
-        
+
         if (!foundGroup) {
             pointGroups.push({
                 position: point.position,
-                points: [point]
+                points: [point],
             });
         }
     });
@@ -359,16 +373,16 @@ export function calculateJunctionStatistics(
     const directIntersections = findDirectPipeIntersections(pipes, tolerance, scale);
     
     // เพิ่มจุดตัดที่หาได้เข้าไปในกลุ่มจุด
-    directIntersections.forEach(intersection => {
+    directIntersections.forEach((intersection) => {
         const positionKey = getPositionKey(intersection.position);
         if (!processedPositions.has(positionKey)) {
             pointGroups.push({
                 position: intersection.position,
-                points: intersection.pipes.map(pipeId => ({
+                points: intersection.pipes.map((pipeId) => ({
                     position: intersection.position,
                     pipeId,
-                    isStart: false
-                }))
+                    isStart: false,
+                })),
             });
         }
     });
@@ -381,11 +395,11 @@ export function calculateJunctionStatistics(
         if (!processedPositions.has(positionKey)) {
             pointGroups.push({
                 position: intersection.position,
-                points: intersection.pipes.map(pipeId => ({
+                points: intersection.pipes.map((pipeId) => ({
                     position: intersection.position,
                     pipeId,
-                    isStart: false
-                }))
+                    isStart: false,
+                })),
             });
         }
     });
@@ -401,25 +415,25 @@ export function calculateJunctionStatistics(
         if (!processedPositions.has(positionKey)) {
             pointGroups.push({
                 position: intersection.position,
-                points: intersection.pipes.map(pipeId => ({
+                points: intersection.pipes.map((pipeId) => ({
                     position: intersection.position,
                     pipeId,
-                    isStart: false
-                }))
+                    isStart: false,
+                })),
             });
         }
     });
 
-    enhancedJunctions.forEach(intersection => {
+    enhancedJunctions.forEach((intersection) => {
         const positionKey = getPositionKey(intersection.position);
         if (!processedPositions.has(positionKey)) {
             pointGroups.push({
                 position: intersection.position,
-                points: intersection.pipes.map(pipeId => ({
+                points: intersection.pipes.map((pipeId) => ({
                     position: intersection.position,
                     pipeId,
-                    isStart: false
-                }))
+                    isStart: false,
+                })),
             });
         }
     });
@@ -429,12 +443,12 @@ export function calculateJunctionStatistics(
     pointGroups.forEach((group) => {
         const positionKey = getPositionKey(group.position);
         if (processedPositions.has(positionKey)) return;
-        
+
         processedPositions.add(positionKey);
 
         // หาท่อที่เชื่อมต่อกับจุดนี้
-        const connectedPipeIds = [...new Set(group.points.map(p => p.pipeId))];
-        
+        const connectedPipeIds = [...new Set(group.points.map((p) => p.pipeId))];
+
         // ตรวจสอบว่ามีหัวฉีดอยู่ที่จุดนี้หรือไม่
         const sprinklerAtPoint = findSprinklerAtPosition(group.position, sprinklers, tolerance, scale);
         
@@ -449,16 +463,16 @@ export function calculateJunctionStatistics(
                 ways,
                 type: 'sprinkler_junction',
                 sprinklerId: sprinklerAtPoint.id,
-                connectedPipes: connectedPipeIds
+                connectedPipes: connectedPipeIds,
             });
-            
+
             // ถ้ามีท่อมากกว่า 2 เส้น ให้สร้าง pipe junction เพิ่มเติมด้วย (จุดแยกที่มีหัวฉีดแต่ก็เป็นข้อต่อท่อด้วย)
             if (connectedPipeIds.length >= 3) {
                 junctionPoints.push({
                     position: group.position,
                     ways: connectedPipeIds.length,
                     type: 'pipe_junction',
-                    connectedPipes: connectedPipeIds
+                    connectedPipes: connectedPipeIds,
                 });
             }
         } else if (connectedPipeIds.length >= 2 && connectedPipeIds.length <= 6) {
@@ -471,7 +485,7 @@ export function calculateJunctionStatistics(
                 position: group.position,
                 ways,
                 type: 'pipe_junction',
-                connectedPipes: connectedPipeIds
+                connectedPipes: connectedPipeIds,
             });
         } else if (connectedPipeIds.length > 6) {
             // Suspicious junction with too many pipes - IGNORED
@@ -481,7 +495,7 @@ export function calculateJunctionStatistics(
     });
 
     // ตรวจสอบหัวฉีดที่ยังไม่ได้ประมวลผล (อาจเป็นหัวฉีดปลายท่อ)
-    sprinklers.forEach(sprinkler => {
+    sprinklers.forEach((sprinkler) => {
         const sprinklerPos = sprinkler.canvasPosition || sprinkler.position;
         if (!sprinklerPos) return;
 
@@ -490,14 +504,22 @@ export function calculateJunctionStatistics(
 
         // หาท่อที่เชื่อมต่อกับหัวฉีดนี้
         const connectedPipes: string[] = [];
-        pipes.forEach(pipe => {
+        pipes.forEach((pipe) => {
             const start = pipe.canvasStart || pipe.start;
             const end = pipe.canvasEnd || pipe.end;
-            
+
             if (start && end) {
-                const distToStart = calculateDistance(sprinklerPos, start, isCanvasCoordinate(sprinklerPos) ? scale : undefined);
-                const distToEnd = calculateDistance(sprinklerPos, end, isCanvasCoordinate(sprinklerPos) ? scale : undefined);
-                
+                const distToStart = calculateDistance(
+                    sprinklerPos,
+                    start,
+                    isCanvasCoordinate(sprinklerPos) ? scale : undefined
+                );
+                const distToEnd = calculateDistance(
+                    sprinklerPos,
+                    end,
+                    isCanvasCoordinate(sprinklerPos) ? scale : undefined
+                );
+
                 if (distToStart <= tolerance || distToEnd <= tolerance) {
                     connectedPipes.push(pipe.id);
                 }
@@ -508,13 +530,13 @@ export function calculateJunctionStatistics(
             // หัวฉีดที่อยู่ปลายท่อ (เชื่อมต่อกับท่อเพียงท่อเดียว) ใช้ 2 ทาง
             // หัวฉีดที่อยู่กลางเส้นทาง (เชื่อมต่อกับท่อมากกว่า 1 ท่อ) บวก 1 ทางเสมอ
             const ways = connectedPipes.length === 1 ? 2 : connectedPipes.length + 1;
-            
+
             junctionPoints.push({
                 position: sprinklerPos,
                 ways,
                 type: 'sprinkler_junction',
                 sprinklerId: sprinkler.id,
-                connectedPipes
+                connectedPipes,
             });
 
             processedPositions.add(positionKey);
@@ -523,15 +545,13 @@ export function calculateJunctionStatistics(
 
     // คำนวณสถิติ
     const totalJunctions = junctionPoints.length;
-    const pipeJunctions = junctionPoints.filter(j => j.type === 'pipe_junction').length;
-    const sprinklerJunctions = junctionPoints.filter(j => j.type === 'sprinkler_junction').length;
-    
+    const pipeJunctions = junctionPoints.filter((j) => j.type === 'pipe_junction').length;
+    const sprinklerJunctions = junctionPoints.filter((j) => j.type === 'sprinkler_junction').length;
+
     const junctionsByWays: { [ways: number]: number } = {};
-    junctionPoints.forEach(junction => {
+    junctionPoints.forEach((junction) => {
         junctionsByWays[junction.ways] = (junctionsByWays[junction.ways] || 0) + 1;
     });
-
-
 
 
     return {
@@ -539,7 +559,7 @@ export function calculateJunctionStatistics(
         pipeJunctions,
         sprinklerJunctions,
         junctionsByWays,
-        junctionPoints
+        junctionPoints,
     };
 }
 
@@ -572,7 +592,7 @@ function findSprinklerAtPosition(
 ): Sprinkler | null {
     // ลดความเข้มงวด: ใช้ tolerance ที่เล็กกว่า เพื่อให้จุดแยกที่ไม่ได้อยู่ตรงหัวฉีดพอดี ถือเป็น pipe junction
     const strictTolerance = tolerance * 0.3; // ลดเหลือ 30% ของ tolerance เดิม
-    
+
     for (const sprinkler of sprinklers) {
         const sprinklerPos = sprinkler.canvasPosition || sprinkler.position;
         if (!sprinklerPos) continue;
@@ -587,7 +607,7 @@ function findSprinklerAtPosition(
             return sprinkler;
         }
     }
-    
+
     return null;
 }
 
@@ -607,20 +627,20 @@ function findDirectPipeIntersections(
         for (let j = i + 1; j < pipes.length; j++) {
             const pipe1 = pipes[i];
             const pipe2 = pipes[j];
-            
+
             const start1 = pipe1.canvasStart || pipe1.start;
             const end1 = pipe1.canvasEnd || pipe1.end;
             const start2 = pipe2.canvasStart || pipe2.start;
             const end2 = pipe2.canvasEnd || pipe2.end;
-            
+
             if (!start1 || !end1 || !start2 || !end2) continue;
-            
+
             // หาจุดตัดของเส้นตรงสองเส้นด้วยสูตรคณิตศาสตร์
             const intersection = findMathematicalLineIntersection(start1, end1, start2, end2);
-            
+
             if (intersection) {
                 // ตรวจสอบว่ามีจุดตัดนี้อยู่แล้วหรือไม่
-                const existingIntersection = intersections.find(existing => {
+                const existingIntersection = intersections.find((existing) => {
                     const dist = calculateDistance(
                         existing.position,
                         intersection,
@@ -628,7 +648,7 @@ function findDirectPipeIntersections(
                     );
                     return dist <= tolerance;
                 });
-                
+
                 if (existingIntersection) {
                     // เพิ่มท่อเข้าไปในจุดตัดที่มีอยู่
                     if (!existingIntersection.pipes.includes(pipe1.id)) {
@@ -641,17 +661,18 @@ function findDirectPipeIntersections(
                     // สร้างจุดตัดใหม่
                     intersections.push({
                         position: intersection,
-                        pipes: [pipe1.id, pipe2.id]
+                        pipes: [pipe1.id, pipe2.id],
                     });
                 }
             }
         }
     }
     // รวมจุดตัดที่อยู่ใกล้กัน และรวมท่อที่ผ่านจุดเดียวกัน
-    const mergedIntersections: Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> = [];
-    
-    intersections.forEach(intersection => {
-        const existing = mergedIntersections.find(merged => {
+    const mergedIntersections: Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> =
+        [];
+
+    intersections.forEach((intersection) => {
+        const existing = mergedIntersections.find((merged) => {
             const dist = calculateDistance(
                 merged.position,
                 intersection.position,
@@ -659,10 +680,10 @@ function findDirectPipeIntersections(
             );
             return dist <= tolerance;
         });
-        
+
         if (existing) {
             // รวมท่อเข้าไปในจุดตัดที่มีอยู่
-            intersection.pipes.forEach(pipeId => {
+            intersection.pipes.forEach((pipeId) => {
                 if (!existing.pipes.includes(pipeId)) {
                     existing.pipes.push(pipeId);
                 }
@@ -670,20 +691,20 @@ function findDirectPipeIntersections(
         } else {
             mergedIntersections.push({
                 position: intersection.position,
-                pipes: [...intersection.pipes]
+                pipes: [...intersection.pipes],
             });
         }
     });
-    
+
     // ตรวจสอบท่อเพิ่มเติมที่อาจผ่านจุดตัดเหล่านี้
-    mergedIntersections.forEach(intersection => {
-        pipes.forEach(pipe => {
+    mergedIntersections.forEach((intersection) => {
+        pipes.forEach((pipe) => {
             if (intersection.pipes.includes(pipe.id)) return; // ท่อนี้อยู่ในจุดตัดแล้ว
-            
+
             const start = pipe.canvasStart || pipe.start;
             const end = pipe.canvasEnd || pipe.end;
             if (!start || !end) return;
-            
+
             // ตรวจสอบว่าท่อนี้ผ่านจุดตัดหรือไม่
             if (isPointOnLineSegment(intersection.position, start, end, tolerance, scale)) {
                 // เพิ่มท่อเข้าไปในจุดตัดโดยไม่ต้องตรวจสอบมุม
@@ -691,7 +712,7 @@ function findDirectPipeIntersections(
             }
         });
     });
-    
+
     return mergedIntersections;
 }
 
@@ -703,41 +724,42 @@ function findPipePassThroughPoints(
     tolerance: number,
     scale: number
 ): Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> {
-    const passThroughPoints: Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> = [];
-    
+    const passThroughPoints: Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> =
+        [];
+
     // สร้างรายการจุดปลายท่อทั้งหมด
     const allEndpoints: Array<{ position: Coordinate | CanvasCoordinate; pipeId: string }> = [];
-    
-    pipes.forEach(pipe => {
+
+    pipes.forEach((pipe) => {
         const start = pipe.canvasStart || pipe.start;
         const end = pipe.canvasEnd || pipe.end;
-        
+
         if (start) allEndpoints.push({ position: start, pipeId: pipe.id });
         if (end) allEndpoints.push({ position: end, pipeId: pipe.id });
     });
-    
+
     // สำหรับแต่ละจุดปลายท่อ ตรวจสอบว่ามีท่อเส้นอื่นผ่านจุดนั้นหรือไม่
-    allEndpoints.forEach(endpoint => {
+    allEndpoints.forEach((endpoint) => {
         const pipesAtPoint: string[] = [endpoint.pipeId];
-        
-        pipes.forEach(otherPipe => {
+
+        pipes.forEach((otherPipe) => {
             if (otherPipe.id === endpoint.pipeId) return; // ข้ามท่อตัวเอง
-            
+
             const otherStart = otherPipe.canvasStart || otherPipe.start;
             const otherEnd = otherPipe.canvasEnd || otherPipe.end;
-            
+
             if (!otherStart || !otherEnd) return;
-            
+
             // ตรวจสอบว่าจุดปลายนี้อยู่บนท่ออื่นหรือไม่
             if (isPointOnLineSegment(endpoint.position, otherStart, otherEnd, tolerance, scale)) {
                 pipesAtPoint.push(otherPipe.id);
             }
         });
-        
+
         // ถ้ามีท่อมากกว่า 1 เส้นที่จุดนี้ แสดงว่าเป็นจุดตัด
         if (pipesAtPoint.length > 1) {
             // ตรวจสอบว่าจุดนี้มีอยู่แล้วหรือไม่
-            const existing = passThroughPoints.find(existing => {
+            const existing = passThroughPoints.find((existing) => {
                 const dist = calculateDistance(
                     existing.position,
                     endpoint.position,
@@ -745,10 +767,10 @@ function findPipePassThroughPoints(
                 );
                 return dist <= tolerance;
             });
-            
+
             if (existing) {
                 // เพิ่มท่อที่ยังไม่มี
-                pipesAtPoint.forEach(pipeId => {
+                pipesAtPoint.forEach((pipeId) => {
                     if (!existing.pipes.includes(pipeId)) {
                         existing.pipes.push(pipeId);
                     }
@@ -757,12 +779,12 @@ function findPipePassThroughPoints(
                 // สร้างจุดใหม่
                 passThroughPoints.push({
                     position: endpoint.position,
-                    pipes: [...pipesAtPoint]
+                    pipes: [...pipesAtPoint],
                 });
             }
         }
     });
-    
+
     return passThroughPoints;
 }
 
@@ -775,62 +797,65 @@ function findEnhancedPipeJunctions(
     scale: number
 ): Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> {
     const junctions: Array<{ position: Coordinate | CanvasCoordinate; pipes: string[] }> = [];
-    
+
     // สร้างตารางจุดทั้งหมดจากท่อ
-    const allPipePoints: Array<{ 
-        position: Coordinate | CanvasCoordinate; 
-        pipeId: string; 
-        type: 'start' | 'end' | 'midpoint' 
+    const allPipePoints: Array<{
+        position: Coordinate | CanvasCoordinate;
+        pipeId: string;
+        type: 'start' | 'end' | 'midpoint';
     }> = [];
-    
-    pipes.forEach(pipe => {
+
+    pipes.forEach((pipe) => {
         const start = pipe.canvasStart || pipe.start;
         const end = pipe.canvasEnd || pipe.end;
-        
+
         if (start && end) {
             allPipePoints.push({ position: start, pipeId: pipe.id, type: 'start' });
             allPipePoints.push({ position: end, pipeId: pipe.id, type: 'end' });
-            
+
             // ลบจุดกลางออกเพื่อลดความซับซ้อน
             // const midpoint = calculateMidpoint(start, end);
             // allPipePoints.push({ position: midpoint, pipeId: pipe.id, type: 'midpoint' });
         }
     });
-    
+
     // สำหรับแต่ละจุด ตรวจสอบว่ามีท่อเส้นอื่นผ่านหรือไม่
-    allPipePoints.forEach(point => {
+    allPipePoints.forEach((point) => {
         const pipesAtPoint: string[] = [point.pipeId];
-        
-        pipes.forEach(otherPipe => {
+
+        pipes.forEach((otherPipe) => {
             if (otherPipe.id === point.pipeId) return;
-            
+
             const otherStart = otherPipe.canvasStart || otherPipe.start;
             const otherEnd = otherPipe.canvasEnd || otherPipe.end;
-            
+
             if (!otherStart || !otherEnd) return;
-            
+
             // ตรวจสอบว่าจุดนี้อยู่บนท่ออื่นหรือใกล้จุดปลายของท่ออื่น
             const distToOtherStart = calculateDistance(
-                point.position, 
-                otherStart, 
+                point.position,
+                otherStart,
                 isCanvasCoordinate(point.position) ? scale : undefined
             );
             const distToOtherEnd = calculateDistance(
-                point.position, 
-                otherEnd, 
+                point.position,
+                otherEnd,
                 isCanvasCoordinate(point.position) ? scale : undefined
             );
-            
-            if (distToOtherStart <= tolerance || distToOtherEnd <= tolerance || 
-                isPointOnLineSegment(point.position, otherStart, otherEnd, tolerance, scale)) {
+
+            if (
+                distToOtherStart <= tolerance ||
+                distToOtherEnd <= tolerance ||
+                isPointOnLineSegment(point.position, otherStart, otherEnd, tolerance, scale)
+            ) {
                 pipesAtPoint.push(otherPipe.id);
             }
         });
-        
+
         // ถ้ามีท่อมากกว่า 1 เส้น แต่ไม่เกิน 6 เส้น (กรองข้อต่อที่ไม่สมเหตุสมผล)
         if (pipesAtPoint.length > 1 && pipesAtPoint.length <= 6) {
             // ตรวจสอบว่าจุดนี้มีอยู่แล้วหรือไม่
-            const existing = junctions.find(existing => {
+            const existing = junctions.find((existing) => {
                 const dist = calculateDistance(
                     existing.position,
                     point.position,
@@ -838,10 +863,10 @@ function findEnhancedPipeJunctions(
                 );
                 return dist <= tolerance;
             });
-            
+
             if (existing) {
                 // รวมท่อเข้าไปในจุดที่มีอยู่
-                pipesAtPoint.forEach(pipeId => {
+                pipesAtPoint.forEach((pipeId) => {
                     if (!existing.pipes.includes(pipeId)) {
                         existing.pipes.push(pipeId);
                     }
@@ -850,16 +875,14 @@ function findEnhancedPipeJunctions(
                 // สร้างจุดใหม่
                 junctions.push({
                     position: point.position,
-                    pipes: [...new Set(pipesAtPoint)]
+                    pipes: [...new Set(pipesAtPoint)],
                 });
             }
         }
     });
-    
+
     return junctions;
 }
-
-
 
 /**
  * หา T-junctions: จุดที่ปลายท่อเส้นหนึ่งเชื่อมต่อกับกลางท่ออีกเส้น
@@ -876,24 +899,24 @@ function findTJunctions(
     pipes.forEach((pipe, i) => {
         const start = pipe.canvasStart || pipe.start;
         const end = pipe.canvasEnd || pipe.end;
-        
+
         if (!start || !end) return;
-        
+
         // ตรวจสอบปลายท่อทั้งสองด้าน
-        [start, end].forEach(endpoint => {
+        [start, end].forEach((endpoint) => {
             pipes.forEach((otherPipe, j) => {
                 if (i === j) return; // ไม่เช็คกับตัวเอง
-                
+
                 const otherStart = otherPipe.canvasStart || otherPipe.start;
                 const otherEnd = otherPipe.canvasEnd || otherPipe.end;
-                
+
                 if (!otherStart || !otherEnd) return;
-                
+
                 // ตรวจสอบว่าปลายท่อนี้อยู่บนท่ออีกเส้นหรือไม่
                 if (isPointOnLineSegment(endpoint, otherStart, otherEnd, tolerance, scale)) {
                     
                     // ตรวจสอบว่ามี T-junction นี้อยู่แล้วหรือไม่
-                    const existingTJunction = tJunctions.find(existing => {
+                    const existingTJunction = tJunctions.find((existing) => {
                         const dist = calculateDistance(
                             existing.position,
                             endpoint,
@@ -901,7 +924,7 @@ function findTJunctions(
                         );
                         return dist <= tolerance;
                     });
-                    
+
                     if (existingTJunction) {
                         // เพิ่มท่อเข้าไปใน T-junction ที่มีอยู่
                         if (!existingTJunction.pipes.includes(pipe.id)) {
@@ -914,7 +937,7 @@ function findTJunctions(
                         // สร้าง T-junction ใหม่
                         tJunctions.push({
                             position: endpoint,
-                            pipes: [pipe.id, otherPipe.id]
+                            pipes: [pipe.id, otherPipe.id],
                         });
                     }
                 }
@@ -937,58 +960,66 @@ function findMathematicalLineIntersection(
     // ใช้สูตร Line-Line Intersection
     // Line 1: จาก p1 ไป p2
     // Line 2: จาก p3 ไป p4
-    
+
     const isCanvas = isCanvasCoordinate(p1);
-    
+
     let x1: number, y1: number, x2: number, y2: number;
     let x3: number, y3: number, x4: number, y4: number;
-    
+
     if (isCanvas) {
         const cp1 = p1 as CanvasCoordinate;
         const cp2 = p2 as CanvasCoordinate;
         const cp3 = p3 as CanvasCoordinate;
         const cp4 = p4 as CanvasCoordinate;
-        
-        x1 = cp1.x; y1 = cp1.y;
-        x2 = cp2.x; y2 = cp2.y;
-        x3 = cp3.x; y3 = cp3.y;
-        x4 = cp4.x; y4 = cp4.y;
+
+        x1 = cp1.x;
+        y1 = cp1.y;
+        x2 = cp2.x;
+        y2 = cp2.y;
+        x3 = cp3.x;
+        y3 = cp3.y;
+        x4 = cp4.x;
+        y4 = cp4.y;
     } else {
         const gp1 = p1 as Coordinate;
         const gp2 = p2 as Coordinate;
         const gp3 = p3 as Coordinate;
         const gp4 = p4 as Coordinate;
-        
-        x1 = gp1.lng; y1 = gp1.lat;
-        x2 = gp2.lng; y2 = gp2.lat;
-        x3 = gp3.lng; y3 = gp3.lat;
-        x4 = gp4.lng; y4 = gp4.lat;
+
+        x1 = gp1.lng;
+        y1 = gp1.lat;
+        x2 = gp2.lng;
+        y2 = gp2.lat;
+        x3 = gp3.lng;
+        y3 = gp3.lat;
+        x4 = gp4.lng;
+        y4 = gp4.lat;
     }
-    
+
     // คำนวณ determinant
     const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    
+
     // เส้นขึ้งขนานกัน
     if (Math.abs(denom) < 1e-10) {
         return null;
     }
-    
+
     // คำนวณจุดตัด
     const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
     const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-    
+
     // ตรวจสอบว่าจุดตัดอยู่บนเส้นตรงทั้งสอง (0 <= t <= 1 และ 0 <= u <= 1)
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
         const intersectionX = x1 + t * (x2 - x1);
         const intersectionY = y1 + t * (y2 - y1);
-        
+
         if (isCanvas) {
             return { x: intersectionX, y: intersectionY } as CanvasCoordinate;
         } else {
             return { lng: intersectionX, lat: intersectionY } as Coordinate;
         }
     }
-    
+
     return null;
 }
 
@@ -1002,10 +1033,22 @@ function isPointOnLineSegment(
     tolerance: number,
     scale: number
 ): boolean {
-    const distToStart = calculateDistance(point, lineStart, isCanvasCoordinate(point) ? scale : undefined);
-    const distToEnd = calculateDistance(point, lineEnd, isCanvasCoordinate(point) ? scale : undefined);
-    const lineLength = calculateDistance(lineStart, lineEnd, isCanvasCoordinate(lineStart) ? scale : undefined);
-    
+    const distToStart = calculateDistance(
+        point,
+        lineStart,
+        isCanvasCoordinate(point) ? scale : undefined
+    );
+    const distToEnd = calculateDistance(
+        point,
+        lineEnd,
+        isCanvasCoordinate(point) ? scale : undefined
+    );
+    const lineLength = calculateDistance(
+        lineStart,
+        lineEnd,
+        isCanvasCoordinate(lineStart) ? scale : undefined
+    );
+
     // จุดอยู่บนเส้นถ้าระยะทางจากจุดไปยังปลายทั้งสองรวมกันเท่ากับความยาวของเส้น
-    return Math.abs((distToStart + distToEnd) - lineLength) <= tolerance;
+    return Math.abs(distToStart + distToEnd - lineLength) <= tolerance;
 }

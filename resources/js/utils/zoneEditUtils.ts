@@ -72,7 +72,7 @@ export const isPolygonWithinMainArea = (
     return polygon.every(point => isPointWithinMainArea(point, mainArea));
 };
 
-// อัปเดตพิกัดโซนเมื่อลากจุดควบคุม (เฉพาะจุดยอดเท่านั้น)
+// อัปเดตพิกัดโซนเมื่อลากจุดควบคุม (ปรับปรุงให้มีความยืดหยุ่นมากขึ้น)
 export const updateZoneCoordinatesOnDrag = (
     zone: IrrigationZone,
     controlPointIndex: number,
@@ -83,6 +83,24 @@ export const updateZoneCoordinatesOnDrag = (
     isValid: boolean; 
     errorMessage?: string; 
 } => {
+    // 🔧 แก้ไข: ตรวจสอบว่าโซนมี coordinates หรือไม่
+    if (!zone.coordinates || zone.coordinates.length < 3) {
+        return {
+            updatedCoordinates: zone.coordinates || [],
+            isValid: false,
+            errorMessage: "โซนไม่มีพิกัดที่ถูกต้อง"
+        };
+    }
+    
+    // ตรวจสอบว่า controlPointIndex ถูกต้องหรือไม่
+    if (controlPointIndex < 0 || controlPointIndex >= zone.coordinates.length) {
+        return {
+            updatedCoordinates: zone.coordinates,
+            isValid: false,
+            errorMessage: "จุดควบคุมไม่ถูกต้อง"
+        };
+    }
+    
     // สร้าง deep copy ของ coordinates เพื่อหลีกเลี่ยง reference sharing
     const newCoordinates = zone.coordinates.map((coord, index) => {
         if (index === controlPointIndex) {
@@ -91,13 +109,11 @@ export const updateZoneCoordinatesOnDrag = (
         return { lat: coord.lat, lng: coord.lng };
     });
 
-    // ตรวจสอบว่าจุดใหม่อยู่ในพื้นที่หลักหรือไม่
-    if (!isPointWithinMainArea(newPosition, mainArea)) {
-        return {
-            updatedCoordinates: zone.coordinates,
-            isValid: false,
-            errorMessage: "ไม่สามารถขยายโซนออกนอกพื้นที่หลักได้"
-        };
+    // 🔧 แก้ไข: เปลี่ยนจากการห้ามออกนอกพื้นที่หลักเป็นการเตือน
+    const isWithinMainArea = isPointWithinMainArea(newPosition, mainArea);
+    if (!isWithinMainArea) {
+        // ให้เป็น warning แทนการห้าม
+        console.warn('⚠️ Control point moved outside main area, but allowing for flexibility');
     }
 
     // ตรวจสอบว่าพอลิกอนใหม่ยังคงเป็นรูปที่ถูกต้อง
@@ -109,13 +125,10 @@ export const updateZoneCoordinatesOnDrag = (
         };
     }
 
-    // ตรวจสอบการตัดกันเองของพอลิกอน (self-intersection)
+    // 🔧 แก้ไข: ลดความเข้มงวดในการตรวจสอบ self-intersection
     if (hasPolygonSelfIntersection(newCoordinates)) {
-        return {
-            updatedCoordinates: zone.coordinates,
-            isValid: false,
-            errorMessage: "โซนไม่สามารถมีเส้นขอบที่ตัดกันเองได้"
-        };
+        // ให้เป็น warning แทนการห้าม แต่ยังคงอนุญาตให้แก้ไขได้
+        console.warn('⚠️ Zone has self-intersection, but allowing edit to continue');
     }
 
     return {

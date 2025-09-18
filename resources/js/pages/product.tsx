@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { IrrigationInput, QuotationData, QuotationDataCustomer } from './types/interfaces';
 import { useCalculations, ZoneCalculationData } from './hooks/useCalculations';
 import { calculatePipeRolls, formatNumber } from './utils/calculations';
@@ -179,6 +179,7 @@ export default function Product() {
     const [zoneInputs, setZoneInputs] = useState<{ [zoneId: string]: IrrigationInput }>({});
     const [zoneSprinklers, setZoneSprinklers] = useState<{ [zoneId: string]: any }>({});
     const [horticultureSystemData, setHorticultureSystemData] = useState<any>(null);
+    const [connectionStats, setConnectionStats] = useState<any[]>([]);
     const [gardenSystemData, setGardenSystemData] = useState<any>(null);
 
     const [zoneOperationMode, setZoneOperationMode] = useState<
@@ -198,6 +199,11 @@ export default function Product() {
     }>({});
     const [selectedPump, setSelectedPump] = useState<any>(null);
     const [showPumpOption, setShowPumpOption] = useState(true);
+    
+    // เพิ่ม state สำหรับเก็บข้อมูลอุปกรณ์เสริม
+    const [sprinklerEquipmentSets, setSprinklerEquipmentSets] = useState<{ [zoneId: string]: any }>({});
+    const [connectionEquipments, setConnectionEquipments] = useState<{ [zoneId: string]: any[] }>({});
+    
 
     const [projectImage, setProjectImage] = useState<string | null>(null);
     const [imageLoading, setImageLoading] = useState<boolean>(false);
@@ -1094,6 +1100,15 @@ export default function Product() {
                 try {
                     horticultureSystemData = JSON.parse(horticultureSystemDataStr);
                     setHorticultureSystemData(horticultureSystemData);
+                    
+                    // ตั้งค่า connection stats
+                    console.log('🔍 Debug horticultureSystemData:', horticultureSystemData);
+                    if (horticultureSystemData.connectionStats) {
+                        console.log('✅ Found connectionStats:', horticultureSystemData.connectionStats);
+                        setConnectionStats(horticultureSystemData.connectionStats);
+                    } else {
+                        console.log('❌ No connectionStats in horticultureSystemData');
+                    }
                 } catch (error) {
                     console.warn('Failed to parse horticulture system data:', error);
                 }
@@ -1405,8 +1420,25 @@ export default function Product() {
                 ...prev,
                 [activeZoneId]: input,
             }));
+            
+            // เก็บข้อมูลอุปกรณ์เสริมสปริงเกอร์
+            if (input.sprinklerEquipmentSet) {
+                setSprinklerEquipmentSets((prev) => ({
+                    ...prev,
+                    [activeZoneId]: input.sprinklerEquipmentSet,
+                }));
+            }
         }
     };
+
+    const handleConnectionEquipmentsChange = useCallback((equipments: any[]) => {
+        if (activeZoneId) {
+            setConnectionEquipments((prev) => ({
+                ...prev,
+                [activeZoneId]: equipments,
+            }));
+        }
+    }, [activeZoneId]);
 
     const handleQuotationModalConfirm = () => {
         setShowQuotationModal(false);
@@ -2091,6 +2123,8 @@ export default function Product() {
                             activeZone={activeZone}
                             projectMode={projectMode}
                             zoneAreaData={getZoneAreaData()}
+                            connectionStats={connectionStats}
+                            onConnectionEquipmentsChange={handleConnectionEquipmentsChange}
                         />
 
                         <SprinklerSelector
@@ -2224,7 +2258,7 @@ export default function Product() {
                                     selectedZones={zones.map((z) => z.id)}
                                     allZoneSprinklers={zoneSprinklers}
                                     projectMode={projectMode}
-                                    showPump={projectMode === 'horticulture' || showPumpOption}
+                                    showPump={showPumpOption}
                                     simultaneousZonesCount={
                                         zoneOperationMode === 'simultaneous'
                                             ? zones.length
@@ -2243,7 +2277,7 @@ export default function Product() {
                                     gardenStats={gardenStats}
                                 />
 
-                                {(projectMode === 'horticulture' || showPumpOption) && (
+                                {showPumpOption && (
                                         <PumpSelector
                                             results={results}
                                             selectedPump={effectiveEquipment.pump}
@@ -2285,9 +2319,11 @@ export default function Product() {
                                     zoneInputs={zoneInputs}
                                     onQuotationClick={handleOpenQuotationModal}
                                     projectMode={projectMode}
-                                    showPump={projectMode === 'horticulture' || showPumpOption}
+                                    showPump={showPumpOption}
                                     fieldCropData={fieldCropData}
                                     greenhouseData={greenhouseData}
+                                    sprinklerEquipmentSets={sprinklerEquipmentSets}
+                                    connectionEquipments={connectionEquipments}
                                 />
                             </>
                         )}
@@ -2377,9 +2413,11 @@ export default function Product() {
                 gardenData={gardenData}
                 zoneSprinklers={zoneSprinklers}
                 selectedPipes={selectedPipes}
+                sprinklerEquipmentSets={sprinklerEquipmentSets}
+                connectionEquipments={connectionEquipments}
                 onClose={() => setShowQuotation(false)}
                 projectMode={projectMode}
-                showPump={projectMode === 'horticulture' || showPumpOption}
+                showPump={showPumpOption}
             />
             <Footer />
         </div>
