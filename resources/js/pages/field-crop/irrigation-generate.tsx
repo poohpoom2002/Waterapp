@@ -2964,17 +2964,10 @@ export default function IrrigationGenerate({
 									onMapLoad={handleMapLoad}
 									mapOptions={{ maxZoom: 22 }}
 								/>
-								{/* Debug overlay */}
 								<div className="absolute top-4 right-4 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-3 text-xs">
-									<div className="text-white">
-										<div>Map Center: {calculatedMapCenter.lat.toFixed(4)}, {calculatedMapCenter.lng.toFixed(4)}</div>
-										<div>Map Zoom: {mapZoom}</div>
-										<div>Final Main Area: {finalMainArea.length} points</div>
-										<div>Final Obstacles: {finalObstacles.length} items</div>
-										<div>Final Plant Points: {finalPlantPoints.length} points</div>
-										<div>Irrigation Type: {selectedIrrigationType || 'none'}</div>
-										<div>Equipment: S:{irrigationPositions.sprinklers.length} P:{irrigationPositions.pivots.length} D:{irrigationPositions.dripTapes.length} W:{irrigationPositions.waterJets.length}</div>
-										<div>Distance Overlays: {Object.keys(distanceOverlaysRef.current).length}</div>
+									<div className="text-white flex gap-2">
+										<span>Lat: {calculatedMapCenter.lat.toFixed(4)}</span>
+										<span>Lng: {calculatedMapCenter.lng.toFixed(4)}</span>
 									</div>
 								</div>
 							</div>
