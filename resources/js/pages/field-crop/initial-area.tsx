@@ -104,6 +104,7 @@ export default function InitialArea({
     const [obstacles, setObstacles] = useState<Obstacle[]>([]);
     const [isDrawingObstacle, setIsDrawingObstacle] = useState<boolean>(false);
     const [selectedObstacleType, setSelectedObstacleType] = useState<'water_source' | 'other'>('water_source');
+    const [selectedObstacleShape, setSelectedObstacleShape] = useState<string>('polygon');
     const [obstacleOverlays, setObstacleOverlays] = useState<google.maps.Polygon[]>([]);
     const [distanceOverlaysByObstacle, setDistanceOverlaysByObstacle] = useState<Record<string, { lines: google.maps.Polyline[]; labels: google.maps.Marker[] }>>({});
 
@@ -123,6 +124,7 @@ export default function InitialArea({
     const obstaclesRef = useRef<Obstacle[]>(obstacles);
     const drawnPolygonRef = useRef<google.maps.Polygon | null>(drawnPolygon);
     const selectedObstacleTypeRef = useRef<'water_source' | 'other'>(selectedObstacleType);
+    const isDrawingObstacleRef = useRef<boolean>(false);
     const obstacleOverlaysRef = useRef<google.maps.Polygon[]>([]);
     const distanceOverlaysByObstacleRef = useRef<Record<string, { lines: google.maps.Polyline[]; labels: google.maps.Marker[] }>>({});
     const drawingManagerObjRef = useRef<google.maps.drawing.DrawingManager | null>(null);
@@ -138,6 +140,7 @@ export default function InitialArea({
     useEffect(() => { obstaclesRef.current = obstacles; }, [obstacles]);
     useEffect(() => { drawnPolygonRef.current = drawnPolygon; }, [drawnPolygon]);
     useEffect(() => { selectedObstacleTypeRef.current = selectedObstacleType; }, [selectedObstacleType]);
+    useEffect(() => { isDrawingObstacleRef.current = isDrawingObstacle; }, [isDrawingObstacle]);
     useEffect(() => { obstacleOverlaysRef.current = obstacleOverlays; }, [obstacleOverlays]);
     useEffect(() => { distanceOverlaysByObstacleRef.current = distanceOverlaysByObstacle; }, [distanceOverlaysByObstacle]);
     useEffect(() => { drawingManagerObjRef.current = drawingManagerRef; }, [drawingManagerRef]);
@@ -1027,17 +1030,45 @@ export default function InitialArea({
     }, [obstacles, obstacleOverlays, drawnPolygon, mainArea, computeAreaAndPerimeter]);
 
     // Obstacle drawing functions
-	const startDrawingObstacle = useCallback((obstacleType: typeof selectedObstacleType) => {
+	const startDrawingObstacle = useCallback((obstacleType: typeof selectedObstacleType, shapeType: string = 'polygon') => {
         if (!drawingManagerRef || !isMainAreaSet) return;
         
 		setIsDrawingObstacle(true);
 		setSelectedObstacleType(obstacleType);
+		setSelectedObstacleShape(shapeType);
 
 		const obstacleColors = obstacleType === 'water_source'
 			? { fill: '#3b82f6', stroke: '#1d4ed8' }
 			: { fill: '#6b7280', stroke: '#374151' };
+
+		const drawingMode = shapeType === 'rectangle' 
+			? google.maps.drawing.OverlayType.RECTANGLE
+			: shapeType === 'circle'
+			? google.maps.drawing.OverlayType.CIRCLE
+			: google.maps.drawing.OverlayType.POLYGON;
+
 		drawingManagerRef.setOptions({
 			polygonOptions: {
+				fillColor: obstacleColors.fill,
+				fillOpacity: 0.4,
+				strokeColor: obstacleColors.stroke,
+				strokeWeight: 2,
+				strokeOpacity: 1,
+				editable: true,
+				draggable: false,
+				clickable: true
+			},
+			rectangleOptions: {
+				fillColor: obstacleColors.fill,
+				fillOpacity: 0.4,
+				strokeColor: obstacleColors.stroke,
+				strokeWeight: 2,
+				strokeOpacity: 1,
+				editable: true,
+				draggable: false,
+				clickable: true
+			},
+			circleOptions: {
 				fillColor: obstacleColors.fill,
 				fillOpacity: 0.4,
 				strokeColor: obstacleColors.stroke,
@@ -1049,7 +1080,7 @@ export default function InitialArea({
 			}
 		});
 
-		drawingManagerRef.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+		drawingManagerRef.setDrawingMode(drawingMode);
 	}, [drawingManagerRef, isMainAreaSet]);
 
 	const stopDrawingObstacle = useCallback(() => {
@@ -1059,6 +1090,26 @@ export default function InitialArea({
         drawingManagerRef.setDrawingMode(null);
 		drawingManagerRef.setOptions({
 			polygonOptions: {
+				fillColor: '#86EFAC',
+				fillOpacity: 0.3,
+				strokeColor: '#22C55E',
+				strokeWeight: 3,
+				strokeOpacity: 1,
+				editable: true,
+				draggable: false,
+				clickable: true
+			},
+			rectangleOptions: {
+				fillColor: '#86EFAC',
+				fillOpacity: 0.3,
+				strokeColor: '#22C55E',
+				strokeWeight: 3,
+				strokeOpacity: 1,
+				editable: true,
+				draggable: false,
+				clickable: true
+			},
+			circleOptions: {
 				fillColor: '#86EFAC',
 				fillOpacity: 0.3,
 				strokeColor: '#22C55E',
@@ -1678,8 +1729,55 @@ export default function InitialArea({
         }));
 
         listenersRef.current.push(drawingManager.addListener('rectanglecomplete', (rectangle: google.maps.Rectangle) => {
-            if (drawnPolygonRef.current != null) { rectangle.setMap(null); return; }
             const coordinates = extractCoordinatesFromRectangle(rectangle);
+            const isObstacleIntent = drawingManager.get('rectangleOptions').fillColor !== '#86EFAC';
+            
+            if (isObstacleIntent && isDrawingObstacleRef.current) {
+                if (validateObstacleInMainAreaWithRefs(coordinates)) {
+                    const newObstacle: Obstacle = {
+                        id: `obstacle-${Date.now()}`,
+                        type: selectedObstacleTypeRef.current,
+                        coordinates: coordinates,
+                        name: selectedObstacleTypeRef.current === 'water_source' ? t('Water Source') : t('Other Obstacle')
+                    };
+                    
+                    setObstacles(prev => [...prev, newObstacle]);
+                    
+                    const styledPolygon = createEditablePolygon(coordinates, [], true);
+                    setObstacleOverlays(prev => [...prev, styledPolygon]);
+                    
+                    try {
+                        setPlantPoints(prev => {
+                            const thresholdMeters = 0.5;
+                            return prev.filter(pt => {
+                                if (!isPointInPolygon(pt, mainAreaRef.current)) return true;
+                                if (isPointInPolygon(pt, newObstacle.coordinates)) return false;
+                                const d = distanceToPolygonEdge(pt, newObstacle.coordinates);
+                                return d > thresholdMeters;
+                            });
+                        });
+                    } catch (e) {
+                        console.warn('Failed to remove overlapped plant points:', e);
+                    }
+                    computeAreaAndPerimeter(mainAreaRef.current, []);
+                } else {
+                    alert(t('Obstacle must be within the main area'));
+                    rectangle.setMap(null);
+                }
+                
+                setIsDrawingObstacle(false);
+                drawingManager.setDrawingMode(null);
+                drawingManager.setOptions({
+                    rectangleOptions: {
+                        fillColor: '#86EFAC', fillOpacity: 0.3, strokeColor: '#22C55E',
+                        strokeWeight: 2, strokeOpacity: 1, editable: true,
+                        draggable: false, clickable: true
+                    }
+                });
+                return;
+            }
+
+            if (drawnPolygonRef.current != null) { rectangle.setMap(null); return; }
             setMainArea(coordinates);
             computeAreaAndPerimeter(coordinates, []);
             setIsDrawing(false);
@@ -1695,8 +1793,55 @@ export default function InitialArea({
         }));
 
         listenersRef.current.push(drawingManager.addListener('circlecomplete', (circle: google.maps.Circle) => {
-            if (drawnPolygonRef.current != null) { circle.setMap(null); return; }
             const coordinates = extractCoordinatesFromCircle(circle);
+            const isObstacleIntent = drawingManager.get('circleOptions').fillColor !== '#86EFAC';
+            
+            if (isObstacleIntent && isDrawingObstacleRef.current) {
+                if (validateObstacleInMainAreaWithRefs(coordinates)) {
+                    const newObstacle: Obstacle = {
+                        id: `obstacle-${Date.now()}`,
+                        type: selectedObstacleTypeRef.current,
+                        coordinates: coordinates,
+                        name: selectedObstacleTypeRef.current === 'water_source' ? t('Water Source') : t('Other Obstacle')
+                    };
+                    
+                    setObstacles(prev => [...prev, newObstacle]);
+                    
+                    const styledPolygon = createEditablePolygon(coordinates, [], true);
+                    setObstacleOverlays(prev => [...prev, styledPolygon]);
+                    
+                    try {
+                        setPlantPoints(prev => {
+                            const thresholdMeters = 0.5;
+                            return prev.filter(pt => {
+                                if (!isPointInPolygon(pt, mainAreaRef.current)) return true;
+                                if (isPointInPolygon(pt, newObstacle.coordinates)) return false;
+                                const d = distanceToPolygonEdge(pt, newObstacle.coordinates);
+                                return d > thresholdMeters;
+                            });
+                        });
+                    } catch (e) {
+                        console.warn('Failed to remove overlapped plant points:', e);
+                    }
+                    computeAreaAndPerimeter(mainAreaRef.current, []);
+                } else {
+                    alert(t('Obstacle must be within the main area'));
+                    circle.setMap(null);
+                }
+                
+                setIsDrawingObstacle(false);
+                drawingManager.setDrawingMode(null);
+                drawingManager.setOptions({
+                    circleOptions: {
+                        fillColor: '#86EFAC', fillOpacity: 0.3, strokeColor: '#22C55E',
+                        strokeWeight: 2, strokeOpacity: 1, editable: true,
+                        draggable: false, clickable: true
+                    }
+                });
+                return;
+            }
+
+            if (drawnPolygonRef.current != null) { circle.setMap(null); return; }
             setMainArea(coordinates);
             computeAreaAndPerimeter(coordinates, []);
             setIsDrawing(false);
@@ -2108,9 +2253,31 @@ export default function InitialArea({
                                         <h3 className="text-sm font-semibold text-white mb-3">🚧 {t('Obstacles & Features')}</h3>
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between text-xs"><span className="text-gray-400">{t('Total Obstacles')}:</span><span className="text-yellow-300">{obstacleCount}</span></div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <button onClick={() => startDrawingObstacle('water_source')} disabled={isDrawingObstacle || !isMainAreaSet} className="bg-blue-600 text-white px-2 py-2 rounded text-xs hover:bg-blue-700 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-1">💧 {t('Water')}</button>
-                                                <button onClick={() => startDrawingObstacle('other')} disabled={isDrawingObstacle || !isMainAreaSet} className="bg-gray-600 text-white px-2 py-2 rounded text-xs hover:bg-gray-700 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-1">🚧 {t('Other obstacles')}</button>
+                                            <div className="space-y-2">
+                                                <div className="text-xs text-blue-200">💧 {t('Water Source')}:</div>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    <button onClick={() => startDrawingObstacle('water_source', 'polygon')} disabled={isDrawingObstacle || !isMainAreaSet} className="bg-blue-600 text-white px-1 py-1 rounded text-xs hover:bg-blue-700 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-1">
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l16 4-4 16-12-20z" /></svg>{t('Polygon')}
+                                                    </button>
+                                                    <button onClick={() => startDrawingObstacle('water_source', 'rectangle')} disabled={isDrawingObstacle || !isMainAreaSet} className="bg-blue-600 text-white px-1 py-1 rounded text-xs hover:bg-blue-700 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-1">
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>{t('Rectangle')}
+                                                    </button>
+                                                    <button onClick={() => startDrawingObstacle('water_source', 'circle')} disabled={isDrawingObstacle || !isMainAreaSet} className="bg-blue-600 text-white px-1 py-1 rounded text-xs hover:bg-blue-700 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-1">
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>{t('Circle')}
+                                                    </button>
+                                                </div>
+                                                <div className="text-xs text-gray-200">🚧 {t('Other obstacles')}:</div>
+                                                <div className="grid grid-cols-3 gap-1">
+                                                    <button onClick={() => startDrawingObstacle('other', 'polygon')} disabled={isDrawingObstacle || !isMainAreaSet} className="bg-gray-600 text-white px-1 py-1 rounded text-xs hover:bg-gray-700 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-1">
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l16 4-4 16-12-20z" /></svg>{t('Polygon')}
+                                                    </button>
+                                                    <button onClick={() => startDrawingObstacle('other', 'rectangle')} disabled={isDrawingObstacle || !isMainAreaSet} className="bg-gray-600 text-white px-1 py-1 rounded text-xs hover:bg-gray-700 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-1">
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>{t('Rectangle')}
+                                                    </button>
+                                                    <button onClick={() => startDrawingObstacle('other', 'circle')} disabled={isDrawingObstacle || !isMainAreaSet} className="bg-gray-600 text-white px-1 py-1 rounded text-xs hover:bg-gray-700 transition-colors disabled:bg-gray-500 flex items-center justify-center gap-1">
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>{t('Circle')}
+                                                    </button>
+                                                </div>
                                             </div>
                                             {!isMainAreaSet && (
                                                 <div className="text-xs text-orange-300 bg-orange-900 bg-opacity-30 p-2 rounded">🔒 {t('Please set main area before adding obstacles')}</div>
@@ -2202,10 +2369,10 @@ export default function InitialArea({
                                     <EnhancedHorticultureSearchControl onPlaceSelect={handleSearch} placeholder="🔍 ค้นหาสถานที่..." />
                                     <HorticultureDrawingManager editMode={null} onCreated={handleDrawingComplete} isEditModeEnabled={true} mainArea={mainArea} />
 
-                                    {/* Drawing Tools Overlay */}
-                                    <div className="absolute left-4 top-16 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-2 shadow-lg pointer-events-none">
-                                        <h4 className="text-white text-xs font-semibold mb-1">{!isMainAreaSet ? '🎯 ' + t('Drawing Tools') : '✅ ' + t('Drawing Complete')}</h4>
-                                        {!isMainAreaSet ? (
+                                    {/* Drawing Tools Overlay - Only show for main area drawing */}
+                                    {!isMainAreaSet && (
+                                        <div className="absolute left-4 top-16 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-2 shadow-lg pointer-events-none">
+                                            <h4 className="text-white text-xs font-semibold mb-1">🎯 {t('Drawing Tools')}</h4>
                                             <div className="flex flex-col gap-1 pointer-events-auto">
                                                 <button onClick={() => startDrawing('polygon')} disabled={isDrawing} className={`px-2 py-1 rounded text-xs transition-colors flex items-center gap-1 ${isDrawing && selectedShape === 'polygon' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'} disabled:opacity-50`}>
                                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4l16 4-4 16-12-20z" /></svg>{t('Polygon')}
@@ -2218,16 +2385,8 @@ export default function InitialArea({
                                                 </button>
                                                 {isDrawing && (<button onClick={stopDrawing} className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>{t('Cancel')}</button>)}
                                             </div>
-                                        ) : (
-                                            <div className="flex flex-col gap-1 pointer-events-auto">
-                                                <div className={`text-xs mb-1 ${isEditingMainArea ? 'text-yellow-300' : 'text-green-300'}`}>{isEditingMainArea ? '✏️ ' + t('Editing main area') : '🔍 ' + t('Main area completed')}</div>
-                                                <div className="text-xs text-blue-300 mb-1">🚧 {t('Obstacle Tools')}:</div>
-                                                <button onClick={() => startDrawingObstacle('water_source')} disabled={isDrawingObstacle} className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition-colors flex items-center gap-1 disabled:bg-gray-500">💧 {t('Water Source')}</button>
-                                                <button onClick={() => startDrawingObstacle('other')} disabled={isDrawingObstacle} className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700 transition-colors flex items-center gap-1 disabled:bg-gray-500">🚧 {t('Other Obstacle')}</button>
-                                                {isDrawingObstacle && (<button onClick={stopDrawingObstacle} className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 transition-colors flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>{t('Cancel')}</button>)}
-                                            </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                     <DistanceMeasurementOverlay map={map} isActive={false} editMode={'mainArea'} />
                                 </HorticultureMapComponent>
 
@@ -2253,8 +2412,12 @@ export default function InitialArea({
                                     <div className="absolute left-4 bottom-4 z-10 bg-purple-900 bg-opacity-90 rounded-lg border border-purple-500 p-3 shadow-lg pointer-events-none">
                                         <div className="text-sm text-white text-center">
                                             <div className="mb-1 font-semibold">🚧 {t('Drawing Obstacle')}</div>
-                                            <div className="text-xs text-purple-200">{t('Drawing')}: {selectedObstacleType.replace('_', ' ')}</div>
-                                            <div className="text-xs text-purple-200">{t('Click points to draw, double-click to finish')}</div>
+                                            <div className="text-xs text-purple-200">{t('Drawing')}: {selectedObstacleType.replace('_', ' ')} ({selectedObstacleShape})</div>
+                                            <div className="text-xs text-purple-200">
+                                                {selectedObstacleShape === 'polygon' ? t('Click points to draw polygon, double-click to finish') : 
+                                                 selectedObstacleShape === 'rectangle' ? t('Click and drag to draw rectangle') : 
+                                                 t('Click and drag to draw circle')}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
