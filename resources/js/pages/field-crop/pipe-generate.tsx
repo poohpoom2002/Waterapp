@@ -1097,6 +1097,31 @@ const useMapManager = () => {
     };
   }, []);
 
+  // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
+  const removeConnectionLinesForPipe = useCallback((pipeId: string) => {
+    const overlays = overlaysRef.current;
+    if (!overlays.connectionLines) return;
+    
+    // หาเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยนี้
+    const linesToRemove: string[] = [];
+    overlays.connectionLines.forEach((line, lineId) => {
+      if (lineId.startsWith(`${pipeId}-connection-`)) {
+        linesToRemove.push(lineId);
+      }
+    });
+    
+    // ลบเส้นเชื่อมต่อที่เกี่ยวข้อง
+    linesToRemove.forEach(lineId => {
+      const line = overlays.connectionLines.get(lineId);
+      if (line) {
+        line.setMap(null);
+        overlays.connectionLines.delete(lineId);
+      }
+    });
+    
+    console.log(`🗑️ Removed ${linesToRemove.length} connection lines for pipe ${pipeId}`);
+  }, []);
+
   const clearPipeOverlays = useCallback((type?: PipeType) => {
     const pipesToRemove: string[] = [];
     overlaysRef.current.pipes.forEach((pipePolyline, pipeId) => {
@@ -1130,7 +1155,7 @@ const useMapManager = () => {
     });
     
     // ลบจุดเชื่อมต่อเมื่อลบท่อย่อยจะถูกจัดการใน useEffect
-  }, []);
+  }, [removeConnectionLinesForPipe]);
   
   // clearDrawingPreview and updateDrawingPreview เหมือนเดิม
   const clearDrawingPreview = useCallback(() => {
@@ -1761,7 +1786,7 @@ const useMapManager = () => {
             currentPipeMap.set(pipe.id, polyline);
         }
     });
-  }, []);
+  }, [removeConnectionLinesForPipe]);
 
   // drawControlHandles เหมือนเดิม
 
@@ -1932,30 +1957,6 @@ const useMapManager = () => {
     console.log(`🔗 Created ${overlays.connectionLines.size} connection lines for ${lateralPipes.length} lateral pipes, connected ${connectedSprinklers.size} unique sprinklers`);
   }, []);
 
-  // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
-  const removeConnectionLinesForPipe = useCallback((pipeId: string) => {
-    const overlays = overlaysRef.current;
-    if (!overlays.connectionLines) return;
-    
-    // หาเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยนี้
-    const linesToRemove: string[] = [];
-    overlays.connectionLines.forEach((line, lineId) => {
-      if (lineId.startsWith(`${pipeId}-connection-`)) {
-        linesToRemove.push(lineId);
-      }
-    });
-    
-    // ลบเส้นเชื่อมต่อที่เกี่ยวข้อง
-    linesToRemove.forEach(lineId => {
-      const line = overlays.connectionLines.get(lineId);
-      if (line) {
-        line.setMap(null);
-        overlays.connectionLines.delete(lineId);
-      }
-    });
-    
-    console.log(`🗑️ Removed ${linesToRemove.length} connection lines for pipe ${pipeId}`);
-  }, []);
 
   const drawControlHandles = useCallback((pipe: Pipe | undefined, onHandleDrag: (index: number, newPosition: Coordinate) => void) => {
     if (!mapRef.current || !pipe) {
@@ -2372,7 +2373,7 @@ const useMapManager = () => {
     }>;
   }, []);
 
-  return {
+  return useMemo(() => ({
     mapRef,
     drawingManagerRef,
     overlaysRef: exposeOverlaysRef(),
@@ -2388,7 +2389,23 @@ const useMapManager = () => {
     removeConnectionLinesForPipe,
     fitBounds,
     updateMapVisuals
-  };
+  }), [
+    mapRef,
+    drawingManagerRef,
+    exposeOverlaysRef,
+    clearAllOverlays,
+    clearPipeOverlays,
+    clearDrawingPreview,
+    updateDrawingPreview,
+    drawPumps,
+    drawPipes,
+    drawControlHandles,
+    drawConnectionPoints,
+    drawConnectionLines,
+    removeConnectionLinesForPipe,
+    fitBounds,
+    updateMapVisuals
+  ]);
 };
 // ======================== MODIFIED SECTION END ========================
 
@@ -2681,13 +2698,13 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       // อัปเดต map visuals ทันทีเมื่อมีข้อมูลและ map พร้อม
       mapManager.updateMapVisuals(fieldData);
     }
-  }, [fieldData]); // Removed mapManager from dependencies
+  }, [fieldData, mapManager]); // Removed mapManager from dependencies
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!mapManager.mapRef.current) return;
     mapManager.drawPipes(pipeManager.pipes, pipeManager.editingPipeId, (pipeId) => pipeManager.setEditingPipeId(pipeId));
-  }, [pipeManager.pipes, pipeManager.editingPipeId]); // Removed mapManager and pipeManager.setEditingPipeId from dependencies
+  }, [pipeManager.pipes, pipeManager.editingPipeId, mapManager, pipeManager]); // Removed mapManager and pipeManager.setEditingPipeId from dependencies
 
 
   // Control point drag handler - moved outside useEffect
@@ -2903,7 +2920,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     return () => {
       clearTimeout(debouncedDrawHandles);
     };
-  }, [handleControlPointDrag]); // Removed mapManager and pipeManager from dependencies
+  }, [handleControlPointDrag, mapManager]); // Removed mapManager and pipeManager from dependencies
 
   const stopDrawing = useCallback(() => {
     pipeManager.setIsDrawing(false);
@@ -2946,7 +2963,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [stopDrawing]); // Removed pipeManager from dependencies
+  }, [stopDrawing, mapManager, pipeManager]); // Removed pipeManager from dependencies
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -2979,16 +2996,14 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         clearTimeout(connectionPointsDebounceTimer.current);
       }
     };
-  }, [snapSystem]); // Removed mapManager from dependencies
+  }, [snapSystem, mapManager.mapRef]); // Removed mapManager from dependencies
 
-  // useEffect แยกสำหรับ component unmount cleanup
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     return () => {
       // Clear overlays เฉพาะเมื่อ component unmount จริงๆ
       mapManager.clearAllOverlays();
     };
-  }, []); // Removed mapManager from dependencies
+  }, [mapManager]); // Removed mapManager from dependencies
 
   const applySnapToCoordinates = useCallback((coordinates: Coordinate[], pipeType: PipeType): Coordinate[] => {
     if (!snapSystem.isEnabled) return coordinates;
@@ -3006,23 +3021,8 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     }
 
     return snappedCoordinates;
-  }, [snapSystem, pipeManager.pipes, fieldData.irrigationPositions, pumps]);
+  }, [snapSystem, pipeManager.pipes, pipeManager.lateralMode, fieldData.irrigationPositions, pumps]);
 
-  // หาจุดที่ใกล้ที่สุดบนท่อเมนย่อยเพื่อใช้เป็นจุดเริ่มต้นของท่อ lateral
-  const getNearestPointOnSubmain = useCallback((point: Coordinate): { snapPoint: Coordinate; distance: number } | null => {
-    let best: { snapPoint: Coordinate; distance: number } | null = null;
-    const submains = pipeManager.pipes.filter(p => p.type === 'submain' && p.coordinates && p.coordinates.length >= 2);
-    for (const sm of submains) {
-      const coords = sm.coordinates as Coordinate[];
-      for (let i = 0; i < coords.length - 1; i++) {
-        const { point: segSnap, distance } = getClosestPointOnSegment(point, coords[i], coords[i + 1]);
-        if (best === null || distance < best.distance) {
-          best = { snapPoint: segSnap, distance };
-        }
-      }
-    }
-    return best;
-  }, [pipeManager.pipes]);
 
   const getNearestPointOnPipes = useCallback((point: Coordinate, types: PipeType[] = ['submain', 'main']): { snapPoint: Coordinate; distance: number } | null => {
     let best: { snapPoint: Coordinate; distance: number } | null = null;
@@ -3547,7 +3547,8 @@ export default function PipeGenerate(props: PipeGenerateProps) {
 
     const overlayRefAssign = mapManager.overlaysRef as React.MutableRefObject<{ drawingListeners?: google.maps.MapsEventListener[] }>;
     overlayRefAssign.current.drawingListeners = listeners;
-  }, [pipeManager, mapManager, snapSystem, applySnapToCoordinates, stopDrawing, t, fieldData, fieldData.irrigationPositions.sprinklers, generateGuidedLateralsFromTemplate, getNearestPointOnSubmain, getNearestPointOnPipes, pumps]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pipeManager, mapManager, snapSystem, applySnapToCoordinates, stopDrawing, t, fieldData, getNearestPointOnPipes, pumps, lateralReference]);
 
 
 
@@ -3601,6 +3602,29 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     void generateLateralPipes;
   }, [generateLateralPipes]);
 
+  // หาจุดตัดของเส้นสองเส้น
+  const getLineIntersection = useCallback((p1: Coordinate, p2: Coordinate, p3: Coordinate, p4: Coordinate): Coordinate | null => {
+    const x1 = p1.lng, y1 = p1.lat;
+    const x2 = p2.lng, y2 = p2.lat;
+    const x3 = p3.lng, y3 = p3.lat;
+    const x4 = p4.lng, y4 = p4.lat;
+
+    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+    if (Math.abs(denom) < 1e-10) return null; // เส้นขนาน
+
+    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+      return {
+        lat: y1 + t * (y2 - y1),
+        lng: x1 + t * (x2 - x1)
+      };
+    }
+
+    return null;
+  }, []);
+
   // ตรวจสอบการลากท่อย่อยข้ามท่อเมนย่อย
   const checkLateralCrossingSubmain = useCallback((startPoint: Coordinate, endPoint: Coordinate, submainPipes: Pipe[]): {
     crosses: boolean;
@@ -3629,30 +3653,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     }
 
     return { crosses, intersectionPoints, submainId };
-  }, []);
-
-  // หาจุดตัดของเส้นสองเส้น
-  const getLineIntersection = useCallback((p1: Coordinate, p2: Coordinate, p3: Coordinate, p4: Coordinate): Coordinate | null => {
-    const x1 = p1.lng, y1 = p1.lat;
-    const x2 = p2.lng, y2 = p2.lat;
-    const x3 = p3.lng, y3 = p3.lat;
-    const x4 = p4.lng, y4 = p4.lat;
-
-    const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    if (Math.abs(denom) < 1e-10) return null; // เส้นขนาน
-
-    const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
-    const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-      return {
-        lat: y1 + t * (y2 - y1),
-        lng: x1 + t * (x2 - x1)
-      };
-    }
-
-    return null;
-  }, []);
+  }, [getLineIntersection]);
 
   // สร้างจุดเชื่อมต่อของท่อย่อยที่ต่อกับท่อเมนย่อย
   const createLateralConnectionPoints = useCallback((lateralPipes: Pipe[]) => {
@@ -4197,10 +4198,10 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         clearTimeout(connectionPointsDebounceTimer.current);
       }
     };
-  }, [pipeManager.pipes, mapManager, createLateralConnectionPoints, createSubmainToMainConnectionPoints]);
+  }, [pipeManager.pipes, pipeManager.findNearbyConnectedIrrigationPoints, pipeManager.lateralMode, mapManager, createLateralConnectionPoints, createSubmainToMainConnectionPoints, fieldData.irrigationPositions]);
 
   // วิเคราะห์รูปแบบของท่อต้นแบบ: "ลากผ่าน" หรือ "ออกจากด้านใดด้านหนึ่ง"
-  function analyzeTemplatePattern(template: Pipe, nearestSubmain: Pipe): 'crossing' | 'extending' {
+  const analyzeTemplatePattern = useCallback((template: Pipe, nearestSubmain: Pipe): 'crossing' | 'extending' => {
     if (!template.coordinates || template.coordinates.length < 2 || !nearestSubmain.coordinates) {
       return 'extending'; // default
     }
@@ -4274,10 +4275,10 @@ export default function PipeGenerate(props: PipeGenerateProps) {
 
     // ถ้าไม่ตรงเงื่อนไขใดๆ ให้เป็น default
     return 'extending';
-  }
+  }, [getLineIntersection]);
 
   // สร้างท่อย่อยตาม "แถวของจุดให้น้ำ" โดยใช้มุมการหมุนของแปลง
-  function generateGuidedLateralsFromTemplate(template: Pipe, selectedPattern?: 'extending' | 'crossing'): Pipe[] {
+  const generateGuidedLateralsFromTemplate = useCallback((template: Pipe, selectedPattern?: 'extending' | 'crossing'): Pipe[] => {
     if (!template.coordinates || template.coordinates.length < 2) return [];
 
     // เลือกโซนเดียวกับต้นแบบเพื่อจำกัดขอบเขตการสร้าง
@@ -4816,7 +4817,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     // สร้างจุดเชื่อมต่อสำหรับท่อย่อยที่สร้างขึ้นจะถูกจัดการใน useEffect
 
     return generated;
-  }
+  }, [fieldData.zones, fieldData.irrigationPositions, pipeManager.pipes, pipeManager.lateralMode, analyzeTemplatePattern]);
 
   const clearPipes = useCallback((type?: PipeType) => {
     if (type) {
@@ -4847,7 +4848,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     if (confirm(t('Use this lateral as new reference?'))) {
       setLateralReference({ pipeId, length: newThreshold, flowLpm: totalFlow });
     }
-  }, [pipeManager.pipes, fieldData.irrigationSettings, fieldData.irrigationPositions.sprinklers, pipeManager, t]);
+  }, [fieldData.irrigationSettings, fieldData.irrigationPositions, pipeManager, t]);
 
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4937,7 +4938,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       console.warn('drawPipes on initial map load failed:', err);
     }
 
-  }, [fieldData, mapManager, handleMapClick]);
+  }, [fieldData, mapManager, handleMapClick, pipeManager]);
   // ======================== MODIFIED SECTION END ========================
 
   const steps = [
@@ -4969,7 +4970,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       completedSteps: toCompletedStepsCsv(parseCompletedSteps(props.completedSteps)),
     };
     router.get('/step3-zones-obstacles', params);
-  }, [fieldData, pipeManager.pipes, mapStatus, props.completedSteps, saveToStorage, loadFromStorage]);
+  }, [fieldData, pipeManager.pipes, mapStatus, props.completedSteps, saveToStorage, loadFromStorage, pumps]);
 
   const handleContinue = useCallback(() => {
     // Prepare a rich dataset and store to localStorage for the summary page
@@ -5032,7 +5033,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       completedSteps: toCompletedStepsCsv([...parseCompletedSteps(props.completedSteps), 4])
     };
     router.post('/field-crop-summary', payload);
-  }, [fieldData, pipeManager.pipes, props.completedSteps]);
+  }, [fieldData, pipeManager.pipes, props.completedSteps, pumps]);
 
   const startPumpPlacement = useCallback(() => {
     if (pipeManager.isDrawing) {
@@ -5056,7 +5057,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
 
   useEffect(() => {
     mapManager.drawPumps(pumps, removePump);
-  }, [pumps, removePump]); // Removed mapManager from dependencies
+  }, [pumps, removePump, mapManager]); // Removed mapManager from dependencies
 
   // Persist pumps to localStorage so summary page can read them
   useEffect(() => {
@@ -5749,20 +5750,8 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                 </div>
                 
                 <div className="absolute top-1 right-1 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-3 text-xs">
-                  <div className="text-white space-y-1">
-                    <div>Map: {mapStatus.center.lat.toFixed(3)}, {mapStatus.center.lng.toFixed(3)}</div>
-                    <div>Zoom: {mapStatus.zoom}</div>
-                    <div>Area: {fieldData.mainArea.length} points</div>
-                    <div>Plants: {fieldData.plantPoints.length}</div>
-                    <div>Zones: {fieldData.zones.length}</div>
-                    <div>Obstacles: {fieldData.obstacles.length}</div>
-                    <div>Pipes: {pipeManager.pipes.length}</div>
-                    <div>Equipment: {
-                      fieldData.irrigationPositions.sprinklers.length + 
-                      fieldData.irrigationPositions.pivots.length + 
-                      fieldData.irrigationPositions.dripTapes.length + 
-                      fieldData.irrigationPositions.waterJets.length
-                    }</div>
+                  <div className="text-white">
+                    <div>Lat: {mapStatus.center.lat.toFixed(3)}, Lng: {mapStatus.center.lng.toFixed(3)}</div>
                   </div>
                 </div>
                 
