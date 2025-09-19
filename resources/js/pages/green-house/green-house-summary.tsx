@@ -664,6 +664,10 @@ export default function GreenhouseSummary() {
                 sprinklerCount: 0,
                 dripEmitterCount: 0,
                 totalEmitters: 0,
+                // เพิ่มข้อมูลอัตราการไหล
+                sprinklerFlowRate: 0,
+                dripEmitterFlowRate: 0,
+                totalFlowRate: 0,
             };
 
             // Find main pipes and sub pipes
@@ -871,12 +875,29 @@ export default function GreenhouseSummary() {
 
             plotPipeData.totalEmitters = plotPipeData.sprinklerCount + plotPipeData.dripEmitterCount;
 
+            // คำนวณอัตราการไหลสำหรับแปลงปลูกนี้
+            const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10; // L/min per sprinkler
+            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24; // L/min per drip emitter
+            
+            // คำนวณอัตราการไหลแยกตามประเภท
+            const plotSprinklerFlowRate = plotPipeData.sprinklerCount * sprinklerFlowRate;
+            const plotDripEmitterFlowRate = plotPipeData.dripEmitterCount * dripEmitterFlowRate;
+            const plotTotalFlowRate = plotSprinklerFlowRate + plotDripEmitterFlowRate;
+            
+            // เพิ่มข้อมูลอัตราการไหลใน plotPipeData
+            plotPipeData.sprinklerFlowRate = plotSprinklerFlowRate;
+            plotPipeData.dripEmitterFlowRate = plotDripEmitterFlowRate;
+            plotPipeData.totalFlowRate = plotTotalFlowRate;
+
             // Debug: ตรวจสอบการนับสปริงเกลอร์ในแต่ละแปลง
             console.log(`🔍 ${plotPipeData.plotName} sprinkler count:`, {
                 plotName: plotPipeData.plotName,
                 sprinklerCount: plotPipeData.sprinklerCount,
                 dripEmitterCount: plotPipeData.dripEmitterCount,
-                totalEmitters: plotPipeData.totalEmitters
+                totalEmitters: plotPipeData.totalEmitters,
+                sprinklerFlowRate: plotPipeData.sprinklerFlowRate,
+                dripEmitterFlowRate: plotPipeData.dripEmitterFlowRate,
+                totalFlowRate: plotPipeData.totalFlowRate
             });
 
             plotPipeData.maxSubPipeLength = Math.round(maxSubPipeLength * 100) / 100;
@@ -3826,14 +3847,8 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                     });
                                                 }
                                                 
-                                                let calculatedFlowRate = 0;
-                                                if (summaryData?.irrigationMethod === 'drip') {
-                                                    calculatedFlowRate = actualDripCount * 0.24;
-                                                } else {
-                                                    // คำนวณอัตราการไหลโดยตรง: จำนวนสปริงเกลอร์ทั้งหมด × อัตราการไหลต่อตัว
-                                                    calculatedFlowRate = actualSprinklerCount * flowRatePerUnit; // L/min per sprinkler
-                                                }
-                                                
+                                                // ใช้ข้อมูลอัตราการไหลจาก plotPipeData ที่คำนวณไว้แล้ว
+                                                const calculatedFlowRate = plotPipe?.totalFlowRate || 0;
                                                 const totalFlowRate = calculatedFlowRate.toFixed(1);
                                                 
                                                 // Debug: ตรวจสอบการคำนวณอัตราการไหลในแต่ละแปลง
@@ -3941,7 +3956,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                  <>
                                                                      <div className="rounded bg-gray-500 p-2 text-center">
                                                                          <div className="text-sm font-bold text-cyan-400">
-                                                                             {actualDripCount}
+                                                                             {plotPipe?.dripEmitterCount || 0}
                                                                          </div>
                                                                          <div className="text-xs text-gray-300">
                                                                              {t('จุดน้ำหยด')}
@@ -3949,7 +3964,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                      </div>
                                                                      <div className="rounded bg-gray-500 p-2 text-center">
                                                                          <div className="text-sm font-bold text-blue-400">
-                                                                             {flowRatePerUnit} {t('ลิตร/นาที')}
+                                                                             {(summaryData?.dripEmitterFlowRate || 0.24).toFixed(2)} {t('ลิตร/นาที')}
                                                                          </div>
                                                                          <div className="text-xs text-gray-300">
                                                                              {t('ต่อจุด')}
@@ -3960,7 +3975,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                  <>
                                                                      <div className="rounded bg-gray-500 p-2 text-center">
                                                                          <div className="text-sm font-bold text-cyan-400">
-                                                                             {actualSprinklerCount}
+                                                                             {plotPipe?.sprinklerCount || 0}
                                                                          </div>
                                                                          <div className="text-xs text-gray-300">
                                                                              {t('สปริงเกลอร์')}
@@ -3968,7 +3983,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                      </div>
                                                                      <div className="rounded bg-gray-500 p-2 text-center">
                                                                          <div className="text-sm font-bold text-blue-400">
-                                                                             {flowRatePerUnit} {t('ลิตร/นาที')}
+                                                                             {(summaryData?.sprinklerFlowRate || 10).toFixed(2)} {t('ลิตร/นาที')}
                                                                          </div>
                                                                          <div className="text-xs text-gray-300">
                                                                              {t('ต่อตัว')}
@@ -3998,12 +4013,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                          <tr>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
-                                                                                 {(() => {
-                                                                                     const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
-                                                                                     const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
-                                                                                     const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
-                                                                                     return totalFlowRate.toFixed(2);
-                                                                                 })()} {t('L/min')}
+                                                                                 {(plotPipe?.totalFlowRate || 0).toFixed(2)} {t('L/min')}
                                                                              </td>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
                                                                                  {(() => {
@@ -4022,12 +4032,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                          <tr>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs">{t('ท่อเมนย่อย')}</td>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">
-                                                                                 {(() => {
-                                                                                     const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
-                                                                                     const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
-                                                                                     const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
-                                                                                     return totalFlowRate.toFixed(2);
-                                                                                 })()} {t('L/min')}
+                                                                                 {(plotPipe?.totalFlowRate || 0).toFixed(2)} {t('L/min')}
                                                                              </td>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">{plotPipe.totalEmitters} {t('ตัว')}</td>
                                                                          </tr>
