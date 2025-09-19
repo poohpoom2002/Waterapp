@@ -41,15 +41,9 @@ interface ProfileProps {
 export default function Profile() {
     const { t } = useLanguage();
 
-    // Defensive usePage call with error handling
-    let auth;
-    try {
-        auth = usePage<ProfileProps>().props.auth;
-    } catch (error) {
-        console.warn('Inertia context not available in Profile, using fallback values');
-        auth = { user: null };
-    }
-
+    // Always call usePage hook unconditionally
+    const page = usePage<ProfileProps>();
+    const auth = page?.props?.auth || { user: null };
     const user = auth.user;
 
     // Helper function to get tier display information
@@ -97,8 +91,8 @@ export default function Profile() {
     const [showPhotoModal, setShowPhotoModal] = useState(false);
 
     const { data, setData, patch, processing, errors } = useForm({
-        name: user.name,
-        email: user.email,
+        name: user?.name || '',
+        email: user?.email || '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -121,10 +115,29 @@ export default function Profile() {
 
     const handlePhotoUploaded = (photoUrl: string) => {
         // Update the user object with the new photo URL
-        user.profile_photo_url = photoUrl;
+        if (user) {
+            user.profile_photo_url = photoUrl;
+        }
         // Force a re-render by updating the page props
         router.reload();
     };
+
+    // Early return if no user data is available
+    if (!user) {
+        return (
+            <div className="min-h-screen bg-gray-900">
+                <Head title="Profile" />
+                <Navbar />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <h1 className="text-2xl font-bold text-white mb-4">Loading Profile...</h1>
+                        <p className="text-gray-400">Please wait while we load your profile information.</p>
+                    </div>
+                </div>
+                <Footer />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-900">
@@ -253,8 +266,8 @@ export default function Profile() {
                                                     onClick={() => {
                                                         setIsEditing(false);
                                                         setData({
-                                                            name: user.name,
-                                                            email: user.email,
+                                                            name: user?.name || '',
+                                                            email: user?.email || '',
                                                         });
                                                     }}
                                                     className="rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-gray-700"

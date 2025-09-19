@@ -7,6 +7,15 @@ import * as turf from '@turf/turf';
 import type * as GeoJSON from 'geojson';
 import type { FieldData } from './pipe-generate';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
+import { getCropByValue } from './choose-crop';
+import { 
+    PlantPoint as LODPlantPoint, 
+    calculateLodLevel, 
+    filterPlantPointsByLod, 
+    createPlantPointMarker,
+    clearMarkers,
+    log
+} from '../../utils/lodClusteringUtils';
 import { getTranslatedCropByValue } from './choose-crop';
 import { createVoronoiZones as createVoronoiZonesFromUtils } from '../../utils/autoZoneUtils';
 import type { PlantLocation } from '../../utils/irrigationZoneUtils';
@@ -446,7 +455,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					rowSpacing: localStorageData.rowSpacing || {},
 					plantSpacing: localStorageData.plantSpacing || {},
 					mapCenter: localStorageData.mapCenter || MAP_CONFIG.DEFAULT_CENTER,
-					mapZoom: localStorageData.mapZoom || MAP_CONFIG.DEFAULT_ZOOM
+					mapZoom: localStorageData.mapZoom || MAP_CONFIG.DEFAULT_ZOOM,
+					hideAllPoints: localStorageData.hideAllPoints || false
 				};
 			}
 
@@ -469,7 +479,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				rowSpacing: {},
 				plantSpacing: {},
 				mapCenter: MAP_CONFIG.DEFAULT_CENTER,
-				mapZoom: MAP_CONFIG.DEFAULT_ZOOM
+				mapZoom: MAP_CONFIG.DEFAULT_ZOOM,
+				hideAllPoints: false
 			};
 		}
 
@@ -491,7 +502,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			rowSpacing: parseJsonSafely(props.rowSpacing, localStorageData.rowSpacing || {}),
 			plantSpacing: parseJsonSafely(props.plantSpacing, localStorageData.plantSpacing || {}),
 			mapCenter: localStorageData.mapCenter || MAP_CONFIG.DEFAULT_CENTER,
-			mapZoom: localStorageData.mapZoom || MAP_CONFIG.DEFAULT_ZOOM
+			mapZoom: localStorageData.mapZoom || MAP_CONFIG.DEFAULT_ZOOM,
+			hideAllPoints: localStorageData.hideAllPoints || false
 		};
 	}, [props]);
 
@@ -502,6 +514,12 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 	const [zoneGenerationMethod, setZoneGenerationMethod] = useState<'convexHull' | 'voronoi'>('voronoi');
 	const [zoneStats, setZoneStats] = useState<ZoneStats | null>(null);
 	const [pointReductionMessage, setPointReductionMessage] = useState<string | null>(null);
+
+	// LOD States
+	const [filteredPlantPoints, setFilteredPlantPoints] = useState<LODPlantPoint[]>([]);
+	const [lodLevel, setLodLevel] = useState<number>(1);
+	const [mapZoom, setMapZoom] = useState<number>(18);
+	const [hideAllPoints, setHideAllPoints] = useState<boolean>(initialFieldData.hideAllPoints || false); // Hide all points toggle
 	
 	// Grouped editing state
 	const [zoneEditingState, setZoneEditingState] = useState<ZoneEditingState>({
@@ -575,43 +593,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		return fieldData.totalWaterRequirement;
 	}, [fieldData.plantPoints.length, fieldData.totalWaterRequirement]);
 
-	const plantCoverageStats = useMemo(() => {
-		if (fieldData.zones.length === 0) {
-			return {
-				totalPlants: fieldData.plantPoints.length,
-				coveredPlants: 0,
-				borderPlants: 0,
-				uncoveredPlants: fieldData.plantPoints.length,
-				coveragePercentage: 0
-			};
-		}
-
-		const coveredPlantIds = new Set<string>();
-		const borderPlantIds = new Set<string>();
-
-		fieldData.zones.forEach(zone => {
-			fieldData.plantPoints.forEach(point => {
-				const pointId = `${point.lat}-${point.lng}`;
-
-				if (isPointInPolygon(point, zone.coordinates)) {
-					coveredPlantIds.add(pointId);
-				} else if (isPointInOrOnPolygon(point, zone.coordinates)) {
-					borderPlantIds.add(pointId);
-				}
-			});
-		});
-
-		const totalCovered = coveredPlantIds.size + borderPlantIds.size;
-		const totalPlants = fieldData.plantPoints.length;
-
-		return {
-			totalPlants,
-			coveredPlants: coveredPlantIds.size,
-			borderPlants: borderPlantIds.size,
-			uncoveredPlants: totalPlants - totalCovered,
-			coveragePercentage: totalPlants > 0 ? (totalCovered / totalPlants) * 100 : 0
-		};
-	}, [fieldData.zones, fieldData.plantPoints]);
 
 	// Centralized map state using MapState interface
 	const mapState: MapState = useMemo(() => ({
@@ -1245,8 +1226,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		obstaclePolygonsRef.current.forEach(polygon => polygon.setMap(null));
 		obstaclePolygonsRef.current = [];
 
-		plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
-		plantPointMarkersRef.current = [];
+		clearMarkers(plantPointMarkersRef.current);
 
 		irrigationMarkersRef.current.forEach(marker => marker.setMap(null));
 		irrigationMarkersRef.current = [];
@@ -1289,7 +1269,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					},
 					title: `Sprinkler ${index + 1}`,
 					optimized: true,
-					clickable: false
+					clickable: false,
+					zIndex: 2000
 				});
 				irrigationMarkersRef.current.push(marker);
 
@@ -1303,7 +1284,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 						strokeOpacity: 0.6,
 						strokeWeight: 1,
 						map: map,
-						clickable: false
+						clickable: false,
+						zIndex: 2000
 					});
 					irrigationCirclesRef.current.push(circle);
 				}
@@ -1326,7 +1308,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					},
 					title: `Pivot ${index + 1}`,
 					optimized: true,
-					clickable: false
+					clickable: false,
+					zIndex: 2000
 				});
 				irrigationMarkersRef.current.push(marker);
 
@@ -1340,7 +1323,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 						strokeOpacity: 1.0,
 						strokeWeight: 1,
 						map: map,
-						clickable: false
+						clickable: false,
+						zIndex: 2000
 					});
 					irrigationCirclesRef.current.push(circle);
 				}
@@ -1467,7 +1451,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		const shouldUpdate = forceUpdate ||
 			!mainPolygonRef.current ||
 			obstaclePolygonsRef.current.length !== fieldData.obstacles.length ||
-			plantPointMarkersRef.current.length !== fieldData.plantPoints.length;
+			plantPointMarkersRef.current.length !== filteredPlantPoints.length;
 
 		if (shouldUpdate) {
 			clearMapObjects();
@@ -1483,33 +1467,16 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					strokeOpacity: 1,
 					map: map,
 					clickable: false,
-					zIndex: 500,
+					zIndex: 1000,
 				});
 				mainPolygonRef.current = poly;
 			}
 
-			// Create plant point markers
-			if (fieldData.plantPoints.length > 0) {
-				const plantIcon = {
-					url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-						<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-							<circle cx="4" cy="4" r="3" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
-						</svg>
-					`),
-					scaledSize: new google.maps.Size(8, 8),
-					anchor: new google.maps.Point(4, 4)
-				};
-
-				fieldData.plantPoints.forEach((point) => {
-					const marker = new google.maps.Marker({
-						position: { lat: point.lat, lng: point.lng },
-						map: map,
-						icon: plantIcon,
-						title: `Plant: ${point.cropType}`,
-						optimized: true,
-						clickable: false,
-						zIndex: 400
-					});
+			// Create plant point markers - only show filtered points
+			if (filteredPlantPoints.length > 0) {
+				filteredPlantPoints.forEach((point) => {
+					const marker = createPlantPointMarker(point, map);
+					marker.setZIndex(400);
 					plantPointMarkersRef.current.push(marker);
 				});
 			}
@@ -1585,7 +1552,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					strokeOpacity: 0.9,
 					map: map,
 					clickable: true,
-					zIndex: 800,
+					zIndex: 1500,
 					editable: zoneEditingState.currentEdit === zone.id
 				});
 
@@ -1602,14 +1569,44 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				});
 			}
 		});
-	}, [fieldData.mainArea, fieldData.obstacles, fieldData.plantPoints, fieldData.zones, zoneEditingState.currentEdit, clearMapObjects, createIrrigationMarkers, updateZoneFromPolygon]); // Add necessary dependencies
+	}, [fieldData.mainArea, fieldData.obstacles, fieldData.zones, zoneEditingState.currentEdit, clearMapObjects, createIrrigationMarkers, updateZoneFromPolygon, filteredPlantPoints]); // Add necessary dependencies
+
+	// Update filtered plant points when plantPoints, lodLevel, or hideAllPoints changes
+	const updateFilteredPlantPoints = useCallback(() => {
+		if (hideAllPoints) {
+			setFilteredPlantPoints([]); // Hide all points
+			log(`Hide all points: ${fieldData.plantPoints.length} -> 0 points`);
+		} else {
+			const filtered = filterPlantPointsByLod(fieldData.plantPoints, lodLevel);
+			setFilteredPlantPoints(filtered);
+			log(`LOD filtering: ${fieldData.plantPoints.length} -> ${filtered.length} points (LOD level: ${lodLevel}, Zoom: ${mapZoom})`);
+		}
+	}, [fieldData.plantPoints, lodLevel, mapZoom, hideAllPoints]);
+
+	// LOD effect: Update filtered plant points when plantPoints or lodLevel changes
+	useEffect(() => {
+		updateFilteredPlantPoints();
+	}, [updateFilteredPlantPoints]);
+
+	// Update map visuals when filtered plant points change
+	useEffect(() => {
+		if (mapRef.current) {
+			updateMapVisuals(mapRef.current, true);
+		}
+	}, [filteredPlantPoints, updateMapVisuals]);
+
 
 	const handleMapLoad = useCallback((loadedMap: google.maps.Map) => {
 		mapRef.current = loadedMap;
 
 		loadedMap.addListener('zoom_changed', () => {
 			const newZoom = loadedMap.getZoom() || MAP_CONFIG.DEFAULT_ZOOM;
+			setMapZoom(newZoom);
 			setFieldData(prev => ({ ...prev, mapZoom: newZoom }));
+			
+			// Update LOD level based on zoom
+			const newLodLevel = calculateLodLevel(newZoom);
+			setLodLevel(newLodLevel);
 		});
 
 		if (fieldData.mainArea.length >= 3) {
@@ -1999,78 +1996,19 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 												{t('Selected Crops')}
 											</h3>
 											<div className="flex flex-wrap gap-2">
-												{fieldData.selectedCrops.map((crop, idx) => (
-													<span key={idx} className="bg-blue-600 text-white px-2 py-1 rounded text-xs border border-white">
-														{crop}
-													</span>
-												))}
+												{fieldData.selectedCrops.map((crop, idx) => {
+													const cropData = getCropByValue(crop);
+													return (
+														<span key={idx} className="bg-blue-600 text-white px-3 py-1 rounded text-xs border border-white flex items-center gap-1">
+															<span className="text-sm">{cropData?.icon || '🌱'}</span>
+															<span>{cropData?.name || crop}</span>
+														</span>
+													);
+												})}
 											</div>
 										</div>
 									)}
 
-									{/* Field Information */}
-									{fieldData.mainArea.length > 0 && (
-										<div className="rounded-lg p-4 border border-white">
-											<h3 className="text-sm font-semibold text-white mb-3">
-												📊 {t('Field Information')}
-											</h3>
-											<div className="space-y-2 text-xs">
-												<div className="flex justify-between text-gray-400">
-													<span>{t('Total Area')}:</span>
-													<span className="text-green-400">
-														{fieldData.perimeterMeters !== null ? fieldData.perimeterMeters.toFixed(1) : '--'} {t('meters')}
-													</span>
-												</div>
-												<div className="flex justify-between text-gray-400">
-													<span>{t('Plant Points')}:</span>
-													<span className="text-green-400">
-														{fieldData.plantPoints.length} {t('points')}
-													</span>
-												</div>
-												<div className="flex justify-between text-gray-400">
-													<span>{t('Obstacles')}:</span>
-													<span className="text-green-400">
-														{fieldData.obstacles.length} {t('items')}
-													</span>
-												</div>
-												{fieldData.zones.length > 0 && (
-													<>
-														<div className="border-t border-gray-600 pt-2 mt-2">
-															<div className="text-xs font-semibold text-blue-300 mb-2">
-																🌱 {t('Plant Coverage')}:
-															</div>
-															<div className="flex justify-between text-gray-400">
-																<span>{t('Covered Plants')}:</span>
-																<span className="text-green-400">
-																	{plantCoverageStats.coveredPlants} {t('points')}
-																</span>
-															</div>
-															<div className="flex justify-between text-gray-400">
-																<span>{t('Border Plants')}:</span>
-																<span className="text-yellow-400">
-																	{plantCoverageStats.borderPlants} {t('points')}
-																</span>
-															</div>
-															<div className="flex justify-between text-gray-400">
-																<span>{t('Uncovered Plants')}:</span>
-																<span className="text-red-400">
-																	{plantCoverageStats.uncoveredPlants} {t('points')}
-																</span>
-															</div>
-															<div className="flex justify-between text-gray-400">
-																<span>{t('Coverage')}:</span>
-																<span className={`font-semibold ${plantCoverageStats.coveragePercentage >= 90 ? 'text-green-400' :
-																	plantCoverageStats.coveragePercentage >= 70 ? 'text-yellow-400' : 'text-red-400'
-																	}`}>
-																	{plantCoverageStats.coveragePercentage.toFixed(1)}%
-																</span>
-															</div>
-														</div>
-													</>
-												)}
-											</div>
-										</div>
-									)}
 
 									{/* Irrigation Information */}
 									{fieldData.selectedIrrigationType && (
@@ -2083,12 +2021,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 													<span>{t('Irrigation Type')}:</span>
 													<span className="text-blue-400">
 														{fieldData.selectedIrrigationType.replace('_', ' ')}
-													</span>
-												</div>
-												<div className="flex justify-between text-gray-400">
-													<span>{t('Total Water Requirement')}:</span>
-													<span className="text-blue-400">
-														{fieldData.totalWaterRequirement.toFixed(1)} ลิตร/ครั้ง
 													</span>
 												</div>
 
@@ -2314,28 +2246,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 													<span>{t('Water Deviation')}:</span>
 													<span className="text-yellow-400">{zoneStats.waterDeviation.toFixed(1)} ลิตร/ครั้ง</span>
 												</div>
-												{zoneStats.balanceScore !== null && zoneStats.balanceScore !== undefined && zoneStats.balanceStatus && (
-													<>
-														<div className="flex justify-between text-gray-400">
-															<span>{t('Balance Score')}:</span>
-															<span className={`font-semibold ${zoneStats.balanceScore >= 80 ? 'text-green-400' :
-																zoneStats.balanceScore >= 60 ? 'text-blue-400' :
-																	zoneStats.balanceScore >= 40 ? 'text-yellow-400' : 'text-red-400'
-																}`}>
-																{zoneStats.balanceScore.toFixed(1)}%
-															</span>
-														</div>
-														<div className="flex justify-between text-gray-400">
-															<span>{t('Balance Status')}:</span>
-															<span className={`font-semibold ${zoneStats.balanceStatus === 'Excellent' ? 'text-green-400' :
-																zoneStats.balanceStatus === 'Good' ? 'text-blue-400' :
-																	zoneStats.balanceStatus === 'Fair' ? 'text-yellow-400' : 'text-red-400'
-																}`}>
-																{zoneStats.balanceStatus}
-															</span>
-														</div>
-													</>
-												)}
 												<div className="flex justify-between text-gray-400">
 													<span>{t('Most Uneven Zone')}:</span>
 													<span className="text-red-400">{zoneStats.mostUnevenZone}</span>
@@ -2662,14 +2572,65 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 										scaleControl: false,
 										streetViewControl: false,
 										rotateControl: false,
-										fullscreenControl: false
+										fullscreenControl: true
 									}}
 								/>
-								<div className="absolute top-4 right-4 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-3 text-xs">
+								<div className="absolute top-2.5 right-16 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-3 text-xs">
 									<div className="text-white flex gap-2">
 										<span>Lat: {fieldData.mapCenter.lat.toFixed(4)}</span>
 										<span>Lng: {fieldData.mapCenter.lng.toFixed(4)}</span>
 									</div>
+								</div>
+								
+								{/* Hide/Show Points Button */}
+								{fieldData.plantPoints.length > 0 && (
+									<div className="absolute top-2.5 right-60 z-10">
+										<button 
+											onClick={() => {
+												const newHideAllPoints = !hideAllPoints;
+												setHideAllPoints(newHideAllPoints);
+												setFieldData(prev => ({ ...prev, hideAllPoints: newHideAllPoints }));
+											}}
+											className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
+												hideAllPoints 
+													? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
+													: 'bg-green-600 text-white border-green-500 hover:bg-green-500'
+											}`}
+											title={hideAllPoints ? t('Show All Points') : t('Hide All Points')}
+										>
+											{hideAllPoints ? (
+												<div className="flex items-center gap-1">
+													<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+													</svg>
+													{t('Show')}
+												</div>
+											) : (
+												<div className="flex items-center gap-1">
+													<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+													</svg>
+													{t('Hide')}
+												</div>
+											)}
+										</button>
+									</div>
+								)}
+								<div className="absolute bottom-4 right-20 z-10 pointer-events-none">
+									<div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
+										{t('Zoom Level')}: {mapZoom}
+									</div>
+									{fieldData.plantPoints.length > 0 && (
+										<div className="px-2 py-1 rounded bg-green-900 bg-opacity-70 border border-green-500 text-xs text-white">
+											<div>LOD: {lodLevel} | {filteredPlantPoints.length}/{fieldData.plantPoints.length} {t('points')}</div>
+											{lodLevel > 1 && (
+												<div className="text-green-200 text-xs">
+													{Math.round((filteredPlantPoints.length / fieldData.plantPoints.length) * 100)}% {t('visible')}
+												</div>
+											)}
+										</div>
+									)}
 								</div>
 								</div>
 							</div>
