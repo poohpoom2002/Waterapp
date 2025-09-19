@@ -345,7 +345,7 @@ export default function NewHome() {
                             </div>
                             
                             <div className="mb-6">
-                                <div className={`text-3xl font-bold ${getTierDisplayInfo('pro').color}`}>{getTierDisplayInfo('pro').price}</div>
+                                <div className="text-3xl font-bold text-white">฿299</div>
                                 <div className="text-sm text-gray-400">per month</div>
                             </div>
 
@@ -405,7 +405,7 @@ export default function NewHome() {
                             </div>
                             
                             <div className="mb-6">
-                                <div className={`text-3xl font-bold ${getTierDisplayInfo('advanced').color}`}>{getTierDisplayInfo('advanced').price}</div>
+                                <div className="text-3xl font-bold text-white">฿599</div>
                                 <div className="text-sm text-gray-400">per month</div>
                             </div>
 
