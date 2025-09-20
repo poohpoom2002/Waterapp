@@ -2176,9 +2176,10 @@ export default function GreenhouseMap() {
             let newShapes = shapes;
             let newIrrigationElements = irrigationElements;
 
-            // หากเป็นท่อย่อย ให้หาและลบสปริงเกลอร์ที่เกี่ยวข้องด้วย
+            // หากเป็นท่อย่อย ให้หาและลบสปริงเกลอร์และสายน้ำหยดที่เกี่ยวข้องด้วย
             if (elementToDelete && elementToDelete.type === 'sub-pipe') {
                 const relatedSprinklers: string[] = [];
+                const relatedDripLines: string[] = [];
 
                 // หาสปริงเกลอร์ที่อยู่ใกล้กับท่อย่อยนี้
                 irrigationElements
@@ -2227,19 +2228,57 @@ export default function GreenhouseMap() {
                         }
                     });
 
-                // ลบท่อย่อยและสปริงเกลอร์ที่เกี่ยวข้องเรียบร้อยแล้ว
+                // หาสายน้ำหยดที่เกี่ยวข้องกับท่อย่อยนี้
+                irrigationElements
+                    .filter((el) => el.type === 'drip-line')
+                    .forEach((dripLine) => {
+                        // ตรวจสอบว่าสายน้ำหยดมีจุดที่ตรงกับท่อย่อยหรือไม่
+                        if (dripLine.points.length === elementToDelete.points.length) {
+                            let isRelated = true;
+                            for (let i = 0; i < elementToDelete.points.length; i++) {
+                                const pipePoint = elementToDelete.points[i];
+                                const dripPoint = dripLine.points[i];
+                                
+                                // ตรวจสอบระยะห่างระหว่างจุด (ถ้าใกล้กันมากกว่า 10 pixels ถือว่าเกี่ยวข้อง)
+                                const distance = Math.sqrt(
+                                    Math.pow(pipePoint.x - dripPoint.x, 2) +
+                                    Math.pow(pipePoint.y - dripPoint.y, 2)
+                                );
+                                
+                                if (distance > 10) {
+                                    isRelated = false;
+                                    break;
+                                }
+                            }
+                            
+                            if (isRelated) {
+                                relatedDripLines.push(dripLine.id);
+                            }
+                        }
+                    });
+
+                // ลบท่อย่อย สปริงเกลอร์ และสายน้ำหยดที่เกี่ยวข้องเรียบร้อยแล้ว
                 newIrrigationElements = irrigationElements.filter(
-                    (el) => el.id !== selectedElement && !relatedSprinklers.includes(el.id)
+                    (el) => el.id !== selectedElement && 
+                           !relatedSprinklers.includes(el.id) && 
+                           !relatedDripLines.includes(el.id)
                 );
 
                 // แสดงข้อความแจ้งเตือน
-                if (relatedSprinklers.length > 0) {
-                    alert(
-                        t('ลบท่อย่อยและสปริงเกลอร์ {count} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว').replace(
-                            '{count}',
-                            relatedSprinklers.length.toString()
-                        )
-                    );
+                const totalRelated = relatedSprinklers.length + relatedDripLines.length;
+                if (totalRelated > 0) {
+                    let message = t('ลบท่อย่อยและ');
+                    if (relatedSprinklers.length > 0) {
+                        message += t('สปริงเกลอร์ {count} ตัว').replace('{count}', relatedSprinklers.length.toString());
+                    }
+                    if (relatedSprinklers.length > 0 && relatedDripLines.length > 0) {
+                        message += t(' และ');
+                    }
+                    if (relatedDripLines.length > 0) {
+                        message += t('สายน้ำหยด {count} เส้น').replace('{count}', relatedDripLines.length.toString());
+                    }
+                    message += t('ที่เกี่ยวข้องเรียบร้อยแล้ว');
+                    alert(message);
                 }
             } else if (elementToDelete && elementToDelete.type === 'drip-line') {
                 // If it's a drip line, delete only the drip line

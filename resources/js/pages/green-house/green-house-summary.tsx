@@ -3,17 +3,13 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import html2canvas from 'html2canvas';
 import { router } from '@inertiajs/react';
 import { greenhouseCrops, getCropByValue } from '../components/Greenhouse/CropData';
-import {
-    saveGreenhouseData,
-    GreenhousePlanningData,
-    calculateAllGreenhouseStats,
-} from '@/utils/greenHouseData';
+import { saveGreenhouseData, GreenhousePlanningData, calculateAllGreenhouseStats } from '@/utils/greenHouseData';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
-import {
-    calculatePlotBasedWaterRequirements,
+import { 
+    calculatePlotBasedWaterRequirements, 
     PlotBasedWaterSummary,
-    type PlotWaterCalculation,
+    type PlotWaterCalculation
 } from '../components/Greenhouse/WaterCalculation';
 
 // Fittings breakdown interface (reused pattern from field-crop)
@@ -110,13 +106,13 @@ export default function GreenhouseSummary() {
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [isCreatingNewProject, setIsCreatingNewProject] = useState(false);
-
+    
     // State for collapsible sections
     const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
         pipeFlowRates: true,
         irrigationEquipment: true,
         pipeSystem: true,
-        plantData: true,
+        plantData: true
     });
 
     // Load component images
@@ -188,17 +184,13 @@ export default function GreenhouseSummary() {
                 field_name: `${t('โรงเรือน')} - ${new Date().toLocaleDateString('th-TH')}`,
                 customer_name: '',
                 category: 'greenhouse',
-                area_coordinates: summaryData.shapes
-                    .filter((s) => s.type === 'greenhouse')
-                    .map(
-                        (shape) => shape.points.map((p) => ({ lat: p.y / 1000, lng: p.x / 1000 })) // Convert canvas coordinates
-                    )
-                    .flat(),
+                area_coordinates: summaryData.shapes.filter(s => s.type === 'greenhouse').map(shape => 
+                    shape.points.map(p => ({ lat: p.y / 1000, lng: p.x / 1000 })) // Convert canvas coordinates
+                ).flat(),
                 plant_type_id: 1, // Default greenhouse plant type
-                total_plants: summaryData.shapes.filter((s) => s.type === 'plot').length,
+                total_plants: summaryData.shapes.filter(s => s.type === 'plot').length,
                 total_area: greenhouseData.summary.totalGreenhouseArea,
-                total_water_need:
-                    greenhouseData.summary.overallProduction.waterRequirementPerIrrigation,
+                total_water_need: greenhouseData.summary.overallProduction.waterRequirementPerIrrigation,
                 area_type: 'greenhouse',
                 greenhouse_data: {
                     shapes: summaryData.shapes,
@@ -244,7 +236,7 @@ export default function GreenhouseSummary() {
             if (responseData.success) {
                 setSaveSuccess(true);
                 localStorage.removeItem('editingGreenhouseId');
-
+                
                 // Show success message
                 setTimeout(() => {
                     setSaveSuccess(false);
@@ -267,19 +259,20 @@ export default function GreenhouseSummary() {
     // NEW: Handle new project
     const handleNewProject = async () => {
         setIsCreatingNewProject(true);
-
+        
         try {
             // Clear localStorage data
             localStorage.removeItem('greenhousePlanningData');
             localStorage.removeItem('editingGreenhouseId');
-
+            
             // Capture and save map image before navigating
             await handleExportMapToProduct();
-
+            
             // Navigate to crop selection page to start new project
             setTimeout(() => {
                 router.visit('/greenhouse-crop');
             }, 1000);
+            
         } catch (error) {
             console.error('Error creating new project:', error);
             // Still navigate even if image capture fails
@@ -301,8 +294,8 @@ export default function GreenhouseSummary() {
                         useCORS: true,
                     });
                     const image = canvas.toDataURL('image/png');
-
-                    localStorage.setItem('projectMapImage', image);
+                    
+                    localStorage.setItem('projectMapImage', image); 
                     console.log('✅ Image saved to localStorage successfully.');
                 } catch (error) {
                     console.error('Error capturing canvas image:', error);
@@ -394,7 +387,7 @@ export default function GreenhouseSummary() {
 
     // Rest of the existing code remains the same...
     // [All other functions and useEffect hooks remain unchanged]
-
+    
     useEffect(() => {
         // Get data from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
@@ -438,9 +431,7 @@ export default function GreenhouseSummary() {
                         selectedCrops: crops ? crops.split(',') : [],
                         planningMethod: (method as 'draw' | 'import') || 'draw',
                         shapes: shapesParam ? JSON.parse(decodeURIComponent(shapesParam)) : [],
-                        irrigationMethod:
-                            (irrigationParam as 'mini-sprinkler' | 'drip' | 'mixed') ||
-                            'mini-sprinkler',
+                        irrigationMethod: (irrigationParam as 'mini-sprinkler' | 'drip' | 'mixed') || 'mini-sprinkler',
                         irrigationElements: [], // Initialize empty array for irrigation elements
                         createdAt: new Date().toISOString(),
                     };
@@ -453,8 +444,7 @@ export default function GreenhouseSummary() {
                 selectedCrops: crops ? crops.split(',') : [],
                 planningMethod: (method as 'draw' | 'import') || 'draw',
                 shapes: shapesParam ? JSON.parse(decodeURIComponent(shapesParam)) : [],
-                irrigationMethod:
-                    (irrigationParam as 'mini-sprinkler' | 'drip' | 'mixed') || 'mini-sprinkler',
+                irrigationMethod: (irrigationParam as 'mini-sprinkler' | 'drip' | 'mixed') || 'mini-sprinkler',
                 irrigationElements: [], // Initialize empty array for irrigation elements
                 createdAt: new Date().toISOString(),
             };
@@ -522,7 +512,11 @@ export default function GreenhouseSummary() {
     };
 
     // Helper function to calculate distance from point to line segment
-    const distancePointToLineSegment = (point: Point, lineStart: Point, lineEnd: Point): number => {
+    const distancePointToLineSegment = (
+        point: Point,
+        lineStart: Point,
+        lineEnd: Point
+    ): number => {
         const result = closestPointOnLineSegment(point, lineStart, lineEnd);
         return result.distance;
     };
@@ -530,60 +524,57 @@ export default function GreenhouseSummary() {
     // Helper function to calculate distance from point to polygon boundary
     const distancePointToPolygon = (point: Point, polygon: Point[]): number => {
         if (polygon.length < 3) return Infinity;
-
+        
         let minDistance = Infinity;
-
+        
         // Check distance to each edge of the polygon
         for (let i = 0; i < polygon.length; i++) {
             const p1 = polygon[i];
             const p2 = polygon[(i + 1) % polygon.length];
-
+            
             const distance = distancePointToLineSegment(point, p1, p2);
             minDistance = Math.min(minDistance, distance);
         }
-
+        
         return minDistance;
     };
 
     // Helper function to check if sub-pipe serves a plot (improved logic)
     const subPipeServesPlot = (subPipe: { points: Point[] }, plotPoints: Point[]): boolean => {
         // วิธีที่ 1: ตรวจสอบจุดปลายของท่อ
-        const subPipeEndpointsInPlot = subPipe.points.some((point: Point) =>
-            isPointInPolygon(point, plotPoints)
-        );
-
+        const subPipeEndpointsInPlot = subPipe.points.some((point: Point) => isPointInPolygon(point, plotPoints));
+        
         // วิธีที่ 2: ตรวจสอบส่วนของเส้นท่อที่อยู่ในแปลง
         let subPipeSegmentInPlot = false;
         for (let i = 0; i < subPipe.points.length - 1; i++) {
             const p1 = subPipe.points[i];
             const p2 = subPipe.points[i + 1];
-
+            
             // ตรวจสอบจุดกึ่งกลางของส่วนท่อ
             const midPoint = {
                 x: (p1.x + p2.x) / 2,
                 y: (p1.y + p2.y) / 2,
             };
-
+            
             if (isPointInPolygon(midPoint, plotPoints)) {
                 subPipeSegmentInPlot = true;
                 break;
             }
         }
-
+        
         // วิธีที่ 3: ตรวจสอบระยะห่างจากขอบเขตแปลง (สำหรับท่อที่อยู่บนเส้นขอบ)
         let subPipeNearPlotBoundary = false;
         if (!subPipeEndpointsInPlot && !subPipeSegmentInPlot) {
             // ตรวจสอบระยะห่างจากจุดปลายของท่อไปยังขอบเขตแปลง
             for (const pipePoint of subPipe.points) {
                 const distanceToBoundary = distancePointToPolygon(pipePoint, plotPoints);
-                if (distanceToBoundary < 20) {
-                    // ระยะห่างน้อยกว่า 20 pixels จากขอบเขต
+                if (distanceToBoundary < 20) { // ระยะห่างน้อยกว่า 20 pixels จากขอบเขต
                     subPipeNearPlotBoundary = true;
                     break;
                 }
             }
         }
-
+        
         // ท่อจะถือว่าให้บริการแปลงนี้หากเป็นไปตามเงื่อนไขใดเงื่อนไขหนึ่ง
         return subPipeEndpointsInPlot || subPipeSegmentInPlot || subPipeNearPlotBoundary;
     };
@@ -620,6 +611,7 @@ export default function GreenhouseSummary() {
 
         return crop ? crop.icon : '🌱';
     };
+
 
     // Calculate cumulative pipe lengths for each plot (Enhanced version)
     const calculatePipeInPlots = () => {
@@ -672,6 +664,10 @@ export default function GreenhouseSummary() {
                 sprinklerCount: 0,
                 dripEmitterCount: 0,
                 totalEmitters: 0,
+                // เพิ่มข้อมูลอัตราการไหล
+                sprinklerFlowRate: 0,
+                dripEmitterFlowRate: 0,
+                totalFlowRate: 0,
             };
 
             // Find main pipes and sub pipes
@@ -797,14 +793,14 @@ export default function GreenhouseSummary() {
             sprinklers.forEach((sprinkler) => {
                 if (sprinkler.points.length > 0) {
                     const sprinklerPoint = sprinkler.points[0]; // สปริงเกลอร์มีจุดเดียว
-
+                    
                     // ตรวจสอบว่าสปริงเกลอร์อยู่ในแปลงหรือไม่
                     const isInPlot = isPointInPolygon(sprinklerPoint, plot.points);
-
+                    
                     // ตรวจสอบว่าสปริงเกลอร์อยู่ใกล้กับท่อย่อยในแปลงหรือไม่
                     let isNearSubPipeInPlot = false;
                     const subPipes = elements.filter((e) => e.type === 'sub-pipe');
-
+                    
                     if (!isInPlot) {
                         // ตรวจสอบว่าท่อย่อยอยู่ในแปลงหรือไม่ (ปรับปรุงตรรกะให้ครอบคลุมมากขึ้น)
                         subPipes.forEach((subPipe) => {
@@ -816,8 +812,7 @@ export default function GreenhouseSummary() {
                                         subPipe.points[i],
                                         subPipe.points[i + 1]
                                     );
-                                    if (distance < 30) {
-                                        // ระยะห่างน้อยกว่า 30 pixels
+                                    if (distance < 30) { // ระยะห่างน้อยกว่า 30 pixels
                                         isNearSubPipeInPlot = true;
                                         break;
                                     }
@@ -825,11 +820,11 @@ export default function GreenhouseSummary() {
                             }
                         });
                     }
-
+                    
                     // นับสปริงเกลอร์ที่อยู่ในแปลงหรืออยู่ใกล้กับท่อย่อยในแปลง
                     if (isInPlot || isNearSubPipeInPlot) {
                         plotPipeData.sprinklerCount++;
-
+                        
                         // Debug: ตรวจสอบการนับสปริงเกลอร์ในแต่ละแปลง
                         console.log(`🔍 Sprinkler counted in ${plotPipeData.plotName}:`, {
                             plotName: plotPipeData.plotName,
@@ -838,7 +833,7 @@ export default function GreenhouseSummary() {
                             isInPlot: isInPlot,
                             isNearSubPipeInPlot: isNearSubPipeInPlot,
                             currentCount: plotPipeData.sprinklerCount,
-                            method: isInPlot ? 'inside_plot' : 'near_subpipe_in_plot',
+                            method: isInPlot ? 'inside_plot' : 'near_subpipe_in_plot'
                         });
                     }
                 }
@@ -849,11 +844,11 @@ export default function GreenhouseSummary() {
                 if (dripLine.points.length > 0 && dripLine.spacing) {
                     // คำนวณจำนวนหัวหยดตามความยาวท่อและระยะห่าง
                     let dripLengthInPlot = 0;
-
+                    
                     for (let i = 0; i < dripLine.points.length - 1; i++) {
                         const p1 = dripLine.points[i];
                         const p2 = dripLine.points[i + 1];
-
+                        
                         // ตรวจสอบว่าส่วนของท่อนี้อยู่ในแปลงหรือไม่
                         const midPoint = {
                             x: (p1.x + p2.x) / 2,
@@ -869,18 +864,30 @@ export default function GreenhouseSummary() {
                             dripLengthInPlot += segmentLength;
                         }
                     }
-
+                    
                     // คำนวณจำนวนหัวหยด (ความยาวท่อ / ระยะห่าง + 1)
                     if (dripLengthInPlot > 0 && dripLine.spacing > 0) {
-                        const emittersInThisLine =
-                            Math.floor(dripLengthInPlot / dripLine.spacing) + 1;
+                        const emittersInThisLine = Math.floor(dripLengthInPlot / dripLine.spacing) + 1;
                         plotPipeData.dripEmitterCount += emittersInThisLine;
                     }
                 }
             });
 
-            plotPipeData.totalEmitters =
-                plotPipeData.sprinklerCount + plotPipeData.dripEmitterCount;
+            plotPipeData.totalEmitters = plotPipeData.sprinklerCount + plotPipeData.dripEmitterCount;
+
+            // คำนวณอัตราการไหลสำหรับแปลงปลูกนี้
+            const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10; // L/min per sprinkler
+            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24; // L/min per drip emitter
+            
+            // คำนวณอัตราการไหลแยกตามประเภท
+            const plotSprinklerFlowRate = plotPipeData.sprinklerCount * sprinklerFlowRate;
+            const plotDripEmitterFlowRate = plotPipeData.dripEmitterCount * dripEmitterFlowRate;
+            const plotTotalFlowRate = plotSprinklerFlowRate + plotDripEmitterFlowRate;
+            
+            // เพิ่มข้อมูลอัตราการไหลใน plotPipeData
+            plotPipeData.sprinklerFlowRate = plotSprinklerFlowRate;
+            plotPipeData.dripEmitterFlowRate = plotDripEmitterFlowRate;
+            plotPipeData.totalFlowRate = plotTotalFlowRate;
 
             // Debug: ตรวจสอบการนับสปริงเกลอร์ในแต่ละแปลง
             console.log(`🔍 ${plotPipeData.plotName} sprinkler count:`, {
@@ -888,6 +895,9 @@ export default function GreenhouseSummary() {
                 sprinklerCount: plotPipeData.sprinklerCount,
                 dripEmitterCount: plotPipeData.dripEmitterCount,
                 totalEmitters: plotPipeData.totalEmitters,
+                sprinklerFlowRate: plotPipeData.sprinklerFlowRate,
+                dripEmitterFlowRate: plotPipeData.dripEmitterFlowRate,
+                totalFlowRate: plotPipeData.totalFlowRate
             });
 
             plotPipeData.maxSubPipeLength = Math.round(maxSubPipeLength * 100) / 100;
@@ -918,17 +928,17 @@ export default function GreenhouseSummary() {
                 subPipeFlowRate: 0,
                 connections: {
                     mainToSub: 0,
-                    subToEmitters: 0,
+                    subToEmitters: 0
                 },
                 longest: {
                     main: { length: 0, connections: 0, flowRate: 0 },
-                    sub: { length: 0, emitters: 0, flowRate: 0 },
-                },
+                    sub: { length: 0, emitters: 0, flowRate: 0 }
+                }
             };
         }
 
         const elements = summaryData.irrigationElements;
-
+        
         // Count different pipe types
         const mainPipes = elements.filter((e) => e.type === 'main-pipe');
         const subPipes = elements.filter((e) => e.type === 'sub-pipe');
@@ -962,7 +972,7 @@ export default function GreenhouseSummary() {
         // These values should come from the choose-irrigation page
         const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10; // L/min per sprinkler
         const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24; // L/min per drip emitter
-
+        
         // Calculate flow rates separately for sprinklers and drip emitters
         const totalSprinklerFlowRate = totalSprinklers * sprinklerFlowRate;
         const totalDripEmitterFlowRate = totalDripEmitters * dripEmitterFlowRate;
@@ -978,20 +988,18 @@ export default function GreenhouseSummary() {
             // Calculate flow rate per sub pipe (total emitters divided by number of sub pipes)
             const sprinklersPerSubPipe = totalSprinklers / subPipes.length;
             const dripEmittersPerSubPipe = totalDripEmitters / subPipes.length;
-            const flowRatePerSubPipe =
-                sprinklersPerSubPipe * sprinklerFlowRate +
-                dripEmittersPerSubPipe * dripEmitterFlowRate;
-
+            const flowRatePerSubPipe = (sprinklersPerSubPipe * sprinklerFlowRate) + (dripEmittersPerSubPipe * dripEmitterFlowRate);
+            
             // For each main pipe, count how many sub pipes connect to it
             mainPipes.forEach((mainPipe) => {
                 let subPipesConnectedToThisMain = 0;
-
+                
                 subPipes.forEach((subPipe) => {
                     // Check if sub pipe connects to this main pipe
                     if (subPipe.points.length > 0 && mainPipe.points.length > 0) {
                         const subStart = subPipe.points[0];
                         let isConnected = false;
-
+                        
                         // Check if sub pipe start point is close to any point on main pipe
                         for (let i = 0; i < mainPipe.points.length - 1; i++) {
                             const result = closestPointOnLineSegment(
@@ -999,20 +1007,19 @@ export default function GreenhouseSummary() {
                                 mainPipe.points[i],
                                 mainPipe.points[i + 1]
                             );
-
-                            if (result.distance < 50) {
-                                // 50 pixels tolerance
+                            
+                            if (result.distance < 50) { // 50 pixels tolerance
                                 isConnected = true;
                                 break;
                             }
                         }
-
+                        
                         if (isConnected) {
                             subPipesConnectedToThisMain++;
                         }
                     }
                 });
-
+                
                 if (subPipesConnectedToThisMain > 0) {
                     // Each connected sub pipe contributes its flow rate to the main pipe
                     mainPipeFlowRate += flowRatePerSubPipe * subPipesConnectedToThisMain;
@@ -1030,8 +1037,7 @@ export default function GreenhouseSummary() {
         const flowRatePerSubPipe = subPipes.length > 0 ? subPipeFlowRate / subPipes.length : 0;
 
         // Calculate emitters per sub pipe
-        const emittersPerSubPipe =
-            subPipes.length > 0 ? Math.round(totalEmitters / subPipes.length) : 0;
+        const emittersPerSubPipe = subPipes.length > 0 ? Math.round(totalEmitters / subPipes.length) : 0;
 
         // Longest-line metrics
         const lengthOfPolyline = (points: Point[]) => {
@@ -1068,8 +1074,7 @@ export default function GreenhouseSummary() {
                             mp.points[i],
                             mp.points[i + 1]
                         );
-                        if (result.distance < 50) {
-                            // 50px tolerance
+                        if (result.distance < 50) { // 50px tolerance
                             isConnected = true;
                             break;
                         }
@@ -1081,10 +1086,8 @@ export default function GreenhouseSummary() {
 
         // Find longest sub pipe length and collect ties
         let longestSubLengthPx = 0;
-        const subPipeLengths: number[] = subPipes.map((sp) => lengthOfPolyline(sp.points));
-        subPipeLengths.forEach((len) => {
-            if (len > longestSubLengthPx) longestSubLengthPx = len;
-        });
+        const subPipeLengths: number[] = subPipes.map(sp => lengthOfPolyline(sp.points));
+        subPipeLengths.forEach(len => { if (len > longestSubLengthPx) longestSubLengthPx = len; });
 
         const TOL_PX = 20; // consider ties within 20px length
         const tieIndices: number[] = [];
@@ -1096,7 +1099,7 @@ export default function GreenhouseSummary() {
         const attachTolPx = 12;
         let bestEmitters = 0;
         let bestFlow = 0;
-        tieIndices.forEach((idx) => {
+        tieIndices.forEach(idx => {
             const sp = subPipes[idx];
             let sprCount = 0;
             let dripEmitterCount = 0;
@@ -1120,16 +1123,8 @@ export default function GreenhouseSummary() {
                 let isAttached = false;
                 for (let i = 1; i < dl.points.length && !isAttached; i++) {
                     for (let j = 1; j < sp.points.length; j++) {
-                        const r1 = closestPointOnLineSegment(
-                            dl.points[i - 1],
-                            sp.points[j - 1],
-                            sp.points[j]
-                        );
-                        const r2 = closestPointOnLineSegment(
-                            dl.points[i],
-                            sp.points[j - 1],
-                            sp.points[j]
-                        );
+                        const r1 = closestPointOnLineSegment(dl.points[i - 1], sp.points[j - 1], sp.points[j]);
+                        const r2 = closestPointOnLineSegment(dl.points[i], sp.points[j - 1], sp.points[j]);
                         if (Math.min(r1.distance, r2.distance) <= attachTolPx) {
                             isAttached = true;
                             break;
@@ -1148,8 +1143,7 @@ export default function GreenhouseSummary() {
                 }
             });
 
-            const flowForThis =
-                sprCount * sprinklerFlowRate + dripEmitterCount * dripEmitterFlowRate;
+            const flowForThis = sprCount * sprinklerFlowRate + dripEmitterCount * dripEmitterFlowRate;
             const emittersForThis = sprCount + dripEmitterCount;
             if (emittersForThis > bestEmitters) {
                 bestEmitters = emittersForThis;
@@ -1179,20 +1173,12 @@ export default function GreenhouseSummary() {
             subPipeFlowRate: flowRatePerSubPipe, // Flow rate per sub pipe
             connections: {
                 mainToSub: mainToSubConnections,
-                subToEmitters: emittersPerSubPipe, // Emitters per sub pipe, not total
+                subToEmitters: emittersPerSubPipe // Emitters per sub pipe, not total
             },
             longest: {
-                main: {
-                    length: longestMainLengthM,
-                    connections: longestMainConnections,
-                    flowRate: longestMainFlow,
-                },
-                sub: {
-                    length: longestSubLengthM,
-                    emitters: longestSubEmitters,
-                    flowRate: longestSubFlow,
-                },
-            },
+                main: { length: longestMainLengthM, connections: longestMainConnections, flowRate: longestMainFlow },
+                sub: { length: longestSubLengthM, emitters: longestSubEmitters, flowRate: longestSubFlow }
+            }
         };
     };
 
@@ -1203,59 +1189,53 @@ export default function GreenhouseSummary() {
         if (!summaryData?.shapes) {
             return {
                 waterSummary: null,
-                plotWaterCalculations: [],
+                plotWaterCalculations: []
             };
         }
 
         const plots = summaryData.shapes.filter((s) => s.type === 'plot');
-
+        
         if (plots.length === 0) {
             return {
                 waterSummary: null,
-                plotWaterCalculations: [],
+                plotWaterCalculations: []
             };
         }
 
         // Convert shapes to format expected by water calculation
-        const shapesForWaterCalc = plots.map((plot) => ({
+        const shapesForWaterCalc = plots.map(plot => ({
             id: plot.id,
             type: plot.type,
             name: plot.name,
             points: plot.points,
-            cropType:
-                plot.cropType ||
-                (summaryData.selectedCrops && summaryData.selectedCrops[0]) ||
-                'tomato',
+            cropType: plot.cropType || (summaryData.selectedCrops && summaryData.selectedCrops[0]) || 'tomato'
         }));
 
         try {
             const waterSummary = calculatePlotBasedWaterRequirements(shapesForWaterCalc);
             return {
                 waterSummary,
-                plotWaterCalculations: waterSummary.plotCalculations,
+                plotWaterCalculations: waterSummary.plotCalculations
             };
         } catch (error) {
             console.error('Error calculating water requirements:', error);
             return {
                 waterSummary: null,
-                plotWaterCalculations: [],
+                plotWaterCalculations: []
             };
         }
     };
 
-    const {
-        waterSummary,
-        plotWaterCalculations,
-    }: {
+    const { waterSummary, plotWaterCalculations }: {
         waterSummary: PlotBasedWaterSummary | null;
         plotWaterCalculations: PlotWaterCalculation[];
     } = calculateWaterRequirements();
 
     // Toggle section visibility
     const toggleSection = (sectionKey: string) => {
-        setExpandedSections((prev) => ({
+        setExpandedSections(prev => ({
             ...prev,
-            [sectionKey]: !prev[sectionKey],
+            [sectionKey]: !prev[sectionKey]
         }));
     };
 
@@ -1360,23 +1340,23 @@ export default function GreenhouseSummary() {
         // Calculate drip points from drip lines
         const calculateDripPoints = (dripLine: IrrigationElement) => {
             if (dripLine.points.length < 2) return 0;
-
+            
             const spacing = (dripLine.spacing || 0.3) * 20; // Convert to pixels (0.3m default spacing)
             let totalPoints = 0;
 
             for (let i = 0; i < dripLine.points.length - 1; i++) {
                 const p1 = dripLine.points[i];
                 const p2 = dripLine.points[i + 1];
-
+                
                 const segmentLength = Math.sqrt(
                     Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)
                 );
-
+                
                 // Calculate number of drip points in this segment
                 const pointsInSegment = Math.floor(segmentLength / spacing);
                 totalPoints += pointsInSegment;
             }
-
+            
             return totalPoints;
         };
 
@@ -1403,10 +1383,7 @@ export default function GreenhouseSummary() {
 
         // Calculate total drip points
         const dripLines = elements.filter((e) => e.type === 'drip-line');
-        const totalDripPoints = dripLines.reduce(
-            (sum, dripLine) => sum + calculateDripPoints(dripLine),
-            0
-        );
+        const totalDripPoints = dripLines.reduce((sum, dripLine) => sum + calculateDripPoints(dripLine), 0);
 
         return {
             maxMainPipeLength: Math.round(maxMainPipeLength * 100) / 100,
@@ -1426,6 +1403,7 @@ export default function GreenhouseSummary() {
     };
 
     const irrigationMetrics = calculateIrrigationMetrics();
+
 
     const segmentIntersection = (a1: Point, a2: Point, b1: Point, b2: Point): Point | null => {
         const dax = a2.x - a1.x;
@@ -1533,24 +1511,22 @@ export default function GreenhouseSummary() {
                 const p1 = pipe.points[i - 1];
                 const p2 = pipe.points[i];
                 const p3 = pipe.points[i + 1];
-
+                
                 // Calculate angle between segments
                 const angle1 = Math.atan2(p2.y - p1.y, p2.x - p1.x);
                 const angle2 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
                 let angleDiff = Math.abs(angle2 - angle1);
-
+                
                 // Normalize angle to 0-π range
                 if (angleDiff > Math.PI) {
                     angleDiff = 2 * Math.PI - angleDiff;
                 }
-
+                
                 // If angle is significantly different from 180° (straight line), it's a turn
                 // We want angles that are NOT close to 180° (straight line)
                 const straightLineThreshold = Math.PI * 0.1; // 18 degrees - anything within this of 180° is considered straight
-                const isStraightLine =
-                    angleDiff < straightLineThreshold ||
-                    angleDiff > Math.PI - straightLineThreshold;
-
+                const isStraightLine = angleDiff < straightLineThreshold || angleDiff > (Math.PI - straightLineThreshold);
+                
                 if (!isStraightLine) {
                     twoWayMain++;
                 }
@@ -1583,10 +1559,8 @@ export default function GreenhouseSummary() {
                         if (ip) {
                             const nearEnd =
                                 distanceBetweenPoints(ip, mp.points[0]) <= attachTolPx ||
-                                distanceBetweenPoints(ip, mp.points[mp.points.length - 1]) <=
-                                    attachTolPx;
-                            if (nearEnd) twoWayMainFromEndpoint += 1;
-                            else threeWayMain += 1;
+                                distanceBetweenPoints(ip, mp.points[mp.points.length - 1]) <= attachTolPx;
+                            if (nearEnd) twoWayMainFromEndpoint += 1; else threeWayMain += 1;
                             found = true;
                         }
                     }
@@ -1610,13 +1584,9 @@ export default function GreenhouseSummary() {
                 if (attaches) {
                     const nearEnd = nearestAttachPoint
                         ? distanceBetweenPoints(nearestAttachPoint, mp.points[0]) <= attachTolPx ||
-                          distanceBetweenPoints(
-                              nearestAttachPoint,
-                              mp.points[mp.points.length - 1]
-                          ) <= attachTolPx
+                          distanceBetweenPoints(nearestAttachPoint, mp.points[mp.points.length - 1]) <= attachTolPx
                         : true;
-                    if (nearEnd) twoWayMainFromEndpoint += 1;
-                    else threeWayMain += 1;
+                    if (nearEnd) twoWayMainFromEndpoint += 1; else threeWayMain += 1;
                     break;
                 }
 
@@ -1646,12 +1616,7 @@ export default function GreenhouseSummary() {
                 const intersections: Point[] = [];
                 for (let i = 1; i < sPoly.length; i++) {
                     for (let j = 1; j < dPoly.length; j++) {
-                        const ip = segmentIntersection(
-                            sPoly[i - 1],
-                            sPoly[i],
-                            dPoly[j - 1],
-                            dPoly[j]
-                        );
+                        const ip = segmentIntersection(sPoly[i - 1], sPoly[i], dPoly[j - 1], dPoly[j]);
                         if (ip) intersections.push(ip);
                     }
                 }
@@ -1666,10 +1631,7 @@ export default function GreenhouseSummary() {
                     stations.push({ station: stationAlongPolyline(sPoly, mid), crossing: true });
                 }
                 intersections.forEach((p) => {
-                    stations.push({
-                        station: stationAlongPolyline(sPoly, p),
-                        crossing: isCrossing,
-                    });
+                    stations.push({ station: stationAlongPolyline(sPoly, p), crossing: isCrossing });
                 });
             });
 
@@ -1681,10 +1643,7 @@ export default function GreenhouseSummary() {
                 for (let i = 1; i < sPoly.length; i++) {
                     const res = closestPointOnLineSegment(p, sPoly[i - 1], sPoly[i]);
                     if (res.distance <= attachTolPx) {
-                        stations.push({
-                            station: stationAlongPolyline(sPoly, res.point),
-                            crossing: false,
-                        });
+                        stations.push({ station: stationAlongPolyline(sPoly, res.point), crossing: false });
                         break;
                     }
                 }
@@ -1695,8 +1654,7 @@ export default function GreenhouseSummary() {
                 const isStart = idx === 0;
                 const isEnd = idx === clusters.length - 1;
                 if (hasCrossing) {
-                    if (isStart || isEnd) threeWaySub += 1;
-                    else fourWaySub += 1;
+                    if (isStart || isEnd) threeWaySub += 1; else fourWaySub += 1;
                 } else {
                     // greenhouse rule update: non-crossing branches on submain
                     if (isEnd) {
@@ -1715,11 +1673,7 @@ export default function GreenhouseSummary() {
             threeWay: threeWayMain + threeWaySub,
             fourWay: fourWaySub,
             breakdown: {
-                main: {
-                    twoWay: twoWayMain + twoWayMainFromEndpoint,
-                    threeWay: threeWayMain,
-                    fourWay: 0,
-                },
+                main: { twoWay: twoWayMain + twoWayMainFromEndpoint, threeWay: threeWayMain, fourWay: 0 },
                 submain: { twoWay: twoWaySub, threeWay: threeWaySub, fourWay: fourWaySub },
                 lateral: { twoWay: 0, threeWay: 0, fourWay: 0 },
             },
@@ -1729,201 +1683,188 @@ export default function GreenhouseSummary() {
     const fittings = calculateGreenhouseFittings(summaryData?.irrigationElements || []);
 
     // Helper function to draw component shapes (irrigation equipment)
-    const drawComponentShape = useCallback(
-        (
-            ctx: CanvasRenderingContext2D,
-            type: string,
-            point: Point,
-            color: string,
-            scale: number = 1
-        ) => {
-            if (componentImages[type]) {
-                const img = componentImages[type];
+    const drawComponentShape = useCallback((
+        ctx: CanvasRenderingContext2D,
+        type: string,
+        point: Point,
+        color: string,
+        scale: number = 1
+    ) => {
+        if (componentImages[type]) {
+            const img = componentImages[type];
 
-                let imgSize, containerSize;
-                if (type === 'pump') {
-                    imgSize = 18 * scale;
-                    containerSize = 24 * scale;
-                } else if (type === 'water-tank') {
-                    imgSize = 36 * scale;
-                    containerSize = 28 * scale;
-                } else if (type === 'fertilizer-machine') {
-                    // Match map view visual size (≈52px normal)
-                    imgSize = 52 * scale;
-                    containerSize = 0; // no container for fertilizer icon on summary
-                } else {
-                    imgSize = 12 * scale;
-                    containerSize = 18 * scale;
-                }
-
-                ctx.save();
-
-                // Draw different container shapes for different components
-                if (type === 'water-tank') {
-                    // Draw rectangular container for water tank
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                    ctx.strokeStyle = '#666666';
-                    ctx.lineWidth = 1.5 * scale;
-                    ctx.fillRect(
-                        point.x - containerSize / 2,
-                        point.y - containerSize / 2,
-                        containerSize,
-                        containerSize
-                    );
-                    ctx.strokeRect(
-                        point.x - containerSize / 2,
-                        point.y - containerSize / 2,
-                        containerSize,
-                        containerSize
-                    );
-                } else if (type !== 'fertilizer-machine') {
-                    // Draw circular container for other components except fertilizer-machine
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                    ctx.strokeStyle = '#666666';
-                    ctx.lineWidth = 1.5 * scale;
-                    ctx.beginPath();
-                    ctx.arc(point.x, point.y, containerSize / 2, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                }
-
-                ctx.drawImage(img, point.x - imgSize / 2, point.y - imgSize / 2, imgSize, imgSize);
-
-                // Draw connection points for equipments
-                if (type === 'fertilizer-machine') {
-                    // Match map: left-right points ~30px from center
-                    const dx = 30 * scale;
-                    const left = { x: point.x - dx, y: point.y };
-                    const right = { x: point.x + dx, y: point.y };
-                    ctx.fillStyle = '#00FF00';
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 2 * scale;
-                    ctx.beginPath();
-                    ctx.arc(left.x, left.y, 6 * scale, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.arc(right.x, right.y, 6 * scale, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                } else if (type === 'water-tank' || type === 'pump') {
-                    // Single center connection point
-                    ctx.fillStyle = '#00FF00';
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 2 * scale;
-                    ctx.beginPath();
-                    ctx.arc(point.x, point.y, 6 * scale, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                }
-                ctx.restore();
-                return;
+            let imgSize, containerSize;
+            if (type === 'pump') {
+                imgSize = 18 * scale;
+                containerSize = 24 * scale;
+            } else if (type === 'water-tank') {
+                imgSize = 36 * scale;
+                containerSize = 28 * scale;
+            } else if (type === 'fertilizer-machine') {
+                // Match map view visual size (≈52px normal)
+                imgSize = 52 * scale;
+                containerSize = 0; // no container for fertilizer icon on summary
+            } else {
+                imgSize = 12 * scale;
+                containerSize = 18 * scale;
             }
 
-            const size = 8 * scale;
-            ctx.fillStyle = color;
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 2 * scale;
-
-            switch (type) {
-                case 'pump':
-                    ctx.beginPath();
-                    ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 1.5 * scale;
-                    for (let i = 0; i < 4; i++) {
-                        const angle = (i * Math.PI) / 2;
-                        const startX = point.x + Math.cos(angle) * (size * 0.3);
-                        const startY = point.y + Math.sin(angle) * (size * 0.3);
-                        const endX = point.x + Math.cos(angle) * (size * 0.7);
-                        const endY = point.y + Math.sin(angle) * (size * 0.7);
-                        ctx.beginPath();
-                        ctx.moveTo(startX, startY);
-                        ctx.lineTo(endX, endY);
-                        ctx.stroke();
-                    }
-                    break;
-                case 'solenoid-valve':
-                    ctx.fillRect(point.x - size / 2, point.y - size / 2, size, size);
-                    ctx.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 1 * scale;
-                    for (let i = 0; i < 3; i++) {
-                        const y = point.y - size / 3 + (i * size) / 3;
-                        ctx.beginPath();
-                        ctx.moveTo(point.x - size / 3, y);
-                        ctx.lineTo(point.x + size / 3, y);
-                        ctx.stroke();
-                    }
-                    break;
-                case 'ball-valve':
-                    ctx.beginPath();
-                    ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 2 * scale;
-                    ctx.beginPath();
-                    ctx.moveTo(point.x - size * 0.7, point.y);
-                    ctx.lineTo(point.x + size * 0.7, point.y);
-                    ctx.stroke();
-                    break;
-                case 'sprinkler':
-                    ctx.fillStyle = color;
-                    ctx.beginPath();
-                    ctx.arc(point.x, point.y, size * 0.5, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 1 * scale;
-                    for (let i = 0; i < 8; i++) {
-                        const angle = (i * Math.PI) / 4;
-                        const endX = point.x + Math.cos(angle) * (size * 1.5);
-                        const endY = point.y + Math.sin(angle) * (size * 1.5);
-                        ctx.beginPath();
-                        ctx.moveTo(point.x, point.y);
-                        ctx.lineTo(endX, endY);
-                        ctx.stroke();
-                    }
-                    break;
-                case 'water-tank':
-                    // Draw water tank as cylinder
-                    ctx.beginPath();
-                    ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-
-                    // Draw water level indicator
-                    ctx.strokeStyle = '#0EA5E9';
-                    ctx.lineWidth = 2 * scale;
-                    for (let i = 0; i < 3; i++) {
-                        const y = point.y - size * 0.3 + i * size * 0.3;
-                        ctx.beginPath();
-                        ctx.moveTo(point.x - size * 0.6, y);
-                        ctx.lineTo(point.x + size * 0.6, y);
-                        ctx.stroke();
-                    }
-                    break;
-                case 'fertilizer-machine':
-                    // Draw fertilizer machine as rounded rect
-                    ctx.fillRect(point.x - size, point.y - size, size * 2, size * 2);
-                    ctx.strokeRect(point.x - size, point.y - size, size * 2, size * 2);
-
-                    // Draw fertilizer symbol
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 1 * scale;
-                    ctx.beginPath();
-                    ctx.moveTo(point.x - size * 0.5, point.y - size * 0.5);
-                    ctx.lineTo(point.x + size * 0.5, point.y + size * 0.5);
-                    ctx.moveTo(point.x + size * 0.5, point.y - size * 0.5);
-                    ctx.lineTo(point.x - size * 0.5, point.y + size * 0.5);
-                    ctx.stroke();
-                    break;
+            ctx.save();
+            
+            // Draw different container shapes for different components
+            if (type === 'water-tank') {
+                // Draw rectangular container for water tank
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.strokeStyle = '#666666';
+                ctx.lineWidth = 1.5 * scale;
+                ctx.fillRect(point.x - containerSize / 2, point.y - containerSize / 2, containerSize, containerSize);
+                ctx.strokeRect(point.x - containerSize / 2, point.y - containerSize / 2, containerSize, containerSize);
+            } else if (type !== 'fertilizer-machine') {
+                // Draw circular container for other components except fertilizer-machine
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.strokeStyle = '#666666';
+                ctx.lineWidth = 1.5 * scale;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, containerSize / 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
             }
-        },
-        [componentImages]
-    );
+            
+            ctx.drawImage(img, point.x - imgSize / 2, point.y - imgSize / 2, imgSize, imgSize);
+
+            // Draw connection points for equipments
+            if (type === 'fertilizer-machine') {
+                // Match map: left-right points ~30px from center
+                const dx = 30 * scale;
+                const left = { x: point.x - dx, y: point.y };
+                const right = { x: point.x + dx, y: point.y };
+                ctx.fillStyle = '#00FF00';
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2 * scale;
+                ctx.beginPath();
+                ctx.arc(left.x, left.y, 6 * scale, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(right.x, right.y, 6 * scale, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            } else if (type === 'water-tank' || type === 'pump') {
+                // Single center connection point
+                ctx.fillStyle = '#00FF00';
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2 * scale;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 6 * scale, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
+            ctx.restore();
+            return;
+        }
+
+        const size = 8 * scale;
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2 * scale;
+
+        switch (type) {
+            case 'pump':
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 1.5 * scale;
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i * Math.PI) / 2;
+                    const startX = point.x + Math.cos(angle) * (size * 0.3);
+                    const startY = point.y + Math.sin(angle) * (size * 0.3);
+                    const endX = point.x + Math.cos(angle) * (size * 0.7);
+                    const endY = point.y + Math.sin(angle) * (size * 0.7);
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+                break;
+            case 'solenoid-valve':
+                ctx.fillRect(point.x - size / 2, point.y - size / 2, size, size);
+                ctx.strokeRect(point.x - size / 2, point.y - size / 2, size, size);
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 1 * scale;
+                for (let i = 0; i < 3; i++) {
+                    const y = point.y - size / 3 + (i * size) / 3;
+                    ctx.beginPath();
+                    ctx.moveTo(point.x - size / 3, y);
+                    ctx.lineTo(point.x + size / 3, y);
+                    ctx.stroke();
+                }
+                break;
+            case 'ball-valve':
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2 * scale;
+                ctx.beginPath();
+                ctx.moveTo(point.x - size * 0.7, point.y);
+                ctx.lineTo(point.x + size * 0.7, point.y);
+                ctx.stroke();
+                break;
+            case 'sprinkler':
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, size * 0.5, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1 * scale;
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i * Math.PI) / 4;
+                    const endX = point.x + Math.cos(angle) * (size * 1.5);
+                    const endY = point.y + Math.sin(angle) * (size * 1.5);
+                    ctx.beginPath();
+                    ctx.moveTo(point.x, point.y);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+                break;
+            case 'water-tank':
+                // Draw water tank as cylinder
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, size, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                
+                // Draw water level indicator
+                ctx.strokeStyle = '#0EA5E9';
+                ctx.lineWidth = 2 * scale;
+                for (let i = 0; i < 3; i++) {
+                    const y = point.y - size * 0.3 + (i * size * 0.3);
+                    ctx.beginPath();
+                    ctx.moveTo(point.x - size * 0.6, y);
+                    ctx.lineTo(point.x + size * 0.6, y);
+                    ctx.stroke();
+                }
+                break;
+            case 'fertilizer-machine':
+                // Draw fertilizer machine as rounded rect
+                ctx.fillRect(point.x - size, point.y - size, size * 2, size * 2);
+                ctx.strokeRect(point.x - size, point.y - size, size * 2, size * 2);
+                
+                // Draw fertilizer symbol
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 1 * scale;
+                ctx.beginPath();
+                ctx.moveTo(point.x - size * 0.5, point.y - size * 0.5);
+                ctx.lineTo(point.x + size * 0.5, point.y + size * 0.5);
+                ctx.moveTo(point.x + size * 0.5, point.y - size * 0.5);
+                ctx.lineTo(point.x - size * 0.5, point.y + size * 0.5);
+                ctx.stroke();
+                break;
+        }
+    }, [componentImages]);
 
     // Helper function to draw drip points
     const drawDripPoints = (
@@ -1956,7 +1897,7 @@ export default function GreenhouseSummary() {
                 ctx.beginPath();
                 ctx.arc(dripPoint.x, dripPoint.y, 2.5 * scale, 0, 2 * Math.PI);
                 ctx.fill();
-
+                
                 // Draw main drip point
                 ctx.fillStyle = '#06B6D4';
                 ctx.beginPath();
@@ -1969,121 +1910,108 @@ export default function GreenhouseSummary() {
     };
 
     // Draw irrigation elements on canvas
-    const drawIrrigationElements = useCallback(
-        (
-            ctx: CanvasRenderingContext2D,
-            elements: IrrigationElement[],
-            scale: number = 1,
-            offsetX: number = 0,
-            offsetY: number = 0
-        ) => {
-            // Ensure correct layering: pipes below, equipments above
-            const getZIndex = (type: string): number => {
-                if (type === 'main-pipe' || type === 'sub-pipe' || type === 'drip-line') return 0;
-                if (type === 'water-tank' || type === 'pump' || type === 'fertilizer-machine')
-                    return 2;
-                return 1; // sprinklers/valves, etc.
-            };
-            const orderedElements = [...elements].sort(
-                (a, b) => getZIndex(a.type) - getZIndex(b.type)
-            );
+    const drawIrrigationElements = useCallback((
+        ctx: CanvasRenderingContext2D,
+        elements: IrrigationElement[],
+        scale: number = 1,
+        offsetX: number = 0,
+        offsetY: number = 0
+    ) => {
+        // Ensure correct layering: pipes below, equipments above
+        const getZIndex = (type: string): number => {
+            if (type === 'main-pipe' || type === 'sub-pipe' || type === 'drip-line') return 0;
+            if (type === 'water-tank' || type === 'pump' || type === 'fertilizer-machine') return 2;
+            return 1; // sprinklers/valves, etc.
+        };
+        const orderedElements = [...elements].sort((a, b) => getZIndex(a.type) - getZIndex(b.type));
 
-            orderedElements.forEach((element) => {
-                ctx.strokeStyle = element.color;
-                ctx.lineWidth = (element.width || 2) * scale;
-                ctx.setLineDash([]);
+        orderedElements.forEach((element) => {
+            ctx.strokeStyle = element.color;
+            ctx.lineWidth = (element.width || 2) * scale;
+            ctx.setLineDash([]);
 
-                if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
-                    if (element.points.length >= 2) {
-                        ctx.beginPath();
-                        ctx.moveTo(
-                            element.points[0].x * scale + offsetX,
-                            element.points[0].y * scale + offsetY
+            if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
+                if (element.points.length >= 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        element.points[0].x * scale + offsetX,
+                        element.points[0].y * scale + offsetY
+                    );
+
+                    for (let i = 1; i < element.points.length; i++) {
+                        ctx.lineTo(
+                            element.points[i].x * scale + offsetX,
+                            element.points[i].y * scale + offsetY
                         );
-
-                        for (let i = 1; i < element.points.length; i++) {
-                            ctx.lineTo(
-                                element.points[i].x * scale + offsetX,
-                                element.points[i].y * scale + offsetY
-                            );
-                        }
-
-                        ctx.stroke();
                     }
-                } else if (element.type === 'drip-line') {
-                    if (element.points.length >= 2) {
-                        ctx.setLineDash([5 * scale, 3 * scale]);
-                        ctx.beginPath();
-                        ctx.moveTo(
-                            element.points[0].x * scale + offsetX,
-                            element.points[0].y * scale + offsetY
+
+                    ctx.stroke();
+                }
+            } else if (element.type === 'drip-line') {
+                if (element.points.length >= 2) {
+                    ctx.setLineDash([5 * scale, 3 * scale]);
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        element.points[0].x * scale + offsetX,
+                        element.points[0].y * scale + offsetY
+                    );
+
+                    for (let i = 1; i < element.points.length; i++) {
+                        ctx.lineTo(
+                            element.points[i].x * scale + offsetX,
+                            element.points[i].y * scale + offsetY
                         );
+                    }
 
-                        for (let i = 1; i < element.points.length; i++) {
-                            ctx.lineTo(
-                                element.points[i].x * scale + offsetX,
-                                element.points[i].y * scale + offsetY
-                            );
-                        }
+                    ctx.stroke();
+                    ctx.setLineDash([]);
 
+                    const scaledElement = {
+                        ...element,
+                        points: element.points.map((p) => ({
+                            x: p.x * scale + offsetX,
+                            y: p.y * scale + offsetY,
+                        })),
+                    };
+                    drawDripPoints(ctx, scaledElement, scale);
+                }
+            } else if (element.type === 'sprinkler') {
+                if (element.points.length >= 1) {
+                    const point = {
+                        x: element.points[0].x * scale + offsetX,
+                        y: element.points[0].y * scale + offsetY,
+                    };
+
+                    if (element.radius) {
+                        ctx.strokeStyle = element.color + '40';
+                        ctx.setLineDash([3 * scale, 2 * scale]);
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, element.radius * scale, 0, 2 * Math.PI);
                         ctx.stroke();
                         ctx.setLineDash([]);
-
-                        const scaledElement = {
-                            ...element,
-                            points: element.points.map((p) => ({
-                                x: p.x * scale + offsetX,
-                                y: p.y * scale + offsetY,
-                            })),
-                        };
-                        drawDripPoints(ctx, scaledElement, scale);
                     }
-                } else if (element.type === 'sprinkler') {
-                    if (element.points.length >= 1) {
-                        const point = {
-                            x: element.points[0].x * scale + offsetX,
-                            y: element.points[0].y * scale + offsetY,
-                        };
 
-                        if (element.radius) {
-                            ctx.strokeStyle = element.color + '40';
-                            ctx.setLineDash([3 * scale, 2 * scale]);
-                            ctx.beginPath();
-                            ctx.arc(point.x, point.y, element.radius * scale, 0, 2 * Math.PI);
-                            ctx.stroke();
-                            ctx.setLineDash([]);
-                        }
-
-                        drawComponentShape(ctx, element.type, point, element.color, scale);
-                    }
-                } else {
-                    if (element.points.length >= 1) {
-                        const point = {
-                            x: element.points[0].x * scale + offsetX,
-                            y: element.points[0].y * scale + offsetY,
-                        };
-                        drawComponentShape(ctx, element.type, point, element.color, scale);
-
-                        // Show capacity for water tanks
-                        if (
-                            element.type === 'water-tank' &&
-                            typeof element.capacityLiters === 'number'
-                        ) {
-                            ctx.fillStyle = '#FFFFFF';
-                            ctx.font = `${8 * scale}px sans-serif`;
-                            ctx.textAlign = 'center';
-                            ctx.fillText(
-                                `${element.capacityLiters}L`,
-                                point.x,
-                                point.y + 20 * scale
-                            );
-                        }
+                    drawComponentShape(ctx, element.type, point, element.color, scale);
+                }
+            } else {
+                if (element.points.length >= 1) {
+                    const point = {
+                        x: element.points[0].x * scale + offsetX,
+                        y: element.points[0].y * scale + offsetY,
+                    };
+                    drawComponentShape(ctx, element.type, point, element.color, scale);
+                    
+                    // Show capacity for water tanks
+                    if (element.type === 'water-tank' && typeof element.capacityLiters === 'number') {
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.font = `${8 * scale}px sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`${element.capacityLiters}L`, point.x, point.y + 20 * scale);
                     }
                 }
-            });
-        },
-        [drawComponentShape]
-    );
+            }
+        });
+    }, [drawComponentShape]);
 
     // Print function for browser print dialog - available for future use
     const handlePrint = (): void => {
@@ -2094,6 +2022,8 @@ export default function GreenhouseSummary() {
     if (typeof window !== 'undefined') {
         (window as Window & { debugHandlePrint?: () => void }).debugHandlePrint = handlePrint;
     }
+
+
 
     // Update canvas when data changes
     useEffect(() => {
@@ -2226,7 +2156,7 @@ export default function GreenhouseSummary() {
                             }
                             return;
                         }
-
+                        
                         // Skip legacy fertilizer-machine polygon/shape; this component is drawn from irrigationElements
                         if ((shape as unknown as { type?: string }).type === 'fertilizer-machine') {
                             return;
@@ -2271,12 +2201,12 @@ export default function GreenhouseSummary() {
         return (
             <div className="min-h-screen bg-gray-900 text-white">
                 <Head title={t('Greenhouse Summary - Growing System Planning')} />
-
+                
                 {/* Add Navbar at the top - fixed position */}
-                <div className="fixed left-0 right-0 top-0 z-50">
+                <div className="fixed top-0 left-0 right-0 z-50">
                     <Navbar />
                 </div>
-
+                
                 {/* Add padding top to account for fixed navbar */}
                 <div className="pt-16"></div>
 
@@ -2308,9 +2238,7 @@ export default function GreenhouseSummary() {
                                         🏠 {t('Greenhouse Summary')}
                                     </h1>
                                     <p className="mb-6 text-gray-400">
-                                        {t(
-                                            'Complete overview of your greenhouse system planning project'
-                                        )}
+                                        {t('Complete overview of your greenhouse system planning project')}
                                     </p>
                                 </div>
 
@@ -2348,9 +2276,7 @@ export default function GreenhouseSummary() {
                                 {t('No Greenhouse Data Found')}
                             </h2>
                             <p className="mb-6 text-gray-400">
-                                {t(
-                                    "It looks like you haven't completed a greenhouse planning project yet, or the data has been cleared."
-                                )}
+                                {t("It looks like you haven't completed a greenhouse planning project yet, or the data has been cleared.")}
                             </p>
                             <div className="space-y-4">
                                 <p className="text-gray-300">{t('To view a summary, please:')}</p>
@@ -2387,12 +2313,12 @@ export default function GreenhouseSummary() {
     return (
         <div className="min-h-screen bg-gray-900 text-white print:bg-white print:text-black">
             <Head title={t('Greenhouse Summary - Growing System Planning')} />
-
+            
             {/* Add Navbar at the top - fixed position, hidden in print */}
-            <div className="fixed left-0 right-0 top-0 z-50 print:hidden">
+            <div className="fixed top-0 left-0 right-0 z-50 print:hidden">
                 <Navbar />
             </div>
-
+            
             {/* Add padding top to account for fixed navbar */}
             <div className="pt-16 print:pt-0"></div>
 
@@ -2559,7 +2485,7 @@ export default function GreenhouseSummary() {
                                 ✅ {t('บันทึกโครงการสำเร็จแล้ว!')}
                             </div>
                         )}
-
+                        
                         {saveError && (
                             <div className="mt-4 rounded-lg bg-red-800 p-3 text-red-100">
                                 ❌ {t('เกิดข้อผิดพลาด')}: {saveError}
@@ -2571,7 +2497,9 @@ export default function GreenhouseSummary() {
 
             <div className="hidden print:mb-6 print:block">
                 <h1 className="text-2xl font-bold text-black">🏠 {t('สรุปการวางแผนโรงเรือน')}</h1>
-                <p className="text-gray-600">{t('ภาพรวมการออกแบบโรงเรือนและระบบการให้น้ำ')}</p>
+                <p className="text-gray-600">
+                    {t('ภาพรวมการออกแบบโรงเรือนและระบบการให้น้ำ')}
+                </p>
                 <hr className="my-2 border-gray-300" />
                 <p className="text-sm text-gray-500">
                     {t('วันที่')}: {new Date().toLocaleDateString('th-TH')}
@@ -2714,7 +2642,7 @@ export default function GreenhouseSummary() {
                                         />
                                     </svg>
                                 </button>
-
+                                
                                 {expandedSections.pipeFlowRates && (
                                     <div className="mb-4 space-y-3">
                                         {/* Pipe Counts */}
@@ -2736,7 +2664,7 @@ export default function GreenhouseSummary() {
                                                 </div>
                                             </div>
                                         </div>
-
+                                        
                                         <div className="grid grid-cols-1 gap-2 print:gap-3">
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
@@ -2748,61 +2676,31 @@ export default function GreenhouseSummary() {
                                             </div>
                                         </div>
 
+
                                         {/* Main and Sub Pipe Flow Rate and Outlet Count Table (Longest lines only) */}
                                         <div className="rounded bg-gray-700 p-3 print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                             <h4 className="mb-2 text-sm font-semibold text-cyan-400 print:text-sm print:text-black">
-                                                {t(
-                                                    'อัตราการไหลและจำนวนทางออกของท่อเมนและท่อเมนย่อย'
-                                                )}
+                                                {t('อัตราการไหลและจำนวนทางออกของท่อเมนและท่อเมนย่อย')}
                                             </h4>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full border-collapse border border-gray-600/50 print:border-gray-300">
                                                     <thead>
                                                         <tr className="bg-gray-800/50 print:bg-gray-100">
-                                                            <th className="border border-gray-600/50 px-2 py-1 text-left text-xs font-semibold text-gray-200 print:border-gray-300 print:text-gray-800">
-                                                                {t('ประเภทท่อ')}
-                                                            </th>
-                                                            <th className="border border-gray-600/50 px-2 py-1 text-left text-xs font-semibold text-gray-200 print:border-gray-300 print:text-gray-800">
-                                                                {t('อัตราการไหล')}
-                                                            </th>
-                                                            <th className="border border-gray-600/50 px-2 py-1 text-left text-xs font-semibold text-gray-200 print:border-gray-300 print:text-gray-800">
-                                                                {t('จำนวนทางออก')}
-                                                            </th>
+                                                            <th className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-left text-gray-200 print:text-gray-800 font-semibold text-xs">{t('ประเภทท่อ')}</th>
+                                                            <th className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-left text-gray-200 print:text-gray-800 font-semibold text-xs">{t('อัตราการไหล')}</th>
+                                                            <th className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-left text-gray-200 print:text-gray-800 font-semibold text-xs">{t('จำนวนทางออก')}</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="text-gray-100 print:text-gray-700">
                                                         <tr>
-                                                            <td className="border border-gray-600/50 px-2 py-1 text-xs print:border-gray-300">
-                                                                {t('ท่อเมน')}
-                                                            </td>
-                                                            <td className="border border-gray-600/50 px-2 py-1 text-xs font-bold text-blue-400 print:border-gray-300">
-                                                                {pipeFlowData.longest.main.flowRate.toFixed(
-                                                                    2
-                                                                )}{' '}
-                                                                {t('L/min')}
-                                                            </td>
-                                                            <td className="border border-gray-600/50 px-2 py-1 text-xs font-bold text-blue-400 print:border-gray-300">
-                                                                {
-                                                                    pipeFlowData.longest.main
-                                                                        .connections
-                                                                }{' '}
-                                                                {t('เส้น')}
-                                                            </td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-blue-400">{pipeFlowData.longest.main.flowRate.toFixed(2)} {t('L/min')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-blue-400">{pipeFlowData.longest.main.connections} {t('เส้น')}</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-gray-600/50 px-2 py-1 text-xs print:border-gray-300">
-                                                                {t('ท่อเมนย่อย')}
-                                                            </td>
-                                                            <td className="border border-gray-600/50 px-2 py-1 text-xs font-bold text-green-400 print:border-gray-300">
-                                                                {pipeFlowData.longest.sub.flowRate.toFixed(
-                                                                    2
-                                                                )}{' '}
-                                                                {t('L/min')}
-                                                            </td>
-                                                            <td className="border border-gray-600/50 px-2 py-1 text-xs font-bold text-green-400 print:border-gray-300">
-                                                                {pipeFlowData.longest.sub.emitters}{' '}
-                                                                {t('ตัว')}
-                                                            </td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs">{t('ท่อเมนย่อย')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-green-400">{pipeFlowData.longest.sub.flowRate.toFixed(2)} {t('L/min')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-green-400">{pipeFlowData.longest.sub.emitters} {t('ตัว')}</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
@@ -2814,133 +2712,73 @@ export default function GreenhouseSummary() {
                                             <h4 className="mb-2 text-sm font-semibold text-cyan-400 print:text-sm print:text-black">
                                                 {t('อัตราการไหลของแต่ละระดับท่อ')}
                                             </h4>
+                                            
                                             {/* Emitter Flow Rates */}
                                             <div className="mb-3 space-y-2 text-xs">
                                                 {(() => {
-                                                    const elements =
-                                                        summaryData?.irrigationElements || [];
+                                                    const elements = summaryData?.irrigationElements || [];
                                                     // const sprinklers = elements.filter((e) => e.type === 'sprinkler');
-                                                    const dripLines = elements.filter(
-                                                        (e) => e.type === 'drip-line'
-                                                    );
-
+                                                    const dripLines = elements.filter((e) => e.type === 'drip-line');
+                                                    
                                                     let totalDripEmitters = 0;
                                                     dripLines.forEach((dripLine) => {
-                                                        if (
-                                                            dripLine.points.length > 1 &&
-                                                            dripLine.spacing
-                                                        ) {
+                                                        if (dripLine.points.length > 1 && dripLine.spacing) {
                                                             let totalLength = 0;
-                                                            for (
-                                                                let i = 0;
-                                                                i < dripLine.points.length - 1;
-                                                                i++
-                                                            ) {
+                                                            for (let i = 0; i < dripLine.points.length - 1; i++) {
                                                                 const p1 = dripLine.points[i];
                                                                 const p2 = dripLine.points[i + 1];
-                                                                const segmentLength =
-                                                                    Math.sqrt(
-                                                                        Math.pow(p2.x - p1.x, 2) +
-                                                                            Math.pow(p2.y - p1.y, 2)
-                                                                    ) / 25;
+                                                                const segmentLength = Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2)) / 25;
                                                                 totalLength += segmentLength;
                                                             }
-                                                            if (
-                                                                totalLength > 0 &&
-                                                                dripLine.spacing > 0
-                                                            ) {
-                                                                const emittersInThisLine =
-                                                                    Math.floor(
-                                                                        totalLength /
-                                                                            dripLine.spacing
-                                                                    ) + 1;
-                                                                totalDripEmitters +=
-                                                                    emittersInThisLine;
+                                                            if (totalLength > 0 && dripLine.spacing > 0) {
+                                                                const emittersInThisLine = Math.floor(totalLength / dripLine.spacing) + 1;
+                                                                totalDripEmitters += emittersInThisLine;
                                                             }
                                                         }
                                                     });
-
+                                                    
                                                     // นับสปริงเกลอร์ทั้งหมดโดยตรงจาก irrigationElements
-                                                    const totalSprinklers = elements.filter(
-                                                        (e) => e.type === 'sprinkler'
-                                                    ).length;
-
+                                                    const totalSprinklers = elements.filter((e) => e.type === 'sprinkler').length;
+                                                    
                                                     // Debug: ตรวจสอบการนับสปริงเกลอร์ทั้งหมด
-                                                    console.log(
-                                                        '🔍 Total sprinkler count calculation:',
-                                                        {
-                                                            totalSprinklers,
-                                                            plotBreakdown: plotPipeData.map(
-                                                                (plot) => ({
-                                                                    plotName: plot.plotName,
-                                                                    sprinklerCount:
-                                                                        plot.sprinklerCount,
-                                                                })
-                                                            ),
-                                                        }
-                                                    );
-                                                    const sprinklerFlowRate =
-                                                        summaryData?.sprinklerFlowRate || 10;
-                                                    const dripEmitterFlowRate =
-                                                        summaryData?.dripEmitterFlowRate || 0.24;
-                                                    const totalSprinklerFlowRate =
-                                                        totalSprinklers * sprinklerFlowRate;
-                                                    const totalDripEmitterFlowRate =
-                                                        totalDripEmitters * dripEmitterFlowRate;
-
+                                                    console.log('🔍 Total sprinkler count calculation:', {
+                                                        totalSprinklers,
+                                                        plotBreakdown: plotPipeData.map(plot => ({
+                                                            plotName: plot.plotName,
+                                                            sprinklerCount: plot.sprinklerCount
+                                                        }))
+                                                    });
+                                                    const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
+                                                    const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
+                                                    const totalSprinklerFlowRate = totalSprinklers * sprinklerFlowRate;
+                                                    const totalDripEmitterFlowRate = totalDripEmitters * dripEmitterFlowRate;
+                                                    
                                                     return (
                                                         <>
                                                             <div className="flex items-center justify-between">
-                                                                <span className="text-gray-300">
-                                                                    {t('สปริงเกลอร์ทั้งหมด')} (
-                                                                    {totalSprinklers} {t('ตัว')})
-                                                                </span>
-                                                                <span className="font-bold text-blue-400">
-                                                                    {totalSprinklerFlowRate.toFixed(
-                                                                        2
-                                                                    )}{' '}
-                                                                    {t('ลิตร/นาที')}
-                                                                </span>
+                                                                <span className="text-gray-300">{t('สปริงเกลอร์ทั้งหมด')} ({totalSprinklers} {t('ตัว')})</span>
+                                                                <span className="font-bold text-blue-400">{totalSprinklerFlowRate.toFixed(2)} {t('ลิตร/นาที')}</span>
                                                             </div>
                                                             <div className="flex items-center justify-between">
-                                                                <span className="text-gray-300">
-                                                                    {t('หัวน้ำหยดทั้งหมด')} (
-                                                                    {totalDripEmitters} {t('ตัว')})
-                                                                </span>
-                                                                <span className="font-bold text-cyan-400">
-                                                                    {totalDripEmitterFlowRate.toFixed(
-                                                                        2
-                                                                    )}{' '}
-                                                                    {t('ลิตร/นาที')}
-                                                                </span>
+                                                                <span className="text-gray-300">{t('หัวน้ำหยดทั้งหมด')} ({totalDripEmitters} {t('ตัว')})</span>
+                                                                <span className="font-bold text-cyan-400">{totalDripEmitterFlowRate.toFixed(2)} {t('ลิตร/นาที')}</span>
                                                             </div>
                                                         </>
                                                     );
                                                 })()}
                                             </div>
-                                            {/* Pipe Flow Rates */}{' '}
-                                            <div className="space-y-2 text-xs">
+                                            
+                                            {/* Pipe Flow Rates */}                                            <div className="space-y-2 text-xs">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">
-                                                        {t(
-                                                            'ท่อเมนย่อย 1 เส้น (จากสปริงเกลอร์และจุดน้ำหยด)'
-                                                        )}
-                                                    </span>
-                                                    <span className="font-bold text-green-400">
-                                                        {pipeFlowData.subPipeFlowRate.toFixed(2)}{' '}
-                                                        {t('ลิตร/นาที')}
-                                                    </span>
+                                                    <span className="text-gray-300">{t('ท่อเมนย่อย 1 เส้น (จากสปริงเกลอร์และจุดน้ำหยด)')}</span>
+                                                    <span className="font-bold text-green-400">{pipeFlowData.subPipeFlowRate.toFixed(2)} {t('ลิตร/นาที')}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">
-                                                        {t('ท่อเมน (จากท่อเมนย่อยทั้งหมด)')}
-                                                    </span>
-                                                    <span className="font-bold text-blue-400">
-                                                        {pipeFlowData.mainPipeFlowRate.toFixed(2)}{' '}
-                                                        {t('ลิตร/นาที')}
-                                                    </span>
+                                                    <span className="text-gray-300">{t('ท่อเมน (จากท่อเมนย่อยทั้งหมด)')}</span>
+                                                    <span className="font-bold text-blue-400">{pipeFlowData.mainPipeFlowRate.toFixed(2)} {t('ลิตร/นาที')}</span>
                                                 </div>
                                             </div>
+                                            
                                             {/* Flow Rate Settings */}
                                             <div className="mt-3 border-t border-gray-600 pt-2">
                                                 <h5 className="mb-1 text-xs font-semibold text-yellow-400">
@@ -2948,27 +2786,12 @@ export default function GreenhouseSummary() {
                                                 </h5>
                                                 <div className="space-y-1 text-xs">
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-gray-300">
-                                                            {t('สปริงเกลอร์ 1 ตัว')}
-                                                        </span>
-                                                        <span className="font-bold text-blue-400">
-                                                            {(
-                                                                summaryData?.sprinklerFlowRate || 10
-                                                            ).toFixed(2)}{' '}
-                                                            {t('ลิตร/นาที')}
-                                                        </span>
+                                                        <span className="text-gray-300">{t('สปริงเกลอร์ 1 ตัว')}</span>
+                                                        <span className="font-bold text-blue-400">{(summaryData?.sprinklerFlowRate || 10).toFixed(2)} {t('ลิตร/นาที')}</span>
                                                     </div>
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-gray-300">
-                                                            {t('จุดน้ำหยด 1 ตัว')}
-                                                        </span>
-                                                        <span className="font-bold text-cyan-400">
-                                                            {(
-                                                                summaryData?.dripEmitterFlowRate ||
-                                                                0.24
-                                                            ).toFixed(2)}{' '}
-                                                            {t('ลิตร/นาที')}
-                                                        </span>
+                                                        <span className="text-gray-300">{t('จุดน้ำหยด 1 ตัว')}</span>
+                                                        <span className="font-bold text-cyan-400">{(summaryData?.dripEmitterFlowRate || 0.24).toFixed(2)} {t('ลิตร/นาที')}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2978,8 +2801,7 @@ export default function GreenhouseSummary() {
                                         <div className="grid grid-cols-1 gap-2 print:gap-3">
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
-                                                    {pipeFlowData.totalFlowRate.toFixed(2)}{' '}
-                                                    {t('ลิตร/นาที')}
+                                                    {pipeFlowData.totalFlowRate.toFixed(2)} {t('ลิตร/นาที')}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('อัตราการไหลรวมทั้งหมด')}
@@ -3021,79 +2843,43 @@ export default function GreenhouseSummary() {
                                         </h3>
                                         <div className="grid grid-cols-3 gap-1">
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:bg-gray-50">
-                                                <div className="text-sm font-bold text-rose-400">
-                                                    {fittings.twoWay}
-                                                </div>
-                                                <div className="text-xs text-gray-400">
-                                                    {t('2-way')}
-                                                </div>
+                                                <div className="text-sm font-bold text-rose-400">{fittings.twoWay}</div>
+                                                <div className="text-xs text-gray-400">{t('2-way')}</div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:bg-gray-50">
-                                                <div className="text-sm font-bold text-rose-400">
-                                                    {fittings.threeWay}
-                                                </div>
-                                                <div className="text-xs text-gray-400">
-                                                    {t('3-way')}
-                                                </div>
+                                                <div className="text-sm font-bold text-rose-400">{fittings.threeWay}</div>
+                                                <div className="text-xs text-gray-400">{t('3-way')}</div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:bg-gray-50">
-                                                <div className="text-sm font-bold text-rose-400">
-                                                    {fittings.fourWay}
-                                                </div>
-                                                <div className="text-xs text-gray-400">
-                                                    {t('4-way')}
-                                                </div>
+                                                <div className="text-sm font-bold text-rose-400">{fittings.fourWay}</div>
+                                                <div className="text-xs text-gray-400">{t('4-way')}</div>
                                             </div>
                                         </div>
                                         <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                                <div className="mb-1 font-semibold text-blue-300">
-                                                    {t('Main')}
-                                                </div>
+                                                <div className="mb-1 font-semibold text-blue-300">{t('Main')}</div>
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">
-                                                        {t('2-way')}
-                                                    </span>
-                                                    <span className="font-bold text-blue-300">
-                                                        {fittings.breakdown.main.twoWay}
-                                                    </span>
+                                                    <span className="text-gray-300">{t('2-way')}</span>
+                                                    <span className="font-bold text-blue-300">{fittings.breakdown.main.twoWay}</span>
                                                 </div>
                                                 <div className="mt-1 flex items-center justify-between">
-                                                    <span className="text-gray-300">
-                                                        {t('3-way')}
-                                                    </span>
-                                                    <span className="font-bold text-blue-300">
-                                                        {fittings.breakdown.main.threeWay}
-                                                    </span>
+                                                    <span className="text-gray-300">{t('3-way')}</span>
+                                                    <span className="font-bold text-blue-300">{fittings.breakdown.main.threeWay}</span>
                                                 </div>
                                             </div>
                                             <div className="rounded bg-gray-700 p-2 print:border print:bg-gray-50">
-                                                <div className="mb-1 font-semibold text-green-300">
-                                                    {t('Submain')}
-                                                </div>
+                                                <div className="mb-1 font-semibold text-green-300">{t('Submain')}</div>
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-gray-300">
-                                                        {t('2-way')}
-                                                    </span>
-                                                    <span className="font-bold text-green-300">
-                                                        {fittings.breakdown.submain.twoWay}
-                                                    </span>
+                                                    <span className="text-gray-300">{t('2-way')}</span>
+                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.twoWay}</span>
                                                 </div>
                                                 <div className="mt-1 flex items-center justify-between">
-                                                    <span className="text-gray-300">
-                                                        {t('3-way')}
-                                                    </span>
-                                                    <span className="font-bold text-green-300">
-                                                        {fittings.breakdown.submain.threeWay}
-                                                    </span>
+                                                    <span className="text-gray-300">{t('3-way')}</span>
+                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.threeWay}</span>
                                                 </div>
                                                 <div className="mt-1 flex items-center justify-between">
-                                                    <span className="text-gray-300">
-                                                        {t('4-way')}
-                                                    </span>
-                                                    <span className="font-bold text-green-300">
-                                                        {fittings.breakdown.submain.fourWay}
-                                                    </span>
+                                                    <span className="text-gray-300">{t('4-way')}</span>
+                                                    <span className="font-bold text-green-300">{fittings.breakdown.submain.fourWay}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -3108,8 +2894,7 @@ export default function GreenhouseSummary() {
                                         <div className="mb-2 grid grid-cols-3 gap-1 print:gap-2">
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
-                                                    {irrigationMetrics.maxMainPipeLength.toFixed(1)}{' '}
-                                                    {t('เมตร')}
+                                                    {irrigationMetrics.maxMainPipeLength.toFixed(1)} {t('เมตร')}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('ท่อเมนสูงสุด')}
@@ -3117,8 +2902,7 @@ export default function GreenhouseSummary() {
                                             </div>
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-green-400 print:text-sm print:text-black">
-                                                    {irrigationMetrics.maxSubPipeLength.toFixed(1)}{' '}
-                                                    {t('เมตร')}
+                                                    {irrigationMetrics.maxSubPipeLength.toFixed(1)} {t('เมตร')}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('ท่อย่อยสูงสุด')}
@@ -3126,10 +2910,7 @@ export default function GreenhouseSummary() {
                                             </div>
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
-                                                    {irrigationMetrics.maxTotalPipeLength.toFixed(
-                                                        1
-                                                    )}{' '}
-                                                    {t('เมตร')}
+                                                    {irrigationMetrics.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('ความยาวสูงสุดรวม')}
@@ -3139,10 +2920,7 @@ export default function GreenhouseSummary() {
                                         <div className="grid grid-cols-3 gap-1 print:gap-2">
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-cyan-400 print:text-sm print:text-black">
-                                                    {irrigationMetrics.totalMainPipeLength.toFixed(
-                                                        1
-                                                    )}{' '}
-                                                    {t('เมตร')}
+                                                    {irrigationMetrics.totalMainPipeLength.toFixed(1)} {t('เมตร')}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('ท่อเมนทั้งหมด')}
@@ -3150,10 +2928,7 @@ export default function GreenhouseSummary() {
                                             </div>
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-yellow-400 print:text-sm print:text-black">
-                                                    {irrigationMetrics.totalSubPipeLength.toFixed(
-                                                        1
-                                                    )}{' '}
-                                                    {t('เมตร')}
+                                                    {irrigationMetrics.totalSubPipeLength.toFixed(1)} {t('เมตร')}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('ท่อย่อยทั้งหมด')}
@@ -3161,8 +2936,7 @@ export default function GreenhouseSummary() {
                                             </div>
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-pink-400 print:text-sm print:text-black">
-                                                    {irrigationMetrics.totalPipeLength.toFixed(1)}{' '}
-                                                    {t('เมตร')}
+                                                    {irrigationMetrics.totalPipeLength.toFixed(1)} {t('เมตร')}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('ความยาวรวมทั้งหมด')}
@@ -3180,11 +2954,8 @@ export default function GreenhouseSummary() {
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
                                                     {(() => {
-                                                        const elements =
-                                                            summaryData?.irrigationElements || [];
-                                                        return elements.filter(
-                                                            (e) => e.type === 'sprinkler'
-                                                        ).length;
+                                                        const elements = summaryData?.irrigationElements || [];
+                                                        return elements.filter((e) => e.type === 'sprinkler').length;
                                                     })()}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
@@ -3194,49 +2965,26 @@ export default function GreenhouseSummary() {
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-green-400 print:text-sm print:text-black">
                                                     {(() => {
-                                                        const elements =
-                                                            summaryData?.irrigationElements || [];
-                                                        const dripLines = elements.filter(
-                                                            (e) => e.type === 'drip-line'
-                                                        );
+                                                        const elements = summaryData?.irrigationElements || [];
+                                                        const dripLines = elements.filter((e) => e.type === 'drip-line');
                                                         let totalDripEmitters = 0;
-
+                                                        
                                                         dripLines.forEach((dripLine) => {
-                                                            if (
-                                                                dripLine.points.length > 1 &&
-                                                                dripLine.spacing
-                                                            ) {
+                                                            if (dripLine.points.length > 1 && dripLine.spacing) {
                                                                 let totalLength = 0;
-                                                                for (
-                                                                    let i = 0;
-                                                                    i < dripLine.points.length - 1;
-                                                                    i++
-                                                                ) {
+                                                                for (let i = 0; i < dripLine.points.length - 1; i++) {
                                                                     const p1 = dripLine.points[i];
-                                                                    const p2 =
-                                                                        dripLine.points[i + 1];
-                                                                    const segmentLength =
-                                                                        distanceBetweenPoints(
-                                                                            p1,
-                                                                            p2
-                                                                        ) / 25; // Convert to meters
+                                                                    const p2 = dripLine.points[i + 1];
+                                                                    const segmentLength = distanceBetweenPoints(p1, p2) / 25; // Convert to meters
                                                                     totalLength += segmentLength;
                                                                 }
-                                                                if (
-                                                                    totalLength > 0 &&
-                                                                    dripLine.spacing > 0
-                                                                ) {
-                                                                    const emittersInThisLine =
-                                                                        Math.floor(
-                                                                            totalLength /
-                                                                                dripLine.spacing
-                                                                        ) + 1;
-                                                                    totalDripEmitters +=
-                                                                        emittersInThisLine;
+                                                                if (totalLength > 0 && dripLine.spacing > 0) {
+                                                                    const emittersInThisLine = Math.floor(totalLength / dripLine.spacing) + 1;
+                                                                    totalDripEmitters += emittersInThisLine;
                                                                 }
                                                             }
                                                         });
-
+                                                        
                                                         return totalDripEmitters;
                                                     })()}
                                                 </div>
@@ -3247,52 +2995,27 @@ export default function GreenhouseSummary() {
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
                                                     {(() => {
-                                                        const elements =
-                                                            summaryData?.irrigationElements || [];
-                                                        const sprinklerCount = elements.filter(
-                                                            (e) => e.type === 'sprinkler'
-                                                        ).length;
-                                                        const dripLines = elements.filter(
-                                                            (e) => e.type === 'drip-line'
-                                                        );
+                                                        const elements = summaryData?.irrigationElements || [];
+                                                        const sprinklerCount = elements.filter((e) => e.type === 'sprinkler').length;
+                                                        const dripLines = elements.filter((e) => e.type === 'drip-line');
                                                         let totalDripEmitters = 0;
-
+                                                        
                                                         dripLines.forEach((dripLine) => {
-                                                            if (
-                                                                dripLine.points.length > 1 &&
-                                                                dripLine.spacing
-                                                            ) {
+                                                            if (dripLine.points.length > 1 && dripLine.spacing) {
                                                                 let totalLength = 0;
-                                                                for (
-                                                                    let i = 0;
-                                                                    i < dripLine.points.length - 1;
-                                                                    i++
-                                                                ) {
+                                                                for (let i = 0; i < dripLine.points.length - 1; i++) {
                                                                     const p1 = dripLine.points[i];
-                                                                    const p2 =
-                                                                        dripLine.points[i + 1];
-                                                                    const segmentLength =
-                                                                        distanceBetweenPoints(
-                                                                            p1,
-                                                                            p2
-                                                                        ) / 25; // Convert to meters
+                                                                    const p2 = dripLine.points[i + 1];
+                                                                    const segmentLength = distanceBetweenPoints(p1, p2) / 25; // Convert to meters
                                                                     totalLength += segmentLength;
                                                                 }
-                                                                if (
-                                                                    totalLength > 0 &&
-                                                                    dripLine.spacing > 0
-                                                                ) {
-                                                                    const emittersInThisLine =
-                                                                        Math.floor(
-                                                                            totalLength /
-                                                                                dripLine.spacing
-                                                                        ) + 1;
-                                                                    totalDripEmitters +=
-                                                                        emittersInThisLine;
+                                                                if (totalLength > 0 && dripLine.spacing > 0) {
+                                                                    const emittersInThisLine = Math.floor(totalLength / dripLine.spacing) + 1;
+                                                                    totalDripEmitters += emittersInThisLine;
                                                                 }
                                                             }
                                                         });
-
+                                                        
                                                         return sprinklerCount + totalDripEmitters;
                                                     })()}
                                                 </div>
@@ -3363,6 +3086,7 @@ export default function GreenhouseSummary() {
                                         </div>
                                     </div>
                                 )}
+
                             </div>
 
                             {/* Updated Management Section - removed from print */}
@@ -3404,9 +3128,7 @@ export default function GreenhouseSummary() {
                                     />
                                 </div>
                                 <div className="mt-2 text-center text-xs text-gray-400 print:hidden">
-                                    {t(
-                                        'แบบแปลนโรงเรือนพร้อมระบบการให้น้ำและอุปกรณ์ทั้งหมด (อยู่ตรงกลาง)'
-                                    )}
+                                    {t('แบบแปลนโรงเรือนพร้อมระบบการให้น้ำและอุปกรณ์ทั้งหมด (อยู่ตรงกลาง)')}
                                 </div>
                             </div>
 
@@ -3418,35 +3140,20 @@ export default function GreenhouseSummary() {
                                     </h3>
                                     <div className="space-y-1 text-xs text-gray-700">
                                         <p>
-                                            •{' '}
-                                            {t(
-                                                'แผนนี้แสดงตำแหน่งของโครงสร้างโรงเรือนและระบบการให้น้ำทั้งหมด'
-                                            )}
+                                            • {t('แผนนี้แสดงตำแหน่งของโครงสร้างโรงเรือนและระบบการให้น้ำทั้งหมด')}
                                         </p>
                                         <p>
-                                            •{' '}
-                                            {t(
-                                                'สีน้ำเงิน: ท่อเมนและท่อย่อย | สีเขียว: พื้นที่แปลงปลูก | สีน้ำตาล: โครงสร้างโรงเรือน'
-                                            )}
+                                            • {t('สีน้ำเงิน: ท่อเมนและท่อย่อย | สีเขียว: พื้นที่แปลงปลูก | สีน้ำตาล: โครงสร้างโรงเรือน')}
                                         </p>
                                         <p>
-                                            •{' '}
-                                            {t(
-                                                'สัญลักษณ์แสดงตำแหน่งของอุปกรณ์การให้น้ำ เช่น ปั๊ม วาล์ว สปริงเกลอร์ ถังเก็บน้ำ และเครื่องให้ปุ๋ย'
-                                            )}
+                                            • {t('สัญลักษณ์แสดงตำแหน่งของอุปกรณ์การให้น้ำ เช่น ปั๊ม วาล์ว สปริงเกลอร์ ถังเก็บน้ำ และเครื่องให้ปุ๋ย')}
                                         </p>
                                         <p>• {t('ขนาดและตำแหน่งอาจต้องปรับตามสภาพพื้นที่จริง')}</p>
                                         <p>
-                                            • {t('ความยาวท่อทั้งหมด')}:{' '}
-                                            {irrigationMetrics.totalPipeLength.toFixed(1)}{' '}
-                                            {t('เมตร')}
+                                            • {t('ความยาวท่อทั้งหมด')}: {irrigationMetrics.totalPipeLength.toFixed(1)} {t('เมตร')}
                                         </p>
                                         <p>
-                                            • {t('จำนวนอุปกรณ์')}: {irrigationMetrics.pumps}{' '}
-                                            {t('ปั๊ม')}, {irrigationMetrics.waterTanks}{' '}
-                                            {t('ถังเก็บน้ำ')},{' '}
-                                            {irrigationMetrics.fertilizerMachines}{' '}
-                                            {t('เครื่องให้ปุ๋ย')}
+                                            • {t('จำนวนอุปกรณ์')}: {irrigationMetrics.pumps} {t('ปั๊ม')}, {irrigationMetrics.waterTanks} {t('ถังเก็บน้ำ')}, {irrigationMetrics.fertilizerMachines} {t('เครื่องให้ปุ๋ย')}
                                         </p>
                                     </div>
                                 </div>
@@ -3457,7 +3164,7 @@ export default function GreenhouseSummary() {
                                     <h3 className="mb-3 text-sm font-bold text-black">
                                         🌱 {t('ข้อมูลการปลูกและความต้องการน้ำ')}
                                     </h3>
-
+                                    
                                     {waterSummary && (
                                         <div className="mb-4 border-b border-gray-200 pb-3">
                                             <h4 className="mb-2 text-sm font-bold text-black">
@@ -3466,8 +3173,7 @@ export default function GreenhouseSummary() {
                                             <div className="grid grid-cols-3 gap-2">
                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                     <div className="text-xs font-bold text-black">
-                                                        {waterSummary.dailyTotal.optimal.toFixed(1)}{' '}
-                                                        {t('ลิตร/วัน')}
+                                                        {waterSummary.dailyTotal.optimal.toFixed(1)} {t('ลิตร/วัน')}
                                                     </div>
                                                     <div className="text-xs text-gray-600">
                                                         {t('น้ำที่ต้องการต่อวัน')}
@@ -3475,10 +3181,7 @@ export default function GreenhouseSummary() {
                                                 </div>
                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                     <div className="text-xs font-bold text-black">
-                                                        {waterSummary.weeklyTotal.optimal.toFixed(
-                                                            1
-                                                        )}{' '}
-                                                        {t('ลิตร/สัปดาห์')}
+                                                        {waterSummary.weeklyTotal.optimal.toFixed(1)} {t('ลิตร/สัปดาห์')}
                                                     </div>
                                                     <div className="text-xs text-gray-600">
                                                         {t('น้ำที่ต้องการต่อสัปดาห์')}
@@ -3486,10 +3189,7 @@ export default function GreenhouseSummary() {
                                                 </div>
                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
                                                     <div className="text-xs font-bold text-black">
-                                                        {waterSummary.monthlyTotal.optimal.toFixed(
-                                                            1
-                                                        )}{' '}
-                                                        {t('ลิตร/เดือน')}
+                                                        {waterSummary.monthlyTotal.optimal.toFixed(1)} {t('ลิตร/เดือน')}
                                                     </div>
                                                     <div className="text-xs text-gray-600">
                                                         {t('น้ำที่ต้องการต่อเดือน')}
@@ -3501,806 +3201,394 @@ export default function GreenhouseSummary() {
                                     <div className="space-y-3">
                                         {plotWaterCalculations.length > 0 ? (
                                             plotWaterCalculations.map((plotWater, index) => {
-                                                const plotPipe =
-                                                    plotPipeData[index] ||
-                                                    plotPipeData.find(
-                                                        (p) => p.plotName === plotWater.plotName
-                                                    );
+                                                const plotPipe = plotPipeData[index] || plotPipeData.find(p => p.plotName === plotWater.plotName);
                                                 return (
-                                                    <div
-                                                        key={index}
-                                                        className="border-b border-gray-200 pb-3"
-                                                    >
-                                                        <div className="mb-2 flex items-center justify-between">
-                                                            <span className="text-sm font-semibold text-gray-700">
-                                                                {getCropIcon(plotWater.cropType)}{' '}
-                                                                {plotWater.plotName}
-                                                            </span>
-                                                            <span className="text-xs text-gray-500">
-                                                                {t('สภาพแวดล้อมควบคุม')}
-                                                            </span>
-                                                        </div>
-                                                        <p className="mb-2 text-xs text-gray-600">
-                                                            {t('พืชที่ปลูก')}: {plotWater.cropName}
-                                                        </p>
+                                                <div
+                                                    key={index}
+                                                    className="border-b border-gray-200 pb-3"
+                                                >
+                                                    <div className="mb-2 flex items-center justify-between">
+                                                        <span className="text-sm font-semibold text-gray-700">
+                                                            {getCropIcon(plotWater.cropType)}{' '}
+                                                            {plotWater.plotName}
+                                                        </span>
+                                                        <span className="text-xs text-gray-500">
+                                                            {t('สภาพแวดล้อมควบคุม')}
+                                                        </span>
+                                                    </div>
+                                                    <p className="mb-2 text-xs text-gray-600">
+                                                        {t('พืชที่ปลูก')}: {plotWater.cropName}
+                                                    </p>
 
-                                                        {/* Water Requirements for this plot */}
-                                                        <div className="mb-3 border border-gray-200 bg-gray-50 p-2">
-                                                            <h5 className="mb-2 text-xs font-bold text-black">
-                                                                💧 {t('ความต้องการน้ำ')}
-                                                            </h5>
-                                                            <div className="grid grid-cols-3 gap-1">
-                                                                <div className="border border-gray-200 bg-white p-1 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plotWater.dailyWaterNeed.optimal.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        {t('ลิตร/วัน')}
+                                                    {/* Water Requirements for this plot */}
+                                                    <div className="mb-3 border border-gray-200 bg-gray-50 p-2">
+                                                        <h5 className="mb-2 text-xs font-bold text-black">
+                                                            💧 {t('ความต้องการน้ำ')}
+                                                        </h5>
+                                                        <div className="grid grid-cols-3 gap-1">
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.dailyWaterNeed.optimal.toFixed(1)} {t('ลิตร/วัน')}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('ต่อวัน')}
+                                                                </div>
+                                                            </div>
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.weeklyWaterNeed.optimal.toFixed(1)} {t('ลิตร/สัปดาห์')}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('ต่อสัปดาห์')}
+                                                                </div>
+                                                            </div>
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.monthlyWaterNeed.optimal.toFixed(1)} {t('ลิตร/เดือน')}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('ต่อเดือน')}
+                                                                </div>
+                                                            </div>
+                                                            {/* Irrigation Emitters Information */}
+                                                            <div className="mt-2 border-t border-gray-200 pt-2">
+                                                                <div className="mb-2 text-xs font-semibold text-gray-700">
+                                                                    💧 Irrigation Emitters
+                                                                </div>
+                                                                <div className="grid grid-cols-3 gap-2">
+                                                                    <div className="border border-gray-200 bg-blue-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-blue-600">
+                                                                            {(() => {
+                                                                                // นับสปริงเกลอร์ในแปลงนี้โดยตรงจาก irrigationElements
+                                                                                const elements = summaryData?.irrigationElements || [];
+                                                                                const sprinklers = elements.filter((e) => e.type === 'sprinkler');
+                                                                                const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
+                                                                                
+                                                                                let sprinklerCount = 0;
+                                                                                if (plotShape && plotShape.points) {
+                                                                                    sprinklers.forEach((sprinkler) => {
+                                                                                        if (sprinkler.points.length > 0) {
+                                                                                            const sprinklerPoint = sprinkler.points[0];
+                                                                                            const isInPlot = isPointInPolygon(sprinklerPoint, plotShape.points);
+                                                                                            
+                                                                                            let isNearSubPipeInPlot = false;
+                                                                                            const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+                                                                                            
+                                                                                            if (!isInPlot) {
+                                                                                                subPipes.forEach((subPipe) => {
+                                                                                                    if (subPipeServesPlot(subPipe, plotShape.points)) {
+                                                                                                        for (let i = 0; i < subPipe.points.length - 1; i++) {
+                                                                                                            const distance = distancePointToLineSegment(
+                                                                                                                sprinklerPoint,
+                                                                                                                subPipe.points[i],
+                                                                                                                subPipe.points[i + 1]
+                                                                                                            );
+                                                                                                            if (distance < 30) {
+                                                                                                                isNearSubPipeInPlot = true;
+                                                                                                                break;
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                });
+                                                                                            }
+                                                                                            
+                                                                                            if (isInPlot || isNearSubPipeInPlot) {
+                                                                                                sprinklerCount++;
+                                                                                            }
+                                                                                        }
+                                                                                    });
+                                                                                }
+                                                                                
+                                                                                return sprinklerCount;
+                                                                            })()}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Sprinklers
+                                                                        </div>
                                                                     </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ต่อวัน')}
+                                                                    <div className="border border-gray-200 bg-green-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-green-600">
+                                                                            {(() => {
+                                                                                // นับจุดน้ำหยดในแปลงนี้โดยตรงจาก irrigationElements
+                                                                                const elements = summaryData?.irrigationElements || [];
+                                                                                const dripLines = elements.filter((e) => e.type === 'drip-line');
+                                                                                const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
+                                                                                
+                                                                                let dripCount = 0;
+                                                                                if (plotShape && plotShape.points) {
+                                                                                    dripLines.forEach((dripLine) => {
+                                                                                        if (dripLine.points.length > 0 && dripLine.spacing) {
+                                                                                            let dripLengthInPlot = 0;
+                                                                                            
+                                                                                            for (let i = 0; i < dripLine.points.length - 1; i++) {
+                                                                                                const p1 = dripLine.points[i];
+                                                                                                const p2 = dripLine.points[i + 1];
+                                                                                                
+                                                                                                const midPoint = {
+                                                                                                    x: (p1.x + p2.x) / 2,
+                                                                                                    y: (p1.y + p2.y) / 2,
+                                                                                                };
+
+                                                                                                if (
+                                                                                                    isPointInPolygon(p1, plotShape.points) ||
+                                                                                                    isPointInPolygon(p2, plotShape.points) ||
+                                                                                                    isPointInPolygon(midPoint, plotShape.points)
+                                                                                                ) {
+                                                                                                    const segmentLength = distanceBetweenPoints(p1, p2) / 25;
+                                                                                                    dripLengthInPlot += segmentLength;
+                                                                                                }
+                                                                                            }
+                                                                                            
+                                                                                            if (dripLengthInPlot > 0 && dripLine.spacing > 0) {
+                                                                                                const emittersInThisLine = Math.floor(dripLengthInPlot / dripLine.spacing) + 1;
+                                                                                                dripCount += emittersInThisLine;
+                                                                                            }
+                                                                                        }
+                                                                                    });
+                                                                                }
+                                                                                
+                                                                                return dripCount;
+                                                                            })()}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Drip Emitters
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="border border-gray-200 bg-purple-50 p-2 text-center">
+                                                                        <div className="text-xs font-bold text-purple-600">
+                                                                            {(() => {
+                                                                                // นับอุปกรณ์ให้น้ำทั้งหมดในแปลงนี้
+                                                                                const elements = summaryData?.irrigationElements || [];
+                                                                                const sprinklers = elements.filter((e) => e.type === 'sprinkler');
+                                                                                const dripLines = elements.filter((e) => e.type === 'drip-line');
+                                                                                const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
+                                                                                
+                                                                                let sprinklerCount = 0;
+                                                                                let dripCount = 0;
+                                                                                
+                                                                                if (plotShape && plotShape.points) {
+                                                                                    // นับสปริงเกลอร์
+                                                                                    sprinklers.forEach((sprinkler) => {
+                                                                                        if (sprinkler.points.length > 0) {
+                                                                                            const sprinklerPoint = sprinkler.points[0];
+                                                                                            const isInPlot = isPointInPolygon(sprinklerPoint, plotShape.points);
+                                                                                            
+                                                                                            let isNearSubPipeInPlot = false;
+                                                                                            const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+                                                                                            
+                                                                                            if (!isInPlot) {
+                                                                                                subPipes.forEach((subPipe) => {
+                                                                                                    if (subPipeServesPlot(subPipe, plotShape.points)) {
+                                                                                                        for (let i = 0; i < subPipe.points.length - 1; i++) {
+                                                                                                            const distance = distancePointToLineSegment(
+                                                                                                                sprinklerPoint,
+                                                                                                                subPipe.points[i],
+                                                                                                                subPipe.points[i + 1]
+                                                                                                            );
+                                                                                                            if (distance < 30) {
+                                                                                                                isNearSubPipeInPlot = true;
+                                                                                                                break;
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                });
+                                                                                            }
+                                                                                            
+                                                                                            if (isInPlot || isNearSubPipeInPlot) {
+                                                                                                sprinklerCount++;
+                                                                                            }
+                                                                                        }
+                                                                                    });
+                                                                                    
+                                                                                    // นับจุดน้ำหยด
+                                                                                    dripLines.forEach((dripLine) => {
+                                                                                        if (dripLine.points.length > 0 && dripLine.spacing) {
+                                                                                            let dripLengthInPlot = 0;
+                                                                                            
+                                                                                            for (let i = 0; i < dripLine.points.length - 1; i++) {
+                                                                                                const p1 = dripLine.points[i];
+                                                                                                const p2 = dripLine.points[i + 1];
+                                                                                                
+                                                                                                const midPoint = {
+                                                                                                    x: (p1.x + p2.x) / 2,
+                                                                                                    y: (p1.y + p2.y) / 2,
+                                                                                                };
+
+                                                                                                if (
+                                                                                                    isPointInPolygon(p1, plotShape.points) ||
+                                                                                                    isPointInPolygon(p2, plotShape.points) ||
+                                                                                                    isPointInPolygon(midPoint, plotShape.points)
+                                                                                                ) {
+                                                                                                    const segmentLength = distanceBetweenPoints(p1, p2) / 25;
+                                                                                                    dripLengthInPlot += segmentLength;
+                                                                                                }
+                                                                                            }
+                                                                                            
+                                                                                            if (dripLengthInPlot > 0 && dripLine.spacing > 0) {
+                                                                                                const emittersInThisLine = Math.floor(dripLengthInPlot / dripLine.spacing) + 1;
+                                                                                                dripCount += emittersInThisLine;
+                                                                                            }
+                                                                                        }
+                                                                                    });
+                                                                                }
+                                                                                
+                                                                                return sprinklerCount + dripCount;
+                                                                            })()}
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-600">
+                                                                            Total
+                                                                        </div>
                                                                     </div>
                                                                 </div>
-                                                                <div className="border border-gray-200 bg-white p-1 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plotWater.weeklyWaterNeed.optimal.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        {t('ลิตร/สัปดาห์')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ต่อสัปดาห์')}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="border border-gray-200 bg-white p-1 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plotWater.monthlyWaterNeed.optimal.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        {t('ลิตร/เดือน')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ต่อเดือน')}
-                                                                    </div>
-                                                                </div>
-                                                                {/* Irrigation Emitters Information */}
+                                                            </div>
+
+                                                            {/* Main and Sub Pipe Flow Rate and Outlet Count for This Plot */}
+                                                            {plotPipe && plotPipe.hasPipes && (
                                                                 <div className="mt-2 border-t border-gray-200 pt-2">
                                                                     <div className="mb-2 text-xs font-semibold text-gray-700">
-                                                                        💧 Irrigation Emitters
+                                                                        {t('อัตราการไหลและจำนวนทางออกของท่อ')}
                                                                     </div>
-                                                                    <div className="grid grid-cols-3 gap-2">
-                                                                        <div className="border border-gray-200 bg-blue-50 p-2 text-center">
-                                                                            <div className="text-xs font-bold text-blue-600">
-                                                                                {(() => {
-                                                                                    // นับสปริงเกลอร์ในแปลงนี้โดยตรงจาก irrigationElements
-                                                                                    const elements =
-                                                                                        summaryData?.irrigationElements ||
-                                                                                        [];
-                                                                                    const sprinklers =
-                                                                                        elements.filter(
-                                                                                            (e) =>
-                                                                                                e.type ===
-                                                                                                'sprinkler'
-                                                                                        );
-                                                                                    const plotShape =
-                                                                                        summaryData?.shapes?.find(
-                                                                                            (s) =>
-                                                                                                s.name ===
-                                                                                                    plotWater.plotName ||
-                                                                                                s.id ===
-                                                                                                    plotWater.plotId
-                                                                                        );
-
-                                                                                    let sprinklerCount = 0;
-                                                                                    if (
-                                                                                        plotShape &&
-                                                                                        plotShape.points
-                                                                                    ) {
-                                                                                        sprinklers.forEach(
-                                                                                            (
-                                                                                                sprinkler
-                                                                                            ) => {
-                                                                                                if (
-                                                                                                    sprinkler
-                                                                                                        .points
-                                                                                                        .length >
-                                                                                                    0
-                                                                                                ) {
-                                                                                                    const sprinklerPoint =
-                                                                                                        sprinkler
-                                                                                                            .points[0];
-                                                                                                    const isInPlot =
-                                                                                                        isPointInPolygon(
-                                                                                                            sprinklerPoint,
-                                                                                                            plotShape.points
-                                                                                                        );
-
-                                                                                                    let isNearSubPipeInPlot = false;
-                                                                                                    const subPipes =
-                                                                                                        elements.filter(
-                                                                                                            (
-                                                                                                                e
-                                                                                                            ) =>
-                                                                                                                e.type ===
-                                                                                                                'sub-pipe'
-                                                                                                        );
-
-                                                                                                    if (
-                                                                                                        !isInPlot
-                                                                                                    ) {
-                                                                                                        subPipes.forEach(
-                                                                                                            (
-                                                                                                                subPipe
-                                                                                                            ) => {
-                                                                                                                if (
-                                                                                                                    subPipeServesPlot(
-                                                                                                                        subPipe,
-                                                                                                                        plotShape.points
-                                                                                                                    )
-                                                                                                                ) {
-                                                                                                                    for (
-                                                                                                                        let i = 0;
-                                                                                                                        i <
-                                                                                                                        subPipe
-                                                                                                                            .points
-                                                                                                                            .length -
-                                                                                                                            1;
-                                                                                                                        i++
-                                                                                                                    ) {
-                                                                                                                        const distance =
-                                                                                                                            distancePointToLineSegment(
-                                                                                                                                sprinklerPoint,
-                                                                                                                                subPipe
-                                                                                                                                    .points[
-                                                                                                                                    i
-                                                                                                                                ],
-                                                                                                                                subPipe
-                                                                                                                                    .points[
-                                                                                                                                    i +
-                                                                                                                                        1
-                                                                                                                                ]
-                                                                                                                            );
-                                                                                                                        if (
-                                                                                                                            distance <
-                                                                                                                            30
-                                                                                                                        ) {
-                                                                                                                            isNearSubPipeInPlot = true;
-                                                                                                                            break;
-                                                                                                                        }
-                                                                                                                    }
-                                                                                                                }
-                                                                                                            }
-                                                                                                        );
-                                                                                                    }
-
-                                                                                                    if (
-                                                                                                        isInPlot ||
-                                                                                                        isNearSubPipeInPlot
-                                                                                                    ) {
-                                                                                                        sprinklerCount++;
-                                                                                                    }
-                                                                                                }
+                                                                    <div className="overflow-x-auto">
+                                                                        <table className="w-full border-collapse border border-gray-300">
+                                                                            <thead>
+                                                                                <tr className="bg-gray-100">
+                                                                                    <th className="border border-gray-300 px-2 py-1 text-left text-gray-800 font-semibold text-xs">{t('ประเภทท่อ')}</th>
+                                                                                    <th className="border border-gray-300 px-2 py-1 text-left text-gray-800 font-semibold text-xs">{t('อัตราการไหล')}</th>
+                                                                                    <th className="border border-gray-300 px-2 py-1 text-left text-gray-800 font-semibold text-xs">{t('จำนวนทางออก')}</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="text-gray-700">
+                                                                                <tr>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-blue-600">
+                                                                                        {(() => {
+                                                                                            const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
+                                                                                            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
+                                                                                            const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
+                                                                                            return totalFlowRate.toFixed(2);
+                                                                                        })()} {t('L/min')}
+                                                                                    </td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-blue-600">
+                                                                                        {(() => {
+                                                                                            // คำนวณจำนวนท่อย่อยที่เชื่อมต่อกับแปลงนี้
+                                                                                            const elements = summaryData?.irrigationElements || [];
+                                                                                            const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+                                                                                            const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
+                                                                                            
+                                                                                            if (plotShape && plotShape.points) {
+                                                                                                return subPipes.filter(subPipe => subPipeServesPlot(subPipe, plotShape.points)).length;
                                                                                             }
-                                                                                        );
-                                                                                    }
-
-                                                                                    return sprinklerCount;
-                                                                                })()}
-                                                                            </div>
-                                                                            <div className="text-xs text-gray-600">
-                                                                                Sprinklers
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="border border-gray-200 bg-green-50 p-2 text-center">
-                                                                            <div className="text-xs font-bold text-green-600">
-                                                                                {(() => {
-                                                                                    // นับจุดน้ำหยดในแปลงนี้โดยตรงจาก irrigationElements
-                                                                                    const elements =
-                                                                                        summaryData?.irrigationElements ||
-                                                                                        [];
-                                                                                    const dripLines =
-                                                                                        elements.filter(
-                                                                                            (e) =>
-                                                                                                e.type ===
-                                                                                                'drip-line'
-                                                                                        );
-                                                                                    const plotShape =
-                                                                                        summaryData?.shapes?.find(
-                                                                                            (s) =>
-                                                                                                s.name ===
-                                                                                                    plotWater.plotName ||
-                                                                                                s.id ===
-                                                                                                    plotWater.plotId
-                                                                                        );
-
-                                                                                    let dripCount = 0;
-                                                                                    if (
-                                                                                        plotShape &&
-                                                                                        plotShape.points
-                                                                                    ) {
-                                                                                        dripLines.forEach(
-                                                                                            (
-                                                                                                dripLine
-                                                                                            ) => {
-                                                                                                if (
-                                                                                                    dripLine
-                                                                                                        .points
-                                                                                                        .length >
-                                                                                                        0 &&
-                                                                                                    dripLine.spacing
-                                                                                                ) {
-                                                                                                    let dripLengthInPlot = 0;
-
-                                                                                                    for (
-                                                                                                        let i = 0;
-                                                                                                        i <
-                                                                                                        dripLine
-                                                                                                            .points
-                                                                                                            .length -
-                                                                                                            1;
-                                                                                                        i++
-                                                                                                    ) {
-                                                                                                        const p1 =
-                                                                                                            dripLine
-                                                                                                                .points[
-                                                                                                                i
-                                                                                                            ];
-                                                                                                        const p2 =
-                                                                                                            dripLine
-                                                                                                                .points[
-                                                                                                                i +
-                                                                                                                    1
-                                                                                                            ];
-
-                                                                                                        const midPoint =
-                                                                                                            {
-                                                                                                                x:
-                                                                                                                    (p1.x +
-                                                                                                                        p2.x) /
-                                                                                                                    2,
-                                                                                                                y:
-                                                                                                                    (p1.y +
-                                                                                                                        p2.y) /
-                                                                                                                    2,
-                                                                                                            };
-
-                                                                                                        if (
-                                                                                                            isPointInPolygon(
-                                                                                                                p1,
-                                                                                                                plotShape.points
-                                                                                                            ) ||
-                                                                                                            isPointInPolygon(
-                                                                                                                p2,
-                                                                                                                plotShape.points
-                                                                                                            ) ||
-                                                                                                            isPointInPolygon(
-                                                                                                                midPoint,
-                                                                                                                plotShape.points
-                                                                                                            )
-                                                                                                        ) {
-                                                                                                            const segmentLength =
-                                                                                                                distanceBetweenPoints(
-                                                                                                                    p1,
-                                                                                                                    p2
-                                                                                                                ) /
-                                                                                                                25;
-                                                                                                            dripLengthInPlot +=
-                                                                                                                segmentLength;
-                                                                                                        }
-                                                                                                    }
-
-                                                                                                    if (
-                                                                                                        dripLengthInPlot >
-                                                                                                            0 &&
-                                                                                                        dripLine.spacing >
-                                                                                                            0
-                                                                                                    ) {
-                                                                                                        const emittersInThisLine =
-                                                                                                            Math.floor(
-                                                                                                                dripLengthInPlot /
-                                                                                                                    dripLine.spacing
-                                                                                                            ) +
-                                                                                                            1;
-                                                                                                        dripCount +=
-                                                                                                            emittersInThisLine;
-                                                                                                    }
-                                                                                                }
-                                                                                            }
-                                                                                        );
-                                                                                    }
-
-                                                                                    return dripCount;
-                                                                                })()}
-                                                                            </div>
-                                                                            <div className="text-xs text-gray-600">
-                                                                                Drip Emitters
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="border border-gray-200 bg-purple-50 p-2 text-center">
-                                                                            <div className="text-xs font-bold text-purple-600">
-                                                                                {(() => {
-                                                                                    // นับอุปกรณ์ให้น้ำทั้งหมดในแปลงนี้
-                                                                                    const elements =
-                                                                                        summaryData?.irrigationElements ||
-                                                                                        [];
-                                                                                    const sprinklers =
-                                                                                        elements.filter(
-                                                                                            (e) =>
-                                                                                                e.type ===
-                                                                                                'sprinkler'
-                                                                                        );
-                                                                                    const dripLines =
-                                                                                        elements.filter(
-                                                                                            (e) =>
-                                                                                                e.type ===
-                                                                                                'drip-line'
-                                                                                        );
-                                                                                    const plotShape =
-                                                                                        summaryData?.shapes?.find(
-                                                                                            (s) =>
-                                                                                                s.name ===
-                                                                                                    plotWater.plotName ||
-                                                                                                s.id ===
-                                                                                                    plotWater.plotId
-                                                                                        );
-
-                                                                                    let sprinklerCount = 0;
-                                                                                    let dripCount = 0;
-
-                                                                                    if (
-                                                                                        plotShape &&
-                                                                                        plotShape.points
-                                                                                    ) {
-                                                                                        // นับสปริงเกลอร์
-                                                                                        sprinklers.forEach(
-                                                                                            (
-                                                                                                sprinkler
-                                                                                            ) => {
-                                                                                                if (
-                                                                                                    sprinkler
-                                                                                                        .points
-                                                                                                        .length >
-                                                                                                    0
-                                                                                                ) {
-                                                                                                    const sprinklerPoint =
-                                                                                                        sprinkler
-                                                                                                            .points[0];
-                                                                                                    const isInPlot =
-                                                                                                        isPointInPolygon(
-                                                                                                            sprinklerPoint,
-                                                                                                            plotShape.points
-                                                                                                        );
-
-                                                                                                    let isNearSubPipeInPlot = false;
-                                                                                                    const subPipes =
-                                                                                                        elements.filter(
-                                                                                                            (
-                                                                                                                e
-                                                                                                            ) =>
-                                                                                                                e.type ===
-                                                                                                                'sub-pipe'
-                                                                                                        );
-
-                                                                                                    if (
-                                                                                                        !isInPlot
-                                                                                                    ) {
-                                                                                                        subPipes.forEach(
-                                                                                                            (
-                                                                                                                subPipe
-                                                                                                            ) => {
-                                                                                                                if (
-                                                                                                                    subPipeServesPlot(
-                                                                                                                        subPipe,
-                                                                                                                        plotShape.points
-                                                                                                                    )
-                                                                                                                ) {
-                                                                                                                    for (
-                                                                                                                        let i = 0;
-                                                                                                                        i <
-                                                                                                                        subPipe
-                                                                                                                            .points
-                                                                                                                            .length -
-                                                                                                                            1;
-                                                                                                                        i++
-                                                                                                                    ) {
-                                                                                                                        const distance =
-                                                                                                                            distancePointToLineSegment(
-                                                                                                                                sprinklerPoint,
-                                                                                                                                subPipe
-                                                                                                                                    .points[
-                                                                                                                                    i
-                                                                                                                                ],
-                                                                                                                                subPipe
-                                                                                                                                    .points[
-                                                                                                                                    i +
-                                                                                                                                        1
-                                                                                                                                ]
-                                                                                                                            );
-                                                                                                                        if (
-                                                                                                                            distance <
-                                                                                                                            30
-                                                                                                                        ) {
-                                                                                                                            isNearSubPipeInPlot = true;
-                                                                                                                            break;
-                                                                                                                        }
-                                                                                                                    }
-                                                                                                                }
-                                                                                                            }
-                                                                                                        );
-                                                                                                    }
-
-                                                                                                    if (
-                                                                                                        isInPlot ||
-                                                                                                        isNearSubPipeInPlot
-                                                                                                    ) {
-                                                                                                        sprinklerCount++;
-                                                                                                    }
-                                                                                                }
-                                                                                            }
-                                                                                        );
-
-                                                                                        // นับจุดน้ำหยด
-                                                                                        dripLines.forEach(
-                                                                                            (
-                                                                                                dripLine
-                                                                                            ) => {
-                                                                                                if (
-                                                                                                    dripLine
-                                                                                                        .points
-                                                                                                        .length >
-                                                                                                        0 &&
-                                                                                                    dripLine.spacing
-                                                                                                ) {
-                                                                                                    let dripLengthInPlot = 0;
-
-                                                                                                    for (
-                                                                                                        let i = 0;
-                                                                                                        i <
-                                                                                                        dripLine
-                                                                                                            .points
-                                                                                                            .length -
-                                                                                                            1;
-                                                                                                        i++
-                                                                                                    ) {
-                                                                                                        const p1 =
-                                                                                                            dripLine
-                                                                                                                .points[
-                                                                                                                i
-                                                                                                            ];
-                                                                                                        const p2 =
-                                                                                                            dripLine
-                                                                                                                .points[
-                                                                                                                i +
-                                                                                                                    1
-                                                                                                            ];
-
-                                                                                                        const midPoint =
-                                                                                                            {
-                                                                                                                x:
-                                                                                                                    (p1.x +
-                                                                                                                        p2.x) /
-                                                                                                                    2,
-                                                                                                                y:
-                                                                                                                    (p1.y +
-                                                                                                                        p2.y) /
-                                                                                                                    2,
-                                                                                                            };
-
-                                                                                                        if (
-                                                                                                            isPointInPolygon(
-                                                                                                                p1,
-                                                                                                                plotShape.points
-                                                                                                            ) ||
-                                                                                                            isPointInPolygon(
-                                                                                                                p2,
-                                                                                                                plotShape.points
-                                                                                                            ) ||
-                                                                                                            isPointInPolygon(
-                                                                                                                midPoint,
-                                                                                                                plotShape.points
-                                                                                                            )
-                                                                                                        ) {
-                                                                                                            const segmentLength =
-                                                                                                                distanceBetweenPoints(
-                                                                                                                    p1,
-                                                                                                                    p2
-                                                                                                                ) /
-                                                                                                                25;
-                                                                                                            dripLengthInPlot +=
-                                                                                                                segmentLength;
-                                                                                                        }
-                                                                                                    }
-
-                                                                                                    if (
-                                                                                                        dripLengthInPlot >
-                                                                                                            0 &&
-                                                                                                        dripLine.spacing >
-                                                                                                            0
-                                                                                                    ) {
-                                                                                                        const emittersInThisLine =
-                                                                                                            Math.floor(
-                                                                                                                dripLengthInPlot /
-                                                                                                                    dripLine.spacing
-                                                                                                            ) +
-                                                                                                            1;
-                                                                                                        dripCount +=
-                                                                                                            emittersInThisLine;
-                                                                                                    }
-                                                                                                }
-                                                                                            }
-                                                                                        );
-                                                                                    }
-
-                                                                                    return (
-                                                                                        sprinklerCount +
-                                                                                        dripCount
-                                                                                    );
-                                                                                })()}
-                                                                            </div>
-                                                                            <div className="text-xs text-gray-600">
-                                                                                Total
-                                                                            </div>
-                                                                        </div>
+                                                                                            return 0;
+                                                                                        })()} {t('เส้น')}
+                                                                                    </td>
+                                                                                </tr>
+                                                                                <tr>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs">{t('ท่อเมนย่อย')}</td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">
+                                                                                        {(() => {
+                                                                                            const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
+                                                                                            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
+                                                                                            const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
+                                                                                            return totalFlowRate.toFixed(2);
+                                                                                        })()} {t('L/min')}
+                                                                                    </td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">{plotPipe.totalEmitters} {t('ตัว')}</td>
+                                                                                </tr>
+                                                                            </tbody>
+                                                                        </table>
                                                                     </div>
                                                                 </div>
-
-                                                                {/* Main and Sub Pipe Flow Rate and Outlet Count for This Plot */}
-                                                                {plotPipe && plotPipe.hasPipes && (
-                                                                    <div className="mt-2 border-t border-gray-200 pt-2">
-                                                                        <div className="mb-2 text-xs font-semibold text-gray-700">
-                                                                            {t(
-                                                                                'อัตราการไหลและจำนวนทางออกของท่อ'
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="overflow-x-auto">
-                                                                            <table className="w-full border-collapse border border-gray-300">
-                                                                                <thead>
-                                                                                    <tr className="bg-gray-100">
-                                                                                        <th className="border border-gray-300 px-2 py-1 text-left text-xs font-semibold text-gray-800">
-                                                                                            {t(
-                                                                                                'ประเภทท่อ'
-                                                                                            )}
-                                                                                        </th>
-                                                                                        <th className="border border-gray-300 px-2 py-1 text-left text-xs font-semibold text-gray-800">
-                                                                                            {t(
-                                                                                                'อัตราการไหล'
-                                                                                            )}
-                                                                                        </th>
-                                                                                        <th className="border border-gray-300 px-2 py-1 text-left text-xs font-semibold text-gray-800">
-                                                                                            {t(
-                                                                                                'จำนวนทางออก'
-                                                                                            )}
-                                                                                        </th>
-                                                                                    </tr>
-                                                                                </thead>
-                                                                                <tbody className="text-gray-700">
-                                                                                    <tr>
-                                                                                        <td className="border border-gray-300 px-2 py-1 text-xs">
-                                                                                            {t(
-                                                                                                'ท่อเมน'
-                                                                                            )}
-                                                                                        </td>
-                                                                                        <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-blue-600">
-                                                                                            {(() => {
-                                                                                                const sprinklerFlowRate =
-                                                                                                    summaryData?.sprinklerFlowRate ||
-                                                                                                    10;
-                                                                                                const dripEmitterFlowRate =
-                                                                                                    summaryData?.dripEmitterFlowRate ||
-                                                                                                    0.24;
-                                                                                                const totalFlowRate =
-                                                                                                    plotPipe.sprinklerCount *
-                                                                                                        sprinklerFlowRate +
-                                                                                                    plotPipe.dripEmitterCount *
-                                                                                                        dripEmitterFlowRate;
-                                                                                                return totalFlowRate.toFixed(
-                                                                                                    2
-                                                                                                );
-                                                                                            })()}{' '}
-                                                                                            {t(
-                                                                                                'L/min'
-                                                                                            )}
-                                                                                        </td>
-                                                                                        <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-blue-600">
-                                                                                            {(() => {
-                                                                                                // คำนวณจำนวนท่อย่อยที่เชื่อมต่อกับแปลงนี้
-                                                                                                const elements =
-                                                                                                    summaryData?.irrigationElements ||
-                                                                                                    [];
-                                                                                                const subPipes =
-                                                                                                    elements.filter(
-                                                                                                        (
-                                                                                                            e
-                                                                                                        ) =>
-                                                                                                            e.type ===
-                                                                                                            'sub-pipe'
-                                                                                                    );
-                                                                                                const plotShape =
-                                                                                                    summaryData?.shapes?.find(
-                                                                                                        (
-                                                                                                            s
-                                                                                                        ) =>
-                                                                                                            s.name ===
-                                                                                                                plotWater.plotName ||
-                                                                                                            s.id ===
-                                                                                                                plotWater.plotId
-                                                                                                    );
-
-                                                                                                if (
-                                                                                                    plotShape &&
-                                                                                                    plotShape.points
-                                                                                                ) {
-                                                                                                    return subPipes.filter(
-                                                                                                        (
-                                                                                                            subPipe
-                                                                                                        ) =>
-                                                                                                            subPipeServesPlot(
-                                                                                                                subPipe,
-                                                                                                                plotShape.points
-                                                                                                            )
-                                                                                                    )
-                                                                                                        .length;
-                                                                                                }
-                                                                                                return 0;
-                                                                                            })()}{' '}
-                                                                                            {t(
-                                                                                                'เส้น'
-                                                                                            )}
-                                                                                        </td>
-                                                                                    </tr>
-                                                                                    <tr>
-                                                                                        <td className="border border-gray-300 px-2 py-1 text-xs">
-                                                                                            {t(
-                                                                                                'ท่อเมนย่อย'
-                                                                                            )}
-                                                                                        </td>
-                                                                                        <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">
-                                                                                            {(() => {
-                                                                                                const sprinklerFlowRate =
-                                                                                                    summaryData?.sprinklerFlowRate ||
-                                                                                                    10;
-                                                                                                const dripEmitterFlowRate =
-                                                                                                    summaryData?.dripEmitterFlowRate ||
-                                                                                                    0.24;
-                                                                                                const totalFlowRate =
-                                                                                                    plotPipe.sprinklerCount *
-                                                                                                        sprinklerFlowRate +
-                                                                                                    plotPipe.dripEmitterCount *
-                                                                                                        dripEmitterFlowRate;
-                                                                                                return totalFlowRate.toFixed(
-                                                                                                    2
-                                                                                                );
-                                                                                            })()}{' '}
-                                                                                            {t(
-                                                                                                'L/min'
-                                                                                            )}
-                                                                                        </td>
-                                                                                        <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">
-                                                                                            {
-                                                                                                plotPipe.totalEmitters
-                                                                                            }{' '}
-                                                                                            {t(
-                                                                                                'ตัว'
-                                                                                            )}
-                                                                                        </td>
-                                                                                    </tr>
-                                                                                </tbody>
-                                                                            </table>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
+                                                            )}
+                                                        </div>
+                                                        <div className="mt-2 grid grid-cols-2 gap-1">
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.totalPlants} {t('ต้น')}
+                                                                </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('จำนวนพืช')}
+                                                                </div>
                                                             </div>
-                                                            <div className="mt-2 grid grid-cols-2 gap-1">
-                                                                <div className="border border-gray-200 bg-white p-1 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plotWater.totalPlants}{' '}
-                                                                        {t('ต้น')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('จำนวนพืช')}
-                                                                    </div>
+                                                            <div className="border border-gray-200 bg-white p-1 text-center">
+                                                                <div className="text-xs font-bold text-black">
+                                                                    {plotWater.waterIntensity.litersPerSquareMeter.toFixed(1)} {t('ลิตร/ตร.ม./วัน')}
                                                                 </div>
-                                                                <div className="border border-gray-200 bg-white p-1 text-center">
-                                                                    <div className="text-xs font-bold text-black">
-                                                                        {plotWater.waterIntensity.litersPerSquareMeter.toFixed(
-                                                                            1
-                                                                        )}{' '}
-                                                                        {t('ลิตร/ตร.ม./วัน')}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-600">
-                                                                        {t('ความเข้มข้นน้ำ')}
-                                                                    </div>
+                                                                <div className="text-xs text-gray-600">
+                                                                    {t('ความเข้มข้นน้ำ')}
                                                                 </div>
                                                             </div>
                                                         </div>
-
-                                                        {plotPipe && plotPipe.hasPipes ? (
-                                                            <div className="space-y-2">
-                                                                <h5 className="mb-2 text-xs font-bold text-black">
-                                                                    🔧 {t('ระบบท่อ')}
-                                                                </h5>
-                                                                <div className="grid grid-cols-3 gap-2">
-                                                                    <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-black">
-                                                                            {plotPipe.maxMainPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-600">
-                                                                            {t('ท่อเมนสูงสุด')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-black">
-                                                                            {plotPipe.maxSubPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-600">
-                                                                            {t('ท่อย่อยสูงสุด')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-black">
-                                                                            {plotPipe.maxTotalPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-600">
-                                                                            {t('ความยาวสูงสุดรวม')}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="grid grid-cols-3 gap-2">
-                                                                    <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-black">
-                                                                            {plotPipe.totalMainPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-600">
-                                                                            {t('ท่อเมนทั้งหมด')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-black">
-                                                                            {plotPipe.totalSubPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-600">
-                                                                            {t('ท่อย่อยทั้งหมด')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-black">
-                                                                            {plotPipe.totalPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-600">
-                                                                            {t('ความยาวรวมทั้งหมด')}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="border border-gray-200 bg-gray-50 p-2 text-center">
-                                                                <span className="text-xs text-gray-600">
-                                                                    {t('ไม่มีระบบท่อในแปลงนี้')}
-                                                                </span>
-                                                            </div>
-                                                        )}
                                                     </div>
-                                                );
-                                            })
-                                        ) : (
+
+                                                                                                         {plotPipe && plotPipe.hasPipes ? (
+                                                         <div className="space-y-2">
+                                                             <h5 className="mb-2 text-xs font-bold text-black">
+                                                                 🔧 {t('ระบบท่อ')}
+                                                             </h5>
+                                                             <div className="grid grid-cols-3 gap-2">
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.maxMainPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ท่อเมนสูงสุด')}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.maxSubPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ท่อย่อยสูงสุด')}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ความยาวสูงสุดรวม')}
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                             <div className="grid grid-cols-3 gap-2">
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.totalMainPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ท่อเมนทั้งหมด')}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.totalSubPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ท่อย่อยทั้งหมด')}
+                                                                     </div>
+                                                                 </div>
+                                                                 <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                                     <div className="text-xs font-bold text-black">
+                                                                         {plotPipe.totalPipeLength.toFixed(1)} {t('เมตร')}
+                                                                     </div>
+                                                                     <div className="text-xs text-gray-600">
+                                                                         {t('ความยาวรวมทั้งหมด')}
+                                                                     </div>
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     ) : (
+                                                         <div className="border border-gray-200 bg-gray-50 p-2 text-center">
+                                                             <span className="text-xs text-gray-600">
+                                                                 {t('ไม่มีระบบท่อในแปลงนี้')}
+                                                             </span>
+                                                         </div>
+                                                     )}
+                                                 </div>
+                                             );
+                                         })
+                                         ) : (
                                             <>
                                                 {summaryData?.selectedCrops?.map((crop, index) => (
                                                     <div
@@ -4331,10 +3619,7 @@ export default function GreenhouseSummary() {
                                     className="mb-3 flex w-full items-center justify-between text-left"
                                 >
                                     <h2 className="text-lg font-bold text-yellow-400">
-                                        🌱{' '}
-                                        {t(
-                                            'ข้อมูลการปลูกและความต้องการน้ำแต่ละโรงเรือนใช้อัตราการไหลกี่ลิตรต่อนาที'
-                                        )}
+                                        🌱 {t('ข้อมูลการปลูกและความต้องการน้ำแต่ละโรงเรือนใช้อัตราการไหลกี่ลิตรต่อนาที')}
                                     </h2>
                                     <svg
                                         className={`h-5 w-5 transform transition-transform ${
@@ -4371,11 +3656,7 @@ export default function GreenhouseSummary() {
                                                     </div>
                                                     <div className="rounded bg-gray-600 p-3 text-center">
                                                         <div className="text-2xl font-bold text-green-400">
-                                                            {plotWaterCalculations.reduce(
-                                                                (sum, plot) =>
-                                                                    sum + plot.totalPlants,
-                                                                0
-                                                            )}
+                                                            {plotWaterCalculations.reduce((sum, plot) => sum + plot.totalPlants, 0)}
                                                         </div>
                                                         <div className="text-sm text-gray-300">
                                                             {t('จำนวนพืชทั้งหมด')}
@@ -4387,12 +3668,8 @@ export default function GreenhouseSummary() {
                                                         <div className="text-sm font-bold text-cyan-400">
                                                             {(() => {
                                                                 // นับสปริงเกลอร์ทั้งหมดโดยตรงจาก irrigationElements
-                                                                const elements =
-                                                                    summaryData?.irrigationElements ||
-                                                                    [];
-                                                                return elements.filter(
-                                                                    (e) => e.type === 'sprinkler'
-                                                                ).length;
+                                                                const elements = summaryData?.irrigationElements || [];
+                                                                return elements.filter((e) => e.type === 'sprinkler').length;
                                                             })()}
                                                         </div>
                                                         <div className="text-xs text-gray-300">
@@ -4403,57 +3680,26 @@ export default function GreenhouseSummary() {
                                                         <div className="text-sm font-bold text-purple-400">
                                                             {(() => {
                                                                 // นับจุดน้ำหยดทั้งหมดโดยตรงจาก irrigationElements
-                                                                const elements =
-                                                                    summaryData?.irrigationElements ||
-                                                                    [];
-                                                                const dripLines = elements.filter(
-                                                                    (e) => e.type === 'drip-line'
-                                                                );
+                                                                const elements = summaryData?.irrigationElements || [];
+                                                                const dripLines = elements.filter((e) => e.type === 'drip-line');
                                                                 let totalDripEmitters = 0;
-
+                                                                
                                                                 dripLines.forEach((dripLine) => {
-                                                                    if (
-                                                                        dripLine.points.length >
-                                                                            1 &&
-                                                                        dripLine.spacing
-                                                                    ) {
+                                                                    if (dripLine.points.length > 1 && dripLine.spacing) {
                                                                         let totalLength = 0;
-                                                                        for (
-                                                                            let i = 0;
-                                                                            i <
-                                                                            dripLine.points.length -
-                                                                                1;
-                                                                            i++
-                                                                        ) {
-                                                                            const p1 =
-                                                                                dripLine.points[i];
-                                                                            const p2 =
-                                                                                dripLine.points[
-                                                                                    i + 1
-                                                                                ];
-                                                                            const segmentLength =
-                                                                                distanceBetweenPoints(
-                                                                                    p1,
-                                                                                    p2
-                                                                                ) / 25; // Convert to meters
-                                                                            totalLength +=
-                                                                                segmentLength;
+                                                                        for (let i = 0; i < dripLine.points.length - 1; i++) {
+                                                                            const p1 = dripLine.points[i];
+                                                                            const p2 = dripLine.points[i + 1];
+                                                                            const segmentLength = distanceBetweenPoints(p1, p2) / 25; // Convert to meters
+                                                                            totalLength += segmentLength;
                                                                         }
-                                                                        if (
-                                                                            totalLength > 0 &&
-                                                                            dripLine.spacing > 0
-                                                                        ) {
-                                                                            const emittersInThisLine =
-                                                                                Math.floor(
-                                                                                    totalLength /
-                                                                                        dripLine.spacing
-                                                                                ) + 1;
-                                                                            totalDripEmitters +=
-                                                                                emittersInThisLine;
+                                                                        if (totalLength > 0 && dripLine.spacing > 0) {
+                                                                            const emittersInThisLine = Math.floor(totalLength / dripLine.spacing) + 1;
+                                                                            totalDripEmitters += emittersInThisLine;
                                                                         }
                                                                     }
                                                                 });
-
+                                                                
                                                                 return totalDripEmitters;
                                                             })()}
                                                         </div>
@@ -4465,66 +3711,28 @@ export default function GreenhouseSummary() {
                                                         <div className="text-sm font-bold text-orange-400">
                                                             {(() => {
                                                                 // นับอุปกรณ์ให้น้ำทั้งหมด
-                                                                const elements =
-                                                                    summaryData?.irrigationElements ||
-                                                                    [];
-                                                                const sprinklerCount =
-                                                                    elements.filter(
-                                                                        (e) =>
-                                                                            e.type === 'sprinkler'
-                                                                    ).length;
-                                                                const dripLines = elements.filter(
-                                                                    (e) => e.type === 'drip-line'
-                                                                );
+                                                                const elements = summaryData?.irrigationElements || [];
+                                                                const sprinklerCount = elements.filter((e) => e.type === 'sprinkler').length;
+                                                                const dripLines = elements.filter((e) => e.type === 'drip-line');
                                                                 let totalDripEmitters = 0;
-
+                                                                
                                                                 dripLines.forEach((dripLine) => {
-                                                                    if (
-                                                                        dripLine.points.length >
-                                                                            1 &&
-                                                                        dripLine.spacing
-                                                                    ) {
+                                                                    if (dripLine.points.length > 1 && dripLine.spacing) {
                                                                         let totalLength = 0;
-                                                                        for (
-                                                                            let i = 0;
-                                                                            i <
-                                                                            dripLine.points.length -
-                                                                                1;
-                                                                            i++
-                                                                        ) {
-                                                                            const p1 =
-                                                                                dripLine.points[i];
-                                                                            const p2 =
-                                                                                dripLine.points[
-                                                                                    i + 1
-                                                                                ];
-                                                                            const segmentLength =
-                                                                                distanceBetweenPoints(
-                                                                                    p1,
-                                                                                    p2
-                                                                                ) / 25; // Convert to meters
-                                                                            totalLength +=
-                                                                                segmentLength;
+                                                                        for (let i = 0; i < dripLine.points.length - 1; i++) {
+                                                                            const p1 = dripLine.points[i];
+                                                                            const p2 = dripLine.points[i + 1];
+                                                                            const segmentLength = distanceBetweenPoints(p1, p2) / 25; // Convert to meters
+                                                                            totalLength += segmentLength;
                                                                         }
-                                                                        if (
-                                                                            totalLength > 0 &&
-                                                                            dripLine.spacing > 0
-                                                                        ) {
-                                                                            const emittersInThisLine =
-                                                                                Math.floor(
-                                                                                    totalLength /
-                                                                                        dripLine.spacing
-                                                                                ) + 1;
-                                                                            totalDripEmitters +=
-                                                                                emittersInThisLine;
+                                                                        if (totalLength > 0 && dripLine.spacing > 0) {
+                                                                            const emittersInThisLine = Math.floor(totalLength / dripLine.spacing) + 1;
+                                                                            totalDripEmitters += emittersInThisLine;
                                                                         }
                                                                     }
                                                                 });
-
-                                                                return (
-                                                                    sprinklerCount +
-                                                                    totalDripEmitters
-                                                                );
+                                                                
+                                                                return sprinklerCount + totalDripEmitters;
                                                             })()}
                                                         </div>
                                                         <div className="text-xs text-gray-300">
@@ -4538,84 +3746,45 @@ export default function GreenhouseSummary() {
                                         {/* Individual Plot Details */}
                                         {plotWaterCalculations.length > 0 ? (
                                             plotWaterCalculations.map((plotWater, index) => {
-                                                const plotPipe =
-                                                    plotPipeData[index] ||
-                                                    plotPipeData.find(
-                                                        (p) => p.plotName === plotWater.plotName
-                                                    );
+                                                const plotPipe = plotPipeData[index] || plotPipeData.find(p => p.plotName === plotWater.plotName);
                                                 // Calculate flow rate based on number of emitters
-                                                const flowRatePerUnit =
-                                                    summaryData?.irrigationMethod === 'drip'
-                                                        ? 0.24
-                                                        : 10; // L/min per unit
+                                                const flowRatePerUnit = summaryData?.irrigationMethod === 'drip' ? 0.24 : 10; // L/min per unit
                                                 const totalEmitters = plotPipe?.totalEmitters || 0;
-
+                                                
                                                 // นับสปริงเกลอร์และจุดน้ำหยดโดยตรงจาก irrigationElements
-                                                const elements =
-                                                    summaryData?.irrigationElements || [];
-                                                const sprinklers = elements.filter(
-                                                    (e) => e.type === 'sprinkler'
-                                                );
-                                                const dripLines = elements.filter(
-                                                    (e) => e.type === 'drip-line'
-                                                );
-
+                                                const elements = summaryData?.irrigationElements || [];
+                                                const sprinklers = elements.filter((e) => e.type === 'sprinkler');
+                                                const dripLines = elements.filter((e) => e.type === 'drip-line');
+                                                
                                                 // หาพิกัดของแปลงปลูกจาก summaryData
-                                                const plotShape = summaryData?.shapes?.find(
-                                                    (s) =>
-                                                        s.name === plotWater.plotName ||
-                                                        s.id === plotWater.plotId
-                                                );
-
+                                                const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
+                                                
                                                 let actualSprinklerCount = 0;
                                                 let actualDripCount = 0;
-
+                                                
                                                 if (plotShape && plotShape.points) {
                                                     // นับสปริงเกลอร์ในแปลงนี้
                                                     sprinklers.forEach((sprinkler) => {
                                                         if (sprinkler.points.length > 0) {
-                                                            const sprinklerPoint =
-                                                                sprinkler.points[0];
-
+                                                            const sprinklerPoint = sprinkler.points[0];
+                                                            
                                                             // ตรวจสอบว่าสปริงเกลอร์อยู่ในแปลงหรือไม่
-                                                            const isInPlot = isPointInPolygon(
-                                                                sprinklerPoint,
-                                                                plotShape.points
-                                                            );
-
+                                                            const isInPlot = isPointInPolygon(sprinklerPoint, plotShape.points);
+                                                            
                                                             // ตรวจสอบว่าสปริงเกลอร์อยู่ใกล้กับท่อย่อยในแปลงหรือไม่
                                                             let isNearSubPipeInPlot = false;
-                                                            const subPipes = elements.filter(
-                                                                (e) => e.type === 'sub-pipe'
-                                                            );
-
+                                                            const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+                                                            
                                                             if (!isInPlot) {
                                                                 subPipes.forEach((subPipe) => {
-                                                                    if (
-                                                                        subPipeServesPlot(
-                                                                            subPipe,
-                                                                            plotShape.points
-                                                                        )
-                                                                    ) {
-                                                                        for (
-                                                                            let i = 0;
-                                                                            i <
-                                                                            subPipe.points.length -
-                                                                                1;
-                                                                            i++
-                                                                        ) {
-                                                                            const distance =
-                                                                                distancePointToLineSegment(
-                                                                                    sprinklerPoint,
-                                                                                    subPipe.points[
-                                                                                        i
-                                                                                    ],
-                                                                                    subPipe.points[
-                                                                                        i + 1
-                                                                                    ]
-                                                                                );
-                                                                            if (distance < 30) {
-                                                                                // ระยะห่างน้อยกว่า 30 pixels
+if (subPipeServesPlot(subPipe, plotShape.points)) {
+                                                                        for (let i = 0; i < subPipe.points.length - 1; i++) {
+                                                                            const distance = distancePointToLineSegment(
+                                                                                sprinklerPoint,
+                                                                                subPipe.points[i],
+                                                                                subPipe.points[i + 1]
+                                                                            );
+                                                                            if (distance < 30) { // ระยะห่างน้อยกว่า 30 pixels
                                                                                 isNearSubPipeInPlot = true;
                                                                                 break;
                                                                             }
@@ -4623,30 +3792,23 @@ export default function GreenhouseSummary() {
                                                                     }
                                                                 });
                                                             }
-
+                                                            
                                                             // นับสปริงเกลอร์ที่อยู่ในแปลงหรืออยู่ใกล้กับท่อย่อยในแปลง
                                                             if (isInPlot || isNearSubPipeInPlot) {
                                                                 actualSprinklerCount++;
                                                             }
                                                         }
                                                     });
-
+                                                    
                                                     // นับหัวหยดในแปลงนี้
                                                     dripLines.forEach((dripLine) => {
-                                                        if (
-                                                            dripLine.points.length > 0 &&
-                                                            dripLine.spacing
-                                                        ) {
+                                                        if (dripLine.points.length > 0 && dripLine.spacing) {
                                                             let dripLengthInPlot = 0;
-
-                                                            for (
-                                                                let i = 0;
-                                                                i < dripLine.points.length - 1;
-                                                                i++
-                                                            ) {
+                                                            
+                                                            for (let i = 0; i < dripLine.points.length - 1; i++) {
                                                                 const p1 = dripLine.points[i];
                                                                 const p2 = dripLine.points[i + 1];
-
+                                                                
                                                                 // ตรวจสอบว่าส่วนของท่อนี้อยู่ในแปลงหรือไม่
                                                                 const midPoint = {
                                                                     x: (p1.x + p2.x) / 2,
@@ -4654,508 +3816,341 @@ export default function GreenhouseSummary() {
                                                                 };
 
                                                                 if (
-                                                                    isPointInPolygon(
-                                                                        p1,
-                                                                        plotShape.points
-                                                                    ) ||
-                                                                    isPointInPolygon(
-                                                                        p2,
-                                                                        plotShape.points
-                                                                    ) ||
-                                                                    isPointInPolygon(
-                                                                        midPoint,
-                                                                        plotShape.points
-                                                                    )
+                                                                    isPointInPolygon(p1, plotShape.points) ||
+                                                                    isPointInPolygon(p2, plotShape.points) ||
+                                                                    isPointInPolygon(midPoint, plotShape.points)
                                                                 ) {
-                                                                    const segmentLength =
-                                                                        distanceBetweenPoints(
-                                                                            p1,
-                                                                            p2
-                                                                        ) / 25; // แปลงเป็นเมตร
-                                                                    dripLengthInPlot +=
-                                                                        segmentLength;
+                                                                    const segmentLength = distanceBetweenPoints(p1, p2) / 25; // แปลงเป็นเมตร
+                                                                    dripLengthInPlot += segmentLength;
                                                                 }
                                                             }
-
+                                                            
                                                             // คำนวณจำนวนหัวหยด (ความยาวท่อ / ระยะห่าง + 1)
-                                                            if (
-                                                                dripLengthInPlot > 0 &&
-                                                                dripLine.spacing > 0
-                                                            ) {
-                                                                const emittersInThisLine =
-                                                                    Math.floor(
-                                                                        dripLengthInPlot /
-                                                                            dripLine.spacing
-                                                                    ) + 1;
-                                                                actualDripCount +=
-                                                                    emittersInThisLine;
+                                                            if (dripLengthInPlot > 0 && dripLine.spacing > 0) {
+                                                                const emittersInThisLine = Math.floor(dripLengthInPlot / dripLine.spacing) + 1;
+                                                                actualDripCount += emittersInThisLine;
                                                             }
                                                         }
                                                     });
                                                 }
-
+                                                
                                                 // นับจำนวนท่อย่อยในแปลงนี้
                                                 let subPipeCount = 0;
-                                                const subPipes = elements.filter(
-                                                    (e) => e.type === 'sub-pipe'
-                                                );
-
+                                                const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+                                                
                                                 if (plotShape && plotShape.points) {
                                                     subPipes.forEach((subPipe) => {
                                                         // ตรวจสอบว่าท่อย่อยนี้อยู่ในแปลงหรือไม่
-                                                        if (
-                                                            subPipeServesPlot(
-                                                                subPipe,
-                                                                plotShape.points
-                                                            )
-                                                        ) {
+if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                             subPipeCount++;
                                                         }
                                                     });
                                                 }
-
-                                                let calculatedFlowRate = 0;
-                                                if (summaryData?.irrigationMethod === 'drip') {
-                                                    calculatedFlowRate = actualDripCount * 0.24;
-                                                } else {
-                                                    // คำนวณอัตราการไหลโดยตรง: จำนวนสปริงเกลอร์ทั้งหมด × อัตราการไหลต่อตัว
-                                                    calculatedFlowRate =
-                                                        actualSprinklerCount * flowRatePerUnit; // L/min per sprinkler
-                                                }
-
+                                                
+                                                // ใช้ข้อมูลอัตราการไหลจาก plotPipeData ที่คำนวณไว้แล้ว
+                                                const calculatedFlowRate = plotPipe?.totalFlowRate || 0;
                                                 const totalFlowRate = calculatedFlowRate.toFixed(1);
-
+                                                
                                                 // Debug: ตรวจสอบการคำนวณอัตราการไหลในแต่ละแปลง
-                                                console.log(
-                                                    `🔍 ${plotWater.plotName} flow rate calculation:`,
-                                                    {
-                                                        plotName: plotWater.plotName,
-                                                        plotIndex: index,
-                                                        plotPipe: plotPipe,
-                                                        totalEmitters: totalEmitters,
-                                                        actualSprinklerCount: actualSprinklerCount,
-                                                        actualDripCount: actualDripCount,
-                                                        subPipeCount: subPipeCount,
-                                                        flowRatePerUnit: flowRatePerUnit,
-                                                        calculatedFlowRate: calculatedFlowRate,
-                                                        totalFlowRate: totalFlowRate,
-                                                        irrigationMethod:
-                                                            summaryData?.irrigationMethod,
-                                                        calculationMethod: 'direct_sprinkler_count',
-                                                        expectedCalculation: `${actualSprinklerCount} × ${flowRatePerUnit} = ${calculatedFlowRate}`,
-                                                    }
-                                                );
-
+                                                console.log(`🔍 ${plotWater.plotName} flow rate calculation:`, {
+                                                    plotName: plotWater.plotName,
+                                                    plotIndex: index,
+                                                    plotPipe: plotPipe,
+                                                    totalEmitters: totalEmitters,
+                                                    actualSprinklerCount: actualSprinklerCount,
+                                                    actualDripCount: actualDripCount,
+                                                    subPipeCount: subPipeCount,
+                                                    flowRatePerUnit: flowRatePerUnit,
+                                                    calculatedFlowRate: calculatedFlowRate,
+                                                    totalFlowRate: totalFlowRate,
+                                                    irrigationMethod: summaryData?.irrigationMethod,
+                                                    calculationMethod: 'direct_sprinkler_count',
+                                                    expectedCalculation: `${actualSprinklerCount} × ${flowRatePerUnit} = ${calculatedFlowRate}`
+                                                });
+                                                
+                                                
                                                 return (
-                                                    <div
-                                                        key={index}
-                                                        className="rounded-lg border-l-4 border-blue-500 bg-gray-700 p-4"
-                                                    >
-                                                        <div className="mb-3 flex items-center justify-between">
-                                                            <div className="flex items-center space-x-3">
-                                                                <span className="text-2xl">
-                                                                    {getCropIcon(
-                                                                        plotWater.cropType
-                                                                    )}
-                                                                </span>
-                                                                <div>
-                                                                    <h3 className="text-lg font-semibold text-white">
-                                                                        {plotWater.plotName}
-                                                                    </h3>
-                                                                    <p className="text-sm text-gray-400">
-                                                                        {t('พืชที่ปลูก')}:{' '}
-                                                                        {plotWater.cropName}
-                                                                    </p>
-                                                                    <p className="text-xs text-gray-500">
-                                                                        {t('แปลงปลูกที่')}{' '}
-                                                                        {index + 1} {t('จาก')}{' '}
-                                                                        {
-                                                                            plotWaterCalculations.length
-                                                                        }{' '}
-                                                                        {t('แปลง')}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <div className="text-sm text-gray-400">
-                                                                    {t('สภาพแวดล้อมควบคุม')}
-                                                                </div>
-                                                                <div className="text-xs text-gray-500">
-                                                                    {t('แปลงปลูก')}
-                                                                </div>
+                                                 <div key={index} className="rounded-lg bg-gray-700 p-4 border-l-4 border-blue-500">
+                                                     <div className="mb-3 flex items-center justify-between">
+                                                         <div className="flex items-center space-x-3">
+                                                             <span className="text-2xl">
+                                                                 {getCropIcon(plotWater.cropType)}
+                                                             </span>
+                                                             <div>
+                                                                 <h3 className="text-lg font-semibold text-white">
+                                                                     {plotWater.plotName}
+                                                                 </h3>
+                                                                 <p className="text-sm text-gray-400">
+                                                                     {t('พืชที่ปลูก')}: {plotWater.cropName}
+                                                                 </p>
+                                                                 <p className="text-xs text-gray-500">
+                                                                     {t('แปลงปลูกที่')} {index + 1} {t('จาก')} {plotWaterCalculations.length} {t('แปลง')}
+                                                                 </p>
+                                                             </div>
+                                                         </div>
+                                                         <div className="text-right">
+                                                             <div className="text-sm text-gray-400">
+                                                                 {t('สภาพแวดล้อมควบคุม')}
+                                                             </div>
+                                                             <div className="text-xs text-gray-500">
+                                                                 {t('แปลงปลูก')}
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {/* Plant Information */}
+                                                     <div className="mb-3 rounded bg-gray-600 p-3">
+                                                         <h4 className="mb-2 text-sm font-semibold text-yellow-400">
+                                                             🌱 {t('ข้อมูลการปลูก')}
+                                                         </h4>
+                                                         <div className="grid grid-cols-3 gap-2">
+                                                             <div className="rounded bg-gray-500 p-2 text-center">
+                                                                 <div className="text-sm font-bold text-green-400">
+                                                                     {plotWater.totalPlants}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-300">
+                                                                     {t('จำนวนพืช')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-500 p-2 text-center">
+                                                                 <div className="text-sm font-bold text-blue-400">
+                                                                     {plotWater.waterIntensity.litersPerSquareMeter.toFixed(1)}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-300">
+                                                                     {t('ลิตร/ตร.ม./วัน')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-500 p-2 text-center">
+                                                                 <div className="text-sm font-bold text-purple-400">
+                                                                     {plotWater.dailyWaterNeed.optimal.toFixed(1)}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-300">
+                                                                     {t('ลิตร/วัน')}
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {/* Flow Rate Section */}
+                                                     <div className="mb-3 rounded bg-gray-600 p-3">
+                                                         <h4 className="mb-3 text-sm font-semibold text-cyan-400">
+                                                             💧 {t('อัตราการไหล')}
+                                                         </h4>
+                                                         <div className="text-center">
+                                                             <div className="text-2xl font-bold text-blue-400 mb-1">
+                                                                 {totalFlowRate} {t('ลิตร/นาที')}
+                                                             </div>
+                                                             <div className="text-xs text-gray-300">
+                                                                 {t('อัตราการไหลของแปลงนี้')}
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {/* Emitter/Sprinkler Count Section */}
+                                                     <div className="mb-3 rounded bg-gray-600 p-3">
+                                                         <h4 className="mb-3 text-sm font-semibold text-green-400">
+                                                             🔧 {t('จำนวนอุปกรณ์ให้น้ำ')}
+                                                         </h4>
+                                                         <div className="grid grid-cols-2 gap-2">
+                                                             {summaryData?.irrigationMethod === 'drip' ? (
+                                                                 <>
+                                                                     <div className="rounded bg-gray-500 p-2 text-center">
+                                                                         <div className="text-sm font-bold text-cyan-400">
+                                                                             {plotPipe?.dripEmitterCount || 0}
+                                                                         </div>
+                                                                         <div className="text-xs text-gray-300">
+                                                                             {t('จุดน้ำหยด')}
+                                                                         </div>
+                                                                     </div>
+                                                                     <div className="rounded bg-gray-500 p-2 text-center">
+                                                                         <div className="text-sm font-bold text-blue-400">
+                                                                             {(summaryData?.dripEmitterFlowRate || 0.24).toFixed(2)} {t('ลิตร/นาที')}
+                                                                         </div>
+                                                                         <div className="text-xs text-gray-300">
+                                                                             {t('ต่อจุด')}
+                                                                         </div>
+                                                                     </div>
+                                                                 </>
+                                                             ) : (
+                                                                 <>
+                                                                     <div className="rounded bg-gray-500 p-2 text-center">
+                                                                         <div className="text-sm font-bold text-cyan-400">
+                                                                             {plotPipe?.sprinklerCount || 0}
+                                                                         </div>
+                                                                         <div className="text-xs text-gray-300">
+                                                                             {t('สปริงเกลอร์')}
+                                                                         </div>
+                                                                     </div>
+                                                                     <div className="rounded bg-gray-500 p-2 text-center">
+                                                                         <div className="text-sm font-bold text-blue-400">
+                                                                             {(summaryData?.sprinklerFlowRate || 10).toFixed(2)} {t('ลิตร/นาที')}
+                                                                         </div>
+                                                                         <div className="text-xs text-gray-300">
+                                                                             {t('ต่อตัว')}
+                                                                         </div>
+                                                                     </div>
+                                                                 </>
+                                                             )}
+                                                         </div>
+                                                     </div>
+
+                                                     {/* Main and Sub Pipe Flow Rate and Outlet Count for This Plot */}
+                                                     {plotPipe && plotPipe.hasPipes && (
+                                                         <div className="mb-3 rounded bg-gray-600 p-3">
+                                                             <h4 className="mb-3 text-sm font-semibold text-cyan-400">
+                                                                 {t('อัตราการไหลและจำนวนทางออกของท่อ')}
+                                                             </h4>
+                                                             <div className="overflow-x-auto">
+                                                                 <table className="w-full border-collapse border border-gray-500/50">
+                                                                     <thead>
+                                                                         <tr className="bg-gray-700/50">
+                                                                             <th className="border border-gray-500/50 px-2 py-1 text-left text-gray-200 font-semibold text-xs">{t('ประเภทท่อ')}</th>
+                                                                             <th className="border border-gray-500/50 px-2 py-1 text-left text-gray-200 font-semibold text-xs">{t('อัตราการไหล')}</th>
+                                                                             <th className="border border-gray-500/50 px-2 py-1 text-left text-gray-200 font-semibold text-xs">{t('จำนวนทางออก')}</th>
+                                                                         </tr>
+                                                                     </thead>
+                                                                     <tbody className="text-gray-100">
+                                                                         <tr>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
+                                                                                 {(plotPipe?.totalFlowRate || 0).toFixed(2)} {t('L/min')}
+                                                                             </td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
+                                                                                 {(() => {
+                                                                                     // คำนวณจำนวนท่อย่อยที่เชื่อมต่อกับแปลงนี้
+                                                                                     const elements = summaryData?.irrigationElements || [];
+                                                                                     const subPipes = elements.filter((e) => e.type === 'sub-pipe');
+                                                                                     const plotShape = summaryData?.shapes?.find(s => s.name === plotWater.plotName || s.id === plotWater.plotId);
+                                                                                     
+                                                                                     if (plotShape && plotShape.points) {
+                                                                                         return subPipes.filter(subPipe => subPipeServesPlot(subPipe, plotShape.points)).length;
+                                                                                     }
+                                                                                     return 0;
+                                                                                 })()} {t('เส้น')}
+                                                                             </td>
+                                                                         </tr>
+                                                                         <tr>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs">{t('ท่อเมนย่อย')}</td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">
+                                                                                 {(plotPipe?.totalFlowRate || 0).toFixed(2)} {t('L/min')}
+                                                                             </td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">{plotPipe.totalEmitters} {t('ตัว')}</td>
+                                                                         </tr>
+                                                                     </tbody>
+                                                                 </table>
+                                                             </div>
+                                                         </div>
+                                                     )}
+
+                                                                                                  {plotPipe && plotPipe.hasPipes ? (
+                                                     <div className="mt-2 space-y-2">
+                                                         <h4 className="mb-2 text-xs font-semibold text-orange-400">
+                                                             🔧 {t('ระบบท่อ')}
+                                                         </h4>
+                                                         <div className="grid grid-cols-3 gap-2">
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-blue-400">
+                                                                     {plotPipe.maxMainPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ท่อเมนสูงสุด')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-green-400">
+                                                                     {plotPipe.maxSubPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ท่อย่อยสูงสุด')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-purple-400">
+                                                                     {plotPipe.maxTotalPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ความยาวสูงสุดรวม')}
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                         <div className="grid grid-cols-3 gap-2">
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-cyan-400">
+                                                                     {plotPipe.totalMainPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ท่อเมนทั้งหมด')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-yellow-400">
+                                                                     {plotPipe.totalSubPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ท่อย่อยทั้งหมด')}
+                                                                 </div>
+                                                             </div>
+                                                             <div className="rounded bg-gray-600 p-2 text-center">
+                                                                 <div className="text-xs font-bold text-pink-400">
+                                                                     {plotPipe.totalPipeLength.toFixed(1)} {t('เมตร')}
+                                                                 </div>
+                                                                 <div className="text-xs text-gray-400">
+                                                                     {t('ความยาวรวมทั้งหมด')}
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+                                                 ) : (
+                                                     <div className="mt-2 rounded bg-gray-600 p-2 text-center">
+                                                         <span className="text-xs text-gray-400">
+                                                             {t('ไม่มีระบบท่อในแปลงนี้')}
+                                                         </span>
+                                                     </div>
+                                                 )}
+                                             </div>
+                                         );
+                                     })
+                                     ) : (
+                                        <>
+                                            {summaryData?.selectedCrops?.map((crop, index) => (
+                                                <div
+                                                    key={index}
+                                                    className="rounded-lg bg-gray-700 p-2"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center space-x-2">
+                                                            <span className="text-lg">
+                                                                {getCropIcon(crop)}
+                                                            </span>
+                                                            <div>
+                                                                <h3 className="text-sm font-semibold text-white">
+                                                                    {crop}
+                                                                </h3>
                                                             </div>
                                                         </div>
-
-                                                        {/* Plant Information */}
-                                                        <div className="mb-3 rounded bg-gray-600 p-3">
-                                                            <h4 className="mb-2 text-sm font-semibold text-yellow-400">
-                                                                🌱 {t('ข้อมูลการปลูก')}
-                                                            </h4>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                <div className="rounded bg-gray-500 p-2 text-center">
-                                                                    <div className="text-sm font-bold text-green-400">
-                                                                        {plotWater.totalPlants}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-300">
-                                                                        {t('จำนวนพืช')}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="rounded bg-gray-500 p-2 text-center">
-                                                                    <div className="text-sm font-bold text-blue-400">
-                                                                        {plotWater.waterIntensity.litersPerSquareMeter.toFixed(
-                                                                            1
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-300">
-                                                                        {t('ลิตร/ตร.ม./วัน')}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="rounded bg-gray-500 p-2 text-center">
-                                                                    <div className="text-sm font-bold text-purple-400">
-                                                                        {plotWater.dailyWaterNeed.optimal.toFixed(
-                                                                            1
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="text-xs text-gray-300">
-                                                                        {t('ลิตร/วัน')}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Flow Rate Section */}
-                                                        <div className="mb-3 rounded bg-gray-600 p-3">
-                                                            <h4 className="mb-3 text-sm font-semibold text-cyan-400">
-                                                                💧 {t('อัตราการไหล')}
-                                                            </h4>
-                                                            <div className="text-center">
-                                                                <div className="mb-1 text-2xl font-bold text-blue-400">
-                                                                    {totalFlowRate} {t('ลิตร/นาที')}
-                                                                </div>
-                                                                <div className="text-xs text-gray-300">
-                                                                    {t('อัตราการไหลของแปลงนี้')}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Emitter/Sprinkler Count Section */}
-                                                        <div className="mb-3 rounded bg-gray-600 p-3">
-                                                            <h4 className="mb-3 text-sm font-semibold text-green-400">
-                                                                🔧 {t('จำนวนอุปกรณ์ให้น้ำ')}
-                                                            </h4>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                {summaryData?.irrigationMethod ===
-                                                                'drip' ? (
-                                                                    <>
-                                                                        <div className="rounded bg-gray-500 p-2 text-center">
-                                                                            <div className="text-sm font-bold text-cyan-400">
-                                                                                {actualDripCount}
-                                                                            </div>
-                                                                            <div className="text-xs text-gray-300">
-                                                                                {t('จุดน้ำหยด')}
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="rounded bg-gray-500 p-2 text-center">
-                                                                            <div className="text-sm font-bold text-blue-400">
-                                                                                {flowRatePerUnit}{' '}
-                                                                                {t('ลิตร/นาที')}
-                                                                            </div>
-                                                                            <div className="text-xs text-gray-300">
-                                                                                {t('ต่อจุด')}
-                                                                            </div>
-                                                                        </div>
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <div className="rounded bg-gray-500 p-2 text-center">
-                                                                            <div className="text-sm font-bold text-cyan-400">
-                                                                                {
-                                                                                    actualSprinklerCount
-                                                                                }
-                                                                            </div>
-                                                                            <div className="text-xs text-gray-300">
-                                                                                {t('สปริงเกลอร์')}
-                                                                            </div>
-                                                                        </div>
-                                                                        <div className="rounded bg-gray-500 p-2 text-center">
-                                                                            <div className="text-sm font-bold text-blue-400">
-                                                                                {flowRatePerUnit}{' '}
-                                                                                {t('ลิตร/นาที')}
-                                                                            </div>
-                                                                            <div className="text-xs text-gray-300">
-                                                                                {t('ต่อตัว')}
-                                                                            </div>
-                                                                        </div>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Main and Sub Pipe Flow Rate and Outlet Count for This Plot */}
-                                                        {plotPipe && plotPipe.hasPipes && (
-                                                            <div className="mb-3 rounded bg-gray-600 p-3">
-                                                                <h4 className="mb-3 text-sm font-semibold text-cyan-400">
-                                                                    {t(
-                                                                        'อัตราการไหลและจำนวนทางออกของท่อ'
-                                                                    )}
-                                                                </h4>
-                                                                <div className="overflow-x-auto">
-                                                                    <table className="w-full border-collapse border border-gray-500/50">
-                                                                        <thead>
-                                                                            <tr className="bg-gray-700/50">
-                                                                                <th className="border border-gray-500/50 px-2 py-1 text-left text-xs font-semibold text-gray-200">
-                                                                                    {t('ประเภทท่อ')}
-                                                                                </th>
-                                                                                <th className="border border-gray-500/50 px-2 py-1 text-left text-xs font-semibold text-gray-200">
-                                                                                    {t(
-                                                                                        'อัตราการไหล'
-                                                                                    )}
-                                                                                </th>
-                                                                                <th className="border border-gray-500/50 px-2 py-1 text-left text-xs font-semibold text-gray-200">
-                                                                                    {t(
-                                                                                        'จำนวนทางออก'
-                                                                                    )}
-                                                                                </th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="text-gray-100">
-                                                                            <tr>
-                                                                                <td className="border border-gray-500/50 px-2 py-1 text-xs">
-                                                                                    {t('ท่อเมน')}
-                                                                                </td>
-                                                                                <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
-                                                                                    {(() => {
-                                                                                        const sprinklerFlowRate =
-                                                                                            summaryData?.sprinklerFlowRate ||
-                                                                                            10;
-                                                                                        const dripEmitterFlowRate =
-                                                                                            summaryData?.dripEmitterFlowRate ||
-                                                                                            0.24;
-                                                                                        const totalFlowRate =
-                                                                                            plotPipe.sprinklerCount *
-                                                                                                sprinklerFlowRate +
-                                                                                            plotPipe.dripEmitterCount *
-                                                                                                dripEmitterFlowRate;
-                                                                                        return totalFlowRate.toFixed(
-                                                                                            2
-                                                                                        );
-                                                                                    })()}{' '}
-                                                                                    {t('L/min')}
-                                                                                </td>
-                                                                                <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
-                                                                                    {(() => {
-                                                                                        // คำนวณจำนวนท่อย่อยที่เชื่อมต่อกับแปลงนี้
-                                                                                        const elements =
-                                                                                            summaryData?.irrigationElements ||
-                                                                                            [];
-                                                                                        const subPipes =
-                                                                                            elements.filter(
-                                                                                                (
-                                                                                                    e
-                                                                                                ) =>
-                                                                                                    e.type ===
-                                                                                                    'sub-pipe'
-                                                                                            );
-                                                                                        const plotShape =
-                                                                                            summaryData?.shapes?.find(
-                                                                                                (
-                                                                                                    s
-                                                                                                ) =>
-                                                                                                    s.name ===
-                                                                                                        plotWater.plotName ||
-                                                                                                    s.id ===
-                                                                                                        plotWater.plotId
-                                                                                            );
-
-                                                                                        if (
-                                                                                            plotShape &&
-                                                                                            plotShape.points
-                                                                                        ) {
-                                                                                            return subPipes.filter(
-                                                                                                (
-                                                                                                    subPipe
-                                                                                                ) =>
-                                                                                                    subPipeServesPlot(
-                                                                                                        subPipe,
-                                                                                                        plotShape.points
-                                                                                                    )
-                                                                                            )
-                                                                                                .length;
-                                                                                        }
-                                                                                        return 0;
-                                                                                    })()}{' '}
-                                                                                    {t('เส้น')}
-                                                                                </td>
-                                                                            </tr>
-                                                                            <tr>
-                                                                                <td className="border border-gray-500/50 px-2 py-1 text-xs">
-                                                                                    {t(
-                                                                                        'ท่อเมนย่อย'
-                                                                                    )}
-                                                                                </td>
-                                                                                <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">
-                                                                                    {(() => {
-                                                                                        const sprinklerFlowRate =
-                                                                                            summaryData?.sprinklerFlowRate ||
-                                                                                            10;
-                                                                                        const dripEmitterFlowRate =
-                                                                                            summaryData?.dripEmitterFlowRate ||
-                                                                                            0.24;
-                                                                                        const totalFlowRate =
-                                                                                            plotPipe.sprinklerCount *
-                                                                                                sprinklerFlowRate +
-                                                                                            plotPipe.dripEmitterCount *
-                                                                                                dripEmitterFlowRate;
-                                                                                        return totalFlowRate.toFixed(
-                                                                                            2
-                                                                                        );
-                                                                                    })()}{' '}
-                                                                                    {t('L/min')}
-                                                                                </td>
-                                                                                <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">
-                                                                                    {
-                                                                                        plotPipe.totalEmitters
-                                                                                    }{' '}
-                                                                                    {t('ตัว')}
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </div>
-                                                        )}
-
-                                                        {plotPipe && plotPipe.hasPipes ? (
-                                                            <div className="mt-2 space-y-2">
-                                                                <h4 className="mb-2 text-xs font-semibold text-orange-400">
-                                                                    🔧 {t('ระบบท่อ')}
-                                                                </h4>
-                                                                <div className="grid grid-cols-3 gap-2">
-                                                                    <div className="rounded bg-gray-600 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-blue-400">
-                                                                            {plotPipe.maxMainPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400">
-                                                                            {t('ท่อเมนสูงสุด')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-gray-600 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-green-400">
-                                                                            {plotPipe.maxSubPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400">
-                                                                            {t('ท่อย่อยสูงสุด')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-gray-600 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-purple-400">
-                                                                            {plotPipe.maxTotalPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400">
-                                                                            {t('ความยาวสูงสุดรวม')}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="grid grid-cols-3 gap-2">
-                                                                    <div className="rounded bg-gray-600 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-cyan-400">
-                                                                            {plotPipe.totalMainPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400">
-                                                                            {t('ท่อเมนทั้งหมด')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-gray-600 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-yellow-400">
-                                                                            {plotPipe.totalSubPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400">
-                                                                            {t('ท่อย่อยทั้งหมด')}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="rounded bg-gray-600 p-2 text-center">
-                                                                        <div className="text-xs font-bold text-pink-400">
-                                                                            {plotPipe.totalPipeLength.toFixed(
-                                                                                1
-                                                                            )}{' '}
-                                                                            {t('เมตร')}
-                                                                        </div>
-                                                                        <div className="text-xs text-gray-400">
-                                                                            {t('ความยาวรวมทั้งหมด')}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="mt-2 rounded bg-gray-600 p-2 text-center">
-                                                                <span className="text-xs text-gray-400">
-                                                                    {t('ไม่มีระบบท่อในแปลงนี้')}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })
-                                        ) : (
-                                            <>
-                                                {summaryData?.selectedCrops?.map((crop, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="rounded-lg bg-gray-700 p-2"
-                                                    >
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex items-center space-x-2">
-                                                                <span className="text-lg">
-                                                                    {getCropIcon(crop)}
-                                                                </span>
-                                                                <div>
-                                                                    <h3 className="text-sm font-semibold text-white">
-                                                                        {crop}
-                                                                    </h3>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <div className="text-xs text-gray-400">
-                                                                    {t('สภาพแวดล้อมควบคุม')}
-                                                                </div>
+                                                        <div className="text-right">
+                                                            <div className="text-xs text-gray-400">
+                                                                {t('สภาพแวดล้อมควบคุม')}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                )) || (
-                                                    <div className="rounded-lg bg-gray-700 p-2 text-center">
-                                                        <span className="text-sm text-gray-400">
-                                                            {t('ไม่มีพืชที่เลือกไว้')}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
+                                                </div>
+                                            )) || (
+                                                <div className="rounded-lg bg-gray-700 p-2 text-center">
+                                                    <span className="text-sm text-gray-400">
+                                                        {t('ไม่มีพืชที่เลือกไว้')}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
                                     </div>
                                 )}
                             </div>
 
                             <div className="hidden print:mt-8 print:block print:text-center">
                                 <p className="text-xs text-gray-500">
-                                    {t(
-                                        'เอกสารนี้สร้างโดยระบบวางแผนโรงเรือนอัตโนมัติ - หน้า {num}/{total}'
-                                    )
-                                        .replace('{num}', '2')
-                                        .replace('{total}', '2')}
+                                    {t('เอกสารนี้สร้างโดยระบบวางแผนโรงเรือนอัตโนมัติ - หน้า {num}/{total}').replace('{num}', '2').replace('{total}', '2')}
                                 </p>
                             </div>
                         </div>
@@ -5165,9 +4160,7 @@ export default function GreenhouseSummary() {
 
             <div className="print:page-break-after-avoid hidden print:mt-8 print:block print:text-center">
                 <p className="text-xs text-gray-500">
-                    {t('เอกสารนี้สร้างโดยระบบวางแผนโรงเรือนอัตโนมัติ - หน้า {num}/{total}')
-                        .replace('{num}', '1')
-                        .replace('{total}', '2')}
+                    {t('เอกสารนี้สร้างโดยระบบวางแผนโรงเรือนอัตโนมัติ - หน้า {num}/{total}').replace('{num}', '1').replace('{total}', '2')}
                 </p>
             </div>
         </div>
