@@ -12,7 +12,14 @@ interface Point {
 
 interface Shape {
     id: string;
-    type: 'greenhouse' | 'plot' | 'walkway' | 'water-source' | 'measurement' | 'fertilizer-area' | 'fertilizer-machine';
+    type:
+        | 'greenhouse'
+        | 'plot'
+        | 'walkway'
+        | 'water-source'
+        | 'measurement'
+        | 'fertilizer-area'
+        | 'fertilizer-machine';
     points: Point[];
     color: string;
     fillColor: string;
@@ -70,7 +77,7 @@ interface Crop {
 
 export default function GreenhouseMap() {
     const { t } = useLanguage();
-    
+
     // Tools configuration
     const tools: Tool[] = [
         {
@@ -80,9 +87,27 @@ export default function GreenhouseMap() {
             description: t('เลือกและแก้ไขอุปกรณ์'),
             category: 'select',
         },
-        { id: 'main-pipe', name: t('ท่อเมน'), icon: '🔴', description: t('วาดท่อเมน'), category: 'pipe' },
-        { id: 'sub-pipe', name: t('ท่อย่อย'), icon: '🟣', description: t('วาดท่อย่อย'), category: 'pipe' },
-        { id: 'pump', name: t('ปั๊ม'), icon: '⚙️', description: t('วางปั๊มน้ำ'), category: 'component' },
+        {
+            id: 'main-pipe',
+            name: t('ท่อเมน'),
+            icon: '🔴',
+            description: t('วาดท่อเมน'),
+            category: 'pipe',
+        },
+        {
+            id: 'sub-pipe',
+            name: t('ท่อย่อย'),
+            icon: '🟣',
+            description: t('วาดท่อย่อย'),
+            category: 'pipe',
+        },
+        {
+            id: 'pump',
+            name: t('ปั๊ม'),
+            icon: '⚙️',
+            description: t('วางปั๊มน้ำ'),
+            category: 'component',
+        },
         {
             id: 'solenoid-valve',
             name: t('โซลินอยด์วาล์ว'),
@@ -138,7 +163,7 @@ export default function GreenhouseMap() {
     // Grid scale constants (1 m = 20 px)
     const PX_PER_METER = 20;
     const MINOR_GRID_STEP = PX_PER_METER * 0.5; // 0.5 m
-    const MAJOR_GRID_STEP = PX_PER_METER * 1;   // 1 m
+    const MAJOR_GRID_STEP = PX_PER_METER * 1; // 1 m
 
     // Canvas and interaction states
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -175,13 +200,13 @@ export default function GreenhouseMap() {
     const [globalRadius, setGlobalRadius] = useState(1.5);
     const [globalDripSpacing, setGlobalDripSpacing] = useState(20); // Default to 20cm
     const [globalSprinklerOverlap, setGlobalSprinklerOverlap] = useState(0);
-    
+
     // Flow rate and pressure settings
     const [sprinklerFlowRate, setSprinklerFlowRate] = useState(10); // L/min
     const [sprinklerPressure, setSprinklerPressure] = useState(2.5); // bar
     const [dripFlowRate, setDripFlowRate] = useState(0.24); // L/min (fixed)
     const [dripPressure, setDripPressure] = useState(1.0); // bar
-    
+
     // Drip spacing options in cm
     const dripSpacingOptions = [10, 15, 20, 30];
 
@@ -189,7 +214,9 @@ export default function GreenhouseMap() {
     const [componentImages, setComponentImages] = useState<{ [key: string]: HTMLImageElement }>({});
 
     // Undo/Redo states
-    const [history, setHistory] = useState<HistoryState[]>([{ shapes: [], irrigationElements: [] }]);
+    const [history, setHistory] = useState<HistoryState[]>([
+        { shapes: [], irrigationElements: [] },
+    ]);
     const [historyIndex, setHistoryIndex] = useState(0);
 
     // Collapsible panel states
@@ -198,7 +225,10 @@ export default function GreenhouseMap() {
 
     // Connection states
     const [isConnecting, setIsConnecting] = useState(false);
-    const [connectionStart, setConnectionStart] = useState<{ elementId: string; pointIndex: number } | null>(null);
+    const [connectionStart, setConnectionStart] = useState<{
+        elementId: string;
+        pointIndex: number;
+    } | null>(null);
     const [snapTarget, setSnapTarget] = useState<{ elementId: string; point: Point } | null>(null);
 
     // Add to history function
@@ -207,7 +237,7 @@ export default function GreenhouseMap() {
             const newHistory = history.slice(0, historyIndex + 1);
             newHistory.push({
                 shapes: [...newShapes],
-                irrigationElements: [...newIrrigationElements]
+                irrigationElements: [...newIrrigationElements],
             });
             setHistory(newHistory);
             setHistoryIndex(newHistory.length - 1);
@@ -218,8 +248,8 @@ export default function GreenhouseMap() {
     // Connection utility functions
     const createConnection = useCallback((fromElementId: string, toElementId: string) => {
         // Update irrigation elements (pipes)
-        setIrrigationElements(prevElements => 
-            prevElements.map(element => {
+        setIrrigationElements((prevElements) =>
+            prevElements.map((element) => {
                 if (element.id === fromElementId) {
                     const connections = element.connections || [];
                     if (!connections.includes(toElementId)) {
@@ -231,8 +261,8 @@ export default function GreenhouseMap() {
         );
 
         // Update shapes (fertilizer machines) - add connections property if needed
-        setShapes(prevShapes =>
-            prevShapes.map(shape => {
+        setShapes((prevShapes) =>
+            prevShapes.map((shape) => {
                 if (shape.id === toElementId && shape.type === 'fertilizer-machine') {
                     const connections = shape.connections || [];
                     if (!connections.includes(fromElementId)) {
@@ -266,7 +296,7 @@ export default function GreenhouseMap() {
                 points: [...currentPath],
                 color: '#22C55E',
                 fillColor: '#22C55E40',
-                name: `${t('พื้นที่ให้ปุ๋ย')} ${shapes.filter(s => s.type === 'fertilizer-area').length + 1}`,
+                name: `${t('พื้นที่ให้ปุ๋ย')} ${shapes.filter((s) => s.type === 'fertilizer-area').length + 1}`,
             };
 
             const newShapes = [...shapes, newShape];
@@ -294,18 +324,28 @@ export default function GreenhouseMap() {
 
         const newIrrigationElements = [...irrigationElements, newElement];
         setIrrigationElements(newIrrigationElements);
-        
+
         // Create connection if there's a snap target
         if (snapTarget) {
             createConnection(newElement.id, snapTarget.elementId);
         }
-        
+
         addToHistory(shapes, newIrrigationElements);
-        
+
         setIsDrawing(false);
         setCurrentPath([]);
         setSnapTarget(null);
-    }, [currentPath, selectedTool, globalDripSpacing, irrigationElements, shapes, addToHistory, t, snapTarget, createConnection]);
+    }, [
+        currentPath,
+        selectedTool,
+        globalDripSpacing,
+        irrigationElements,
+        shapes,
+        addToHistory,
+        t,
+        snapTarget,
+        createConnection,
+    ]);
 
     // Undo function
     const undo = useCallback(() => {
@@ -391,8 +431,11 @@ export default function GreenhouseMap() {
                 const parsedShapes = JSON.parse(decodeURIComponent(shapesParam));
                 console.log('Map: Loaded', parsedShapes.length, 'shapes');
                 setShapes(parsedShapes);
-                
-                setHistory([{ shapes: [], irrigationElements: [] }, { shapes: parsedShapes, irrigationElements: [] }]);
+
+                setHistory([
+                    { shapes: [], irrigationElements: [] },
+                    { shapes: parsedShapes, irrigationElements: [] },
+                ]);
                 setHistoryIndex(1);
             } catch (error) {
                 console.error('Error parsing shapes:', error);
@@ -411,11 +454,16 @@ export default function GreenhouseMap() {
                             parsedData.irrigationElements
                         );
                         setIrrigationElements(parsedData.irrigationElements);
-                        
-                        const currentShapes = shapesParam ? JSON.parse(decodeURIComponent(shapesParam)) : [];
+
+                        const currentShapes = shapesParam
+                            ? JSON.parse(decodeURIComponent(shapesParam))
+                            : [];
                         setHistory([
-                            { shapes: [], irrigationElements: [] }, 
-                            { shapes: currentShapes, irrigationElements: parsedData.irrigationElements }
+                            { shapes: [], irrigationElements: [] },
+                            {
+                                shapes: currentShapes,
+                                irrigationElements: parsedData.irrigationElements,
+                            },
                         ]);
                         setHistoryIndex(1);
                     }
@@ -430,11 +478,15 @@ export default function GreenhouseMap() {
 
     // Initialize history when no shapes are loaded from URL
     useEffect(() => {
-        if (history.length === 1 && history[0].shapes.length === 0 && history[0].irrigationElements.length === 0) {
+        if (
+            history.length === 1 &&
+            history[0].shapes.length === 0 &&
+            history[0].irrigationElements.length === 0
+        ) {
             if (shapes.length > 0 || irrigationElements.length > 0) {
                 setHistory([
                     { shapes: [], irrigationElements: [] },
-                    { shapes: [...shapes], irrigationElements: [...irrigationElements] }
+                    { shapes: [...shapes], irrigationElements: [...irrigationElements] },
                 ]);
                 setHistoryIndex(1);
             }
@@ -508,61 +560,64 @@ export default function GreenhouseMap() {
     }, [isDrawing, selectedElement, selectedTool, finishDrawing, undo, redo]);
 
     // Memoized crop lookup function
-    const getCropByValue = useCallback((value: string): Crop | undefined => {
-        const basicCrops: Record<string, Crop> = {
-            tomato: {
-                value: 'tomato',
-                name: t('มะเขือเทศ'),
-                nameEn: 'Tomato',
-                icon: '🍅',
-                category: 'vegetables',
-                description: t('มะเขือเทศ'),
-            },
-            'bell-pepper': {
-                value: 'bell-pepper',
-                name: t('พริกหวาน'),
-                nameEn: 'Bell Pepper',
-                icon: '🫑',
-                category: 'vegetables',
-                description: t('พริกหวาน'),
-            },
-            cucumber: {
-                value: 'cucumber',
-                name: t('แตงกวา'),
-                nameEn: 'Cucumber',
-                icon: '🥒',
-                category: 'vegetables',
-                description: t('แตงกวา'),
-            },
-            lettuce: {
-                value: 'lettuce',
-                name: t('ผักกาดหอม'),
-                nameEn: 'Lettuce',
-                icon: '🥬',
-                category: 'vegetables',
-                description: t('ผักกาดหอม'),
-            },
-            strawberry: {
-                value: 'strawberry',
-                name: t('สตรอเบอร์รี่'),
-                nameEn: 'Strawberry',
-                icon: '🍓',
-                category: 'fruits',
-                description: t('สตรอเบอร์รี่'),
-            },
-        };
+    const getCropByValue = useCallback(
+        (value: string): Crop | undefined => {
+            const basicCrops: Record<string, Crop> = {
+                tomato: {
+                    value: 'tomato',
+                    name: t('มะเขือเทศ'),
+                    nameEn: 'Tomato',
+                    icon: '🍅',
+                    category: 'vegetables',
+                    description: t('มะเขือเทศ'),
+                },
+                'bell-pepper': {
+                    value: 'bell-pepper',
+                    name: t('พริกหวาน'),
+                    nameEn: 'Bell Pepper',
+                    icon: '🫑',
+                    category: 'vegetables',
+                    description: t('พริกหวาน'),
+                },
+                cucumber: {
+                    value: 'cucumber',
+                    name: t('แตงกวา'),
+                    nameEn: 'Cucumber',
+                    icon: '🥒',
+                    category: 'vegetables',
+                    description: t('แตงกวา'),
+                },
+                lettuce: {
+                    value: 'lettuce',
+                    name: t('ผักกาดหอม'),
+                    nameEn: 'Lettuce',
+                    icon: '🥬',
+                    category: 'vegetables',
+                    description: t('ผักกาดหอม'),
+                },
+                strawberry: {
+                    value: 'strawberry',
+                    name: t('สตรอเบอร์รี่'),
+                    nameEn: 'Strawberry',
+                    icon: '🍓',
+                    category: 'fruits',
+                    description: t('สตรอเบอร์รี่'),
+                },
+            };
 
-        return (
-            basicCrops[value] || {
-                value: value,
-                name: value,
-                nameEn: value,
-                icon: '🌱',
-                category: 'unknown',
-                description: value,
-            }
-        );
-    }, [t]);
+            return (
+                basicCrops[value] || {
+                    value: value,
+                    name: value,
+                    nameEn: value,
+                    icon: '🌱',
+                    category: 'unknown',
+                    description: value,
+                }
+            );
+        },
+        [t]
+    );
 
     // Check if prerequisites are met for auto generation
     const canAutoGenerate = useMemo(() => {
@@ -583,8 +638,8 @@ export default function GreenhouseMap() {
     // Canvas utility functions
     const snapToGrid = useCallback(
         (point: Point): Point => ({
-            x: Math.round(point.x / (MINOR_GRID_STEP)) * (MINOR_GRID_STEP),
-            y: Math.round(point.y / (MINOR_GRID_STEP)) * (MINOR_GRID_STEP),
+            x: Math.round(point.x / MINOR_GRID_STEP) * MINOR_GRID_STEP,
+            y: Math.round(point.y / MINOR_GRID_STEP) * MINOR_GRID_STEP,
         }),
         []
     );
@@ -754,54 +809,58 @@ export default function GreenhouseMap() {
     }, []);
 
     const findNearestConnectionPoint = useCallback(
-        (point: Point, excludeElementId?: string): { elementId: string; connectionPoint: Point; distance: number } | null => {
+        (
+            point: Point,
+            excludeElementId?: string
+        ): { elementId: string; connectionPoint: Point; distance: number } | null => {
             // Require clicking essentially on the connection point (tight threshold)
             const SNAP_DISTANCE = 6; // pixels
-            let nearest: { elementId: string; connectionPoint: Point; distance: number } | null = null;
+            let nearest: { elementId: string; connectionPoint: Point; distance: number } | null =
+                null;
 
             // Check irrigation elements (water tanks, pumps)
-            irrigationElements.forEach(element => {
+            irrigationElements.forEach((element) => {
                 if (element.id === excludeElementId) return;
-                
+
                 // Allow connections to water tanks and pumps
                 if (element.type !== 'water-tank' && element.type !== 'pump') return;
 
                 const connectionPoints = getConnectionPoints(element);
-                connectionPoints.forEach(connectionPoint => {
+                connectionPoints.forEach((connectionPoint) => {
                     const distance = Math.sqrt(
-                        Math.pow(point.x - connectionPoint.x, 2) + 
-                        Math.pow(point.y - connectionPoint.y, 2)
+                        Math.pow(point.x - connectionPoint.x, 2) +
+                            Math.pow(point.y - connectionPoint.y, 2)
                     );
-                    
+
                     if (distance <= SNAP_DISTANCE && (!nearest || distance < nearest.distance)) {
                         nearest = {
                             elementId: element.id,
                             connectionPoint,
-                            distance
+                            distance,
                         };
                     }
                 });
             });
 
             // Check shapes (fertilizer machines)
-            shapes.forEach(shape => {
+            shapes.forEach((shape) => {
                 if (shape.id === excludeElementId) return;
-                
+
                 // Only allow connections to fertilizer machines
                 if (shape.type !== 'fertilizer-machine') return;
 
                 const connectionPoints = getConnectionPoints(shape);
-                connectionPoints.forEach(connectionPoint => {
+                connectionPoints.forEach((connectionPoint) => {
                     const distance = Math.sqrt(
-                        Math.pow(point.x - connectionPoint.x, 2) + 
-                        Math.pow(point.y - connectionPoint.y, 2)
+                        Math.pow(point.x - connectionPoint.x, 2) +
+                            Math.pow(point.y - connectionPoint.y, 2)
                     );
-                    
+
                     if (distance <= SNAP_DISTANCE && (!nearest || distance < nearest.distance)) {
                         nearest = {
                             elementId: shape.id,
                             connectionPoint,
-                            distance
+                            distance,
                         };
                     }
                 });
@@ -812,36 +871,39 @@ export default function GreenhouseMap() {
         [irrigationElements, shapes, getConnectionPoints]
     );
 
-    const findPipeEndpointAtPoint = useCallback((point: Point): { elementId: string; pointIndex: number } | null => {
-        // Also tighten endpoint click detection to avoid accidental grabs
-        const ENDPOINT_RADIUS = 6;
-        
-        for (const element of irrigationElements) {
-            if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
-                if (element.points.length >= 2) {
-                    // Check start point
-                    const startDistance = Math.sqrt(
-                        Math.pow(point.x - element.points[0].x, 2) + 
-                        Math.pow(point.y - element.points[0].y, 2)
-                    );
-                    if (startDistance <= ENDPOINT_RADIUS) {
-                        return { elementId: element.id, pointIndex: 0 };
-                    }
-                    
-                    // Check end point
-                    const endDistance = Math.sqrt(
-                        Math.pow(point.x - element.points[element.points.length - 1].x, 2) + 
-                        Math.pow(point.y - element.points[element.points.length - 1].y, 2)
-                    );
-                    if (endDistance <= ENDPOINT_RADIUS) {
-                        return { elementId: element.id, pointIndex: element.points.length - 1 };
+    const findPipeEndpointAtPoint = useCallback(
+        (point: Point): { elementId: string; pointIndex: number } | null => {
+            // Also tighten endpoint click detection to avoid accidental grabs
+            const ENDPOINT_RADIUS = 6;
+
+            for (const element of irrigationElements) {
+                if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
+                    if (element.points.length >= 2) {
+                        // Check start point
+                        const startDistance = Math.sqrt(
+                            Math.pow(point.x - element.points[0].x, 2) +
+                                Math.pow(point.y - element.points[0].y, 2)
+                        );
+                        if (startDistance <= ENDPOINT_RADIUS) {
+                            return { elementId: element.id, pointIndex: 0 };
+                        }
+
+                        // Check end point
+                        const endDistance = Math.sqrt(
+                            Math.pow(point.x - element.points[element.points.length - 1].x, 2) +
+                                Math.pow(point.y - element.points[element.points.length - 1].y, 2)
+                        );
+                        if (endDistance <= ENDPOINT_RADIUS) {
+                            return { elementId: element.id, pointIndex: element.points.length - 1 };
+                        }
                     }
                 }
             }
-        }
-        
-        return null;
-    }, [irrigationElements]);
+
+            return null;
+        },
+        [irrigationElements]
+    );
 
     // Helper function to draw component shapes
     const drawComponentShape = useCallback(
@@ -912,13 +974,33 @@ export default function GreenhouseMap() {
                     ctx.beginPath();
                     ctx.moveTo(point.x - w / 2 + r, point.y - h / 2);
                     ctx.lineTo(point.x + w / 2 - r, point.y - h / 2);
-                    ctx.quadraticCurveTo(point.x + w / 2, point.y - h / 2, point.x + w / 2, point.y - h / 2 + r);
+                    ctx.quadraticCurveTo(
+                        point.x + w / 2,
+                        point.y - h / 2,
+                        point.x + w / 2,
+                        point.y - h / 2 + r
+                    );
                     ctx.lineTo(point.x + w / 2, point.y + h / 2 - r);
-                    ctx.quadraticCurveTo(point.x + w / 2, point.y + h / 2, point.x + w / 2 - r, point.y + h / 2);
+                    ctx.quadraticCurveTo(
+                        point.x + w / 2,
+                        point.y + h / 2,
+                        point.x + w / 2 - r,
+                        point.y + h / 2
+                    );
                     ctx.lineTo(point.x - w / 2 + r, point.y + h / 2);
-                    ctx.quadraticCurveTo(point.x - w / 2, point.y + h / 2, point.x - w / 2, point.y + h / 2 - r);
+                    ctx.quadraticCurveTo(
+                        point.x - w / 2,
+                        point.y + h / 2,
+                        point.x - w / 2,
+                        point.y + h / 2 - r
+                    );
                     ctx.lineTo(point.x - w / 2, point.y - h / 2 + r);
-                    ctx.quadraticCurveTo(point.x - w / 2, point.y - h / 2, point.x - w / 2 + r, point.y - h / 2);
+                    ctx.quadraticCurveTo(
+                        point.x - w / 2,
+                        point.y - h / 2,
+                        point.x - w / 2 + r,
+                        point.y - h / 2
+                    );
                     ctx.closePath();
                     ctx.fill();
                     ctx.stroke();
@@ -980,7 +1062,7 @@ export default function GreenhouseMap() {
                     ctx.strokeStyle = '#FFFFFF';
                     ctx.lineWidth = 2;
                     for (let i = 0; i < 3; i++) {
-                        const y = point.y - size + (i * size * 0.6);
+                        const y = point.y - size + i * size * 0.6;
                         ctx.beginPath();
                         ctx.moveTo(point.x - size * 0.6, y);
                         ctx.lineTo(point.x + size * 0.6, y);
@@ -1048,7 +1130,7 @@ export default function GreenhouseMap() {
                     ctx.beginPath();
                     ctx.arc(dripPoint.x, dripPoint.y, 2.5, 0, 2 * Math.PI);
                     ctx.fill();
-                    
+
                     // Draw main drip point
                     ctx.fillStyle = '#06B6D4';
                     ctx.beginPath();
@@ -1198,8 +1280,10 @@ export default function GreenhouseMap() {
 
                         // Draw water icon in center (match planner behavior)
                         if (shape.points.length > 0) {
-                            const centerX = shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
-                            const centerY = shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
+                            const centerX =
+                                shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length;
+                            const centerY =
+                                shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length;
 
                             ctx.fillStyle = '#FFFFFF';
                             ctx.font = '16px sans-serif';
@@ -1227,7 +1311,13 @@ export default function GreenhouseMap() {
                     const labelOffset = 10;
                     ctx.save();
                     if (img) {
-                        ctx.drawImage(img, point.x - imgSize / 2, point.y - imgSize / 2, imgSize, imgSize);
+                        ctx.drawImage(
+                            img,
+                            point.x - imgSize / 2,
+                            point.y - imgSize / 2,
+                            imgSize,
+                            imgSize
+                        );
                     } else {
                         // fallback rectangle if image not loaded
                         ctx.fillStyle = '#84CC16';
@@ -1240,7 +1330,11 @@ export default function GreenhouseMap() {
                     ctx.fillStyle = '#FFFFFF';
                     ctx.textAlign = 'center';
                     ctx.font = '12px sans-serif';
-                    ctx.fillText(`${t('เครื่องให้ปุ๋ย')}`, point.x, point.y - imgSize / 2 - labelOffset);
+                    ctx.fillText(
+                        `${t('เครื่องให้ปุ๋ย')}`,
+                        point.x,
+                        point.y - imgSize / 2 - labelOffset
+                    );
                     ctx.restore();
                     return;
                 }
@@ -1381,7 +1475,10 @@ export default function GreenhouseMap() {
                     if (element.points.length >= 1) {
                         const point = element.points[0];
                         drawComponentShape(ctx, element.type, point, element.color, isSelected);
-                        if (element.type === 'water-tank' && typeof element.capacityLiters === 'number') {
+                        if (
+                            element.type === 'water-tank' &&
+                            typeof element.capacityLiters === 'number'
+                        ) {
                             ctx.fillStyle = '#FFFFFF';
                             ctx.font = '12px sans-serif';
                             ctx.textAlign = 'center';
@@ -1459,87 +1556,96 @@ export default function GreenhouseMap() {
     );
 
     // Main draw function with better performance
-    const drawConnectionPoints = useCallback((ctx: CanvasRenderingContext2D) => {
-        // Draw connection points for water tanks and pumps
-        irrigationElements.forEach(element => {
-            if (element.type === 'water-tank' || element.type === 'pump') {
-                const connectionPoints = getConnectionPoints(element);
-                connectionPoints.forEach(point => {
-                    ctx.save();
-                    ctx.fillStyle = '#00FF00';
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.restore();
-                });
-            }
-        });
-
-        // Draw connection points for fertilizer machines (shapes)
-        shapes.forEach(shape => {
-            if (shape.type === 'fertilizer-machine') {
-                const connectionPoints = getConnectionPoints(shape);
-                connectionPoints.forEach(point => {
-                    ctx.save();
-                    ctx.fillStyle = '#00FF00';
-                    ctx.strokeStyle = '#FFFFFF';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.restore();
-                });
-            }
-        });
-
-        // Draw pipe endpoints when select tool is active
-        if (selectedTool === 'select') {
-            irrigationElements.forEach(element => {
-                if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
-                    if (element.points.length >= 2) {
-                        // Draw start point
+    const drawConnectionPoints = useCallback(
+        (ctx: CanvasRenderingContext2D) => {
+            // Draw connection points for water tanks and pumps
+            irrigationElements.forEach((element) => {
+                if (element.type === 'water-tank' || element.type === 'pump') {
+                    const connectionPoints = getConnectionPoints(element);
+                    connectionPoints.forEach((point) => {
                         ctx.save();
-                        ctx.fillStyle = '#FF6B6B';
+                        ctx.fillStyle = '#00FF00';
                         ctx.strokeStyle = '#FFFFFF';
                         ctx.lineWidth = 2;
                         ctx.beginPath();
-                        ctx.arc(element.points[0].x, element.points[0].y, 5, 0, 2 * Math.PI);
+                        ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
                         ctx.fill();
                         ctx.stroke();
                         ctx.restore();
-
-                        // Draw end point
-                        ctx.save();
-                        ctx.fillStyle = '#FF6B6B';
-                        ctx.strokeStyle = '#FFFFFF';
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.arc(element.points[element.points.length - 1].x, element.points[element.points.length - 1].y, 5, 0, 2 * Math.PI);
-                        ctx.fill();
-                        ctx.stroke();
-                        ctx.restore();
-                    }
+                    });
                 }
             });
-        }
 
-        // Draw snap target indicator
-        if (snapTarget) {
-            ctx.save();
-            ctx.fillStyle = '#FFD700';
-            ctx.strokeStyle = '#FFA500';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(snapTarget.point.x, snapTarget.point.y, 8, 0, 2 * Math.PI);
-            ctx.fill();
-            ctx.stroke();
-            ctx.restore();
-        }
-    }, [irrigationElements, shapes, getConnectionPoints, snapTarget, selectedTool]);
+            // Draw connection points for fertilizer machines (shapes)
+            shapes.forEach((shape) => {
+                if (shape.type === 'fertilizer-machine') {
+                    const connectionPoints = getConnectionPoints(shape);
+                    connectionPoints.forEach((point) => {
+                        ctx.save();
+                        ctx.fillStyle = '#00FF00';
+                        ctx.strokeStyle = '#FFFFFF';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(point.x, point.y, 6, 0, 2 * Math.PI);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    });
+                }
+            });
+
+            // Draw pipe endpoints when select tool is active
+            if (selectedTool === 'select') {
+                irrigationElements.forEach((element) => {
+                    if (element.type === 'main-pipe' || element.type === 'sub-pipe') {
+                        if (element.points.length >= 2) {
+                            // Draw start point
+                            ctx.save();
+                            ctx.fillStyle = '#FF6B6B';
+                            ctx.strokeStyle = '#FFFFFF';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.arc(element.points[0].x, element.points[0].y, 5, 0, 2 * Math.PI);
+                            ctx.fill();
+                            ctx.stroke();
+                            ctx.restore();
+
+                            // Draw end point
+                            ctx.save();
+                            ctx.fillStyle = '#FF6B6B';
+                            ctx.strokeStyle = '#FFFFFF';
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.arc(
+                                element.points[element.points.length - 1].x,
+                                element.points[element.points.length - 1].y,
+                                5,
+                                0,
+                                2 * Math.PI
+                            );
+                            ctx.fill();
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+                    }
+                });
+            }
+
+            // Draw snap target indicator
+            if (snapTarget) {
+                ctx.save();
+                ctx.fillStyle = '#FFD700';
+                ctx.strokeStyle = '#FFA500';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(snapTarget.point.x, snapTarget.point.y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        },
+        [irrigationElements, shapes, getConnectionPoints, snapTarget, selectedTool]
+    );
 
     const draw = useCallback(() => {
         const canvas = canvasRef.current;
@@ -1569,7 +1675,15 @@ export default function GreenhouseMap() {
         }
 
         ctx.restore();
-    }, [drawGrid, drawShapes, drawIrrigationElements, drawCurrentPath, drawConnectionPoints, zoom, pan]);
+    }, [
+        drawGrid,
+        drawShapes,
+        drawIrrigationElements,
+        drawCurrentPath,
+        drawConnectionPoints,
+        zoom,
+        pan,
+    ]);
 
     // Effect for drawing with throttling
     useEffect(() => {
@@ -1642,12 +1756,17 @@ export default function GreenhouseMap() {
             // Only handle left mouse button for drawing
             if (e.button === 0) {
                 // For line drawing tools, handle directly here to avoid conflicts
-                if (['main-pipe', 'sub-pipe', 'drip-line', 'fertilizer-area'].includes(selectedTool)) {
+                if (
+                    ['main-pipe', 'sub-pipe', 'drip-line', 'fertilizer-area'].includes(selectedTool)
+                ) {
                     if (!isDrawing) {
                         // Check for snap target when starting pipe drawing
                         const snapTarget = findNearestConnectionPoint(point);
                         if (snapTarget) {
-                            setSnapTarget({ elementId: snapTarget.elementId, point: snapTarget.connectionPoint });
+                            setSnapTarget({
+                                elementId: snapTarget.elementId,
+                                point: snapTarget.connectionPoint,
+                            });
                             setCurrentPath([snapTarget.connectionPoint]);
                         } else {
                             setSnapTarget(null);
@@ -1658,7 +1777,10 @@ export default function GreenhouseMap() {
                         // Check for snap target when adding points
                         const snapTarget = findNearestConnectionPoint(point);
                         if (snapTarget) {
-                            setSnapTarget({ elementId: snapTarget.elementId, point: snapTarget.connectionPoint });
+                            setSnapTarget({
+                                elementId: snapTarget.elementId,
+                                point: snapTarget.connectionPoint,
+                            });
                             setCurrentPath((prev) => [...prev, snapTarget.connectionPoint]);
                         } else {
                             setSnapTarget(null);
@@ -1669,7 +1791,16 @@ export default function GreenhouseMap() {
                 }
 
                 // For single-point tools (including fertilizer-machine placement)
-                if (['pump', 'solenoid-valve', 'ball-valve', 'sprinkler', 'water-tank', 'fertilizer-machine'].includes(selectedTool)) {
+                if (
+                    [
+                        'pump',
+                        'solenoid-valve',
+                        'ball-valve',
+                        'sprinkler',
+                        'water-tank',
+                        'fertilizer-machine',
+                    ].includes(selectedTool)
+                ) {
                     const elementTypes: Record<
                         string,
                         { color: string; width: number; radius?: number }
@@ -1704,7 +1835,7 @@ export default function GreenhouseMap() {
                                 points: [point],
                                 color: '#84CC16',
                                 fillColor: '#84CC1640',
-                                name: `${t('เครื่องให้ปุ๋ย')} ${shapes.filter(s => s.type === 'fertilizer-machine').length + 1}`,
+                                name: `${t('เครื่องให้ปุ๋ย')} ${shapes.filter((s) => s.type === 'fertilizer-machine').length + 1}`,
                             };
                             const newShapes = [...shapes, newShape];
                             setShapes(newShapes);
@@ -1766,8 +1897,8 @@ export default function GreenhouseMap() {
         // Handle pipe connection completion
         if (isConnecting && connectionStart && snapTarget) {
             // Update the pipe endpoint to the snap target
-            setIrrigationElements(prevElements =>
-                prevElements.map(element => {
+            setIrrigationElements((prevElements) =>
+                prevElements.map((element) => {
                     if (element.id === connectionStart.elementId) {
                         const newPoints = [...element.points];
                         newPoints[connectionStart.pointIndex] = snapTarget.point;
@@ -1820,9 +1951,14 @@ export default function GreenhouseMap() {
 
                     if (
                         'type' in element &&
-                        ['greenhouse', 'plot', 'walkway', 'water-source', 'measurement', 'fertilizer-area'].includes(
-                            element.type
-                        )
+                        [
+                            'greenhouse',
+                            'plot',
+                            'walkway',
+                            'water-source',
+                            'measurement',
+                            'fertilizer-area',
+                        ].includes(element.type)
                     ) {
                         setShapes((prevShapes) =>
                             prevShapes.map((shape) => {
@@ -1858,7 +1994,10 @@ export default function GreenhouseMap() {
                     // Handle pipe endpoint dragging
                     const snapTarget = findNearestConnectionPoint(point, connectionStart.elementId);
                     if (snapTarget) {
-                        setSnapTarget({ elementId: snapTarget.elementId, point: snapTarget.connectionPoint });
+                        setSnapTarget({
+                            elementId: snapTarget.elementId,
+                            point: snapTarget.connectionPoint,
+                        });
                     } else {
                         setSnapTarget(null);
                     }
@@ -1870,7 +2009,10 @@ export default function GreenhouseMap() {
                 // Check for snap targets during pipe drawing
                 const snapTarget = findNearestConnectionPoint(point);
                 if (snapTarget) {
-                    setSnapTarget({ elementId: snapTarget.elementId, point: snapTarget.connectionPoint });
+                    setSnapTarget({
+                        elementId: snapTarget.elementId,
+                        point: snapTarget.connectionPoint,
+                    });
                 } else {
                     setSnapTarget(null);
                 }
@@ -1951,65 +2093,75 @@ export default function GreenhouseMap() {
     }, [isPanning, isDragging]);
 
     // Utility functions
-    const getSprinklersNearPipe = useCallback((pipe: IrrigationElement): IrrigationElement[] => {
-        const related: IrrigationElement[] = [];
-        if (!pipe || pipe.type !== 'sub-pipe') return related;
+    const getSprinklersNearPipe = useCallback(
+        (pipe: IrrigationElement): IrrigationElement[] => {
+            const related: IrrigationElement[] = [];
+            if (!pipe || pipe.type !== 'sub-pipe') return related;
 
-        const sprinklers = irrigationElements.filter((el) => el.type === 'sprinkler');
-        sprinklers.forEach((sprinkler) => {
-            const sprinklerPoint = sprinkler.points[0];
-            for (let i = 0; i < pipe.points.length - 1; i++) {
-                const p1 = pipe.points[i];
-                const p2 = pipe.points[i + 1];
-                const A = sprinklerPoint.x - p1.x;
-                const B = sprinklerPoint.y - p1.y;
-                const C = p2.x - p1.x;
-                const D = p2.y - p1.y;
-                const dot = A * C + B * D;
-                const lenSq = C * C + D * D;
-                let param = -1;
-                if (lenSq !== 0) param = dot / lenSq;
-                let xx, yy;
-                if (param < 0) {
-                    xx = p1.x;
-                    yy = p1.y;
-                } else if (param > 1) {
-                    xx = p2.x;
-                    yy = p2.y;
-                } else {
-                    xx = p1.x + param * C;
-                    yy = p1.y + param * D;
+            const sprinklers = irrigationElements.filter((el) => el.type === 'sprinkler');
+            sprinklers.forEach((sprinkler) => {
+                const sprinklerPoint = sprinkler.points[0];
+                for (let i = 0; i < pipe.points.length - 1; i++) {
+                    const p1 = pipe.points[i];
+                    const p2 = pipe.points[i + 1];
+                    const A = sprinklerPoint.x - p1.x;
+                    const B = sprinklerPoint.y - p1.y;
+                    const C = p2.x - p1.x;
+                    const D = p2.y - p1.y;
+                    const dot = A * C + B * D;
+                    const lenSq = C * C + D * D;
+                    let param = -1;
+                    if (lenSq !== 0) param = dot / lenSq;
+                    let xx, yy;
+                    if (param < 0) {
+                        xx = p1.x;
+                        yy = p1.y;
+                    } else if (param > 1) {
+                        xx = p2.x;
+                        yy = p2.y;
+                    } else {
+                        xx = p1.x + param * C;
+                        yy = p1.y + param * D;
+                    }
+                    const distanceToLine = Math.sqrt(
+                        Math.pow(sprinklerPoint.x - xx, 2) + Math.pow(sprinklerPoint.y - yy, 2)
+                    );
+                    if (distanceToLine < 2) {
+                        related.push(sprinkler);
+                        break;
+                    }
                 }
-                const distanceToLine = Math.sqrt(
-                    Math.pow(sprinklerPoint.x - xx, 2) + Math.pow(sprinklerPoint.y - yy, 2)
-                );
-                if (distanceToLine < 2) {
-                    related.push(sprinkler);
-                    break;
-                }
-            }
-        });
-        return related;
-    }, [irrigationElements]);
+            });
+            return related;
+        },
+        [irrigationElements]
+    );
 
-    const updateSelectedSubPipeSprinklerRadius = useCallback((newRadiusMeters: number) => {
-        if (!selectedElement) return;
-        const pipe = irrigationElements.find((el) => el.id === selectedElement && el.type === 'sub-pipe');
-        if (!pipe) return;
-        const related = getSprinklersNearPipe(pipe);
-        if (related.length === 0) return;
-        const newRadiusPx = newRadiusMeters * 20;
-        const relatedIds = new Set(related.map((s) => s.id));
-        const updated = irrigationElements.map((el) =>
-            relatedIds.has(el.id) ? { ...el, radius: newRadiusPx } : el
-        );
-        setIrrigationElements(updated);
-        addToHistory(shapes, updated);
-    }, [selectedElement, irrigationElements, getSprinklersNearPipe, addToHistory, shapes]);
+    const updateSelectedSubPipeSprinklerRadius = useCallback(
+        (newRadiusMeters: number) => {
+            if (!selectedElement) return;
+            const pipe = irrigationElements.find(
+                (el) => el.id === selectedElement && el.type === 'sub-pipe'
+            );
+            if (!pipe) return;
+            const related = getSprinklersNearPipe(pipe);
+            if (related.length === 0) return;
+            const newRadiusPx = newRadiusMeters * 20;
+            const relatedIds = new Set(related.map((s) => s.id));
+            const updated = irrigationElements.map((el) =>
+                relatedIds.has(el.id) ? { ...el, radius: newRadiusPx } : el
+            );
+            setIrrigationElements(updated);
+            addToHistory(shapes, updated);
+        },
+        [selectedElement, irrigationElements, getSprinklersNearPipe, addToHistory, shapes]
+    );
 
     const getSelectedSubPipeSprinklerRadiusMeters = useCallback((): number => {
         if (!selectedElement) return globalRadius;
-        const pipe = irrigationElements.find((el) => el.id === selectedElement && el.type === 'sub-pipe');
+        const pipe = irrigationElements.find(
+            (el) => el.id === selectedElement && el.type === 'sub-pipe'
+        );
         if (!pipe) return globalRadius;
         const related = getSprinklersNearPipe(pipe);
         if (related.length === 0) return globalRadius;
@@ -2083,16 +2235,23 @@ export default function GreenhouseMap() {
                 // แสดงข้อความแจ้งเตือน
                 if (relatedSprinklers.length > 0) {
                     alert(
-                        t('ลบท่อย่อยและสปริงเกลอร์ {count} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว').replace('{count}', relatedSprinklers.length.toString())
+                        t('ลบท่อย่อยและสปริงเกลอร์ {count} ตัวที่เกี่ยวข้องเรียบร้อยแล้ว').replace(
+                            '{count}',
+                            relatedSprinklers.length.toString()
+                        )
                     );
                 }
             } else if (elementToDelete && elementToDelete.type === 'drip-line') {
                 // If it's a drip line, delete only the drip line
-                newIrrigationElements = irrigationElements.filter((el) => el.id !== selectedElement);
+                newIrrigationElements = irrigationElements.filter(
+                    (el) => el.id !== selectedElement
+                );
             } else {
                 // For other elements, delete normally
                 newShapes = shapes.filter((s) => s.id !== selectedElement);
-                newIrrigationElements = irrigationElements.filter((el) => el.id !== selectedElement);
+                newIrrigationElements = irrigationElements.filter(
+                    (el) => el.id !== selectedElement
+                );
             }
 
             setShapes(newShapes);
@@ -2157,14 +2316,28 @@ export default function GreenhouseMap() {
         if (newSprinklers.length > 0) {
             const newIrrigationElements = [...baseElements, ...newSprinklers];
             setIrrigationElements(newIrrigationElements);
-            
+
             addToHistory(shapes, newIrrigationElements);
-            
-            alert(t('สร้างมินิสปริงเกลอร์ {count} ตัวตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace('{count}', newSprinklers.length.toString()));
+
+            alert(
+                t('สร้างมินิสปริงเกลอร์ {count} ตัวตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace(
+                    '{count}',
+                    newSprinklers.length.toString()
+                )
+            );
         } else {
             alert(t('ท่อย่อยทั้งหมดมีมินิสปริงเกลอร์อยู่แล้ว'));
         }
-    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalRadius, globalSprinklerOverlap, t, shapes, addToHistory]);
+    }, [
+        canAutoGenerate,
+        selectedIrrigationMethod,
+        irrigationElements,
+        globalRadius,
+        globalSprinklerOverlap,
+        t,
+        shapes,
+        addToHistory,
+    ]);
 
     const autoGenerateDripLines = useCallback(() => {
         if (!canAutoGenerate) {
@@ -2226,14 +2399,27 @@ export default function GreenhouseMap() {
         if (newDripLines.length > 0) {
             const newIrrigationElements = [...irrigationElements, ...newDripLines];
             setIrrigationElements(newIrrigationElements);
-            
+
             addToHistory(shapes, newIrrigationElements);
-            
-            alert(t('สร้างสายน้ำหยด {count} เส้นตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace('{count}', newDripLines.length.toString()));
+
+            alert(
+                t('สร้างสายน้ำหยด {count} เส้นตามแนวท่อย่อยใหม่เรียบร้อยแล้ว').replace(
+                    '{count}',
+                    newDripLines.length.toString()
+                )
+            );
         } else {
             alert(t('ท่อย่อยทั้งหมดมีสายน้ำหยดอยู่แล้ว'));
         }
-    }, [canAutoGenerate, selectedIrrigationMethod, irrigationElements, globalDripSpacing, t, shapes, addToHistory]);
+    }, [
+        canAutoGenerate,
+        selectedIrrigationMethod,
+        irrigationElements,
+        globalDripSpacing,
+        t,
+        shapes,
+        addToHistory,
+    ]);
 
     const assignCropToPlot = useCallback(
         (cropValue: string) => {
@@ -2244,11 +2430,11 @@ export default function GreenhouseMap() {
                     }
                     return shape;
                 });
-                
+
                 setShapes(newShapes);
-                
+
                 addToHistory(newShapes, irrigationElements);
-                
+
                 setShowCropSelector(false);
                 setSelectedPlot(null);
             }
@@ -2257,20 +2443,23 @@ export default function GreenhouseMap() {
     );
 
     // Radius adjustment functions
-    const updateAllSprinklerRadius = useCallback((newRadius: number) => {
-        const radiusInPixels = newRadius * 20;
-        const newIrrigationElements = irrigationElements.map((el) => {
-            if (el.type === 'sprinkler') {
-                return { ...el, radius: radiusInPixels };
-            }
-            return el;
-        });
-        
-        setIrrigationElements(newIrrigationElements);
-        setGlobalRadius(newRadius);
-        
-        addToHistory(shapes, newIrrigationElements);
-    }, [irrigationElements, shapes, addToHistory]);
+    const updateAllSprinklerRadius = useCallback(
+        (newRadius: number) => {
+            const radiusInPixels = newRadius * 20;
+            const newIrrigationElements = irrigationElements.map((el) => {
+                if (el.type === 'sprinkler') {
+                    return { ...el, radius: radiusInPixels };
+                }
+                return el;
+            });
+
+            setIrrigationElements(newIrrigationElements);
+            setGlobalRadius(newRadius);
+
+            addToHistory(shapes, newIrrigationElements);
+        },
+        [irrigationElements, shapes, addToHistory]
+    );
 
     const updateSelectedSprinklerRadius = useCallback(
         (newRadius: number) => {
@@ -2282,29 +2471,32 @@ export default function GreenhouseMap() {
                     }
                     return el;
                 });
-                
+
                 setIrrigationElements(newIrrigationElements);
-                
+
                 addToHistory(shapes, newIrrigationElements);
             }
         },
         [selectedElement, irrigationElements, shapes, addToHistory]
     );
 
-    const updateGlobalDripSpacing = useCallback((newSpacing: number) => {
-        const spacingInMeters = newSpacing / 100; // Convert cm to meters
-        const newIrrigationElements = irrigationElements.map((el) => {
-            if (el.type === 'drip-line') {
-                return { ...el, spacing: spacingInMeters };
-            }
-            return el;
-        });
-        
-        setIrrigationElements(newIrrigationElements);
-        setGlobalDripSpacing(newSpacing);
-        
-        addToHistory(shapes, newIrrigationElements);
-    }, [irrigationElements, shapes, addToHistory]);
+    const updateGlobalDripSpacing = useCallback(
+        (newSpacing: number) => {
+            const spacingInMeters = newSpacing / 100; // Convert cm to meters
+            const newIrrigationElements = irrigationElements.map((el) => {
+                if (el.type === 'drip-line') {
+                    return { ...el, spacing: spacingInMeters };
+                }
+                return el;
+            });
+
+            setIrrigationElements(newIrrigationElements);
+            setGlobalDripSpacing(newSpacing);
+
+            addToHistory(shapes, newIrrigationElements);
+        },
+        [irrigationElements, shapes, addToHistory]
+    );
 
     const updateSelectedDripSpacing = useCallback(
         (newSpacing: number) => {
@@ -2316,9 +2508,9 @@ export default function GreenhouseMap() {
                     }
                     return el;
                 });
-                
+
                 setIrrigationElements(newIrrigationElements);
-                
+
                 addToHistory(shapes, newIrrigationElements);
             }
         },
@@ -2373,26 +2565,30 @@ export default function GreenhouseMap() {
                 (el) => el.type === 'solenoid-valve' || el.type === 'ball-valve'
             ).length,
             waterTankCount: irrigationElements.filter((el) => el.type === 'water-tank').length,
-            fertilizerMachineCount: irrigationElements.filter((el) => el.type === 'fertilizer-machine').length,
+            fertilizerMachineCount: irrigationElements.filter(
+                (el) => el.type === 'fertilizer-machine'
+            ).length,
             fertilizerAreaCount: shapes.filter((s) => s.type === 'fertilizer-area').length,
         };
     }, [irrigationElements, shapes]);
 
     return (
-        <div className="h-screen bg-gray-900 text-white overflow-hidden">
+        <div className="h-screen overflow-hidden bg-gray-900 text-white">
             {/* Fixed Navbar */}
-            <div className="fixed top-0 left-0 right-0 z-50">
+            <div className="fixed left-0 right-0 top-0 z-50">
                 <Navbar />
             </div>
 
             {/* Main Content with top padding to account for fixed navbar */}
-            <div className="pt-16 h-full flex flex-col">
+            <div className="flex h-full flex-col pt-16">
                 {/* Header */}
                 {!isHeaderCollapsed ? (
-                    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3 relative">
+                    <div className="relative flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
                         <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-xl font-bold">💧 {t('ออกแบบระบบน้ำในโรงเรือน (ขนาดใหญ่)')}</h1>
+                                <h1 className="text-xl font-bold">
+                                    💧 {t('ออกแบบระบบน้ำในโรงเรือน (ขนาดใหญ่)')}
+                                </h1>
                                 <p className="text-sm text-gray-400">
                                     {t('ออกแบบระบบการให้น้ำแบบ')}:{' '}
                                     {
@@ -2412,7 +2608,9 @@ export default function GreenhouseMap() {
                                 <span>→</span>
                                 <span className="text-green-400">✓ {t('เลือกระบบน้ำ')}</span>
                                 <span>→</span>
-                                <span className="font-medium text-blue-400">{t('ออกแบบระบบน้ำ')}</span>
+                                <span className="font-medium text-blue-400">
+                                    {t('ออกแบบระบบน้ำ')}
+                                </span>
                             </div>
                         </div>
 
@@ -2425,7 +2623,7 @@ export default function GreenhouseMap() {
                         </button>
                     </div>
                 ) : (
-                    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-1 flex items-center justify-between">
+                    <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-700 bg-gray-800 px-6 py-1">
                         <span className="text-xs text-gray-400">{t('แถบหัวข้อถูกซ่อน')}</span>
                         <button
                             onClick={() => setIsHeaderCollapsed(false)}
@@ -2444,7 +2642,9 @@ export default function GreenhouseMap() {
                         <div className="flex-1 overflow-y-auto p-4">
                             {/* Selected Crops */}
                             <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('พืชที่เลือก')}</h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    {t('พืชที่เลือก')}
+                                </h3>
                                 <div className="flex flex-wrap gap-1">
                                     {selectedCrops.map((cropValue, index) => {
                                         const crop = getCropByValue(cropValue);
@@ -2476,7 +2676,9 @@ export default function GreenhouseMap() {
 
                             {/* Tools */}
                             <div className="mb-4">
-                                <h3 className="mb-3 text-sm font-medium text-gray-300">{t('เครื่องมือ')}</h3>
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                    {t('เครื่องมือ')}
+                                </h3>
                                 <div className="space-y-1">
                                     {tools.map((tool) => (
                                         <button
@@ -2517,7 +2719,9 @@ export default function GreenhouseMap() {
                                         }`}
                                     >
                                         <span>
-                                            {irrigationElements.some((el) => el.type === 'main-pipe')
+                                            {irrigationElements.some(
+                                                (el) => el.type === 'main-pipe'
+                                            )
                                                 ? '✓'
                                                 : '✗'}
                                         </span>
@@ -2554,11 +2758,26 @@ export default function GreenhouseMap() {
                                                     : 'text-yellow-400'
                                             }`}
                                         >
-                                            <span>{plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}</span>
+                                            <span>
+                                                {plotsWithoutCrops.length === 0 ? '✓' : '⚠️'}
+                                            </span>
                                             <span>
                                                 {t('เลือกพืชครบทุกแปลง ({assigned}/{total})')
-                                                    .replace('{assigned}', shapes.filter((s) => s.type === 'plot' && s.cropType).length.toString())
-                                                    .replace('{total}', shapes.filter((s) => s.type === 'plot').length.toString())}
+                                                    .replace(
+                                                        '{assigned}',
+                                                        shapes
+                                                            .filter(
+                                                                (s) =>
+                                                                    s.type === 'plot' && s.cropType
+                                                            )
+                                                            .length.toString()
+                                                    )
+                                                    .replace(
+                                                        '{total}',
+                                                        shapes
+                                                            .filter((s) => s.type === 'plot')
+                                                            .length.toString()
+                                                    )}
                                             </span>
                                         </div>
                                         <div
@@ -2586,10 +2805,15 @@ export default function GreenhouseMap() {
                                 </h3>
                                 <div className="space-y-1 text-xs text-gray-400">
                                     <p>
-                                        📏 {t('ขนาด')}: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
+                                        📏 {t('ขนาด')}: {CANVAS_SIZE.width} × {CANVAS_SIZE.height}{' '}
+                                        px
                                     </p>
-                                    <p>📏 {t('กริด')}: {GRID_SIZE} px</p>
-                                    <p>📏 {t('ซูม')}: {(zoom * 100).toFixed(0)}%</p>
+                                    <p>
+                                        📏 {t('กริด')}: {GRID_SIZE} px
+                                    </p>
+                                    <p>
+                                        📏 {t('ซูม')}: {(zoom * 100).toFixed(0)}%
+                                    </p>
                                     <p>
                                         📏 {t('แพน')}: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
                                     </p>
@@ -2638,7 +2862,11 @@ export default function GreenhouseMap() {
                                                     max="30"
                                                     step="1"
                                                     value={sprinklerFlowRate}
-                                                    onChange={(e) => setSprinklerFlowRate(parseFloat(e.target.value) || 10)}
+                                                    onChange={(e) =>
+                                                        setSprinklerFlowRate(
+                                                            parseFloat(e.target.value) || 10
+                                                        )
+                                                    }
                                                     className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
                                                 />
                                             </div>
@@ -2655,7 +2883,11 @@ export default function GreenhouseMap() {
                                                     max="4.0"
                                                     step="0.1"
                                                     value={sprinklerPressure}
-                                                    onChange={(e) => setSprinklerPressure(parseFloat(e.target.value) || 2.5)}
+                                                    onChange={(e) =>
+                                                        setSprinklerPressure(
+                                                            parseFloat(e.target.value) || 2.5
+                                                        )
+                                                    }
                                                     className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
                                                 />
                                             </div>
@@ -2674,7 +2906,13 @@ export default function GreenhouseMap() {
                                                     value={globalSprinklerOverlap}
                                                     onChange={(e) =>
                                                         setGlobalSprinklerOverlap(
-                                                            Math.min(0.5, Math.max(0, parseFloat(e.target.value)))
+                                                            Math.min(
+                                                                0.5,
+                                                                Math.max(
+                                                                    0,
+                                                                    parseFloat(e.target.value)
+                                                                )
+                                                            )
                                                         )
                                                     }
                                                     className="flex-1"
@@ -2690,7 +2928,9 @@ export default function GreenhouseMap() {
 
                                         {selectedElement &&
                                             irrigationElements.find(
-                                                (el) => el.id === selectedElement && el.type === 'sub-pipe'
+                                                (el) =>
+                                                    el.id === selectedElement &&
+                                                    el.type === 'sub-pipe'
                                             ) && (
                                                 <div className="mt-3 rounded bg-gray-700 p-2">
                                                     <div className="mb-2 text-xs text-yellow-300">
@@ -2715,7 +2955,8 @@ export default function GreenhouseMap() {
                                                                 className="flex-1"
                                                             />
                                                             <span className="min-w-[2rem] text-xs text-white">
-                                                                {getSelectedSubPipeSprinklerRadiusMeters()}m
+                                                                {getSelectedSubPipeSprinklerRadiusMeters()}
+                                                                m
                                                             </span>
                                                         </div>
                                                     </div>
@@ -2724,7 +2965,8 @@ export default function GreenhouseMap() {
                                         {selectedElement &&
                                             irrigationElements.find(
                                                 (el) =>
-                                                    el.id === selectedElement && el.type === 'sprinkler'
+                                                    el.id === selectedElement &&
+                                                    el.type === 'sprinkler'
                                             ) && (
                                                 <div className="mt-3 rounded bg-gray-700 p-2">
                                                     <div className="mb-2 text-xs text-yellow-300">
@@ -2751,7 +2993,9 @@ export default function GreenhouseMap() {
                                                                     }
                                                                     onChange={(e) =>
                                                                         updateSelectedSprinklerRadius(
-                                                                            parseFloat(e.target.value)
+                                                                            parseFloat(
+                                                                                e.target.value
+                                                                            )
                                                                         )
                                                                     }
                                                                     className="flex-1"
@@ -2836,7 +3080,11 @@ export default function GreenhouseMap() {
                                                     max="2.0"
                                                     step="0.1"
                                                     value={dripPressure}
-                                                    onChange={(e) => setDripPressure(parseFloat(e.target.value) || 1.0)}
+                                                    onChange={(e) =>
+                                                        setDripPressure(
+                                                            parseFloat(e.target.value) || 1.0
+                                                        )
+                                                    }
                                                     className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
                                                 />
                                             </div>
@@ -2845,7 +3093,8 @@ export default function GreenhouseMap() {
                                         {selectedElement &&
                                             irrigationElements.find(
                                                 (el) =>
-                                                    el.id === selectedElement && el.type === 'drip-line'
+                                                    el.id === selectedElement &&
+                                                    el.type === 'drip-line'
                                             ) && (
                                                 <div className="mt-2 rounded bg-gray-700 p-2">
                                                     <div className="mb-1 text-xs text-yellow-300">
@@ -2853,13 +3102,13 @@ export default function GreenhouseMap() {
                                                     </div>
                                                     <div className="flex items-center space-x-2">
                                                         <select
-                                                            value={
-                                                                Math.round(
-                                                                    (irrigationElements.find(
-                                                                        (el) => el.id === selectedElement
-                                                                    )?.spacing || globalDripSpacing / 100) * 100
-                                                                )
-                                                            }
+                                                            value={Math.round(
+                                                                (irrigationElements.find(
+                                                                    (el) =>
+                                                                        el.id === selectedElement
+                                                                )?.spacing ||
+                                                                    globalDripSpacing / 100) * 100
+                                                            )}
                                                             onChange={(e) =>
                                                                 updateSelectedDripSpacing(
                                                                     parseInt(e.target.value)
@@ -2868,7 +3117,10 @@ export default function GreenhouseMap() {
                                                             className="flex-1 rounded bg-gray-600 px-2 py-1 text-xs text-white"
                                                         >
                                                             {dripSpacingOptions.map((spacing) => (
-                                                                <option key={spacing} value={spacing}>
+                                                                <option
+                                                                    key={spacing}
+                                                                    value={spacing}
+                                                                >
                                                                     {spacing} ซม
                                                                 </option>
                                                             ))}
@@ -2926,7 +3178,9 @@ export default function GreenhouseMap() {
 
                             {/* View Controls */}
                             <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('การแสดงผล')}</h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    {t('การแสดงผล')}
+                                </h3>
                                 <div className="space-y-2">
                                     <button
                                         onClick={() => setShowGrid(!showGrid)}
@@ -2964,11 +3218,15 @@ export default function GreenhouseMap() {
                                     </div>
                                     <div className="flex justify-between">
                                         <span>🌱 {t('แปลงปลูก')}:</span>
-                                        <span>{shapes.filter((s) => s.type === 'plot').length}</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'plot').length}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>🚶 {t('ทางเดิน')}:</span>
-                                        <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
+                                        <span>
+                                            {shapes.filter((s) => s.type === 'walkway').length}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>💧 {t('แหล่งน้ำ')}:</span>
@@ -2982,7 +3240,9 @@ export default function GreenhouseMap() {
                                     </div>
                                 </div>
 
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('สถิติระบบน้ำ')}</h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    {t('สถิติระบบน้ำ')}
+                                </h3>
                                 <div className="space-y-1 text-xs text-gray-400">
                                     <div className="flex justify-between">
                                         <span>{t('ท่อเมนแมพ')}:</span>
@@ -2998,23 +3258,33 @@ export default function GreenhouseMap() {
                                     </div>
                                     <div className="flex justify-between">
                                         <span>{t('มินิสปริงเกลอร์')}:</span>
-                                        <span>{calculateStats.sprinklerCount} {t('หน่วย')}</span>
+                                        <span>
+                                            {calculateStats.sprinklerCount} {t('หน่วย')}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>{t('ปั๊ม')}:</span>
-                                        <span>{calculateStats.pumpCount} {t('หน่วย')}</span>
+                                        <span>
+                                            {calculateStats.pumpCount} {t('หน่วย')}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>{t('วาล์ว')}:</span>
-                                        <span>{calculateStats.valveCount} {t('หน่วย')}</span>
+                                        <span>
+                                            {calculateStats.valveCount} {t('หน่วย')}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>{t('ถังน้ำ')}:</span>
-                                        <span>{calculateStats.waterTankCount} {t('หน่วย')}</span>
+                                        <span>
+                                            {calculateStats.waterTankCount} {t('หน่วย')}
+                                        </span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span>{t('เครื่องให้ปุ๋ย')}:</span>
-                                        <span>{calculateStats.fertilizerMachineCount} {t('หน่วย')}</span>
+                                        <span>
+                                            {calculateStats.fertilizerMachineCount} {t('หน่วย')}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -3115,7 +3385,7 @@ export default function GreenhouseMap() {
                             >
                                 ↷ {t('ทำซ้ำ')}
                             </button>
-                        </div>                 
+                        </div>
 
                         {/* Action Buttons */}
                         <div className="absolute right-4 top-4 flex space-x-2">
@@ -3133,7 +3403,7 @@ export default function GreenhouseMap() {
                                     const newIrrigationElements: IrrigationElement[] = [];
                                     setIrrigationElements(newIrrigationElements);
                                     setSelectedElement(null);
-                                    
+
                                     addToHistory(shapes, newIrrigationElements);
                                 }}
                                 className="rounded bg-orange-600 px-4 py-2 text-sm text-white shadow-lg transition-colors hover:bg-orange-700"
@@ -3145,7 +3415,7 @@ export default function GreenhouseMap() {
 
                     {/* Properties Panel */}
                     {!isRightPanelCollapsed && (
-                        <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800 relative">
+                        <div className="relative flex w-64 flex-col border-l border-gray-700 bg-gray-800">
                             <button
                                 onClick={() => setIsRightPanelCollapsed(true)}
                                 className="absolute -left-3 top-2 rounded bg-gray-700 px-1 py-0.5 text-xs text-gray-200 shadow hover:bg-gray-600"
@@ -3154,267 +3424,292 @@ export default function GreenhouseMap() {
                                 ▶
                             </button>
                             <div className="flex-1 overflow-y-auto p-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">
-                                {t('โครงสร้างโรงเรือน')}
-                            </h3>
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                    {t('โครงสร้างโรงเรือน')}
+                                </h3>
 
-                            {shapes.length === 0 ? (
-                                <p className="text-sm text-gray-500">{t('ไม่มีโครงสร้าง')}</p>
-                            ) : (
-                                <div className="mb-4 space-y-3">
-                                    {shapes.filter((s) => s.type === 'plot').length > 0 && (
-                                        <div>
-                                            <h4 className="mb-2 text-xs font-medium text-green-400">
-                                                🌱 {t('แปลงปลูก')}
-                                            </h4>
-                                            <div className="space-y-1">
-                                                {shapes
-                                                    .filter((s) => s.type === 'plot')
-                                                    .map((plot) => {
-                                                        const crop = plot.cropType
-                                                            ? getCropByValue(plot.cropType)
-                                                            : null;
-                                                        return (
-                                                            <div
-                                                                key={plot.id}
-                                                                onClick={() => {
-                                                                    if (selectedCrops.length === 0) {
-                                                                        alert(
-                                                                            t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก')
-                                                                        );
-                                                                        return;
+                                {shapes.length === 0 ? (
+                                    <p className="text-sm text-gray-500">{t('ไม่มีโครงสร้าง')}</p>
+                                ) : (
+                                    <div className="mb-4 space-y-3">
+                                        {shapes.filter((s) => s.type === 'plot').length > 0 && (
+                                            <div>
+                                                <h4 className="mb-2 text-xs font-medium text-green-400">
+                                                    🌱 {t('แปลงปลูก')}
+                                                </h4>
+                                                <div className="space-y-1">
+                                                    {shapes
+                                                        .filter((s) => s.type === 'plot')
+                                                        .map((plot) => {
+                                                            const crop = plot.cropType
+                                                                ? getCropByValue(plot.cropType)
+                                                                : null;
+                                                            return (
+                                                                <div
+                                                                    key={plot.id}
+                                                                    onClick={() => {
+                                                                        if (
+                                                                            selectedCrops.length ===
+                                                                            0
+                                                                        ) {
+                                                                            alert(
+                                                                                t(
+                                                                                    'ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก'
+                                                                                )
+                                                                            );
+                                                                            return;
+                                                                        }
+                                                                        setSelectedPlot(plot.id);
+                                                                        setShowCropSelector(true);
+                                                                    }}
+                                                                    className={`cursor-pointer rounded p-2 text-sm transition-colors ${
+                                                                        selectedCrops.length === 0
+                                                                            ? 'cursor-not-allowed bg-gray-700 text-gray-500'
+                                                                            : plot.cropType
+                                                                              ? 'bg-green-700 text-gray-300 hover:bg-green-600'
+                                                                              : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
+                                                                    }`}
+                                                                    title={
+                                                                        selectedCrops.length === 0
+                                                                            ? t('กรุณาเลือกพืชก่อน')
+                                                                            : plot.cropType
+                                                                              ? t(
+                                                                                    'คลิกเพื่อเปลี่ยนพืช'
+                                                                                )
+                                                                              : t(
+                                                                                    'คลิกเพื่อเลือกพืช (จำเป็น)'
+                                                                                )
                                                                     }
-                                                                    setSelectedPlot(plot.id);
-                                                                    setShowCropSelector(true);
-                                                                }}
-                                                                className={`cursor-pointer rounded p-2 text-sm transition-colors ${
-                                                                    selectedCrops.length === 0
-                                                                        ? 'cursor-not-allowed bg-gray-700 text-gray-500'
-                                                                        : plot.cropType
-                                                                          ? 'bg-green-700 text-gray-300 hover:bg-green-600'
-                                                                          : 'bg-yellow-700 text-gray-300 hover:bg-yellow-600'
-                                                                }`}
-                                                                title={
-                                                                    selectedCrops.length === 0
-                                                                        ? t('กรุณาเลือกพืชก่อน')
-                                                                        : plot.cropType
-                                                                          ? t('คลิกเพื่อเปลี่ยนพืช')
-                                                                          : t('คลิกเพื่อเลือกพืช (จำเป็น)')
-                                                                }
+                                                                >
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="truncate">
+                                                                            {plot.name}
+                                                                            {!plot.cropType && (
+                                                                                <span className="ml-1 text-yellow-400">
+                                                                                    ⚠️
+                                                                                </span>
+                                                                            )}
+                                                                        </span>
+                                                                        <div className="flex items-center space-x-2">
+                                                                            {crop ? (
+                                                                                <span className="text-lg">
+                                                                                    {crop.icon}
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="text-xs text-yellow-400">
+                                                                                    {selectedCrops.length ===
+                                                                                    0
+                                                                                        ? t(
+                                                                                              'ไม่มีพืชให้เลือก'
+                                                                                          )
+                                                                                        : t(
+                                                                                              'ยังไม่เลือกพืช'
+                                                                                          )}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                    {crop && (
+                                                                        <div className="mt-1 text-xs text-gray-400">
+                                                                            {crop.name}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {shapes.filter((s) => s.type === 'greenhouse').length >
+                                            0 && (
+                                            <div>
+                                                <h4 className="mb-2 text-xs font-medium text-green-400">
+                                                    🏠 {t('โรงเรือน')}
+                                                </h4>
+                                                <div className="space-y-1">
+                                                    {shapes
+                                                        .filter((s) => s.type === 'greenhouse')
+                                                        .map((greenhouse) => (
+                                                            <div
+                                                                key={greenhouse.id}
+                                                                className="rounded bg-gray-700 p-2 text-sm text-gray-300"
                                                             >
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="truncate">
-                                                                        {plot.name}
-                                                                        {!plot.cropType && (
-                                                                            <span className="ml-1 text-yellow-400">
-                                                                                ⚠️
-                                                                            </span>
-                                                                        )}
+                                                                        {greenhouse.name}
                                                                     </span>
-                                                                    <div className="flex items-center space-x-2">
-                                                                        {crop ? (
-                                                                            <span className="text-lg">
-                                                                                {crop.icon}
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="text-xs text-yellow-400">
-                                                                                {selectedCrops.length ===
-                                                                                0
-                                                                                    ? t('ไม่มีพืชให้เลือก')
-                                                                                    : t('ยังไม่เลือกพืช')}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
+                                                                    <span className="text-xs text-gray-400">
+                                                                        {greenhouse.points.length}{' '}
+                                                                        {t('จุด')}
+                                                                    </span>
                                                                 </div>
-                                                                {crop && (
-                                                                    <div className="mt-1 text-xs text-gray-400">
-                                                                        {crop.name}
-                                                                    </div>
-                                                                )}
                                                             </div>
-                                                        );
-                                                    })}
+                                                        ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {shapes.filter((s) => s.type === 'greenhouse').length > 0 && (
-                                        <div>
-                                            <h4 className="mb-2 text-xs font-medium text-green-400">
-                                                🏠 {t('โรงเรือน')}
-                                            </h4>
-                                            <div className="space-y-1">
-                                                {shapes
-                                                    .filter((s) => s.type === 'greenhouse')
-                                                    .map((greenhouse) => (
-                                                        <div
-                                                            key={greenhouse.id}
-                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="truncate">
-                                                                    {greenhouse.name}
-                                                                </span>
-                                                                <span className="text-xs text-gray-400">
-                                                                    {greenhouse.points.length} {t('จุด')}
-                                                                </span>
+                                        {shapes.filter((s) => s.type === 'walkway').length > 0 && (
+                                            <div>
+                                                <h4 className="mb-2 text-xs font-medium text-gray-400">
+                                                    🚶 {t('ทางเดิน')}
+                                                </h4>
+                                                <div className="space-y-1">
+                                                    {shapes
+                                                        .filter((s) => s.type === 'walkway')
+                                                        .map((walkway) => (
+                                                            <div
+                                                                key={walkway.id}
+                                                                className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="truncate">
+                                                                        {walkway.name}
+                                                                    </span>
+                                                                    <span className="text-xs text-gray-400">
+                                                                        {walkway.points.length}{' '}
+                                                                        {t('จุด')}
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {shapes.filter((s) => s.type === 'walkway').length > 0 && (
-                                        <div>
-                                            <h4 className="mb-2 text-xs font-medium text-gray-400">
-                                                🚶 {t('ทางเดิน')}
-                                            </h4>
-                                            <div className="space-y-1">
-                                                {shapes
-                                                    .filter((s) => s.type === 'walkway')
-                                                    .map((walkway) => (
-                                                        <div
-                                                            key={walkway.id}
-                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="truncate">
-                                                                    {walkway.name}
-                                                                </span>
-                                                                <span className="text-xs text-gray-400">
-                                                                    {walkway.points.length} {t('จุด')}
-                                                                </span>
+                                        {shapes.filter((s) => s.type === 'water-source').length >
+                                            0 && (
+                                            <div>
+                                                <h4 className="mb-2 text-xs font-medium text-blue-400">
+                                                    💧 {t('แหล่งน้ำ')}
+                                                </h4>
+                                                <div className="space-y-1">
+                                                    {shapes
+                                                        .filter((s) => s.type === 'water-source')
+                                                        .map((water) => (
+                                                            <div
+                                                                key={water.id}
+                                                                className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="truncate">
+                                                                        {water.name}
+                                                                    </span>
+                                                                    <span className="text-xs text-gray-400">
+                                                                        {water.points.length === 1
+                                                                            ? t('จุดเดียว')
+                                                                            : `${water.points.length} ${t('จุด')}`}
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                    {shapes.filter((s) => s.type === 'water-source').length > 0 && (
-                                        <div>
-                                            <h4 className="mb-2 text-xs font-medium text-blue-400">
-                                                💧 {t('แหล่งน้ำ')}
-                                            </h4>
-                                            <div className="space-y-1">
-                                                {shapes
-                                                    .filter((s) => s.type === 'water-source')
-                                                    .map((water) => (
-                                                        <div
-                                                            key={water.id}
-                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="truncate">
-                                                                    {water.name}
-                                                                </span>
-                                                                <span className="text-xs text-gray-400">
-                                                                    {water.points.length === 1
-                                                                        ? t('จุดเดียว')
-                                                                        : `${water.points.length} ${t('จุด')}`}
-                                                                </span>
+                                        {shapes.filter((s) => s.type === 'fertilizer-area').length >
+                                            0 && (
+                                            <div>
+                                                <h4 className="mb-2 text-xs font-medium text-green-400">
+                                                    🌿 {t('พื้นที่ให้ปุ๋ย')}
+                                                </h4>
+                                                <div className="space-y-1">
+                                                    {shapes
+                                                        .filter((s) => s.type === 'fertilizer-area')
+                                                        .map((area) => (
+                                                            <div
+                                                                key={area.id}
+                                                                className="rounded bg-gray-700 p-2 text-sm text-gray-300"
+                                                            >
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="truncate">
+                                                                        {area.name}
+                                                                    </span>
+                                                                    <span className="text-xs text-gray-400">
+                                                                        {area.points.length}{' '}
+                                                                        {t('จุด')}
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
+                                )}
 
-                                    {shapes.filter((s) => s.type === 'fertilizer-area').length > 0 && (
-                                        <div>
-                                            <h4 className="mb-2 text-xs font-medium text-green-400">
-                                                🌿 {t('พื้นที่ให้ปุ๋ย')}
-                                            </h4>
-                                            <div className="space-y-1">
-                                                {shapes
-                                                    .filter((s) => s.type === 'fertilizer-area')
-                                                    .map((area) => (
-                                                        <div
-                                                            key={area.id}
-                                                            className="rounded bg-gray-700 p-2 text-sm text-gray-300"
-                                                        >
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="truncate">
-                                                                    {area.name}
-                                                                </span>
-                                                                <span className="text-xs text-gray-400">
-                                                                    {area.points.length} {t('จุด')}
-                                                                </span>
-                                                            </div>
+                                {/* Irrigation Elements List */}
+                                <div className="border-t border-gray-700 pt-4">
+                                    <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                        {t('องค์ประกอบระบบน้ำ')}
+                                    </h3>
+
+                                    {irrigationElements.length === 0 ? (
+                                        <p className="text-sm text-gray-500">
+                                            {t('ยังไม่มีองค์ประกอบ')}
+                                        </p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {irrigationElements.map((element) => {
+                                                const typeNames = {
+                                                    'main-pipe': '🔵 ' + t('ท่อเมนแมพ'),
+                                                    'sub-pipe': '🟢 ' + t('ท่อเมนย่อยแมพ'),
+                                                    pump: '⚙️ ' + t('ปั๊ม'),
+                                                    'solenoid-valve': '🔧 ' + t('โซลินอยด์วาล์ว'),
+                                                    'ball-valve': '🟡 ' + t('บอลวาล์ว'),
+                                                    'water-tank': '🗂️ ' + t('ถังเก็บน้ำ'),
+                                                    'fertilizer-machine':
+                                                        '🧪 ' + t('เครื่องให้ปุ๋ย'),
+                                                    sprinkler: '💦 ' + t('มินิสปริงเกลอร์'),
+                                                    'drip-line': '💧 ' + t('สายน้ำหยด'),
+                                                };
+
+                                                return (
+                                                    <div
+                                                        key={element.id}
+                                                        onClick={() =>
+                                                            setSelectedElement(element.id)
+                                                        }
+                                                        className={`cursor-pointer rounded p-2 text-sm transition-colors ${
+                                                            selectedElement === element.id
+                                                                ? 'bg-yellow-600 text-white'
+                                                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="truncate">
+                                                                {typeNames[element.type] ||
+                                                                    element.type}
+                                                            </span>
+                                                            {selectedElement === element.id && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        deleteElement();
+                                                                    }}
+                                                                    className="text-red-400 transition-colors hover:text-red-300"
+                                                                    title={t('ลบอุปกรณ์')}
+                                                                >
+                                                                    🗑️
+                                                                </button>
+                                                            )}
                                                         </div>
-                                                    ))}
-                                            </div>
+                                                        <div className="mt-1 text-xs text-gray-400">
+                                                            {element.points.length} {t('จุด')}
+                                                            {element.radius &&
+                                                                ` | ${t('รัศมี')}: ${(element.radius / 20).toFixed(1)}m`}
+                                                            {element.spacing &&
+                                                                ` | ${t('ระยะห่าง')}: ${element.spacing.toFixed(2)}m`}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
-                            )}
-
-                            {/* Irrigation Elements List */}
-                            <div className="border-t border-gray-700 pt-4">
-                                <h3 className="mb-3 text-sm font-medium text-gray-300">
-                                    {t('องค์ประกอบระบบน้ำ')}
-                                </h3>
-
-                                {irrigationElements.length === 0 ? (
-                                    <p className="text-sm text-gray-500">{t('ยังไม่มีองค์ประกอบ')}</p>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {irrigationElements.map((element) => {
-                                            const typeNames = {
-                                                'main-pipe': '🔵 ' + t('ท่อเมนแมพ'),
-                                                'sub-pipe': '🟢 ' + t('ท่อเมนย่อยแมพ'),
-                                                pump: '⚙️ ' + t('ปั๊ม'),
-                                                'solenoid-valve': '🔧 ' + t('โซลินอยด์วาล์ว'),
-                                                'ball-valve': '🟡 ' + t('บอลวาล์ว'),
-                                                'water-tank': '🗂️ ' + t('ถังเก็บน้ำ'),
-                                                'fertilizer-machine': '🧪 ' + t('เครื่องให้ปุ๋ย'),
-                                                sprinkler: '💦 ' + t('มินิสปริงเกลอร์'),
-                                                'drip-line': '💧 ' + t('สายน้ำหยด'),
-                                            };
-
-                                            return (
-                                                <div
-                                                    key={element.id}
-                                                    onClick={() => setSelectedElement(element.id)}
-                                                    className={`cursor-pointer rounded p-2 text-sm transition-colors ${
-                                                        selectedElement === element.id
-                                                            ? 'bg-yellow-600 text-white'
-                                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="truncate">
-                                                            {typeNames[element.type] || element.type}
-                                                        </span>
-                                                        {selectedElement === element.id && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    deleteElement();
-                                                                }}
-                                                                className="text-red-400 transition-colors hover:text-red-300"
-                                                                title={t('ลบอุปกรณ์')}
-                                                            >
-                                                                🗑️
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-gray-400">
-                                                        {element.points.length} {t('จุด')}
-                                                        {element.radius &&
-                                                            ` | ${t('รัศมี')}: ${(element.radius / 20).toFixed(1)}m`}
-                                                        {element.spacing &&
-                                                            ` | ${t('ระยะห่าง')}: ${element.spacing.toFixed(2)}m`}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
                             </div>
                         </div>
-                    </div>
                     )}
                     {isRightPanelCollapsed && (
                         <div className="flex w-6 flex-col items-center justify-center border-l border-gray-700 bg-gray-800">
@@ -3565,7 +3860,8 @@ export default function GreenhouseMap() {
                             {selectedCrops.length === 0 && (
                                 <div className="mb-4 rounded-lg border border-yellow-600 bg-yellow-900/30 p-3">
                                     <div className="text-sm text-yellow-300">
-                                        ⚠️ {t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก')}
+                                        ⚠️{' '}
+                                        {t('ไม่มีพืชที่เลือกไว้ กรุณากลับไปเลือกพืชในขั้นตอนแรก')}
                                     </div>
                                 </div>
                             )}
@@ -3586,7 +3882,9 @@ export default function GreenhouseMap() {
                                                 className="rounded-lg border border-gray-600 bg-gray-700 p-3 text-center transition-colors hover:bg-gray-600"
                                             >
                                                 <div className="mb-1 text-2xl">{crop.icon}</div>
-                                                <div className="text-sm text-white">{crop.name}</div>
+                                                <div className="text-sm text-white">
+                                                    {crop.name}
+                                                </div>
                                                 <div className="text-xs text-gray-400">
                                                     {crop.nameEn}
                                                 </div>
@@ -3607,9 +3905,9 @@ export default function GreenhouseMap() {
                                                 }
                                                 return shape;
                                             });
-                                            
+
                                             setShapes(newShapes);
-                                            
+
                                             addToHistory(newShapes, irrigationElements);
                                         }
                                         setShowCropSelector(false);

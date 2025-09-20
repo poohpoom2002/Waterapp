@@ -1,9 +1,5 @@
 import React from 'react';
-import { 
-    FaBezierCurve, 
-    FaTimes, 
-    FaInfoCircle
-} from 'react-icons/fa';
+import { FaBezierCurve, FaTimes, FaInfoCircle } from 'react-icons/fa';
 
 interface CurvedPipeControlPanelProps {
     isActive: boolean;
@@ -21,21 +17,21 @@ const CurvedPipeControlPanel: React.FC<CurvedPipeControlPanelProps> = ({
     onCancelDrawing,
     // showGuides,
     // onShowGuidesChange,
-    t
+    t,
 }) => {
     if (!isActive) return null;
 
     return (
-        <div className="fixed top-20 right-4 bg-white rounded-lg shadow-xl border border-gray-200 p-4 min-w-[300px] z-[100] pointer-events-auto">
+        <div className="pointer-events-auto fixed right-4 top-20 z-[100] min-w-[300px] rounded-lg border border-gray-200 bg-white p-4 shadow-xl">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <div className="mb-4 flex items-center justify-between">
+                <h3 className="flex items-center gap-2 text-lg font-bold text-gray-800">
                     <FaBezierCurve className="text-blue-600" />
                     {t('กำลังลากท่อ')}
                 </h3>
                 <button
                     onClick={onCancelDrawing}
-                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                    className="text-gray-400 transition-colors hover:text-gray-600"
                     title={t('close') || 'ปิด'}
                 >
                     <FaTimes size={16} />
@@ -84,7 +80,7 @@ const CurvedPipeControlPanel: React.FC<CurvedPipeControlPanelProps> = ({
                 </button> */}
                 <button
                     onClick={onCancelDrawing}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-red-600 text-white rounded-md font-medium hover:bg-red-700 transition-colors"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md bg-red-600 px-3 py-2 font-medium text-white transition-colors hover:bg-red-700"
                 >
                     <FaTimes size={14} />
                     {t('ยกเลิก')}
@@ -93,18 +89,29 @@ const CurvedPipeControlPanel: React.FC<CurvedPipeControlPanelProps> = ({
 
             {/* Simple Instructions - แสดงตลอดเวลา */}
             <div className="mt-4">
-                <div className="p-3 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-md">
+                <div className="rounded-md border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-3">
                     <div className="text-xs text-blue-800">
-                        <div className="font-medium mb-2 flex items-center gap-1">
+                        <div className="mb-2 flex items-center gap-1 font-medium">
                             <FaInfoCircle className="text-blue-600" />
                             {t('วิธีใช้งานแบบง่าย')}:
                         </div>
                         <ul className="space-y-1">
-                            <li>• <strong>{t('คลิกวางจุด')}</strong> {t('ตามเส้นทางท่อ')}</li>
-                            <li>• <strong>{t('ลากจุดออกจากมุม')}</strong> = {t('กำหนดรัศมีโค้ง')}</li>
-                            <li>• <strong>{t('ลากไกล')}</strong> = {t('โค้งใหญ่')}, <strong>{t('ลากใกล้')}</strong> = {t('โค้งเล็ก')}</li>
-                            <li>• <strong>{t('คลิกขวา')}</strong> {t('เพื่อจบการวาด')}</li>
-                            <li>• {t('จุดเขียว')} = {t('ปลายท่อ')} ({t('ไม่เลื่อน')})</li>
+                            <li>
+                                • <strong>{t('คลิกวางจุด')}</strong> {t('ตามเส้นทางท่อ')}
+                            </li>
+                            <li>
+                                • <strong>{t('ลากจุดออกจากมุม')}</strong> = {t('กำหนดรัศมีโค้ง')}
+                            </li>
+                            <li>
+                                • <strong>{t('ลากไกล')}</strong> = {t('โค้งใหญ่')},{' '}
+                                <strong>{t('ลากใกล้')}</strong> = {t('โค้งเล็ก')}
+                            </li>
+                            <li>
+                                • <strong>{t('คลิกขวา')}</strong> {t('เพื่อจบการวาด')}
+                            </li>
+                            <li>
+                                • {t('จุดเขียว')} = {t('ปลายท่อ')} ({t('ไม่เลื่อน')})
+                            </li>
                         </ul>
                     </div>
                 </div>

@@ -52,7 +52,9 @@ interface QuotationDocumentProps {
     greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
     showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
-    selectedPipes: { [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any } };
+    selectedPipes: {
+        [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any };
+    };
     sprinklerEquipmentSets?: { [zoneId: string]: any }; // เพิ่มสำหรับ Sprinkler Equipment Sets
     connectionEquipments?: { [zoneId: string]: any[] }; // เพิ่มสำหรับ Connection Equipments
     onClose: () => void;
@@ -135,7 +137,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
             const firstPageItems = getItemsPerPage(1 + imagePageOffset, totalPages, totalItems);
             const remainingItems = totalItems - firstPageItems;
             const itemsInThisPage = remainingItems - (effectivePage - 2) * 13;
-            
+
             if (itemsInThisPage <= 10) {
                 return itemsInThisPage;
             } else if (itemsInThisPage === 11) {
@@ -668,7 +670,11 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
         // เพิ่มอุปกรณ์จาก Sprinkler Equipment Sets
         Object.entries(sprinklerEquipmentSets).forEach(([zoneId, equipmentSet]) => {
-            if (equipmentSet && equipmentSet.selectedItems && equipmentSet.selectedItems.length > 0) {
+            if (
+                equipmentSet &&
+                equipmentSet.selectedItems &&
+                equipmentSet.selectedItems.length > 0
+            ) {
                 equipmentSet.selectedItems.forEach((item: any) => {
                     if (item.equipment && item.quantity > 0) {
                         initialItems.push({
@@ -743,7 +749,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     ]);
 
     const calculateItemAmount = (item: QuotationItem) => {
-        const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0;
+        const unitPrice =
+            typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0;
         return unitPrice * item.quantity - unitPrice * (item.discount / 100);
     };
 
@@ -936,7 +943,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     ) : (
                         <div className="max-h-[400px] overflow-auto">
                             {equipmentList.length === 0 && localSelectedCategory ? (
-                                <div className="py-8 text-center text-gray-500">{t('ไม่พบอุปกรณ์')}</div>
+                                <div className="py-8 text-center text-gray-500">
+                                    {t('ไม่พบอุปกรณ์')}
+                                </div>
                             ) : (
                                 <div className="space-y-2">
                                     {equipmentList.map((equipment) => (
@@ -1304,7 +1313,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         const currentIndex = currentPageItems.findIndex((i) => i.id === item.id);
         const imagePageOffset = hasProjectImagePage ? 1 : 0;
         const effectivePage = currentPage - imagePageOffset;
-        
+
         // คำนวณจำนวนรายการในหน้าแรกตามกฎใหม่
         let firstPageItems;
         if (items.length <= 7) {
@@ -1318,9 +1327,11 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
         } else {
             firstPageItems = 10;
         }
-        
+
         const absoluteIndex =
-            effectivePage === 1 ? currentIndex : firstPageItems + (effectivePage - 2) * 13 + currentIndex;
+            effectivePage === 1
+                ? currentIndex
+                : firstPageItems + (effectivePage - 2) * 13 + currentIndex;
 
         return (
             <tr key={item.id}>
@@ -1408,7 +1419,10 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             step="0.001"
                         />
                     ) : (
-                        (typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0).toFixed(4)
+                        (typeof item.unitPrice === 'number'
+                            ? item.unitPrice
+                            : parseFloat(item.unitPrice) || 0
+                        ).toFixed(4)
                     )}
                 </td>
                 <td className="border border-gray-400 p-1 text-right align-top">
@@ -1429,7 +1443,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                     )}
                 </td>
                 <td className="border border-gray-400 p-1 text-right align-top">
-                    {((typeof item.unitPrice === 'number' ? item.unitPrice : parseFloat(item.unitPrice) || 0) * (item.discount / 100)).toFixed(2)}
+                    {(
+                        (typeof item.unitPrice === 'number'
+                            ? item.unitPrice
+                            : parseFloat(item.unitPrice) || 0) *
+                        (item.discount / 100)
+                    ).toFixed(2)}
                 </td>
                 <td className="border border-gray-400 p-1 text-right align-top">
                     {item.taxes.split('\n').map((line, i) => (
@@ -1519,7 +1538,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                     >
                                         <div className="text-center">
                                             <div className="mb-4 text-6xl text-gray-400">📷</div>
-                                            <p className="text-gray-500">{t('คลิกเพื่อเพิ่มรูปแผนผัง')}</p>
+                                            <p className="text-gray-500">
+                                                {t('คลิกเพื่อเพิ่มรูปแผนผัง')}
+                                            </p>
                                         </div>
                                     </div>
                                 )}
@@ -1569,7 +1590,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 📋 {t('กดปุ่ม')} "{t('ถัดไป')}" {t('ด้านบนเพื่อดูรายการอุปกรณ์')}
                             </p>
                             <p className="text-xs text-blue-600">
-                                {t('หน้านี้แสดงแผนผังโปรเจค')} {t('หน้าถัดไปจะแสดงตารางอุปกรณ์และราคา')}
+                                {t('หน้านี้แสดงแผนผังโปรเจค')}{' '}
+                                {t('หน้าถัดไปจะแสดงตารางอุปกรณ์และราคา')}
                             </p>
                         </div>
                     )}
@@ -1578,8 +1600,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                 <div className="print-footer-container mt-auto text-center text-xs">
                     <hr className="print-footer-hr mb-2 border-gray-800" />
                     <div className="print-footer">
-                        <p>{t('Phone:')} 02-451-1111 {t('Tax ID:')} 0105549044446</p>
-                        <p>{t('Page:')} 1 / {totalPages}</p>
+                        <p>
+                            {t('Phone:')} 02-451-1111 {t('Tax ID:')} 0105549044446
+                        </p>
+                        <p>
+                            {t('Page:')} 1 / {totalPages}
+                        </p>
                     </div>
                 </div>
             </div>
@@ -1744,7 +1770,8 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                 <p className="font-bold">{t('หมายเหตุ:')}</p>
                                 <p className="text-sm">
                                     {t('รายการที่เพิ่มใหม่จะหายไปเมื่อรีเฟรชหน้า')}
-                                    {t('เนื่องจากข้อจำกัดของระบบ')} {t('กรุณาพิมพ์หรือบันทึกก่อนออกจากหน้านี้')}
+                                    {t('เนื่องจากข้อจำกัดของระบบ')}{' '}
+                                    {t('กรุณาพิมพ์หรือบันทึกก่อนออกจากหน้านี้')}
                                 </p>
                             </div>
                         </div>
@@ -1806,8 +1833,12 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                                         </div>
                                         <div className="text-xs text-gray-300">
                                             {isImagePage && '📷 ' + t('แผนผัง')}
-                                            {!isImagePage && hasProjectImagePage && '📋 ' + t('อุปกรณ์')}
-                                            {!isImagePage && !hasProjectImagePage && '📋 ' + t('รายการ')}
+                                            {!isImagePage &&
+                                                hasProjectImagePage &&
+                                                '📋 ' + t('อุปกรณ์')}
+                                            {!isImagePage &&
+                                                !hasProjectImagePage &&
+                                                '📋 ' + t('รายการ')}
                                         </div>
                                     </div>
 
@@ -1905,7 +1936,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             </div>
                             <hr className="print-hr mb-4 border-gray-800" />
                             <div className="print-company-info mb-4 self-start text-sm">
-                                <p className="font-semibold">{t('บจก. กนกโปรดักส์ (สำนักงานใหญ่)')}</p>
+                                <p className="font-semibold">
+                                    {t('บจก. กนกโปรดักส์ (สำนักงานใหญ่)')}
+                                </p>
                                 <p>{t('15 ซ. พระยามนธาตุ แยก 10')}</p>
                                 <p>{t('แขวงคลองบางบอน เขตบางบอน')}</p>
                                 <p>{t('กรุงเทพมหานคร 10150')}</p>
@@ -1979,7 +2012,9 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
                             <div className="print-footer-container mt-auto text-center text-xs">
                                 <hr className="print-footer-hr mb-2 border-gray-800" />
                                 <div className="print-footer">
-                                    <p>{t('Phone:')} 02-451-1111 {t('Tax ID:')} 0105549044446</p>
+                                    <p>
+                                        {t('Phone:')} 02-451-1111 {t('Tax ID:')} 0105549044446
+                                    </p>
                                     <p>
                                         {t('Page:')} {currentPage} / {totalPages}
                                     </p>

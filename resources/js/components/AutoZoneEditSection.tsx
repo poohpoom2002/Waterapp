@@ -21,7 +21,7 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
     mainArea,
     onZonesUpdate,
     onDeleteAllZones,
-    className = ""
+    className = '',
 }) => {
     const [statusMessage, setStatusMessage] = React.useState<{
         type: 'success' | 'error' | 'info';
@@ -40,7 +40,7 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
         onSuccess: (message) => {
             setStatusMessage({ type: 'success', message });
             setTimeout(() => setStatusMessage(null), 3000);
-        }
+        },
     });
 
     const handleMapClick = (event: React.MouseEvent) => {
@@ -49,7 +49,7 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
         const rect = (event.target as Element).getBoundingClientRect();
         const pixelX = event.clientX - rect.left;
         const pixelY = event.clientY - rect.top;
-        
+
         const clickPoint = zoneEditor.pixelToCoordinate(pixelX, pixelY);
         zoneEditor.handleZoneClick(clickPoint);
     };
@@ -65,14 +65,15 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
                     onClick={onDeleteAllZones}
                     disabled={!hasZones}
                     className={`
-                        flex items-center gap-2 px-4 py-2 rounded-lg border font-medium text-sm
+                        flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium
                         transition-all duration-200 ease-in-out
-                        ${hasZones
-                            ? 'bg-red-500 hover:bg-red-600 text-white border-red-500 hover:shadow-sm active:scale-95'
-                            : 'bg-gray-200 text-gray-400 border-gray-200 cursor-not-allowed'
+                        ${
+                            hasZones
+                                ? 'border-red-500 bg-red-500 text-white hover:bg-red-600 hover:shadow-sm active:scale-95'
+                                : 'cursor-not-allowed border-gray-200 bg-gray-200 text-gray-400'
                         }
                     `}
-                    title={hasZones ? "ลบโซนทั้งหมด" : "ไม่มีโซนให้ลบ"}
+                    title={hasZones ? 'ลบโซนทั้งหมด' : 'ไม่มีโซนให้ลบ'}
                 >
                     <span className="text-lg">🗑️</span>
                     <span>ลบโซนทั้งหมด</span>
@@ -90,18 +91,24 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
 
             {/* Status Message */}
             {statusMessage && (
-                <div className={`
-                    flex items-center gap-2 px-4 py-3 rounded-lg border
-                    ${statusMessage.type === 'success' 
-                        ? 'bg-green-50 border-green-200 text-green-700' 
-                        : statusMessage.type === 'error' 
-                        ? 'bg-red-50 border-red-200 text-red-700'
-                        : 'bg-blue-50 border-blue-200 text-blue-700'
+                <div
+                    className={`
+                    flex items-center gap-2 rounded-lg border px-4 py-3
+                    ${
+                        statusMessage.type === 'success'
+                            ? 'border-green-200 bg-green-50 text-green-700'
+                            : statusMessage.type === 'error'
+                              ? 'border-red-200 bg-red-50 text-red-700'
+                              : 'border-blue-200 bg-blue-50 text-blue-700'
                     }
-                `}>
+                `}
+                >
                     <span className="text-lg">
-                        {statusMessage.type === 'success' ? '✅' : 
-                         statusMessage.type === 'error' ? '❌' : 'ℹ️'}
+                        {statusMessage.type === 'success'
+                            ? '✅'
+                            : statusMessage.type === 'error'
+                              ? '❌'
+                              : 'ℹ️'}
                     </span>
                     <span className="text-sm font-medium">{statusMessage.message}</span>
                 </div>
@@ -109,37 +116,37 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
 
             {/* Zone Edit Controls */}
             {zoneEditor.selectedZone && (
-                <div className="bg-white rounded-lg shadow-lg border p-4">
-                    <div className="flex items-center justify-between mb-4">
+                <div className="rounded-lg border bg-white p-4 shadow-lg">
+                    <div className="mb-4 flex items-center justify-between">
                         <div>
                             <h3 className="text-lg font-semibold text-gray-800">
                                 แก้ไข: {zoneEditor.selectedZone.name}
                             </h3>
                             <p className="text-sm text-gray-600">
-                                ต้นไม้: {zoneEditor.selectedZone.plants.length} ต้น | 
-                                น้ำ: {zoneEditor.selectedZone.totalWaterNeed.toFixed(1)} L/min
+                                ต้นไม้: {zoneEditor.selectedZone.plants.length} ต้น | น้ำ:{' '}
+                                {zoneEditor.selectedZone.totalWaterNeed.toFixed(1)} L/min
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={zoneEditor.applyZoneChanges}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm rounded-md transition-colors"
+                                className="flex items-center gap-2 rounded-md bg-green-500 px-3 py-1.5 text-sm text-white transition-colors hover:bg-green-600"
                             >
                                 <span>✅</span>
                                 <span>บันทึก</span>
                             </button>
                             <button
                                 onClick={zoneEditor.cancelZoneChanges}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-sm rounded-md transition-colors"
+                                className="flex items-center gap-2 rounded-md bg-gray-500 px-3 py-1.5 text-sm text-white transition-colors hover:bg-gray-600"
                             >
                                 <span>❌</span>
                                 <span>ยกเลิก</span>
                             </button>
                         </div>
                     </div>
-                    
-                    <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-md">
-                        <div className="font-medium mb-1">วิธีใช้:</div>
+
+                    <div className="rounded-md bg-gray-50 p-3 text-xs text-gray-500">
+                        <div className="mb-1 font-medium">วิธีใช้:</div>
                         <div>• ลากจุดสีส้ม (มุม) เพื่อเปลี่ยนรูปทรงโซน</div>
                         <div>• ลากจุดสีน้ำเงิน (กึ่งกลาง) เพื่อเพิ่มจุดใหม่</div>
                         <div>• ไม่สามารถลากออกนอกพื้นที่หลักได้</div>
@@ -149,8 +156,8 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
 
             {/* Map Overlay for Zone Editing */}
             {zoneEditor.isEditMode && (
-                <div 
-                    className="fixed inset-0 bg-black bg-opacity-10 z-40 cursor-crosshair"
+                <div
+                    className="fixed inset-0 z-40 cursor-crosshair bg-black bg-opacity-10"
                     onClick={handleMapClick}
                 >
                     {/* Control Points */}
@@ -169,28 +176,33 @@ const AutoZoneEditSection: React.FC<AutoZoneEditSectionProps> = ({
 
             {/* Zone Information */}
             {hasZones && !zoneEditor.isEditMode && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-800 mb-2">ข้อมูลโซนปัจจุบัน</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="rounded-lg bg-gray-50 p-4">
+                    <h4 className="mb-2 font-semibold text-gray-800">ข้อมูลโซนปัจจุบัน</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                         <div className="text-center">
-                            <div className="font-bold text-lg text-blue-600">{zones.length}</div>
+                            <div className="text-lg font-bold text-blue-600">{zones.length}</div>
                             <div className="text-gray-600">โซนทั้งหมด</div>
                         </div>
                         <div className="text-center">
-                            <div className="font-bold text-lg text-green-600">
+                            <div className="text-lg font-bold text-green-600">
                                 {zones.reduce((sum, zone) => sum + zone.plants.length, 0)}
                             </div>
                             <div className="text-gray-600">ต้นไม้ทั้งหมด</div>
                         </div>
                         <div className="text-center">
-                            <div className="font-bold text-lg text-purple-600">
-                                {zones.reduce((sum, zone) => sum + zone.totalWaterNeed, 0).toFixed(1)}
+                            <div className="text-lg font-bold text-purple-600">
+                                {zones
+                                    .reduce((sum, zone) => sum + zone.totalWaterNeed, 0)
+                                    .toFixed(1)}
                             </div>
                             <div className="text-gray-600">L/min</div>
                         </div>
                         <div className="text-center">
-                            <div className="font-bold text-lg text-orange-600">
-                                {(zones.reduce((sum, zone) => sum + zone.totalWaterNeed, 0) / zones.length).toFixed(1)}
+                            <div className="text-lg font-bold text-orange-600">
+                                {(
+                                    zones.reduce((sum, zone) => sum + zone.totalWaterNeed, 0) /
+                                    zones.length
+                                ).toFixed(1)}
                             </div>
                             <div className="text-gray-600">L/min เฉลี่ย</div>
                         </div>

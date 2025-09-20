@@ -26,19 +26,19 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
     onPointDragEnd,
     isDragging,
     draggedPointIndex,
-    mapBounds
+    mapBounds,
 }) => {
     // แปลงพิกัด lat/lng เป็น pixel coordinates สำหรับแสดงบนแผนที่
     const coordinateToPixel = (coord: Coordinate): { x: number; y: number } => {
         if (!mapBounds) return { x: 0, y: 0 };
-        
+
         // สมมติใช้ขนาดแผนที่ 800x600 pixels
         const mapWidth = 800;
         const mapHeight = 600;
-        
+
         const x = ((coord.lng - mapBounds.west) / (mapBounds.east - mapBounds.west)) * mapWidth;
         const y = ((mapBounds.north - coord.lat) / (mapBounds.north - mapBounds.south)) * mapHeight;
-        
+
         return { x, y };
     };
 
@@ -85,69 +85,71 @@ const ZoneControlPoints: React.FC<ZoneControlPointsProps> = ({
     }
 
     return (
-        <div 
-            className="absolute inset-0 pointer-events-none"
+        <div
+            className="pointer-events-none absolute inset-0"
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
         >
             {controlPoints
-                .filter(point => point.index % 1 === 0) // แสดงเฉพาะจุดยอด (ไม่แสดงจุดกึ่งกลาง)
+                .filter((point) => point.index % 1 === 0) // แสดงเฉพาะจุดยอด (ไม่แสดงจุดกึ่งกลาง)
                 .map((point) => {
-                const pixelPos = coordinateToPixel(point.position);
-                const isBeingDragged = draggedPointIndex === point.index;
-                const isMidPoint = point.index % 1 !== 0; // จุดกึ่งกลางมี index เป็นทศนิยม
+                    const pixelPos = coordinateToPixel(point.position);
+                    const isBeingDragged = draggedPointIndex === point.index;
+                    const isMidPoint = point.index % 1 !== 0; // จุดกึ่งกลางมี index เป็นทศนิยม
 
-                return (
-                    <div
-                        key={point.id}
-                        className={`
-                            absolute pointer-events-auto cursor-pointer z-50
+                    return (
+                        <div
+                            key={point.id}
+                            className={`
+                            pointer-events-auto absolute z-50 cursor-pointer
                             ${isBeingDragged ? 'z-[60]' : ''}
                         `}
-                        style={{
-                            left: `${pixelPos.x - 6}px`,
-                            top: `${pixelPos.y - 6}px`,
-                            transform: isBeingDragged ? 'scale(1.3)' : 'scale(1)',
-                            transition: isBeingDragged ? 'none' : 'transform 0.2s ease'
-                        }}
-                        onMouseDown={(e) => handleMouseDown(point, e)}
-                        title={`จุดควบคุม ${isMidPoint ? '(กึ่งกลาง)' : '(มุม)'} - ลากเพื่อแก้ไขโซน`}
-                    >
-                        <div
-                            className={`
-                                w-3 h-3 rounded-full border-2 shadow-lg
-                                ${isMidPoint 
-                                    ? 'bg-blue-400 border-blue-600' 
-                                    : 'bg-orange-400 border-orange-600'
+                            style={{
+                                left: `${pixelPos.x - 6}px`,
+                                top: `${pixelPos.y - 6}px`,
+                                transform: isBeingDragged ? 'scale(1.3)' : 'scale(1)',
+                                transition: isBeingDragged ? 'none' : 'transform 0.2s ease',
+                            }}
+                            onMouseDown={(e) => handleMouseDown(point, e)}
+                            title={`จุดควบคุม ${isMidPoint ? '(กึ่งกลาง)' : '(มุม)'} - ลากเพื่อแก้ไขโซน`}
+                        >
+                            <div
+                                className={`
+                                h-3 w-3 rounded-full border-2 shadow-lg
+                                ${
+                                    isMidPoint
+                                        ? 'border-blue-600 bg-blue-400'
+                                        : 'border-orange-600 bg-orange-400'
                                 }
-                                ${isBeingDragged 
-                                    ? 'bg-red-500 border-red-700 shadow-xl' 
-                                    : 'hover:bg-opacity-80'
+                                ${
+                                    isBeingDragged
+                                        ? 'border-red-700 bg-red-500 shadow-xl'
+                                        : 'hover:bg-opacity-80'
                                 }
                             `}
-                        />
-                        
-                        {/* แสดงเส้นขอบเพื่อให้เห็นการเชื่อมต่อ */}
-                        {!isMidPoint && (
-                            <div className="absolute inset-0 border border-dashed border-orange-300 opacity-50" />
-                        )}
-                    </div>
-                );
-            })}
-            
+                            />
+
+                            {/* แสดงเส้นขอบเพื่อให้เห็นการเชื่อมต่อ */}
+                            {!isMidPoint && (
+                                <div className="absolute inset-0 border border-dashed border-orange-300 opacity-50" />
+                            )}
+                        </div>
+                    );
+                })}
+
             {/* แสดงข้อความช่วยเหลือ */}
             {controlPoints.length > 0 && (
-                <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-3 border max-w-sm pointer-events-auto">
-                    <div className="flex items-center gap-2 text-sm font-medium text-gray-800 mb-2">
+                <div className="pointer-events-auto absolute left-4 top-4 max-w-sm rounded-lg border bg-white p-3 shadow-lg">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-800">
                         <span>🎯</span>
                         <span>โหมดแก้ไขโซน</span>
                     </div>
-                    <div className="text-xs text-gray-600 space-y-1">
+                    <div className="space-y-1 text-xs text-gray-600">
                         <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-orange-400 border border-orange-600"></div>
+                            <div className="h-2 w-2 rounded-full border border-orange-600 bg-orange-400"></div>
                             <span>จุดมุม - ลากเพื่อเปลี่ยนรูปทรงโซน</span>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="mt-1 text-xs text-gray-500">
                             💡 เคล็ดลับ: ลากจุดมุมเพื่อปรับขนาดและรูปทรงของโซน
                         </div>
                     </div>

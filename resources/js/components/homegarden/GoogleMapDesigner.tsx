@@ -414,10 +414,10 @@ const DrawingManager: React.FC<{
             const rectangleToPolygon = (rectangle: google.maps.Rectangle): Coordinate[] => {
                 const bounds = rectangle.getBounds();
                 if (!bounds) return [];
-                
+
                 const ne = bounds.getNorthEast();
                 const sw = bounds.getSouthWest();
-                
+
                 return [
                     { lat: ne.lat(), lng: sw.lng() }, // top-left
                     { lat: ne.lat(), lng: ne.lng() }, // top-right
@@ -431,17 +431,20 @@ const DrawingManager: React.FC<{
                 const center = circle.getCenter();
                 const radius = circle.getRadius();
                 if (!center || !radius) return [];
-                
+
                 const coordinates: Coordinate[] = [];
                 const numPoints = 32; // Number of points to approximate circle
-                
+
                 for (let i = 0; i < numPoints; i++) {
                     const angle = (i * 2 * Math.PI) / numPoints;
                     const lat = center.lat() + (radius / 111000) * Math.cos(angle);
-                    const lng = center.lng() + (radius / (111000 * Math.cos((center.lat() * Math.PI) / 180))) * Math.sin(angle);
+                    const lng =
+                        center.lng() +
+                        (radius / (111000 * Math.cos((center.lat() * Math.PI) / 180))) *
+                            Math.sin(angle);
                     coordinates.push({ lat, lng });
                 }
-                
+
                 return coordinates;
             };
 
@@ -635,24 +638,27 @@ const ClippedSprinklerCoverage: React.FC<{
                 for (let i = 0; i < zoneCoordinates.length; i++) {
                     const edgeStart = zoneCoordinates[i];
                     const edgeEnd = zoneCoordinates[(i + 1) % zoneCoordinates.length];
-                    
+
                     // Calculate intersection points between circle and line segment
-                    const intersections = getCircleLineIntersectionsGPS(center, radius, edgeStart, edgeEnd);
+                    const intersections = getCircleLineIntersectionsGPS(
+                        center,
+                        radius,
+                        edgeStart,
+                        edgeEnd
+                    );
                     intersectionPoints.push(...intersections);
                 }
 
                 if (intersectionPoints.length >= 3) {
                     // Remove duplicate points
                     const uniquePoints = removeDuplicatePointsGPS(intersectionPoints);
-                    
+
                     if (uniquePoints.length >= 3) {
                         // Sort points clockwise around the center
                         const centroidLat =
-                            uniquePoints.reduce((sum, p) => sum + p.lat, 0) /
-                            uniquePoints.length;
+                            uniquePoints.reduce((sum, p) => sum + p.lat, 0) / uniquePoints.length;
                         const centroidLng =
-                            uniquePoints.reduce((sum, p) => sum + p.lng, 0) /
-                            uniquePoints.length;
+                            uniquePoints.reduce((sum, p) => sum + p.lng, 0) / uniquePoints.length;
 
                         uniquePoints.sort((a, b) => {
                             const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);
@@ -1245,7 +1251,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                                     }}
                                     onClick={() => props.onSprinklerClick(sprinkler.id)}
                                 >
-                                    <div className="w-full h-full bg-blue-500 rounded-full border-2 border-white shadow-lg"></div>
+                                    <div className="h-full w-full rounded-full border-2 border-white bg-blue-500 shadow-lg"></div>
                                 </div>
                             )}
                         </div>
@@ -1276,8 +1282,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                     <div>🎯 {t('คลิกเพื่อวางหัวฉีด')}</div>
                     <div className="mt-1 text-xs text-gray-300">
                         {t('รัศมี:')} {props.manualSprinklerRadius}
-                        {t('ม.')} • 🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} •{' '}
-                        {t('ลากเพื่อเลื่อนแผนที่')}
+                        {t('ม.')} • 🔍 {t('ใช้ล้อเมาส์เพื่อซูม')} • {t('ลากเพื่อเลื่อนแผนที่')}
                     </div>
                 </div>
             )}
@@ -1285,10 +1290,10 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
             {props.editMode === 'edit' && (
                 <div className="absolute bottom-4 left-4 rounded-lg border border-yellow-500 bg-gray-800/90 p-4 text-sm text-white backdrop-blur">
                     <div className="mb-2 flex items-center gap-2">
-                        <img 
-                            src="/images/water-pump.png" 
-                            alt="Water Pump" 
-                            className="w-4 h-4 object-contain"
+                        <img
+                            src="/images/water-pump.png"
+                            alt="Water Pump"
+                            className="h-4 w-4 object-contain"
                         />
                         <span className="font-semibold">{t('โหมดจัดการแหล่งน้ำ')}</span>
                     </div>
@@ -1305,9 +1310,7 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                     <div className="mb-2 flex items-center gap-2">
                         <span className="text-purple-400">🔧</span>
                         <span className="font-semibold">
-                            {props.pipeEditMode === 'add'
-                                ? t('เพิ่มท่อ')
-                                : t('ลบท่อ')}
+                            {props.pipeEditMode === 'add' ? t('เพิ่มท่อ') : t('ลบท่อ')}
                         </span>
                     </div>
                     <div>
@@ -1320,8 +1323,6 @@ const GoogleMapDesignerContent: React.FC<GoogleMapDesignerProps & { map?: google
                     </div>
                 </div>
             )}
-
-            
         </>
     );
 };
