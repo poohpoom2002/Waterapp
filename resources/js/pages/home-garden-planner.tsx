@@ -622,6 +622,55 @@ export default function HomeGardenPlanner() {
         [isPointInAvoidanceZone, findLongestEdgeAngle, gardenZones, canvasData]
     );
 
+    // ฟังก์ชันตรวจสอบว่าโซนเป็นวงกลมหรือไม่
+    const isCircleShape = useCallback(
+        (coordinates: Coordinate[] | CanvasCoordinate[], isCanvas: boolean, scale: number): boolean => {
+            if (coordinates.length < 8) return false; // วงกลมต้องมีจุดอย่างน้อย 8 จุด
+            
+            // คำนวณจุดศูนย์กลาง
+            let centerX: number, centerY: number;
+            if (isCanvas) {
+                const canvasCoords = coordinates as CanvasCoordinate[];
+                centerX = canvasCoords.reduce((sum, c) => sum + c.x, 0) / canvasCoords.length;
+                centerY = canvasCoords.reduce((sum, c) => sum + c.y, 0) / canvasCoords.length;
+            } else {
+                const gpsCoords = coordinates as Coordinate[];
+                centerX = gpsCoords.reduce((sum, c) => sum + c.lng, 0) / gpsCoords.length;
+                centerY = gpsCoords.reduce((sum, c) => sum + c.lat, 0) / gpsCoords.length;
+            }
+
+            // คำนวณระยะทางจากจุดศูนย์กลางไปยังแต่ละจุด
+            const distances: number[] = [];
+            coordinates.forEach((coord) => {
+                let distance: number;
+                if (isCanvas) {
+                    const canvasCoord = coord as CanvasCoordinate;
+                    distance = Math.sqrt(
+                        Math.pow(canvasCoord.x - centerX, 2) + Math.pow(canvasCoord.y - centerY, 2)
+                    );
+                } else {
+                    const gpsCoord = coord as Coordinate;
+                    distance = calculateDistance(
+                        { lat: centerY, lng: centerX },
+                        gpsCoord,
+                        scale
+                    );
+                }
+                distances.push(distance);
+            });
+
+            // คำนวณรัศมีเฉลี่ย
+            const avgRadius = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+            
+            // ตรวจสอบว่าทุกจุดมีระยะทางใกล้เคียงกับรัศมีเฉลี่ยหรือไม่ (ความผิดพลาดไม่เกิน 10%)
+            const tolerance = avgRadius * 0.1;
+            const isCircular = distances.every(distance => Math.abs(distance - avgRadius) <= tolerance);
+            
+            return isCircular;
+        },
+        []
+    );
+
     const autoPlaceSprinklersInZone = useCallback(
         (zoneId: string) => {
             const zone = gardenZones.find((z) => z.id === zoneId);
@@ -643,8 +692,8 @@ export default function HomeGardenPlanner() {
             const isCanvas = !!zone.canvasCoordinates;
             const scale = isCanvas ? currentScale : 1;
 
-            const longestEdgeAngle = findLongestEdgeAngle(coordinates);
-            const radians = (longestEdgeAngle * Math.PI) / 180;
+            // ตรวจสอบว่าโซนนี้เป็นวงกลมหรือไม่
+            const isCircleZone = isCircleShape(coordinates, isCanvas, scale);
 
             let centerX: number, centerY: number;
             if (isCanvas) {
@@ -661,11 +710,50 @@ export default function HomeGardenPlanner() {
             const newSprinklers: Sprinkler[] = [];
             let sprinklerCounter = 0;
 
-            const cornerSprinklers = placeCornerSprinklers(zone, sprinklerType);
-            newSprinklers.push(...cornerSprinklers);
-            sprinklerCounter += cornerSprinklers.length;
+            // ถ้าเป็นวงกลม ให้วางสปริงเกอร์แค่ตรงกลาง
+            if (isCircleZone) {
+                const centerPoint = isCanvas 
+                    ? { x: centerX, y: centerY }
+                    : { lat: centerY, lng: centerX };
 
-            if (isCanvas) {
+                let shouldAvoid = false;
+                if (zone.type === 'grass') {
+                    shouldAvoid = isPointInAvoidanceZone(centerPoint, zone.id);
+                } else {
+                    shouldAvoid = gardenZones.some(
+                        (forbiddenZone) =>
+                            forbiddenZone.type === 'forbidden' &&
+                            !forbiddenZone.parentZoneId &&
+                            (forbiddenZone.canvasCoordinates 
+                                ? isPointInPolygon(centerPoint, forbiddenZone.canvasCoordinates)
+                                : isPointInPolygon(centerPoint, forbiddenZone.coordinates))
+                    );
+                }
+
+                if (!shouldAvoid) {
+                    const gpsPos = isCanvas 
+                        ? canvasToGPS(centerPoint, canvasData)
+                        : centerPoint as Coordinate;
+                    
+                    newSprinklers.push({
+                        id: `${zone.id}_sprinkler_${Date.now()}_${sprinklerCounter++}`,
+                        position: gpsPos,
+                        canvasPosition: isCanvas ? centerPoint as CanvasCoordinate : undefined,
+                        type: sprinklerType,
+                        zoneId: zone.id,
+                        orientation: 0,
+                    });
+                }
+            } else {
+                // สำหรับโซนที่ไม่ใช่วงกลม ใช้วิธีเดิม
+                const longestEdgeAngle = findLongestEdgeAngle(coordinates);
+                const radians = (longestEdgeAngle * Math.PI) / 180;
+
+                const cornerSprinklers = placeCornerSprinklers(zone, sprinklerType);
+                newSprinklers.push(...cornerSprinklers);
+                sprinklerCounter += cornerSprinklers.length;
+
+                if (isCanvas) {
                 const spacingPixels = spacing * scale;
                 const cos = Math.cos(radians);
                 const sin = Math.sin(radians);
@@ -794,6 +882,7 @@ export default function HomeGardenPlanner() {
                     }
                 }
             }
+            }
 
             setSelectedSprinkler(null);
             setSprinklers((prev) => [...prev.filter((s) => s.zoneId !== zoneId), ...newSprinklers]);
@@ -809,6 +898,7 @@ export default function HomeGardenPlanner() {
             manualSprinklerRadius,
             manualSprinklerPressure,
             manualSprinklerFlowRate,
+            isCircleShape,
         ]
     );
 

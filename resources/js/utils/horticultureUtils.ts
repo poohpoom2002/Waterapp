@@ -530,7 +530,9 @@ export const calculatePipeLength = (coordinates: Coordinate[]): number => {
 };
 
 export const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): boolean => {
-    if (!point || !polygon || polygon.length < 3) return false;
+    if (!point || !polygon || polygon.length < 3) {
+        return false;
+    }
 
     try {
         let inside = false;
@@ -545,6 +547,7 @@ export const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): bool
                 point.lat < ((xj - xi) * (point.lng - yi)) / (yj - yi) + xi;
             if (intersect) inside = !inside;
         }
+        
         return inside;
     } catch (error) {
         console.error('Error checking point in polygon:', error);

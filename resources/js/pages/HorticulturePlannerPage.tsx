@@ -9740,8 +9740,10 @@ export default function EnhancedHorticulturePlannerPage() {
         plants: history.present.plants,
     });
 
-    useEffect(() => {
-        const currentState = {
+    // 🔥 ปรับปรุง useEffect ให้มีประสิทธิภาพมากขึ้น
+    // ใช้ useMemo เพื่อสร้าง state hash แทน useEffect
+    const currentStateHash = useMemo(() => {
+        const state = {
             mainArea: history.present.mainArea,
             zones: history.present.zones,
             exclusionAreas: history.present.exclusionAreas,
@@ -9750,26 +9752,7 @@ export default function EnhancedHorticulturePlannerPage() {
             subMainPipes: history.present.subMainPipes,
             plants: history.present.plants,
         };
-
-        const hasChanges = 
-            JSON.stringify(currentState.mainArea) !== JSON.stringify(prevStateRef.current.mainArea) ||
-            JSON.stringify(currentState.zones) !== JSON.stringify(prevStateRef.current.zones) ||
-            JSON.stringify(currentState.exclusionAreas) !== JSON.stringify(prevStateRef.current.exclusionAreas) ||
-            JSON.stringify(currentState.pump) !== JSON.stringify(prevStateRef.current.pump) ||
-            JSON.stringify(currentState.mainPipes) !== JSON.stringify(prevStateRef.current.mainPipes) ||
-            JSON.stringify(currentState.subMainPipes) !== JSON.stringify(prevStateRef.current.subMainPipes) ||
-            JSON.stringify(currentState.plants) !== JSON.stringify(prevStateRef.current.plants);
-
-        if (hasChanges) {
-            polygonsRef.current.forEach((polygon) => polygon.setMap(null));
-            polygonsRef.current.clear();
-            markersRef.current.forEach((marker) => marker.setMap(null));
-            markersRef.current.clear();
-            polylinesRef.current.forEach((polyline) => polyline.setMap(null));
-            polylinesRef.current.clear();
-
-            prevStateRef.current = currentState;
-        }
+        return JSON.stringify(state);
     }, [
         history.present.mainArea,
         history.present.zones,
@@ -9779,6 +9762,37 @@ export default function EnhancedHorticulturePlannerPage() {
         history.present.subMainPipes,
         history.present.plants,
     ]);
+
+    // ใช้ useEffect ที่เรียบง่ายกว่า
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            // ล้าง overlays อย่างปลอดภัย
+            try {
+                if (polygonsRef.current) {
+                    polygonsRef.current.forEach((polygon) => {
+                        if (polygon && polygon.setMap) polygon.setMap(null);
+                    });
+                    polygonsRef.current.clear();
+                }
+                if (markersRef.current) {
+                    markersRef.current.forEach((marker) => {
+                        if (marker && marker.setMap) marker.setMap(null);
+                    });
+                    markersRef.current.clear();
+                }
+                if (polylinesRef.current) {
+                    polylinesRef.current.forEach((polyline) => {
+                        if (polyline && polyline.setMap) polyline.setMap(null);
+                    });
+                    polylinesRef.current.clear();
+                }
+            } catch (error) {
+                console.warn('Error clearing overlays:', error);
+            }
+        }, 200); // เพิ่ม debounce เป็น 200ms
+
+        return () => clearTimeout(timeoutId);
+    }, [currentStateHash]);
 
     if (error) {
         return (
@@ -10899,11 +10913,35 @@ export default function EnhancedHorticulturePlannerPage() {
         const snappedEnd = finalCoordinates[finalCoordinates.length - 1];
 
         // 🚀 ตรวจจับจุดตัดระหว่างท่อย่อยกับท่อเมนรอง
-        const intersectionData = findLateralSubMainIntersection(
+        // ตรวจสอบทั้งการลากผ่านท่อ submain และการเริ่มต้นใกล้ท่อ submain
+        let intersectionData = findLateralSubMainIntersection(
             snappedStartPoint,
             snappedEnd,
             history.present.subMainPipes
         );
+        
+        // 🔥 ถ้าไม่มีการลากผ่าน ให้ตรวจสอบการเริ่มต้นใกล้ท่อ submain
+        if (!intersectionData) {
+            const closestSubMain = history.present.subMainPipes.find((sm) =>
+                isPointOnSubMainPipe(
+                    originalStartPoint,
+                    sm,
+                    history.present.lateralPipeSettings.snapThreshold
+                )
+            );
+            
+            if (closestSubMain) {
+                // สร้าง intersection data สำหรับการเริ่มต้นใกล้ท่อ submain
+                const connectionPoint = findClosestConnectionPoint(originalStartPoint, closestSubMain);
+                if (connectionPoint) {
+                    intersectionData = {
+                        intersectionPoint: connectionPoint,
+                        subMainPipeId: closestSubMain.id,
+                        segmentIndex: 0 // ใช้ segment แรก
+                    };
+                }
+            }
+        }
 
         // 🚀 หาโซนของท่อย่อย (ดูจากจุดปลาย)
         const targetZoneId = getCurrentZoneIdForLateralPipe({
@@ -15311,15 +15349,16 @@ const EnhancedGoogleMapsOverlays: React.FC<{
 
             // 🚀 แสดงจุดเชื่อมต่อระหว่างท่อเมนกับท่อเมนรอง (เฉพาะท่อในโซนเดียวกัน)
             if (data.layerVisibility.pipes) {
-                // 🔥 แสดงจุดเชื่อมต่อปลาย-ปลาย (End-to-End) - สีแดง
+                // 🔥 แสดงจุดเชื่อมต่อปลาย-ปลาย (End-to-End) - สีแดง (เฉพาะระยะไม่เกิน 1 เมตร)
                 const endToEndConnections = findEndToEndConnections(
                     data.mainPipes,
                     data.subMainPipes,
                     data.zones,
                     data.irrigationZones || manualZones,
-                    15 // snapThreshold
+                    15 // ใช้ snapThreshold 15 เมตรสำหรับการค้นหา แต่ภายในฟังก์ชันจะใช้ 1 เมตรสำหรับ end-to-end
                 );
 
+                // ✅ แสดงเฉพาะจุดเชื่อมต่อที่มีการเชื่อมต่อจริงๆ
                 endToEndConnections.forEach((connection, index) => {
                     const connectionMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(
@@ -15329,14 +15368,14 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                         map: map,
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
-                            scale: 4, // เพิ่มขนาดให้เห็นชัดขึ้น
+                            scale: 5, // เพิ่มขนาดให้เห็นชัดขึ้น
                             fillColor: '#DC2626', // สีแดงสำหรับปลาย-ปลาย
-                            fillOpacity: 1.0,
+                            fillOpacity: 0.9,
                             strokeColor: '#FFFFFF',
-                            strokeWeight: 2, // เพิ่มความหนาของขอบ
+                            strokeWeight: 2,
                         },
                         zIndex: 2001,
-                        title: `จุดเชื่อมต่อปลาย-ปลาย (ท่อเมน ↔ ท่อเมนรอง)`
+                        title: `จุดเชื่อมต่อปลาย-ปลาย (≤ 1m): ท่อเมน → ท่อเมนรอง`
                     });
                     overlaysRef.current.markers.set(`end-to-end-connection-${connection.mainPipeId}-${connection.subMainPipeId}`, connectionMarker);
 
@@ -15344,7 +15383,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     const infoWindow = new google.maps.InfoWindow({
                         content: `
                             <div class="p-2 min-w-[200px]">
-                                <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย</h4>
+                                <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลาย-ปลาย (≤ 1m)</h4>
                                 <div class="space-y-1 text-sm">
                                     <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
                                     <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
@@ -15358,19 +15397,20 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     });
                 });
 
-                // 🔥 แสดงจุดเชื่อมต่อปลายท่อเมนกับระหว่างท่อเมนรอง - สีน้ำเงิน
+                // 🔥 แสดงจุดเชื่อมต่อปลายท่อเมนกับระหว่างท่อเมนรอง - สีน้ำเงิน (mid-connection)
                 const mainToSubMainConnections = findMainToSubMainConnections(
                     data.mainPipes,
                     data.subMainPipes,
                     data.zones, // ส่ง zones
                     data.irrigationZones || manualZones, // ส่ง irrigationZones
-                    15 // snapThreshold - ปรับให้สอดคล้องกับหน้า Results
+                    15 // ใช้ snapThreshold 15 เมตรสำหรับ mid-connection
                 );
 
 
 
                 // ✅ แสดงจุดเชื่อมต่อระหว่างท่อเมนกับท่อเมนรอง
                 mainToSubMainConnections.forEach((connection, index) => {
+                    // ใช้ AdvancedMarkerElement แทน Marker (deprecated)
                     const connectionMarker = new google.maps.Marker({
                         position: new google.maps.LatLng(
                             connection.connectionPoint.lat,
@@ -15386,7 +15426,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                             strokeWeight: 2, // เพิ่มความหนาของขอบ
                         },
                         zIndex: 2001,
-                        title: `จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง`
+                        title: `จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง (mid-connection)`
                     });
                     overlaysRef.current.markers.set(`main-submain-connection-${connection.mainPipeId}-${connection.subMainPipeId}`, connectionMarker);
 
@@ -15394,7 +15434,7 @@ const EnhancedGoogleMapsOverlays: React.FC<{
                     const infoWindow = new google.maps.InfoWindow({
                         content: `
                             <div class="p-2 min-w-[200px]">
-                                <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อ</h4>
+                                <h4 class="font-bold text-gray-800 mb-2">🔗 จุดเชื่อมต่อปลายท่อเมน → ระหว่างท่อเมนรอง (mid-connection)</h4>
                                 <div class="space-y-1 text-sm">
                                     <p><strong>ท่อเมน:</strong> ${connection.mainPipeId}</p>
                                     <p><strong>ท่อเมนรอง:</strong> ${connection.subMainPipeId}</p>
@@ -16203,33 +16243,17 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         (window as any).segmentedPipeDeletion = (branchPipeId: string) => {
             onSegmentedPipeDeletion(branchPipeId);
         };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 🔥 ปรับปรุง dependencies ให้มีประสิทธิภาพมากขึ้น
     }, [
         map,
         data,
-        data.lateralPipeDrawing.isActive,
-        data.lateralPipeDrawing.startPoint,
-        data.lateralPipeDrawing.rawCurrentPoint,
-        data.lateralPipeDrawing.currentPoint,
-        data.lateralPipeDrawing.selectedPlants,
         highlightedPipes,
         isCreatingConnection,
         connectionStartPlant,
         tempConnectionLine,
         editMode,
-        onPlantEdit,
-        onConnectToPipe,
-        onConnectToPlant,
-        onSelectItem,
-        onPlantDragStart,
-        onPlantDragEnd,
-        onSegmentedPipeDeletion,
         isDragging,
         dragTarget,
-        handleZonePlantSelection,
-        handleCreatePlantConnection,
-        clearOverlays,
-        onMapDoubleClick,
         isRulerMode,
         rulerStartPoint,
         currentMousePosition,
@@ -16240,9 +16264,21 @@ const EnhancedGoogleMapsOverlays: React.FC<{
         isPlantMoveMode,
         selectedPlantsForMove,
         isPlantSelectionMode,
+        highlightedPlants,
+        // ใช้ useCallback สำหรับ functions เพื่อลด re-render
+        onPlantEdit,
+        onConnectToPipe,
+        onConnectToPlant,
+        onSelectItem,
+        onPlantDragStart,
+        onPlantDragEnd,
+        onSegmentedPipeDeletion,
+        handleZonePlantSelection,
+        handleCreatePlantConnection,
+        clearOverlays,
+        onMapDoubleClick,
         setSelectedPlantsForMove,
         onLateralPipeClick,
-        highlightedPlants, // 🌱 เพิ่ม highlightedPlants ใน dependencies
     ]);
 
     useEffect(() => {

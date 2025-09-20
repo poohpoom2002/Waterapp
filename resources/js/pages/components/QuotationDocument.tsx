@@ -49,6 +49,7 @@ interface QuotationDocumentProps {
     projectMode: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     gardenData: any;
     projectData: any;
+    greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
     showPump: boolean;
     zoneSprinklers: { [zoneId: string]: any };
     selectedPipes: { [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any } };
@@ -72,6 +73,7 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
     projectData,
     projectMode,
     gardenData,
+    greenhouseData,
     zoneSprinklers,
     selectedPipes,
     sprinklerEquipmentSets = {},

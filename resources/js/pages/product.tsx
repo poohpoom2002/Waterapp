@@ -2125,6 +2125,7 @@ export default function Product() {
                             zoneAreaData={getZoneAreaData()}
                             connectionStats={connectionStats}
                             onConnectionEquipmentsChange={handleConnectionEquipmentsChange}
+                            greenhouseData={greenhouseData}
                         />
 
                         <SprinklerSelector
@@ -2135,6 +2136,7 @@ export default function Product() {
                             allZoneSprinklers={zoneSprinklers}
                             projectMode={projectMode}
                             gardenStats={gardenStats}
+                            greenhouseData={greenhouseData}
                         />
 
                         {currentSprinkler && (
@@ -2148,6 +2150,7 @@ export default function Product() {
                                         onPipeChange={(pipe) => handlePipeChange('branch', pipe)}
                                         horticultureSystemData={horticultureSystemData}
                                         gardenSystemData={gardenSystemData}
+                                        greenhouseSystemData={greenhouseData}
                                         activeZoneId={activeZoneId}
                                         selectedSprinkler={currentSprinkler}
                                         projectMode={projectMode}
@@ -2164,6 +2167,7 @@ export default function Product() {
                                             }
                                             horticultureSystemData={horticultureSystemData}
                                             gardenSystemData={gardenSystemData}
+                                            greenhouseSystemData={greenhouseData}
                                             activeZoneId={activeZoneId}
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
@@ -2186,6 +2190,7 @@ export default function Product() {
                                             onPipeChange={(pipe) => handlePipeChange('main', pipe)}
                                             horticultureSystemData={horticultureSystemData}
                                             gardenSystemData={gardenSystemData}
+                                            greenhouseSystemData={greenhouseData}
                                             activeZoneId={activeZoneId}
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
@@ -2201,6 +2206,7 @@ export default function Product() {
                                             onPipeChange={(pipe) => handlePipeChange('emitter', pipe)}
                                             horticultureSystemData={horticultureSystemData}
                                             gardenSystemData={gardenSystemData}
+                                            greenhouseSystemData={greenhouseData}
                                             activeZoneId={activeZoneId}
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
@@ -2300,6 +2306,7 @@ export default function Product() {
                                             allZoneResults={results?.allZoneResults}
                                             projectSummary={results?.projectSummary}
                                             projectMode={projectMode}
+                                            greenhouseData={greenhouseData}
                                         />
                                     )}
                                 
@@ -2411,6 +2418,7 @@ export default function Product() {
                 projectImage={projectImage}
                 projectData={projectData}
                 gardenData={gardenData}
+                greenhouseData={greenhouseData}
                 zoneSprinklers={zoneSprinklers}
                 selectedPipes={selectedPipes}
                 sprinklerEquipmentSets={sprinklerEquipmentSets}

@@ -17,6 +17,7 @@ interface PumpSelectorProps {
     projectSummary?: any;
     zoneOperationMode?: string;
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
+    greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
 }
 
 interface ZoneOperationGroup {
@@ -38,6 +39,7 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     projectSummary,
     zoneOperationMode = 'sequential',
     projectMode = 'horticulture',
+    greenhouseData,
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [showAccessoriesModal, setShowAccessoriesModal] = useState(false);
@@ -519,6 +521,12 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 }
             } catch (error) {
                 console.error('Error parsing garden stats:', error);
+            }
+        } else if (projectMode === 'greenhouse') {
+            // สำหรับ greenhouse mode ใช้ข้อมูลจาก greenhouseData
+            if (greenhouseData && greenhouseData.summary) {
+                // ใช้ค่า default สำหรับ greenhouse
+                sprinklerPressureBar = 2.5;
             }
         } else {
             // สำหรับ mode อื่นๆ ใช้ข้อมูลจาก results

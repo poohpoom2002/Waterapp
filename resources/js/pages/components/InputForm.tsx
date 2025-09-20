@@ -34,6 +34,7 @@ interface InputFormProps {
     };
     connectionStats?: ConnectionPointStats[];
     onConnectionEquipmentsChange?: (equipments: ConnectionPointEquipment[]) => void;
+    greenhouseData?: any; // เพิ่มสำหรับ greenhouse projectMode
 }
 
 interface BranchPipeStats {
@@ -89,6 +90,7 @@ const InputForm: React.FC<InputFormProps> = ({
     zoneAreaData,
     connectionStats = [],
     onConnectionEquipmentsChange,
+    greenhouseData,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);

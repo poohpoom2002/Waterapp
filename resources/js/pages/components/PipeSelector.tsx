@@ -28,6 +28,7 @@ interface PipeSelectorProps {
     onPipeChange: (pipe: any) => void;
     horticultureSystemData?: any;
     gardenSystemData?: any; // เพิ่มสำหรับ garden mode
+    greenhouseSystemData?: any; // เพิ่มสำหรับ greenhouse mode
     activeZoneId?: string;
     selectedSprinkler?: any;
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
@@ -42,6 +43,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     onPipeChange,
     horticultureSystemData,
     gardenSystemData,
+    greenhouseSystemData,
     activeZoneId,
     selectedSprinkler,
     projectMode = 'horticulture',
@@ -86,6 +88,58 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         };
                     }
                     return currentZone.bestPipes.branch; // fallback
+                default:
+                    return null;
+            }
+        }
+
+        // สำหรับ greenhouse mode ใช้ greenhouseSystemData
+        if (projectMode === 'greenhouse' && greenhouseSystemData && activeZoneId) {
+            const currentPlot = greenhouseSystemData.summary.plotStats.find(
+                (plot: any) => plot.plotId === activeZoneId
+            );
+            if (!currentPlot) return null;
+
+            // สร้างข้อมูล pipe สำหรับ greenhouse
+            const createGreenhousePipeInfo = (type: string, length: number, flowRate: number) => ({
+                id: `${type}-pipe-${activeZoneId}`,
+                length: length,
+                count: 1,
+                waterFlowRate: flowRate,
+                details: { type: type },
+            });
+
+            switch (pipeType) {
+                case 'branch':
+                    return createGreenhousePipeInfo(
+                        'branch',
+                        currentPlot.pipeStats.drip.longest || currentPlot.pipeStats.sub.longest || 30,
+                        currentPlot.production.waterRequirementPerIrrigation / Math.max(currentPlot.equipmentCount.sprinklers || 1, 1)
+                    );
+                case 'secondary':
+                    return createGreenhousePipeInfo(
+                        'secondary',
+                        currentPlot.pipeStats.main.longest || 0,
+                        currentPlot.production.waterRequirementPerIrrigation
+                    );
+                case 'main':
+                    return createGreenhousePipeInfo(
+                        'main',
+                        0, // greenhouse มักไม่มี main pipe
+                        0
+                    );
+                case 'emitter':
+                    if (currentPlot.production?.waterCalculation) {
+                        const waterCalc = currentPlot.production.waterCalculation;
+                        // ตรวจสอบ null safety สำหรับ waterPerPlant
+                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                        return createGreenhousePipeInfo(
+                            'emitter',
+                            currentPlot.pipeStats.drip.longest || 10,
+                            flowRate
+                        );
+                    }
+                    return createGreenhousePipeInfo('emitter', 10, 6.0);
                 default:
                     return null;
             }
@@ -175,6 +229,38 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 setSprinklerPressure(pressureInfo);
             }
         }
+        // สำหรับ greenhouse mode ใช้ greenhouseSystemData
+        else if (projectMode === 'greenhouse') {
+            if (greenhouseSystemData && activeZoneId) {
+                const currentPlot = greenhouseSystemData.summary.plotStats.find((p: any) => p.plotId === activeZoneId);
+                if (currentPlot && currentPlot.production.waterCalculation) {
+                    const waterCalc = currentPlot.production.waterCalculation;
+                    const pressureBar = 2.5; // ค่า default สำหรับ greenhouse
+                    const pressureInfo = {
+                        pressureBar: pressureBar,
+                        headM: pressureBar * 10,
+                        head20PercentM: pressureBar * 10 * 0.2,
+                    };
+                    setSprinklerPressure(pressureInfo);
+                } else {
+                    // ใช้ค่า default สำหรับ greenhouse
+                    const pressureInfo = {
+                        pressureBar: 2.5,
+                        headM: 25,
+                        head20PercentM: 5,
+                    };
+                    setSprinklerPressure(pressureInfo);
+                }
+            } else {
+                // ใช้ค่า default สำหรับ greenhouse
+                const pressureInfo = {
+                    pressureBar: 2.5,
+                    headM: 25,
+                    head20PercentM: 5,
+                };
+                setSprinklerPressure(pressureInfo);
+            }
+        }
         // สำหรับ horticulture mode ใช้ horticultureSystemData (เดิม)
         else if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
             const pressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
@@ -189,7 +275,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             const pressureInfo = calculateSprinklerPressure(selectedSprinkler);
             setSprinklerPressure(pressureInfo);
         }
-    }, [projectMode, horticultureSystemData, gardenSystemData, selectedSprinkler]);
+    }, [projectMode, horticultureSystemData, gardenSystemData, greenhouseSystemData, activeZoneId, selectedSprinkler]);
 
     // Garden mode: ดึงข้อมูล zone statistics
     useEffect(() => {

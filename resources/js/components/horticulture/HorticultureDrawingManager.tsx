@@ -57,7 +57,7 @@ interface HorticultureDrawingManagerProps {
     const snapPointToMainPipeEnd = (
         point: Coordinate,
         mainPipes: any[],
-        snapThreshold: number = 5
+        snapThreshold: number = 1.0 // เปลี่ยน default เป็น 1 เมตร
     ): Coordinate => {
         if (!mainPipes || mainPipes.length === 0) {
             return point;
@@ -72,16 +72,18 @@ interface HorticultureDrawingManagerProps {
                 continue;
             }
 
+            // ✅ ตรวจสอบเฉพาะปลายท่อ main (จุดสุดท้าย)
             const pipeEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
             const distance = calculateDistanceBetweenPoints(point, pipeEnd);
 
-            if (distance < minDistance) {
+            if (distance < minDistance && distance <= snapThreshold) {
                 minDistance = distance;
                 closestPoint = pipeEnd;
                 closestPipeId = mainPipe.id;
             }
         }
 
+        // ✅ คืนค่าจุดที่ snap ได้เท่านั้น (ระยะไม่เกิน threshold)
         if (minDistance <= snapThreshold) {
             return closestPoint;
         }
@@ -482,9 +484,31 @@ const getShapeOptions = (editMode: string | null, fillColor?: string, strokeColo
         mainPipes: any[],
         mainArea: Coordinate[]
     ): Coordinate[] => {
-        // 🚫 ปิดการ snap ท่อ sub main ทั้งหมด - ห้ามขยับท่อ sub main!
-        // ให้คืนค่า coordinates เดิมโดยไม่มีการแก้ไขใดๆ
-        return coordinates;
+        if (coordinates.length === 0) {
+            return coordinates;
+        }
+
+        const snappedCoordinates = [...coordinates];
+        
+        // ✅ จุดเริ่มต้นของท่อ submain ให้ snap ไปยังปลายท่อ main (เฉพาะระยะ ≤ 1 เมตร)
+        if (mainPipes && mainPipes.length > 0) {
+            const startPoint = coordinates[0];
+            
+            // snap เฉพาะระยะ ≤ 1 เมตรเท่านั้น (end-to-end connection)
+            const snappedStart = snapPointToMainPipeEnd(startPoint, mainPipes, 1.0);
+            
+            // ถ้า snap สำเร็จ (ระยะ ≤ 1m) ให้อัพเดทจุดเริ่มต้น
+            if (snappedStart.lat !== startPoint.lat || snappedStart.lng !== startPoint.lng) {
+                snappedCoordinates[0] = snappedStart;
+                
+                // แสดงการแจ้งเตือน
+                if (typeof window !== 'undefined' && (window as any).showSnapNotification) {
+                    (window as any).showSnapNotification('ท่อเมนรองเชื่อมต่อกับปลายท่อเมนสำเร็จ (end-to-end ≤ 1m)');
+                }
+            }
+        }
+
+        return snappedCoordinates;
     };
 
     // ฟังก์ชันใหม่สำหรับ snap ไปยังท่อเมน

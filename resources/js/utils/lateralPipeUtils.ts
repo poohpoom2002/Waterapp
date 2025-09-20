@@ -319,6 +319,10 @@ export const findMainToSubMainConnections = (
         connectionPoint: Coordinate;
     }[] = [];
 
+    if (!mainPipes || !subMainPipes || mainPipes.length === 0 || subMainPipes.length === 0) {
+        return connections;
+    }
+
     // Helper function สำหรับหาโซนของท่อ (ตามจุดปลาย)
     const findPipeZone = (pipe: any): string | null => {
         if (!pipe.coordinates || pipe.coordinates.length === 0) return null;
@@ -346,58 +350,70 @@ export const findMainToSubMainConnections = (
         return null;
     };
 
-    for (const mainPipe of mainPipes) {
-        if (!mainPipe.coordinates || mainPipe.coordinates.length < 2) {
+    // 🔥 วิธีใหม่: หาท่อ main ที่เชื่อมกับท่อ submain จริงๆ ก่อน
+    for (const subMainPipe of subMainPipes) {
+        if (!subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
             continue;
         }
 
-        const mainEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
-        const mainZone = findPipeZone(mainPipe);
-
-        for (const subMainPipe of subMainPipes) {
-            if (!subMainPipe.coordinates || subMainPipe.coordinates.length < 2) {
-                continue;
-            }
-
-            const subMainZone = findPipeZone(subMainPipe);
-            
-            // 🔥 เข้มงวดการตรวจสอบโซน: เชื่อมต่อเฉพาะท่อที่อยู่ในโซนเดียวกัน
-            if (mainZone && subMainZone && mainZone !== subMainZone) {
+        const subMainStart = subMainPipe.coordinates[0];
+        const subMainZone = findPipeZone(subMainPipe);
+        
+        // หาท่อ main ที่ใกล้ที่สุดกับท่อ submain นี้
+        let closestMainPipe: any = null;
+        let closestDistance = Infinity;
+        let closestMainEnd: Coordinate | null = null;
+        
+        for (const mainPipe of mainPipes) {
+            if (!mainPipe.coordinates || mainPipe.coordinates.length < 2) {
                 continue;
             }
             
-            // 🔥 ตรวจสอบปลายท่อเมนกับทุกจุดบนท่อเมนรอง (ไม่ใช่แค่จุดเริ่มต้น)
-            for (let i = 0; i < subMainPipe.coordinates.length - 1; i++) {
-                const segmentStart = subMainPipe.coordinates[i];
-                const segmentEnd = subMainPipe.coordinates[i + 1];
+            const mainEnd = mainPipe.coordinates[mainPipe.coordinates.length - 1];
+            const mainZone = findPipeZone(mainPipe);
+            
+                // 🔥 เข้มงวดการตรวจสอบโซน: เชื่อมต่อเฉพาะท่อที่อยู่ในโซนเดียวกัน
+                if (mainZone && subMainZone && mainZone !== subMainZone) {
+                    continue; // ข้าม - ห้ามเชื่อมข้ามโซนโดยเด็ดขาด
+                }
+            
+            // คำนวณระยะห่างจากปลายท่อ main ไปยังจุดเริ่มต้นของท่อ submain
+            const distanceToSubMainStart = calculateDistanceBetweenPoints(mainEnd, subMainStart);
+            
+            if (distanceToSubMainStart < closestDistance) {
+                closestDistance = distanceToSubMainStart;
+                closestMainPipe = mainPipe;
+                closestMainEnd = mainEnd;
+            }
+        }
+        
+        // ถ้าเจอท่อ main ที่ใกล้ที่สุด ให้ตรวจสอบการเชื่อมต่อ
+        if (closestMainPipe && closestMainEnd) {
+            
+            // 🔥 ตรวจสอบปลายท่อเมนกับทุกจุดบนท่อเมนรอง (ยกเว้นจุดปลายเริ่มต้น)
+            for (let i = 1; i < subMainPipe.coordinates.length; i++) { // เริ่มจาก index 1 (ข้ามจุดเริ่มต้น)
+                const subMainPoint = subMainPipe.coordinates[i];
+                const distanceToSubMainPoint = calculateDistanceBetweenPoints(closestMainEnd, subMainPoint);
                 
-                // หาจุดที่ใกล้ที่สุดบน segment นี้
-                const closestPoint = findClosestPointOnLineSegment(mainEnd, segmentStart, segmentEnd);
-                const distance = calculateDistanceBetweenPoints(mainEnd, closestPoint);
-                
-                if (distance <= snapThreshold) {
-                    // 🔥 ตรวจสอบว่าไม่ใช่การเชื่อมปลายต่อปลาย (end-to-end connection)
-                    const isEndToEndConnection = 
-                        (calculateDistanceBetweenPoints(mainEnd, segmentStart) <= snapThreshold) ||
-                        (calculateDistanceBetweenPoints(mainEnd, segmentEnd) <= snapThreshold);
+                // 🔥 ตรวจสอบว่าไม่ใช่การเชื่อมปลายต่อปลาย (end-to-end connection) - ใช้ 1 เมตรเป็นเกณฑ์
+                const subMainStart = subMainPipe.coordinates[0];
+                const subMainEnd = subMainPipe.coordinates[subMainPipe.coordinates.length - 1];
+                const distanceToSubMainStart = calculateDistanceBetweenPoints(closestMainEnd, subMainStart);
+                const distanceToSubMainEnd = calculateDistanceBetweenPoints(closestMainEnd, subMainEnd);
+                const isEndToEndConnection = distanceToSubMainStart <= 1.0 || distanceToSubMainEnd <= 1.0;
 
-                    // 🔥 ตรวจสอบเพิ่มเติม: จุดเชื่อมต้องอยู่ภายใน segment (ไม่ใช่ endpoint)
-                    const segmentLength = calculateDistanceBetweenPoints(segmentStart, segmentEnd);
-                    const distanceFromStart = calculateDistanceBetweenPoints(closestPoint, segmentStart);
-                    const distanceFromEnd = calculateDistanceBetweenPoints(closestPoint, segmentEnd);
-                    const isWithinSegment = distanceFromStart > 1 && distanceFromEnd > 1; // อย่างน้อย 1 เมตรจาก endpoint
+                // 🔥 สร้าง mid-connection เมื่อระยะ > 1m และไม่ใช่ end-to-end connection
+                if (distanceToSubMainPoint > 1.0 && !isEndToEndConnection) {
+                    connections.push({
+                        mainPipeId: closestMainPipe.id,
+                        subMainPipeId: subMainPipe.id,
+                        connectionPoint: {
+                            lat: parseFloat(closestMainEnd.lat.toFixed(8)),
+                            lng: parseFloat(closestMainEnd.lng.toFixed(8))
+                        }
+                    });
 
-                    if (!isEndToEndConnection && isWithinSegment) {
-                        connections.push({
-                            mainPipeId: mainPipe.id,
-                            subMainPipeId: subMainPipe.id,
-                            connectionPoint: {
-                                lat: parseFloat(closestPoint.lat.toFixed(8)),
-                                lng: parseFloat(closestPoint.lng.toFixed(8))
-                            }
-                        });
-                        break; // หาเจอแล้ว ไม่ต้องตรวจสอบ segment อื่น
-                    }
+                    break; // หาเจอแล้ว ไม่ต้องตรวจสอบจุดอื่น
                 }
             }
         }
@@ -424,6 +440,10 @@ export const findEndToEndConnections = (
         subMainPipeId: string;
         connectionPoint: Coordinate;
     }[] = [];
+
+    if (!mainPipes || !subMainPipes || mainPipes.length === 0 || subMainPipes.length === 0) {
+        return connections;
+    }
 
     // Helper function สำหรับหาโซนของท่อ (ตามจุดปลาย)
     const findPipeZone = (pipe: any): string | null => {
@@ -473,14 +493,15 @@ export const findEndToEndConnections = (
                 continue;
             }
             
-            // 🔥 ตรวจสอบเฉพาะการเชื่อมต่อปลาย-ปลาย (End-to-End)
+            // 🔥 ตรวจสอบเฉพาะการเชื่อมต่อปลาย-ปลาย (End-to-End) - เฉพาะระยะไม่เกิน 1 เมตร
             const distance = calculateDistanceBetweenPoints(mainEnd, subMainStart);
             
-            if (distance <= snapThreshold) {
-                // 🔥 ใช้จุดกึ่งกลางระหว่างปลายท่อเมนกับเริ่มท่อเมนรอง
+            // ✅ เชื่อมต่อ end-to-end เฉพาะเมื่อระยะห่างไม่เกิน 1 เมตรเท่านั้น
+            if (distance <= 1.0) { // เปลี่ยนจาก snapThreshold เป็น 1.0 เมตร
+                // ✅ ใช้จุดที่ท่อเชื่อมต่อกันจริง (ปลายท่อเมน) แทนจุดกึ่งกลาง
                 const connectionPoint = {
-                    lat: (mainEnd.lat + subMainStart.lat) / 2,
-                    lng: (mainEnd.lng + subMainStart.lng) / 2
+                    lat: mainEnd.lat,
+                    lng: mainEnd.lng
                 };
 
                 connections.push({
@@ -660,7 +681,6 @@ export const findSubMainToLateralStartConnections = (
                         });
                     }
                 } else {
-                    console.log(`❌ Rejected lateral-submain connection: distance ${distance.toFixed(2)}m > threshold ${snapThreshold}m`);
                 }
             }
         }
@@ -850,6 +870,20 @@ export const findMidConnections = (
         return null;
     };
 
+    // 🔥 ตรวจสอบการเชื่อมต่อ end-to-end และ main-to-submain ก่อน เพื่อป้องกันการซ้ำซ้อน
+    const endToEndConnections = findEndToEndConnections(targetPipes, sourcePipes, zones, irrigationZones, 1.0);
+    const mainToSubMainConnections = findMainToSubMainConnections(targetPipes, sourcePipes, zones, irrigationZones, 15);
+    
+    // สร้าง Set ของการเชื่อมต่อที่มีอยู่แล้ว
+    const existingConnections = new Set<string>();
+    endToEndConnections.forEach(conn => {
+        existingConnections.add(`${conn.mainPipeId}-${conn.subMainPipeId}`);
+    });
+    mainToSubMainConnections.forEach(conn => {
+        existingConnections.add(`${conn.mainPipeId}-${conn.subMainPipeId}`);
+    });
+
+
     for (const sourcePipe of sourcePipes) {
         if (!sourcePipe.coordinates || sourcePipe.coordinates.length < 2) {
             continue;
@@ -873,7 +907,20 @@ export const findMidConnections = (
                 
                 // 🔥 เข้มงวดการตรวจสอบโซน: เชื่อมต่อเฉพาะท่อที่อยู่ในโซนเดียวกัน
                 if (sourceZone && targetZone && sourceZone !== targetZone) {
-                    continue;
+                    continue; // ข้าม - ห้ามเชื่อมข้ามโซนโดยเด็ดขาด
+                }
+
+                // 🔥 ตรวจสอบว่ามีการเชื่อมต่ออยู่แล้วหรือไม่ (end-to-end หรือ main-to-submain)
+                const connectionKey = `${targetPipe.id}-${sourcePipe.id}`;
+                if (existingConnections.has(connectionKey)) {
+                    // ตรวจสอบว่าการเชื่อมต่อที่มีอยู่เป็น end-to-end หรือไม่
+                    const isExistingEndToEnd = endToEndConnections.some(conn => 
+                        conn.mainPipeId === targetPipe.id && conn.subMainPipeId === sourcePipe.id
+                    );
+                    if (isExistingEndToEnd) {
+                        continue; // ข้าม - มีการเชื่อมต่อ end-to-end อยู่แล้ว
+                    }
+                    // ถ้าไม่ใช่ end-to-end ให้อนุญาต mid-connection
                 }
 
                 // ตรวจสอบว่าจุดปลายของ source pipe อยู่บน target pipe หรือไม่
@@ -884,19 +931,24 @@ export const findMidConnections = (
                     const closestPoint = findClosestPointOnLineSegment(endpoint.point, segmentStart, segmentEnd);
                     const distance = calculateDistanceBetweenPoints(endpoint.point, closestPoint);
 
+
                     if (distance <= snapThreshold) {
                         // 🔥 ตรวจสอบว่าไม่ใช่การเชื่อมปลายต่อปลาย (end-to-end connection)
                         const isEndToEndConnection = 
-                            (calculateDistanceBetweenPoints(endpoint.point, segmentStart) <= snapThreshold) ||
-                            (calculateDistanceBetweenPoints(endpoint.point, segmentEnd) <= snapThreshold);
+                            (calculateDistanceBetweenPoints(endpoint.point, segmentStart) <= 1.0) ||
+                            (calculateDistanceBetweenPoints(endpoint.point, segmentEnd) <= 1.0);
 
-                        // 🔥 ตรวจสอบเพิ่มเติม: จุดเชื่อมต้องอยู่ภายใน segment (ไม่ใช่ endpoint)
-                        const segmentLength = calculateDistanceBetweenPoints(segmentStart, segmentEnd);
-                        const distanceFromStart = calculateDistanceBetweenPoints(closestPoint, segmentStart);
-                        const distanceFromEnd = calculateDistanceBetweenPoints(closestPoint, segmentEnd);
-                        const isWithinSegment = distanceFromStart > 1 && distanceFromEnd > 1; // อย่างน้อย 1 เมตรจาก endpoint
+                // 🔥 ตรวจสอบเพิ่มเติม: จุดเชื่อมต้องอยู่ภายใน segment (ไม่ใช่ endpoint)
+                const segmentLength = calculateDistanceBetweenPoints(segmentStart, segmentEnd);
+                const distanceFromStart = calculateDistanceBetweenPoints(closestPoint, segmentStart);
+                const distanceFromEnd = calculateDistanceBetweenPoints(closestPoint, segmentEnd);
+                const isWithinSegment = distanceFromStart > 0.00000000000000000000000000000000000000000000000000000000000000000000000001 && distanceFromEnd > 0.00000000000000000000000000000000000000000000000000000000000000000000000001; // ลดจาก 0.0000000000000000000000000000000000000000000000000000000000000000000000001 เป็น 0.00000000000000000000000000000000000000000000000000000000000000000000000001 เมตร
 
-                        if (!isEndToEndConnection && isWithinSegment) {
+                        // 🔥 ตรวจสอบเพิ่มเติม: ต้องเป็น mid-connection จริงๆ (ไม่ใช่การเชื่อมปลายต่อปลาย)
+                        const isActualMidConnection = !isEndToEndConnection && isWithinSegment && distance > 1.0;
+                        
+
+                        if (isActualMidConnection) {
                             // 🔥 สร้าง unique key เพื่อป้องกันการซ้ำซ้อน
                             const connectionKey = `${sourcePipe.id}-${targetPipe.id}-${endpoint.index}-${i}`;
                             
@@ -910,6 +962,7 @@ export const findMidConnections = (
                                     targetSegmentIndex: i
                                 });
                             }
+                        } else {
                         }
                     }
                 }
@@ -1448,7 +1501,6 @@ const getDragOrientation = (start: Coordinate, end: Coordinate, plants?: PlantLo
                 }
             } catch (error) {
                 // Silent fallback - ถ้า grouping fail ให้ใช้ distance-based logic
-                console.warn('Layout analysis failed, falling back to distance-based orientation', error);
             }
         }
     }
@@ -2231,7 +2283,6 @@ export const generateEmitterLinesForBetweenPlantsMode = (
             
 
         } else {
-            console.log(`❌ Skipped plant ${plant.id}: distance ${distance.toFixed(2)}m > max ${adaptiveMaxDistance.toFixed(1)}m`);
         }
     });
 
@@ -2389,11 +2440,9 @@ export const computeMultiSegmentAlignment = (
                     // segment i จบที่ waypoint j เมื่อ i === j
                     if (i !== j) {
                         // segment นี้ไม่ใช่ segment ที่จบที่ waypoint นี้ จึงไม่เอาต้นไม้นี้
-                        // console.log(`🚫 Plant ${plant.id} near waypoint[${j}] excluded from segment ${i} (should be in segment ${j})`);
                         shouldAddPlant = false;
                         break;
                     } else {
-                        // console.log(`✅ Plant ${plant.id} near waypoint[${j}] included in segment ${i} (before turn)`);
                     }
                 }
             }

@@ -17,6 +17,7 @@ interface SprinklerSelectorProps {
     allZoneSprinklers: { [zoneId: string]: any };
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     gardenStats?: any; // เพิ่มสำหรับ garden mode
+    greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
 }
 
 const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
@@ -27,6 +28,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     allZoneSprinklers,
     projectMode = 'horticulture',
     gardenStats,
+    greenhouseData,
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
@@ -66,9 +68,9 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         return Math.abs(value - target) < 0.01; // Allow small floating point differences
     };
 
-    // Auto-select sprinkler for horticulture and garden modes based on system requirements
+    // Auto-select sprinkler for horticulture, garden, and greenhouse modes based on system requirements
     useEffect(() => {
-        if ((projectMode === 'horticulture' || projectMode === 'garden') && analyzedSprinklers.length > 0) {
+        if ((projectMode === 'horticulture' || projectMode === 'garden' || projectMode === 'greenhouse') && analyzedSprinklers.length > 0) {
             let sprinklerConfig: any = null;
             
             if (projectMode === 'horticulture') {
@@ -98,6 +100,35 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                         flowRatePerMinute: 6.0,
                         pressureBar: 2.5,
                         radiusMeters: 8.0,
+                    };
+                }
+            } else if (projectMode === 'greenhouse') {
+                // ใช้ข้อมูลจาก greenhouse plot หรือค่า default
+                if (greenhouseData && activeZone) {
+                    const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                    if (currentPlot && currentPlot.production?.waterCalculation) {
+                        const waterCalc = currentPlot.production.waterCalculation;
+                        // ตรวจสอบ null safety สำหรับ waterPerPlant
+                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                        sprinklerConfig = {
+                            flowRatePerMinute: flowRate,
+                            pressureBar: 2.5, // ค่า default สำหรับ greenhouse
+                            radiusMeters: 4.0, // ค่า default สำหรับ greenhouse (เล็กกว่าสวนบ้าน)
+                        };
+                    } else {
+                        // fallback ค่า default สำหรับ greenhouse
+                        sprinklerConfig = {
+                            flowRatePerMinute: 6.0,
+                            pressureBar: 2.5,
+                            radiusMeters: 4.0,
+                        };
+                    }
+                } else {
+                    // fallback ค่า default สำหรับ greenhouse
+                    sprinklerConfig = {
+                        flowRatePerMinute: 6.0,
+                        pressureBar: 2.5,
+                        radiusMeters: 4.0,
                     };
                 }
             }

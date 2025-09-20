@@ -501,6 +501,7 @@ const GoogleMapsResultsOverlays: React.FC<{
             );
 
 
+
             endToEndConnections.forEach((connection, index) => {
                 const connectionMarker = new google.maps.Marker({
                     position: new google.maps.LatLng(
@@ -547,6 +548,7 @@ const GoogleMapsResultsOverlays: React.FC<{
                 irrigationZones,
                 15 // snapThreshold
             );
+
 
 
             mainToSubMainConnections.forEach((connection, index) => {
@@ -1108,11 +1110,6 @@ function EnhancedHorticultureResultsPageContent() {
                     // Recalculate enhanced stats after loading sprinkler config
                     const updatedStats = getOverallStats();
                     setEnhancedStats(updatedStats);
-                    console.log('✅ Sprinkler config loaded and stats updated:', {
-                        config,
-                        updatedStats,
-                        sprinklerFlowRate: updatedStats?.sprinklerFlowRate
-                    });
                 } else {
                     console.warn('⚠️ No sprinkler config found in localStorage');
                 }
@@ -1367,14 +1364,7 @@ function EnhancedHorticultureResultsPageContent() {
                 localStorage.setItem('projectType', 'horticulture');
                 
                 // ส่งข้อมูลระบบหัวฉีดและโซนสำหรับ product page
-                console.log('Debug handleExportMapToProduct:', {
-                    enhancedStats: enhancedStats,
-                    sprinklerFlowRate: enhancedStats?.sprinklerFlowRate,
-                    projectData: projectData,
-                    irrigationZones: irrigationZones,
-                    irrigationZonesLength: irrigationZones?.length || 0,
-                    projectDataIrrigationZones: projectData?.irrigationZones
-                });
+                localStorage.setItem('projectDataIrrigationZones', JSON.stringify(projectData?.irrigationZones));
                 
                 if (enhancedStats && enhancedStats.sprinklerFlowRate && projectData) {
                     // คำนวณ connection stats
@@ -1512,7 +1502,6 @@ function EnhancedHorticultureResultsPageContent() {
                         isMultipleZones: !!(irrigationZones && irrigationZones.length > 0),
                     };
                     
-                    console.log('💾 Saving horticultureSystemData to localStorage:', horticultureSystemData);
                     localStorage.setItem('horticultureSystemData', JSON.stringify(horticultureSystemData));
                 } else {
                     console.warn('Missing data for horticultureSystemData:', {
