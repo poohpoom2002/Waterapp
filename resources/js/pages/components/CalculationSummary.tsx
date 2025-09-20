@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { getEnhancedFieldCropData, FieldCropData } from '../../utils/fieldCropData';
 
 interface ZoneOperationGroup {
     id: string;
@@ -61,9 +62,32 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const getActualPipeHeadLoss = useCallback(() => {
         // ลองดึงข้อมูลจาก localStorage ก่อน (สำหรับทุก mode)
         try {
-            const pipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
-            if (pipeCalculationsStr) {
-                const pipeCalculations = JSON.parse(pipeCalculationsStr);
+            // ลองดึงข้อมูลจาก garden_pipe_calculations
+            const gardenPipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+            if (gardenPipeCalculationsStr) {
+                const pipeCalculations = JSON.parse(gardenPipeCalculationsStr);
+
+                const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
+
+                const totalHeadLoss =
+                    branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+                return {
+                    branch: branchHeadLoss,
+                    secondary: secondaryHeadLoss,
+                    main: mainHeadLoss,
+                    emitter: emitterHeadLoss,
+                    total: totalHeadLoss,
+                };
+            }
+
+            // ลองดึงข้อมูลจาก greenhouse_pipe_calculations
+            const greenhousePipeCalculationsStr = localStorage.getItem('greenhouse_pipe_calculations');
+            if (greenhousePipeCalculationsStr) {
+                const pipeCalculations = JSON.parse(greenhousePipeCalculationsStr);
 
                 const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
                 const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
@@ -272,6 +296,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 const currentZone = gardenStats.zones.find((z: any) => z.zoneId === activeZone.id);
                 if (currentZone) {
                     sprinklerPressureBar = currentZone.sprinklerPressure || 2.5;
+                } else {
+                    sprinklerPressureBar = 2.5; // default
+                }
+            } else {
+                sprinklerPressureBar = 2.5; // default
+            }
+        } else if (projectMode === 'greenhouse') {
+            // สำหรับ greenhouse mode ใช้ข้อมูลจาก plot
+            if (greenhouseData && activeZone) {
+                const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                if (currentPlot) {
+                    sprinklerPressureBar = 2.5; // ค่า default สำหรับ greenhouse
                 } else {
                     sprinklerPressureBar = 2.5; // default
                 }
@@ -487,15 +523,22 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     };
 
     const getProjectSummaryData = () => {
-        if (projectMode === 'field-crop' && fieldCropData) {
-            return {
-                totalArea: fieldCropData.area.size,
-                totalZones: fieldCropData.zones.count,
-                totalItems: fieldCropData.summary.totalPlantingPoints,
-                totalWaterNeed: fieldCropData.summary.totalWaterRequirementPerDay,
-                totalEstimatedYield: fieldCropData.summary.totalEstimatedYield,
-                totalEstimatedIncome: fieldCropData.summary.totalEstimatedIncome,
-            };
+        if (projectMode === 'field-crop') {
+            // Try to get field-crop data from props first, then from localStorage
+            const fcData = fieldCropData || getEnhancedFieldCropData();
+            if (fcData) {
+                return {
+                    totalArea: fcData.area?.sizeInRai || 0,
+                    totalZones: fcData.zones?.count || 0,
+                    totalItems: fcData.summary?.totalPlantingPoints || 0,
+                    totalWaterNeed: fcData.summary?.totalWaterRequirementPerDay || 0,
+                    totalEstimatedYield: fcData.summary?.totalEstimatedYield || 0,
+                    totalEstimatedIncome: fcData.summary?.totalEstimatedIncome || 0,
+                    irrigationEfficiency: fcData.summary?.irrigationEfficiency || 0,
+                    totalIrrigationPoints: fcData.irrigation?.totalCount || 0,
+                    irrigationByType: fcData.irrigation?.byType || {},
+                };
+            }
         }
 
         if (projectMode === 'greenhouse' && greenhouseData) {
@@ -586,6 +629,42 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             )}
                         </div>
                     )}
+
+                    {/* Field-crop specific irrigation information */}
+                    {projectMode === 'field-crop' && projectSummaryData && (
+                        <div className="mt-3 border-t border-blue-700 pt-3">
+                            <h4 className="mb-2 text-sm font-semibold text-blue-200">
+                                🌱 {t('ข้อมูลระบบให้น้ำ')}
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="text-blue-200">{t('จุดให้น้ำรวม:')}</p>
+                                    <p className="font-bold text-white">
+                                        {(projectSummaryData.totalIrrigationPoints || 0).toLocaleString()}
+                                    </p>
+                                </div>
+                                {projectSummaryData.irrigationByType && (
+                                    <div>
+                                        <p className="text-blue-200">{t('ประเภทระบบ:')}</p>
+                                        <div className="text-xs text-gray-300">
+                                            {projectSummaryData.irrigationByType.sprinkler > 0 && (
+                                                <p>• {t('สปริงเกลอร์')}: {projectSummaryData.irrigationByType.sprinkler}</p>
+                                            )}
+                                            {projectSummaryData.irrigationByType.dripTape > 0 && (
+                                                <p>• {t('เทปหยด')}: {projectSummaryData.irrigationByType.dripTape}</p>
+                                            )}
+                                            {projectSummaryData.irrigationByType.pivot > 0 && (
+                                                <p>• {t('ปิโวต์')}: {projectSummaryData.irrigationByType.pivot}</p>
+                                            )}
+                                            {projectSummaryData.irrigationByType.waterJetTape > 0 && (
+                                                <p>• {t('เทปน้ำพุ่ง')}: {projectSummaryData.irrigationByType.waterJetTape}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -606,6 +685,15 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 if (projectMode === 'garden') {
                                     // สำหรับ garden mode ใช้ข้อมูลจาก input ต้องการน้ำ (คำนวณอัตโนมัติจาก garden statistics)
                                     return input.waterPerTreeLiters.toFixed(1);
+                                } else if (projectMode === 'greenhouse') {
+                                    // สำหรับ greenhouse mode ใช้ข้อมูลจาก greenhouse data
+                                    if (greenhouseData && activeZone) {
+                                        const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                                        if (currentPlot) {
+                                            return currentPlot.production.waterRequirementPerIrrigation.toFixed(1);
+                                        }
+                                    }
+                                    return (results.totalWaterRequiredLPM || 0).toFixed(1);
                                 } else {
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);
                                 }
@@ -738,6 +826,13 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     if (currentZone) {
                                         return `${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                                     }
+                                } else if (projectMode === 'greenhouse' && greenhouseData && activeZone) {
+                                    const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                                    if (currentPlot && currentPlot.production?.waterCalculation) {
+                                        const waterCalc = currentPlot.production.waterCalculation;
+                                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                                        return `${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                    }
                                 }
                                 return `${results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                             })()}
@@ -753,7 +848,17 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                               ? `${t('ค่าจาก garden zone:')} ${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`
                                               : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                                       })()
-                                    : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
+                                    : projectMode === 'greenhouse' && greenhouseData && activeZone
+                                      ? (() => {
+                                            const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                                            if (currentPlot && currentPlot.production?.waterCalculation) {
+                                                const waterCalc = currentPlot.production.waterCalculation;
+                                                const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                                                return `${t('ค่าจาก greenhouse plot:')} ${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                            }
+                                            return `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                        })()
+                                      : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
                             </p>
                         </div>
                         {selectedSprinkler && (

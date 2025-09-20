@@ -19,6 +19,7 @@ import {
     SelectedPipeSizes,
 } from '../../utils/horticulturePipeCalculations';
 import { getSelectedPipeDataInfo, getPipeDataWithSmartSize } from './PipeFrictionLoss';
+import { getEnhancedFieldCropData, FieldCropData } from '../../utils/fieldCropData';
 
 interface PipeSelectorProps {
     pipeType: PipeType;
@@ -29,6 +30,7 @@ interface PipeSelectorProps {
     horticultureSystemData?: any;
     gardenSystemData?: any; // เพิ่มสำหรับ garden mode
     greenhouseSystemData?: any; // เพิ่มสำหรับ greenhouse mode
+    fieldCropData?: any; // เพิ่มสำหรับ field-crop mode
     activeZoneId?: string;
     selectedSprinkler?: any;
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
@@ -44,6 +46,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
     horticultureSystemData,
     gardenSystemData,
     greenhouseSystemData,
+    fieldCropData,
     activeZoneId,
     selectedSprinkler,
     projectMode = 'horticulture',
@@ -94,6 +97,50 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
         }
 
         // สำหรับ greenhouse mode ใช้ greenhouseSystemData
+        if (projectMode === 'field-crop') {
+            // Try to get field-crop data from props first, then from localStorage
+            const fcData = fieldCropData || getEnhancedFieldCropData();
+            if (fcData) {
+                // สร้างข้อมูล pipe สำหรับ field-crop
+                const createFieldCropPipeInfo = (type: string, length: number, flowRate: number) => ({
+                    id: `${type}-pipe-field-crop`,
+                    length: length,
+                    count: 1,
+                    waterFlowRate: flowRate,
+                    details: { type: type },
+                });
+
+                switch (pipeType) {
+                    case 'branch':
+                        return createFieldCropPipeInfo(
+                            'branch',
+                            fcData.pipes.stats.lateral.longest || 50,
+                            fcData.summary.totalWaterRequirementPerDay / Math.max(fcData.summary.totalPlantingPoints || 1, 1) / 60 // Convert to LPM
+                        );
+                    case 'secondary':
+                        return createFieldCropPipeInfo(
+                            'secondary',
+                            fcData.pipes.stats.submain.longest || 100,
+                            fcData.summary.totalWaterRequirementPerDay / 60 // Convert to LPM
+                        );
+                    case 'main':
+                        return createFieldCropPipeInfo(
+                            'main',
+                            fcData.pipes.stats.main.longest || 200,
+                            fcData.summary.totalWaterRequirementPerDay / 60 // Convert to LPM
+                        );
+                    case 'emitter':
+                        return createFieldCropPipeInfo(
+                            'emitter',
+                            fcData.pipes.stats.lateral.averageLength || 20,
+                            0.24 // Default drip tape flow rate
+                        );
+                    default:
+                        return null;
+                }
+            }
+        }
+
         if (projectMode === 'greenhouse' && greenhouseSystemData && activeZoneId) {
             const currentPlot = greenhouseSystemData.summary.plotStats.find(
                 (plot: any) => plot.plotId === activeZoneId
@@ -261,6 +308,36 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                 setSprinklerPressure(pressureInfo);
             }
         }
+        // สำหรับ field-crop mode
+        else if (projectMode === 'field-crop') {
+            if (fieldCropData) {
+                const irrigationByType = fieldCropData.irrigation?.byType || {};
+                let pressureBar = 2.5; // Default pressure for sprinklers
+                
+                if (irrigationByType.dripTape > 0) {
+                    pressureBar = 1.0; // Lower pressure for drip tape
+                } else if (irrigationByType.pivot > 0) {
+                    pressureBar = 3.0; // Higher pressure for pivot systems
+                } else if (irrigationByType.waterJetTape > 0) {
+                    pressureBar = 1.5; // Medium pressure for water jet tape
+                }
+                
+                const pressureInfo = {
+                    pressureBar: pressureBar,
+                    headM: pressureBar * 10,
+                    head20PercentM: pressureBar * 10 * 0.2,
+                };
+                setSprinklerPressure(pressureInfo);
+            } else {
+                // ใช้ค่า default สำหรับ field-crop
+                const pressureInfo = {
+                    pressureBar: 2.5,
+                    headM: 25,
+                    head20PercentM: 5,
+                };
+                setSprinklerPressure(pressureInfo);
+            }
+        }
         // สำหรับ horticulture mode ใช้ horticultureSystemData (เดิม)
         else if (horticultureSystemData?.sprinklerConfig?.pressureBar) {
             const pressureBar = horticultureSystemData.sprinklerConfig.pressureBar;
@@ -275,7 +352,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             const pressureInfo = calculateSprinklerPressure(selectedSprinkler);
             setSprinklerPressure(pressureInfo);
         }
-    }, [projectMode, horticultureSystemData, gardenSystemData, greenhouseSystemData, activeZoneId, selectedSprinkler]);
+    }, [projectMode, horticultureSystemData, gardenSystemData, greenhouseSystemData, fieldCropData, activeZoneId, selectedSprinkler]);
 
     // Garden mode: ดึงข้อมูล zone statistics
     useEffect(() => {
@@ -350,6 +427,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
 
                     return pipeTypeMatch;
                 });
+                
 
                 // กรองตามขนาดท่อสำหรับแต่ละประเภท
                 if (pipeType === 'branch' || pipeType === 'emitter') {
@@ -358,6 +436,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                         (pipe) =>
                             pipe.sizeMM <= 32 || (pipe.sizeInch && parseFloat(pipe.sizeInch) <= 1)
                     );
+                    
                 }
 
                 // กรองตามแรงดันหัวฉีด
@@ -365,13 +444,57 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     filteredPipes = filteredPipes.filter(
                         (pipe) => pipe.pn >= sprinklerPressure.pressureBar
                     );
+                    
                 }
 
+                
                 setAvailablePipes(filteredPipes);
                 // Reset manual selection when pipe type changes to allow auto-selection
                 setIsManuallySelected(false);
             } catch (error) {
-                setAvailablePipes([]);
+                console.error('Error loading pipes:', error);
+                // For field-crop mode, provide some fallback pipe data
+                if (projectMode === 'field-crop') {
+                    const fallbackPipes = [
+                        // PE pipes
+                        { id: 1, name: 'PE PN2.5 25mm', productCode: 'PE25', pipeType: 'PE', type: 'PE', sizeMM: 25, pn: 2.5, lengthM: 100, price: 1500, image: null, brand: 'Generic' },
+                        { id: 2, name: 'PE PN2.5 32mm', productCode: 'PE32', pipeType: 'PE', type: 'PE', sizeMM: 32, pn: 2.5, lengthM: 100, price: 2000, image: null, brand: 'Generic' },
+                        { id: 3, name: 'PE PN4 50mm', productCode: 'PE50', pipeType: 'PE', type: 'PE', sizeMM: 50, pn: 4, lengthM: 100, price: 3000, image: null, brand: 'Generic' },
+                        { id: 4, name: 'PE PN4 63mm', productCode: 'PE63', pipeType: 'PE', type: 'PE', sizeMM: 63, pn: 4, lengthM: 100, price: 4000, image: null, brand: 'Generic' },
+                        // PVC pipes
+                        { id: 5, name: 'PVC Class5 25mm', productCode: 'PVC25', pipeType: 'PVC', type: 'PVC', sizeMM: 25, pn: 5, lengthM: 100, price: 1200, image: null, brand: 'Generic' },
+                        { id: 6, name: 'PVC Class5 32mm', productCode: 'PVC32', pipeType: 'PVC', type: 'PVC', sizeMM: 32, pn: 5, lengthM: 100, price: 1800, image: null, brand: 'Generic' },
+                        { id: 7, name: 'PVC Class5 50mm', productCode: 'PVC50', pipeType: 'PVC', type: 'PVC', sizeMM: 50, pn: 5, lengthM: 100, price: 2500, image: null, brand: 'Generic' },
+                        { id: 8, name: 'PVC Class5 63mm', productCode: 'PVC63', pipeType: 'PVC', type: 'PVC', sizeMM: 63, pn: 5, lengthM: 100, price: 3500, image: null, brand: 'Generic' },
+                    ];
+                    
+                    // Filter fallback pipes based on selected pipe type
+                    const filteredFallbackPipes = fallbackPipes.filter((pipe) => {
+                        const pipeTypeMatch = pipe.pipeType?.toLowerCase() === selectedPipeType.toLowerCase() ||
+                                            pipe.type?.toLowerCase() === selectedPipeType.toLowerCase();
+                        return pipeTypeMatch;
+                    });
+                    
+                    // Filter by size for branch/emitter
+                    let sizeFilteredPipes = filteredFallbackPipes;
+                    if (pipeType === 'branch' || pipeType === 'emitter') {
+                        sizeFilteredPipes = filteredFallbackPipes.filter(
+                            (pipe) => pipe.sizeMM <= 32
+                        );
+                    }
+                    
+                    // Filter by pressure
+                    let pressureFilteredPipes = sizeFilteredPipes;
+                    if (sprinklerPressure) {
+                        pressureFilteredPipes = sizeFilteredPipes.filter(
+                            (pipe) => pipe.pn >= sprinklerPressure.pressureBar
+                        );
+                    }
+                    
+                    setAvailablePipes(pressureFilteredPipes);
+                } else {
+                    setAvailablePipes([]);
+                }
             }
         };
 
@@ -676,7 +799,9 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                     const storageKey =
                         projectMode === 'garden'
                             ? 'garden_pipe_calculations'
-                            : 'horticulture_pipe_calculations';
+                            : projectMode === 'greenhouse'
+                              ? 'greenhouse_pipe_calculations'
+                              : 'horticulture_pipe_calculations';
                     const existingCalcStr = localStorage.getItem(storageKey);
                     const existingCalc = existingCalcStr ? JSON.parse(existingCalcStr) : {};
 
@@ -870,13 +995,13 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
             return a.diffFrom19 - b.diffFrom19;
         });
 
-    // Only show for horticulture and garden modes
-    if (projectMode !== 'horticulture' && projectMode !== 'garden') {
+    // Only show for horticulture, garden, greenhouse and field-crop modes
+    if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'greenhouse' && projectMode !== 'field-crop') {
         return (
             <div className="flex items-center justify-center rounded-lg bg-gray-800 p-8">
                 <div className="text-center text-gray-500">
                     <div className="mb-2 text-4xl">🚧</div>
-                    <p>ระบบใหม่สำหรับ Horticulture และ Garden เท่านั้น</p>
+                    <p>ระบบใหม่สำหรับ Horticulture, Garden, Greenhouse และ Field-crop เท่านั้น</p>
                 </div>
             </div>
         );
@@ -926,19 +1051,78 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                             <span className="font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? `${gardenZoneStats.totalPipeLength.toFixed(1)} ม.`
-                                    : `${currentZoneBestPipe.length.toFixed(1)} ม.`}
+                                    : projectMode === 'greenhouse' && greenhouseSystemData && activeZoneId
+                                      ? (() => {
+                                            const currentPlot = greenhouseSystemData.summary.plotStats.find((p: any) => p.plotId === activeZoneId);
+                                            if (currentPlot) {
+                                                switch (pipeType) {
+                                                    case 'branch':
+                                                        return `${(currentPlot.pipeStats.drip.longest || currentPlot.pipeStats.sub.longest || 30).toFixed(1)} ม.`;
+                                                    case 'secondary':
+                                                        return `${(currentPlot.pipeStats.main.longest || 0).toFixed(1)} ม.`;
+                                                    case 'main':
+                                                        return '0.0 ม.';
+                                                    case 'emitter':
+                                                        return `${(currentPlot.pipeStats.drip.longest || 10).toFixed(1)} ม.`;
+                                                    default:
+                                                        return `${currentZoneBestPipe.length.toFixed(1)} ม.`;
+                                                }
+                                            }
+                                            return `${currentZoneBestPipe.length.toFixed(1)} ม.`;
+                                        })()
+                                      : `${currentZoneBestPipe.length.toFixed(1)} ม.`}
                             </span>
                             <span className="text-orange-200">| ทางออก:</span>
                             <span className="font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? gardenZoneStats.sprinklerCount
-                                    : currentZoneBestPipe.count}
+                                    : projectMode === 'greenhouse' && greenhouseSystemData && activeZoneId
+                                      ? (() => {
+                                            const currentPlot = greenhouseSystemData.summary.plotStats.find((p: any) => p.plotId === activeZoneId);
+                                            if (currentPlot) {
+                                                switch (pipeType) {
+                                                    case 'branch':
+                                                        return currentPlot.equipmentCount.sprinklers || 1;
+                                                    case 'secondary':
+                                                        return 1;
+                                                    case 'main':
+                                                        return 0;
+                                                    case 'emitter':
+                                                        return currentPlot.equipmentCount.sprinklers || 1;
+                                                    default:
+                                                        return currentZoneBestPipe.count;
+                                                }
+                                            }
+                                            return currentZoneBestPipe.count;
+                                        })()
+                                      : currentZoneBestPipe.count}
                             </span>
                             <span className="text-orange-200">| ใช้น้ำ:</span>
                             <span className="font-bold text-white">
                                 {projectMode === 'garden' && gardenZoneStats
                                     ? `${(gardenZoneStats.sprinklerFlowRate * gardenZoneStats.sprinklerCount).toFixed(1)} L/min`
-                                    : `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`}
+                                    : projectMode === 'greenhouse' && greenhouseSystemData && activeZoneId
+                                      ? (() => {
+                                            const currentPlot = greenhouseSystemData.summary.plotStats.find((p: any) => p.plotId === activeZoneId);
+                                            if (currentPlot) {
+                                                switch (pipeType) {
+                                                    case 'branch':
+                                                        return `${(currentPlot.production.waterRequirementPerIrrigation / Math.max(currentPlot.equipmentCount.sprinklers || 1, 1)).toFixed(1)} L/min`;
+                                                    case 'secondary':
+                                                        return `${currentPlot.production.waterRequirementPerIrrigation.toFixed(1)} L/min`;
+                                                    case 'main':
+                                                        return '0.0 L/min';
+                                                    case 'emitter':
+                                                        const waterCalc = currentPlot.production?.waterCalculation;
+                                                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                                                        return `${flowRate.toFixed(1)} L/min`;
+                                                    default:
+                                                        return `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`;
+                                                }
+                                            }
+                                            return `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`;
+                                        })()
+                                      : `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`}
                             </span>
                         </span>
                     </h4>

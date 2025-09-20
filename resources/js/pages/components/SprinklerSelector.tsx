@@ -13,6 +13,7 @@ import {
     formatRadius,
 } from '../../utils/sprinklerUtils';
 import SearchableDropdown from './SearchableDropdown';
+import { getEnhancedFieldCropData, FieldCropData } from '../../utils/fieldCropData';
 
 interface SprinklerSelectorProps {
     selectedSprinkler: any;
@@ -23,6 +24,7 @@ interface SprinklerSelectorProps {
     projectMode?: 'horticulture' | 'garden' | 'field-crop' | 'greenhouse';
     gardenStats?: any; // เพิ่มสำหรับ garden mode
     greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
+    fieldCropData?: any; // เพิ่มสำหรับ field-crop mode
 }
 
 const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
@@ -34,6 +36,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
     projectMode = 'horticulture',
     gardenStats,
     greenhouseData,
+    fieldCropData,
 }) => {
     const [showImageModal, setShowImageModal] = useState(false);
     const [modalImage, setModalImage] = useState({ src: '', alt: '' });
@@ -43,6 +46,85 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         () => results.analyzedSprinklers || [],
         [results.analyzedSprinklers]
     );
+
+    // Helper function to get field-crop sprinkler requirements
+    const getFieldCropSprinklerRequirements = useCallback(() => {
+        const fcData = fieldCropData || getEnhancedFieldCropData();
+        if (fcData) {
+            // Calculate target flow per sprinkler based on field-crop data
+            const totalWaterRequirement = fcData.summary?.totalWaterRequirementPerDay || 0;
+            const totalPlantingPoints = fcData.summary?.totalPlantingPoints || 1;
+            const irrigationTimeMinutes = 30; // Default irrigation time
+            
+            // Calculate flow per sprinkler (LPM)
+            const targetFlowPerSprinkler = totalWaterRequirement / totalPlantingPoints / irrigationTimeMinutes;
+            
+            // Calculate target pressure based on irrigation type
+            const irrigationByType = fcData.irrigation?.byType || {};
+            let targetPressure = 2.5; // Default pressure for sprinklers
+            
+            if (irrigationByType.dripTape > 0) {
+                targetPressure = 1.0; // Lower pressure for drip tape
+            } else if (irrigationByType.pivot > 0) {
+                targetPressure = 3.0; // Higher pressure for pivot systems
+            } else if (irrigationByType.waterJetTape > 0) {
+                targetPressure = 1.5; // Medium pressure for water jet tape
+            }
+            
+            return {
+                targetFlowPerSprinkler,
+                targetPressure,
+                totalSprinklers: totalPlantingPoints,
+                irrigationTypes: irrigationByType,
+            };
+        }
+        
+        return null;
+    }, [fieldCropData]);
+
+    // Auto-select sprinkler for field-crop mode
+    useEffect(() => {
+        if (projectMode === 'field-crop' && !selectedSprinkler && analyzedSprinklers.length > 0) {
+            const fieldCropRequirements = getFieldCropSprinklerRequirements();
+            if (fieldCropRequirements) {
+                // Find the best matching sprinkler based on field-crop requirements
+                const targetFlow = fieldCropRequirements.targetFlowPerSprinkler;
+                const targetPressure = fieldCropRequirements.targetPressure;
+                
+                // Sort sprinklers by how well they match the requirements
+                const sortedSprinklers = analyzedSprinklers
+                    .map(sprinkler => {
+                        const sprinklerFlow = sprinkler.waterVolumeLitersPerMinute || 0;
+                        const sprinklerPressure = getAverageValue(sprinkler.pressureBar);
+                        
+                        // Calculate match score (lower is better)
+                        const flowDiff = Math.abs(sprinklerFlow - targetFlow);
+                        const pressureDiff = Math.abs(sprinklerPressure - targetPressure);
+                        const matchScore = flowDiff + (pressureDiff * 2); // Weight pressure more
+                        
+                        return {
+                            ...sprinkler,
+                            matchScore,
+                            flowDiff,
+                            pressureDiff
+                        };
+                    })
+                    .sort((a, b) => {
+                        // First sort by match score
+                        if (a.matchScore !== b.matchScore) {
+                            return a.matchScore - b.matchScore;
+                        }
+                        // Then by price
+                        return a.price - b.price;
+                    });
+                
+                // Select the best matching sprinkler
+                if (sortedSprinklers.length > 0) {
+                    onSprinklerChange(sortedSprinklers[0]);
+                }
+            }
+        }
+    }, [projectMode, selectedSprinkler, analyzedSprinklers, getFieldCropSprinklerRequirements, onSprinklerChange]);
 
     // Helper function to get average value from range or single value
     const getAverageValue = (value: any): number => {
@@ -199,6 +281,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         onSprinklerChange,
         gardenStats,
         activeZone,
+        greenhouseData,
     ]);
 
     const openImageModal = (src: string, alt: string) => {
@@ -211,13 +294,13 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
         setModalImage({ src: '', alt: '' });
     };
 
-    // กรองสปริงเกอร์สำหรับ horticulture และ garden modes
+    // กรองสปริงเกอร์สำหรับ horticulture, garden, greenhouse และ field-crop modes
     const getFilteredSprinklers = () => {
-        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'greenhouse' && projectMode !== 'field-crop') {
             return analyzedSprinklers.sort((a, b) => a.price - b.price);
         }
 
-        // สำหรับ horticulture และ garden modes - กรองเฉพาะสปริงเกอร์ที่เข้ากันได้
+        // สำหรับ horticulture, garden และ greenhouse modes - กรองเฉพาะสปริงเกอร์ที่เข้ากันได้
         let sprinklerConfig: any = null;
 
         if (projectMode === 'horticulture') {
@@ -246,6 +329,52 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     flowRatePerMinute: 6.0,
                     pressureBar: 2.5,
                     radiusMeters: 8.0,
+                };
+            }
+        } else if (projectMode === 'field-crop') {
+            // ใช้ข้อมูลจาก field-crop data
+            const fieldCropRequirements = getFieldCropSprinklerRequirements();
+            if (fieldCropRequirements) {
+                sprinklerConfig = {
+                    flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
+                    pressureBar: fieldCropRequirements.targetPressure,
+                    radiusMeters: 8.0, // Default radius for field-crop
+                };
+            } else {
+                // fallback ค่า default สำหรับ field-crop
+                sprinklerConfig = {
+                    flowRatePerMinute: 6.0,
+                    pressureBar: 2.5,
+                    radiusMeters: 8.0,
+                };
+            }
+        } else if (projectMode === 'greenhouse') {
+            // ใช้ข้อมูลจาก greenhouse plot หรือค่า default
+            if (greenhouseData && activeZone) {
+                const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                if (currentPlot && currentPlot.production?.waterCalculation) {
+                    const waterCalc = currentPlot.production.waterCalculation;
+                    // ตรวจสอบ null safety สำหรับ waterPerPlant
+                    const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                    sprinklerConfig = {
+                        flowRatePerMinute: flowRate,
+                        pressureBar: 2.5, // ค่า default สำหรับ greenhouse
+                        radiusMeters: 4.0, // ค่า default สำหรับ greenhouse (เล็กกว่าสวนบ้าน)
+                    };
+                } else {
+                    // fallback ค่า default สำหรับ greenhouse
+                    sprinklerConfig = {
+                        flowRatePerMinute: 6.0,
+                        pressureBar: 2.5,
+                        radiusMeters: 4.0,
+                    };
+                }
+            } else {
+                // fallback ค่า default สำหรับ greenhouse
+                sprinklerConfig = {
+                    flowRatePerMinute: 6.0,
+                    pressureBar: 2.5,
+                    radiusMeters: 4.0,
                 };
             }
         }
@@ -337,8 +466,8 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 )}
             </h3>
 
-            {/* แสดงข้อมูลระบบหัวฉีดสำหรับ Horticulture และ Garden Mode */}
-            {(projectMode === 'horticulture' || projectMode === 'garden') &&
+            {/* แสดงข้อมูลระบบหัวฉีดสำหรับ Horticulture, Garden, Greenhouse และ Field-crop Mode */}
+            {(projectMode === 'horticulture' || projectMode === 'garden' || projectMode === 'greenhouse' || projectMode === 'field-crop') &&
                 (() => {
                     let sprinklerConfig: any = null;
 
@@ -366,6 +495,52 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             }
                         } else {
                             // fallback ค่า default
+                            sprinklerConfig = {
+                                flowRatePerMinute: 6.0,
+                                pressureBar: 2.5,
+                                radiusMeters: 8.0,
+                            };
+                        }
+                    } else if (projectMode === 'greenhouse') {
+                        // ใช้ข้อมูลจาก greenhouse plot หรือค่า default
+                        if (greenhouseData && activeZone) {
+                            const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
+                            if (currentPlot && currentPlot.production?.waterCalculation) {
+                                const waterCalc = currentPlot.production.waterCalculation;
+                                // ตรวจสอบ null safety สำหรับ waterPerPlant
+                                const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                                sprinklerConfig = {
+                                    flowRatePerMinute: flowRate,
+                                    pressureBar: 2.5, // ค่า default สำหรับ greenhouse
+                                    radiusMeters: 4.0, // ค่า default สำหรับ greenhouse (เล็กกว่าสวนบ้าน)
+                                };
+                            } else {
+                                // fallback ค่า default สำหรับ greenhouse
+                                sprinklerConfig = {
+                                    flowRatePerMinute: 6.0,
+                                    pressureBar: 2.5,
+                                    radiusMeters: 4.0,
+                                };
+                            }
+                        } else {
+                            // fallback ค่า default สำหรับ greenhouse
+                            sprinklerConfig = {
+                                flowRatePerMinute: 6.0,
+                                pressureBar: 2.5,
+                                radiusMeters: 4.0,
+                            };
+                        }
+                    } else if (projectMode === 'field-crop') {
+                        // ใช้ข้อมูลจาก field-crop data
+                        const fieldCropRequirements = getFieldCropSprinklerRequirements();
+                        if (fieldCropRequirements) {
+                            sprinklerConfig = {
+                                flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
+                                pressureBar: fieldCropRequirements.targetPressure,
+                                radiusMeters: 8.0, // Default radius for field-crop
+                            };
+                        } else {
+                            // fallback ค่า default สำหรับ field-crop
                             sprinklerConfig = {
                                 flowRatePerMinute: 6.0,
                                 pressureBar: 2.5,
@@ -431,7 +606,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     );
 
                     // อัปเดต global default sprinkler เมื่อมีการเลือกด้วยตนเอง
-                    if (selected && (projectMode === 'horticulture' || projectMode === 'garden')) {
+                    if (selected && (projectMode === 'horticulture' || projectMode === 'garden' || projectMode === 'greenhouse')) {
                         localStorage.setItem(
                             `${projectMode}_defaultSprinkler`,
                             JSON.stringify(selected)

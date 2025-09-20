@@ -13,6 +13,7 @@ import { GardenPlannerData } from '../../utils/homeGardenData';
 import { GardenStatistics } from '../../utils/gardenStatistics';
 import { calculatePipeRolls } from '../utils/calculations';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { getEnhancedFieldCropData, FieldCropData } from '../../utils/fieldCropData';
 
 interface CostSummaryProps {
     results: CalculationResults;
@@ -1160,14 +1161,21 @@ const CostSummary: React.FC<CostSummaryProps> = ({
     const totalZones = getTotalZones();
 
     const getProjectSummary = () => {
-        if (projectMode === 'field-crop' && fieldCropData) {
-            return {
-                totalWaterNeed: fieldCropData.summary?.totalWaterRequirementPerDay || 0,
-                totalProduction: fieldCropData.summary?.totalEstimatedYield || 0,
-                totalIncome: fieldCropData.summary?.totalEstimatedIncome || 0,
-                waterUnit: 'ลิตร/ครั้ง',
-                productionUnit: 'กก.',
-            };
+        if (projectMode === 'field-crop') {
+            // Try to get field-crop data from props first, then from localStorage
+            const fcData = fieldCropData || getEnhancedFieldCropData();
+            if (fcData) {
+                return {
+                    totalWaterNeed: fcData.summary?.totalWaterRequirementPerDay || 0,
+                    totalProduction: fcData.summary?.totalEstimatedYield || 0,
+                    totalIncome: fcData.summary?.totalEstimatedIncome || 0,
+                    totalSprinklers: fcData.summary?.totalPlantingPoints || 0,
+                    totalIrrigationPoints: fcData.irrigation?.totalCount || 0,
+                    irrigationByType: fcData.irrigation?.byType || {},
+                    waterUnit: 'ลิตร/ครั้ง',
+                    productionUnit: 'กก.',
+                };
+            }
         }
 
         if (projectMode === 'greenhouse' && greenhouseData) {
@@ -1230,6 +1238,15 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                 </p>
                             </div>
                         )}
+                        {projectMode === 'field-crop' && projectSummary.totalIrrigationPoints > 0 && (
+                            <div>
+                                <p className="text-blue-200">{t('จุดให้น้ำรวม:')}</p>
+                                <p className="font-bold text-white">
+                                    {(projectSummary.totalIrrigationPoints || 0).toLocaleString()}{' '}
+                                    {t('จุด')}
+                                </p>
+                            </div>
+                        )}
                         {(projectSummary.totalProduction || 0) > 0 && (
                             <div>
                                 <p className="text-blue-200">{t('ผลผลิตประมาณ:')}</p>
@@ -1251,6 +1268,49 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             </div>
                         )}
                     </div>
+
+                    {/* Field-crop specific irrigation information */}
+                    {projectMode === 'field-crop' && projectSummary.irrigationByType && (
+                        <div className="mt-3 border-t border-blue-700 pt-3">
+                            <h4 className="mb-2 text-sm font-semibold text-blue-200">
+                                🌱 {t('ประเภทระบบให้น้ำ')}
+                            </h4>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                {projectSummary.irrigationByType.sprinkler > 0 && (
+                                    <div>
+                                        <p className="text-blue-200">{t('สปริงเกลอร์:')}</p>
+                                        <p className="font-bold text-white">
+                                            {projectSummary.irrigationByType.sprinkler.toLocaleString()} {t('จุด')}
+                                        </p>
+                                    </div>
+                                )}
+                                {projectSummary.irrigationByType.dripTape > 0 && (
+                                    <div>
+                                        <p className="text-blue-200">{t('เทปหยด:')}</p>
+                                        <p className="font-bold text-white">
+                                            {projectSummary.irrigationByType.dripTape.toLocaleString()} {t('จุด')}
+                                        </p>
+                                    </div>
+                                )}
+                                {projectSummary.irrigationByType.pivot > 0 && (
+                                    <div>
+                                        <p className="text-blue-200">{t('ปิโวต์:')}</p>
+                                        <p className="font-bold text-white">
+                                            {projectSummary.irrigationByType.pivot.toLocaleString()} {t('จุด')}
+                                        </p>
+                                    </div>
+                                )}
+                                {projectSummary.irrigationByType.waterJetTape > 0 && (
+                                    <div>
+                                        <p className="text-blue-200">{t('เทปน้ำพุ่ง:')}</p>
+                                        <p className="font-bold text-white">
+                                            {projectSummary.irrigationByType.waterJetTape.toLocaleString()} {t('จุด')}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
