@@ -8,14 +8,6 @@ import type * as GeoJSON from 'geojson';
 import type { FieldData } from './pipe-generate';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 import { getCropByValue } from './choose-crop';
-import { 
-    PlantPoint as LODPlantPoint, 
-    calculateLodLevel, 
-    filterPlantPointsByLod, 
-    createPlantPointMarker,
-    clearMarkers,
-    log
-} from '../../utils/lodClusteringUtils';
 import { getTranslatedCropByValue } from './choose-crop';
 import { createVoronoiZones as createVoronoiZonesFromUtils } from '../../utils/autoZoneUtils';
 import type { PlantLocation } from '../../utils/irrigationZoneUtils';
@@ -515,9 +507,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 	const [zoneStats, setZoneStats] = useState<ZoneStats | null>(null);
 	const [pointReductionMessage, setPointReductionMessage] = useState<string | null>(null);
 
-	// LOD States
-	const [filteredPlantPoints, setFilteredPlantPoints] = useState<LODPlantPoint[]>([]);
-	const [lodLevel, setLodLevel] = useState<number>(1);
+	// Plant points state
 	const [mapZoom, setMapZoom] = useState<number>(18);
 	const [hideAllPoints, setHideAllPoints] = useState<boolean>(initialFieldData.hideAllPoints || false); // Hide all points toggle
 	
@@ -1226,7 +1216,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		obstaclePolygonsRef.current.forEach(polygon => polygon.setMap(null));
 		obstaclePolygonsRef.current = [];
 
-		clearMarkers(plantPointMarkersRef.current);
+		plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
 
 		irrigationMarkersRef.current.forEach(marker => marker.setMap(null));
 		irrigationMarkersRef.current = [];
@@ -1451,7 +1441,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		const shouldUpdate = forceUpdate ||
 			!mainPolygonRef.current ||
 			obstaclePolygonsRef.current.length !== fieldData.obstacles.length ||
-			plantPointMarkersRef.current.length !== filteredPlantPoints.length;
+			plantPointMarkersRef.current.length !== (hideAllPoints ? 0 : fieldData.plantPoints.length);
 
 		if (shouldUpdate) {
 			clearMapObjects();
@@ -1472,11 +1462,26 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				mainPolygonRef.current = poly;
 			}
 
-			// Create plant point markers - only show filtered points
-			if (filteredPlantPoints.length > 0) {
-				filteredPlantPoints.forEach((point) => {
-					const marker = createPlantPointMarker(point, map);
-					marker.setZIndex(400);
+			// Create plant point markers - only show if not hidden
+			if (!hideAllPoints && fieldData.plantPoints.length > 0) {
+				fieldData.plantPoints.forEach((point) => {
+					const marker = new google.maps.Marker({
+						position: { lat: point.lat, lng: point.lng },
+						map: map,
+						icon: {
+							url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+								<svg width="6" height="6" viewBox="0 0 6 6" xmlns="http://www.w3.org/2000/svg">
+									<circle cx="3" cy="3" r="2.5" fill="#22C55E" stroke="#16A34A" stroke-width="1"/>
+								</svg>
+							`),
+							scaledSize: new google.maps.Size(6, 6),
+							anchor: new google.maps.Point(3, 3)
+						},
+						title: `Plant ${point.id}`,
+						optimized: true,
+						clickable: false,
+						zIndex: 400
+					});
 					plantPointMarkersRef.current.push(marker);
 				});
 			}
@@ -1569,31 +1574,15 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				});
 			}
 		});
-	}, [fieldData.mainArea, fieldData.obstacles, fieldData.zones, zoneEditingState.currentEdit, clearMapObjects, createIrrigationMarkers, updateZoneFromPolygon, filteredPlantPoints]); // Add necessary dependencies
+	}, [fieldData.mainArea, fieldData.obstacles, fieldData.zones, fieldData.plantPoints, zoneEditingState.currentEdit, clearMapObjects, createIrrigationMarkers, updateZoneFromPolygon, hideAllPoints]); // Add necessary dependencies
 
-	// Update filtered plant points when plantPoints, lodLevel, or hideAllPoints changes
-	const updateFilteredPlantPoints = useCallback(() => {
-		if (hideAllPoints) {
-			setFilteredPlantPoints([]); // Hide all points
-			log(`Hide all points: ${fieldData.plantPoints.length} -> 0 points`);
-		} else {
-			const filtered = filterPlantPointsByLod(fieldData.plantPoints, lodLevel);
-			setFilteredPlantPoints(filtered);
-			log(`LOD filtering: ${fieldData.plantPoints.length} -> ${filtered.length} points (LOD level: ${lodLevel}, Zoom: ${mapZoom})`);
-		}
-	}, [fieldData.plantPoints, lodLevel, mapZoom, hideAllPoints]);
 
-	// LOD effect: Update filtered plant points when plantPoints or lodLevel changes
-	useEffect(() => {
-		updateFilteredPlantPoints();
-	}, [updateFilteredPlantPoints]);
-
-	// Update map visuals when filtered plant points change
+	// Update map visuals when plant points change
 	useEffect(() => {
 		if (mapRef.current) {
 			updateMapVisuals(mapRef.current, true);
 		}
-	}, [filteredPlantPoints, updateMapVisuals]);
+	}, [fieldData.plantPoints, hideAllPoints, updateMapVisuals]);
 
 
 	const handleMapLoad = useCallback((loadedMap: google.maps.Map) => {
@@ -1603,10 +1592,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			const newZoom = loadedMap.getZoom() || MAP_CONFIG.DEFAULT_ZOOM;
 			setMapZoom(newZoom);
 			setFieldData(prev => ({ ...prev, mapZoom: newZoom }));
-			
-			// Update LOD level based on zoom
-			const newLodLevel = calculateLodLevel(newZoom);
-			setLodLevel(newLodLevel);
 		});
 
 		if (fieldData.mainArea.length >= 3) {
@@ -2590,6 +2575,21 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 												const newHideAllPoints = !hideAllPoints;
 												setHideAllPoints(newHideAllPoints);
 												setFieldData(prev => ({ ...prev, hideAllPoints: newHideAllPoints }));
+												
+												// Save the new state to localStorage immediately
+												try {
+													const existingData = localStorage.getItem('fieldCropData');
+													if (existingData) {
+														const fieldData = JSON.parse(existingData) as FieldData;
+														const updatedData = {
+															...fieldData,
+															hideAllPoints: newHideAllPoints
+														};
+														localStorage.setItem('fieldCropData', JSON.stringify(updatedData));
+													}
+												} catch (error) {
+													console.error('Error saving hideAllPoints state:', error);
+												}
 											}}
 											className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
 												hideAllPoints 
@@ -2623,12 +2623,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 									</div>
 									{fieldData.plantPoints.length > 0 && (
 										<div className="px-2 py-1 rounded bg-green-900 bg-opacity-70 border border-green-500 text-xs text-white">
-											<div>LOD: {lodLevel} | {filteredPlantPoints.length}/{fieldData.plantPoints.length} {t('points')}</div>
-											{lodLevel > 1 && (
-												<div className="text-green-200 text-xs">
-													{Math.round((filteredPlantPoints.length / fieldData.plantPoints.length) * 100)}% {t('visible')}
-												</div>
-											)}
+											<div>{fieldData.plantPoints.length} {t('points')}</div>
 										</div>
 									)}
 								</div>

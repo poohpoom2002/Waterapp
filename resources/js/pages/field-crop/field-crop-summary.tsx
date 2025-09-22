@@ -2768,14 +2768,6 @@ const buildZoneConnectivityLongestFlows = (
     // Flow from lateral sprinklers
     const perSprinkler = flowSettings?.sprinkler_system?.flow ?? 0;
     
-    // Debug logging for flow settings
-    if (perSprinkler === 0) {
-        console.log(`🔍 Flow settings debug:`, {
-            flowSettings,
-            perSprinkler,
-            sprinklerSystemFlow: flowSettings?.sprinkler_system?.flow
-        });
-    }
     
     // ฟังก์ชันสำหรับหาสปริงเกลอร์ที่เชื่อมต่อกับท่อย่อยแบบโหมดระหว่างแถว
     const findNearbyConnectedSprinklersBetweenRows = (coordinates: Coordinate[], sprinklers: Coordinate[]): Coordinate[] => {
@@ -2966,7 +2958,6 @@ const buildZoneConnectivityLongestFlows = (
                             latLongestUnits = leftRowSprinklers.length + rightRowSprinklers.length;
                             
                             // Debug logging สำหรับโหมดระหว่างแถว
-                            console.log(`🌾 Zone ${zone.id}: Between rows mode - ${latLongestUnits} units, ${(latLongestUnits * perSprinkler).toFixed(2)} L/min`);
                         } else {
                             // ถ้าไม่สามารถหาสปริงเกลอร์ทั้งสองแถวได้ ใช้วิธีเดิม
                             latLongestUnits = connectedSprinklers.length;
@@ -3119,7 +3110,6 @@ const buildZoneConnectivityLongestFlows = (
         
         // Debug logging for troubleshooting
         if (totalFlow === 0 && latIds.length > 0) {
-            console.log(`🔍 Submain ${sid} flow calculation debug:`, debugInfo);
         }
         
         return { latCount, flow: totalFlow };
@@ -3156,7 +3146,6 @@ const buildZoneConnectivityLongestFlows = (
         
         // Debug logging for troubleshooting
         if (totalMainFlow === 0 && subIds.length > 0) {
-            console.log(`🔍 Main ${m.id} flow calculation debug:`, { mainId: m.id, subCount, totalMainFlow });
         }
         
         if (totalMainFlow > bestMainFlow) {
@@ -3180,12 +3169,6 @@ const buildZoneConnectivityLongestFlows = (
         }
     }
 
-    // Debug logging for final results
-    console.log(`🔍 Zone ${zone.id} final flow calculation:`, {
-        main: { flowLMin: bestMainFlow },
-        submain: { flowLMin: subLongestStats.flow },
-        lateral: { flowLMin: latLongestFlow }
-    });
 
     return {
         main: { longestId: bestMainId, connectedSubmains: bestMainSubCount, flowLMin: bestMainFlow },
@@ -3784,14 +3767,6 @@ export default function FieldCropSummary() {
         }
     }, [summaryData]);
 
-    // Debug logging for irrigation settings
-    useEffect(() => {
-        console.log('🔍 Irrigation Settings Debug:', {
-            sprinklerFlow: irrigationSettingsData?.sprinkler_system?.flow,
-            actualPipes: actualPipes.length,
-            actualIrrigationPoints: actualIrrigationPoints.length
-        });
-    }, [irrigationSettingsData, actualPipes, actualIrrigationPoints]);
 
     // Build global pipe network connectivity & flow summary
     const pipeNetworkSummary = useMemo(() => {
@@ -5195,7 +5170,6 @@ export default function FieldCropSummary() {
                                                 }
                                             });
                                             
-                                            console.log('🔍 All Zone Flow Calculations:', allZoneFlows);
                                             
                                             return null;
                                         })()}

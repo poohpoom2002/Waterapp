@@ -8,18 +8,103 @@ import EnhancedHorticultureSearchControl from '../../components/horticulture/Hor
 import DistanceMeasurementOverlay from '../../components/horticulture/DistanceMeasurementOverlay';
 import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
-import { 
-    calculateLodLevel, 
-    filterPlantPointsByLod, 
-    createPlantPointMarker, 
-    clearMarkers,
-    log as clusteringLog,
-    type PlantPoint as UtilityPlantPoint
-} from '../../utils/lodClusteringUtils';
 
 
 // Yield back to the browser between heavy batches without blocking UI
 const yieldToFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+// Helper function to safely save data to localStorage with size optimization
+const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
+	try {
+		const dataString = JSON.stringify(data);
+		const dataSizeKB = new Blob([dataString]).size / 1024;
+		
+		if (dataSizeKB > maxSizeKB) {
+			console.warn(`Data size (${dataSizeKB.toFixed(2)}KB) exceeds limit (${maxSizeKB}KB), optimizing...`);
+			
+			// Optimize by reducing precision
+			const dataObj = data as Record<string, unknown>;
+			const optimizedData = {
+				...dataObj,
+				mainArea: Array.isArray(dataObj.mainArea) ? dataObj.mainArea.map((coord: unknown) => {
+					const c = coord as { lat: number; lng: number };
+					return {
+						lat: Math.round(c.lat * 1000000) / 1000000,
+						lng: Math.round(c.lng * 1000000) / 1000000
+					};
+				}) : [],
+				obstacles: Array.isArray(dataObj.obstacles) ? dataObj.obstacles.map((obs: unknown) => {
+					const o = obs as { coordinates: unknown[]; [key: string]: unknown };
+					return {
+						...o,
+						coordinates: Array.isArray(o.coordinates) ? o.coordinates.map((coord: unknown) => {
+							const c = coord as { lat: number; lng: number };
+							return {
+								lat: Math.round(c.lat * 1000000) / 1000000,
+								lng: Math.round(c.lng * 1000000) / 1000000
+							};
+						}) : []
+					};
+				}) : [],
+				plantPoints: Array.isArray(dataObj.plantPoints) ? dataObj.plantPoints.map((point: unknown) => {
+					const p = point as { lat: number; lng: number; cropType: string; isValid: boolean };
+					return {
+						lat: Math.round(p.lat * 1000000) / 1000000,
+						lng: Math.round(p.lng * 1000000) / 1000000,
+						cropType: p.cropType,
+						isValid: p.isValid
+					};
+				}) : []
+			};
+			
+			const optimizedString = JSON.stringify(optimizedData);
+			const optimizedSizeKB = new Blob([optimizedString]).size / 1024;
+			
+			if (optimizedSizeKB > maxSizeKB) {
+				console.warn('Data still too large after optimization, further reducing plant points...');
+				// Further reduce plant points precision
+				const dataObj = optimizedData as Record<string, unknown>;
+				const furtherOptimizedData = {
+					...dataObj,
+					plantPoints: Array.isArray(dataObj.plantPoints) ? dataObj.plantPoints.map((point: unknown) => {
+						const p = point as { lat: number; lng: number; cropType: string; isValid: boolean };
+						return {
+							lat: Math.round(p.lat * 100000) / 100000, // 5 decimal places
+							lng: Math.round(p.lng * 100000) / 100000,
+							cropType: p.cropType,
+							isValid: p.isValid
+						};
+					}) : []
+				};
+				
+				const furtherOptimizedString = JSON.stringify(furtherOptimizedData);
+				const furtherOptimizedSizeKB = new Blob([furtherOptimizedString]).size / 1024;
+				
+				if (furtherOptimizedSizeKB > maxSizeKB) {
+					console.warn('Data still too large, sampling plant points...');
+					// Sample plant points (keep every 2nd point)
+					const sampledPlantPoints = Array.isArray(furtherOptimizedData.plantPoints) ? 
+						furtherOptimizedData.plantPoints.filter((_, index) => index % 2 === 0) : [];
+					const finalData = {
+						...furtherOptimizedData,
+						plantPoints: sampledPlantPoints
+					};
+					localStorage.setItem(key, JSON.stringify(finalData));
+				} else {
+					localStorage.setItem(key, furtherOptimizedString);
+				}
+			} else {
+				localStorage.setItem(key, optimizedString);
+			}
+		} else {
+			localStorage.setItem(key, dataString);
+		}
+		return true;
+	} catch (error) {
+		console.error('Error saving to localStorage:', error);
+		return false;
+	}
+};
 
 // Type guard and helper to safely detach Google Maps overlays without TS errors
 const hasSetMap = (obj: unknown): obj is { setMap: (map: google.maps.Map | null) => void } => {
@@ -142,9 +227,7 @@ export default function InitialArea({
     const [editingRowSpacingForCrop, setEditingRowSpacingForCrop] = useState<string | null>(null);
     const [editingPlantSpacingForCrop, setEditingPlantSpacingForCrop] = useState<string | null>(null);
 
-    // LOD (Level of Detail) States
-    const [filteredPlantPoints, setFilteredPlantPoints] = useState<PlantPoint[]>([]);
-    const [lodLevel, setLodLevel] = useState<number>(1);
+    // Plant points state
 
 
     // Refs for state synchronization
@@ -369,47 +452,18 @@ export default function InitialArea({
         }
     }, [realPlantPoints, hideAllPoints]);
 
-    // Update filtered plant points when plantPoints or lodLevel changes
-    const updateFilteredPlantPoints = useCallback(() => {
-        // Convert PlantPoint to UtilityPlantPoint format
-        const utilityPlantPoints: UtilityPlantPoint[] = plantPoints.map(point => ({
-            id: point.id,
-            lat: point.lat,
-            lng: point.lng,
-            cropType: point.cropType,
-            isValid: point.isValid
-        }));
-
-        const filtered = filterPlantPointsByLod(utilityPlantPoints, lodLevel);
-        
-        // Convert back to local PlantPoint format
-        const localFiltered: PlantPoint[] = filtered.map(point => ({
-            id: point.id,
-            lat: point.lat,
-            lng: point.lng,
-            cropType: point.cropType,
-            isValid: point.isValid
-        }));
-        
-        setFilteredPlantPoints(localFiltered);
-        
-        clusteringLog(`LOD filtering: ${plantPoints.length} -> ${localFiltered.length} points (LOD: ${lodLevel}, Zoom: ${mapZoom})`);
-    }, [plantPoints, lodLevel, mapZoom]);
 
     // ===== PLANT POINT FUNCTIONS =====
     
-    // Enhanced function to clear all existing plant markers immediately using utility function
+    // Enhanced function to clear all existing plant markers immediately
     const clearAllPlantMarkers = useCallback(() => {
-        clusteringLog('Clearing all existing plant markers...');
-        clearMarkers(plantPointMarkersRef.current);
-        clusteringLog('All plant markers cleared successfully');
+        plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
     }, []);
 
     // Create optimized markers for plant points using utility function
     const createPlantMarkers = useCallback(async (points: PlantPoint[], generationId: number) => {
         if (!map) return [] as google.maps.Marker[];
         
-        clusteringLog(`Creating ${points.length} plant markers for generation ${generationId}`);
         const markers: google.maps.Marker[] = [];
         
         // Validate input points
@@ -428,7 +482,6 @@ export default function InitialArea({
         for (let i = 0; i < validPoints.length; i += batchSize) {
             // Check if this generation is still current
             if (currentGenerationIdRef.current !== generationId) {
-                clusteringLog(`Generation ${generationId} cancelled, cleaning up partial markers`);
                 markers.forEach(m => m.setMap(null));
                 return [] as google.maps.Marker[];
             }
@@ -437,22 +490,29 @@ export default function InitialArea({
             for (const point of batch) {
                 // Double check before creating each marker
                 if (currentGenerationIdRef.current !== generationId) {
-                    clusteringLog(`Generation ${generationId} cancelled mid-batch`);
                     markers.forEach(m => m.setMap(null));
                     return [] as google.maps.Marker[];
                 }
                 
                 try {
-                    // Convert to utility format and use utility function
-                    const utilityPoint: UtilityPlantPoint = {
-                        id: point.id,
-                        lat: point.lat,
-                        lng: point.lng,
-                        cropType: point.cropType,
-                        isValid: point.isValid
-                    };
-                    
-                    const marker = createPlantPointMarker(utilityPoint, map);
+                    // Create marker directly
+                    const marker = new google.maps.Marker({
+                        position: { lat: point.lat, lng: point.lng },
+                        map: map,
+                        icon: {
+                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                                <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="4" cy="4" r="3.5" fill="#22C55E" stroke="#16A34A" stroke-width="1"/>
+                                </svg>
+                            `),
+                            scaledSize: new google.maps.Size(8, 8),
+                            anchor: new google.maps.Point(4, 4)
+                        },
+                        title: `Plant ${point.id}`,
+                        optimized: true,
+                        clickable: false,
+                        zIndex: 1000
+                    });
                     markers.push(marker);
                 } catch {
                     // Continue with other markers instead of failing completely
@@ -463,7 +523,6 @@ export default function InitialArea({
             await yieldToFrame();
         }
         
-        clusteringLog(`Successfully created ${markers.length} markers for generation ${generationId}`);
         return markers;
     }, [map]);
 
@@ -1022,10 +1081,6 @@ export default function InitialArea({
         updateDisplayedPoints();
     }, [updateDisplayedPoints]);
 
-    // LOD effect: Update filtered plant points when plantPoints or lodLevel changes
-    useEffect(() => {
-        updateFilteredPlantPoints();
-    }, [updateFilteredPlantPoints]);
 
 
     // Plant points markers rendering effect
@@ -1035,8 +1090,8 @@ export default function InitialArea({
         // Always clear existing markers first
         clearAllPlantMarkers();
         
-        // Don't show points if none are filtered
-        if (filteredPlantPoints.length === 0) return;
+        // Don't show points if hideAllPoints is true
+        if (hideAllPoints) return;
 
 
         // Increment generation ID for this recreation
@@ -1053,7 +1108,7 @@ export default function InitialArea({
         };
 
         const newMarkers: google.maps.Marker[] = [];
-        filteredPlantPoints.forEach((point) => {
+        plantPoints.forEach((point) => {
             // Check if still current generation
             if (currentGenerationIdRef.current !== generationId) {
                 // Clean up any markers created so far
@@ -1079,7 +1134,7 @@ export default function InitialArea({
             // Clean up if generation was cancelled
             newMarkers.forEach(m => m.setMap(null));
         }
-    }, [map, filteredPlantPoints, clearAllPlantMarkers, lodLevel]);
+    }, [map, plantPoints, clearAllPlantMarkers, hideAllPoints]);
     
     // [FIX] Enhanced plant generation logic with proper race condition handling and error recovery
     const runPlantGeneration = useCallback(async (angle: number) => {
@@ -1129,7 +1184,7 @@ export default function InitialArea({
             }
             
             // Create markers for the new points with batch processing
-            const markers = await createPlantMarkers(plantPoints, generationId);
+            const markers = await createPlantMarkers(realPoints, generationId);
             
             // Final check before rendering markers
             if (currentGenerationIdRef.current === generationId) {
@@ -1150,7 +1205,7 @@ export default function InitialArea({
         } finally {
             setIsGeneratingPlants(false);
         }
-    }, [generatePlantPointsOriented, createPlantMarkers, clearAllPlantMarkers, t]);
+    }, [generatePlantPointsOriented, createPlantMarkers, clearAllPlantMarkers, t, hideAllPoints]);
 
     // Handle plant point generation
     const handleGeneratePlantPoints = useCallback(async () => {
@@ -1783,9 +1838,6 @@ export default function InitialArea({
                 const newZoom = loadedMap.getZoom() || 16;
                 setMapZoom(newZoom);
                 
-                // Update LOD level based on zoom using utility function
-                const newLodLevel = calculateLodLevel(newZoom);
-                setLodLevel(newLodLevel);
             })
         );
         
@@ -2223,7 +2275,7 @@ export default function InitialArea({
                 } : { lat: 13.7563, lng: 100.5018 },
                 mapZoom: map ? Math.max(1, Math.min(22, map.getZoom() || 16)) : 16
             };
-            localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
+            safeSetItem('fieldCropData', fieldData);
         } catch {
             // Error saving field data before navigation
         }
@@ -2350,7 +2402,7 @@ export default function InitialArea({
                             ...furtherOptimizedData,
                             plantPoints: sampledPlantPoints
                         };
-                        localStorage.setItem('fieldCropData', JSON.stringify(finalData));
+                        safeSetItem('fieldCropData', finalData);
                     } else {
                         localStorage.setItem('fieldCropData', furtherOptimizedString);
                     }
@@ -2397,7 +2449,7 @@ export default function InitialArea({
                     mapZoom: fieldData.mapZoom,
                     plantPoints: optimizedPlantPoints // Keep optimized plant points
                 };
-                localStorage.setItem('fieldCropData', JSON.stringify(minimalData));
+                safeSetItem('fieldCropData', minimalData);
             } catch {
                 // Failed to save even minimal data
                 // Clear localStorage and try again
@@ -2437,7 +2489,7 @@ export default function InitialArea({
                         mapZoom: fieldData.mapZoom,
                         plantPoints: heavilyOptimizedPlantPoints // Keep heavily optimized plant points
                     };
-                    localStorage.setItem('fieldCropData', JSON.stringify(minimalData));
+                    safeSetItem('fieldCropData', minimalData);
                 } catch {
                     // Failed to clear localStorage
                 }
@@ -2833,7 +2885,26 @@ export default function InitialArea({
                                 {realPlantCount > 0 && (
                                     <div className="absolute top-2.5 right-60 z-10">
                                         <button 
-                                            onClick={() => setHideAllPoints(!hideAllPoints)}
+                                            onClick={() => {
+                                                const newHideState = !hideAllPoints;
+                                                setHideAllPoints(newHideState);
+                                                
+                                                // Save the new state to localStorage immediately
+                                                try {
+                                                    const existingData = localStorage.getItem('fieldCropData');
+                                                    if (existingData) {
+                                                        const fieldData = JSON.parse(existingData) as Record<string, unknown>;
+                                                        const updatedData = {
+                                                            ...fieldData,
+                                                            hideAllPoints: newHideState
+                                                        };
+                                                        // Use safeSetItem to ensure consistency with irrigation-generate.tsx
+                                                        safeSetItem('fieldCropData', updatedData);
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error saving hideAllPoints state:', error);
+                                                }
+                                            }}
                                             className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
                                                 hideAllPoints 
                                                     ? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
@@ -2866,12 +2937,7 @@ export default function InitialArea({
                                     </div>
                                     {plantPoints.length > 0 && (
                                         <div className="px-2 py-1 rounded bg-green-900 bg-opacity-70 border border-green-500 text-xs text-white">
-                                            <div>LOD: {lodLevel} | {filteredPlantPoints.length}/{plantPoints.length} {t('points')}</div>
-                                            {lodLevel > 1 && (
-                                                <div className="text-green-200 text-xs">
-                                                    {Math.round((filteredPlantPoints.length / plantPoints.length) * 100)}% {t('visible')}
-                                                </div>
-                                            )}
+                                            <div>{plantPoints.length} {t('points')}</div>
                                         </div>
                                     )}
                                 </div>

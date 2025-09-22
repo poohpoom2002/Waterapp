@@ -6,14 +6,6 @@ import HorticultureMapComponent from '../../components/horticulture/Horticulture
 import { getCropByValue } from './choose-crop';
 import type { FieldData } from './pipe-generate';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
-import { 
-    PlantPoint, 
-    calculateLodLevel, 
-    filterPlantPointsByLod, 
-    createPlantPointMarker,
-    clearMarkers,
-    log
-} from '../../utils/lodClusteringUtils';
 
 interface Zone {
 	id: string;
@@ -163,10 +155,8 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
 						plantPoints: sampledPlantPoints
 					};
 					localStorage.setItem(key, JSON.stringify(finalData));
-					console.log(`Saved data with ${sampledPlantPoints.length} sampled plant points`);
 				} else {
 					localStorage.setItem(key, furtherOptimizedString);
-					console.log('Saved further optimized data successfully');
 				}
 			} else {
 				localStorage.setItem(key, optimizedString);
@@ -237,26 +227,19 @@ export default function IrrigationGenerate({
 	const [parsedMapZoom, setParsedMapZoom] = useState<number>(18);
 	const hasInitializedRef = useRef<boolean>(false);
 
-	// LOD States
-	const [filteredPlantPoints, setFilteredPlantPoints] = useState<PlantPoint[]>([]);
-	const [lodLevel, setLodLevel] = useState<number>(1);
+	// Plant points state
 	const [hideAllPoints, setHideAllPoints] = useState<boolean>(false); // Hide all points toggle
 
 	// Parse data on component mount
 	useEffect(() => {
 		if (hasInitializedRef.current) return;
 		hasInitializedRef.current = true;
-		console.log('Irrigation Generate - Received props:', {
-			selectedCrops,
-			crops
-		});
 		
 		// On fresh page load (no URL parameters), make behavior match the Reset button
 		// Treat as "Reset irrigation only" while keeping existing field data
 		const hasUrlParams = !!(crops || completedSteps || mainAreaData || obstaclesData || plantPointsData || areaRai || perimeterMeters || rotationAngle || rowSpacing || plantSpacing);
 		
 		if (!hasUrlParams) {
-			console.log('Fresh page load detected - resetting irrigation config to match Reset');
 			try {
 				const fieldDataStr = localStorage.getItem('fieldCropData');
 				if (fieldDataStr) {
@@ -275,10 +258,7 @@ export default function IrrigationGenerate({
 					
 					if (fieldData.plantPoints) {
 						dbg('Loading plantPoints from localStorage:', fieldData.plantPoints.length, 'points');
-						console.log('Plant points loaded from localStorage:', fieldData.plantPoints.length, 'points');
 						setParsedPlantPoints(fieldData.plantPoints);
-					} else {
-						console.log('No plant points found in localStorage');
 					}
 					
 					if (fieldData.areaRai) {
@@ -323,6 +303,7 @@ export default function IrrigationGenerate({
 					}
 					
 					if (typeof fieldData.hideAllPoints === 'boolean') {
+						console.log('Irrigation - Loading hideAllPoints from localStorage (fresh load):', fieldData.hideAllPoints);
 						setHideAllPoints(fieldData.hideAllPoints);
 					}
 					
@@ -337,7 +318,8 @@ export default function IrrigationGenerate({
 							drip_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 0.24, pressure: 1.0 },
 							water_jet_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 1.5, pressure: 1.5 }
 						},
-						irrigationPositions: { sprinklers: [], pivots: [], dripTapes: [], waterJets: [] }
+						irrigationPositions: { sprinklers: [], pivots: [], dripTapes: [], waterJets: [] },
+						hideAllPoints: fieldData.hideAllPoints // Preserve hideAllPoints state
 					};
 					safeSetItem('fieldCropData', sanitized);
 				}
@@ -356,17 +338,13 @@ export default function IrrigationGenerate({
 		// Parse selectedCrops from crops parameter
 		if (crops) {
 			const cropList = crops.split(',').filter(crop => crop.trim());
-			console.log('Setting selectedCrops from crops parameter:', cropList);
 			setParsedSelectedCrops(cropList);
-		} else {
-			console.log('No crops parameter found in URL');
 		}
 		
 		// Load data from localStorage if available (back navigation or fresh reload with stored data)
 		const shouldLoadFromStorage = (() => {
 			try { return !!localStorage.getItem('fieldCropData'); } catch { return false; }
 		})();
-		console.log('Data loading check:', { hasUrlParams, shouldLoadFromStorage });
 		if (hasUrlParams || shouldLoadFromStorage) {
 			try {
 				dbg('Checking localStorage for fieldCropData...');
@@ -435,6 +413,7 @@ export default function IrrigationGenerate({
 					}
 					
 					if (typeof fieldData.hideAllPoints === 'boolean') {
+						console.log('Irrigation - Loading hideAllPoints from localStorage (with URL params):', fieldData.hideAllPoints);
 						setHideAllPoints(fieldData.hideAllPoints);
 					}
 					
@@ -477,26 +456,7 @@ export default function IrrigationGenerate({
 		parsedPlantPoints.length > 0 ? parsedPlantPoints : []
 	), [parsedPlantPoints]);
 
-	// Debug: Log final data for rendering
-	console.log('Final data for rendering:', {
-		finalMainArea: finalMainArea.length,
-		finalObstacles: finalObstacles.length,
-		finalPlantPoints: finalPlantPoints.length,
-		parsedMainArea: parsedMainArea.length,
-		parsedObstacles: parsedObstacles.length,
-		parsedPlantPoints: parsedPlantPoints.length,
-		propsMainArea: mainArea.length,
-		propsObstacles: obstacles.length,
-		hasUrlParams: !!(crops || completedSteps || mainAreaData || obstaclesData || plantPointsData || areaRai || perimeterMeters || rotationAngle || rowSpacing || plantSpacing)
-	});
 	
-	// Debug: Log final obstacles data
-	console.log('Final obstacles for rendering:', {
-		parsedObstaclesLength: parsedObstacles.length,
-		propsObstaclesLength: obstacles.length,
-		finalObstaclesLength: finalObstacles.length,
-		finalObstacles: finalObstacles.map(o => ({ type: o.type, coordinates: o.coordinates.length }))
-	});
 	const finalAreaRai = parsedAreaRai !== null ? parsedAreaRai : null;
 	const finalPerimeterMeters = parsedPerimeterMeters !== null ? parsedPerimeterMeters : null;
 	const finalRotationAngle = parsedRotationAngle !== 0 ? parsedRotationAngle : 0;
@@ -506,8 +466,6 @@ export default function IrrigationGenerate({
 	const finalMapCenter = parsedMapCenter.lat !== 13.7563 || parsedMapCenter.lng !== 100.5018 ? parsedMapCenter : mapCenter;
 	const finalMapZoom = parsedMapZoom !== 18 ? parsedMapZoom : mapZoom;
 	
-	// Debug: Log final selected crops
-	console.log('Final selected crops:', finalSelectedCrops);
 	
 	// (moved below irrigationPositions state)
 
@@ -588,9 +546,6 @@ export default function IrrigationGenerate({
 
 	// Calculate total water requirement
 	const totalWaterRequirement = useMemo(() => {
-		console.log('Calculating water requirement for crops:', finalSelectedCrops);
-		console.log('Number of plant points:', finalPlantPoints.length);
-		
 		// Get water requirement per plant for the primary crop
 		const primaryCrop = finalSelectedCrops[0];
 		const crop = getCropByValue(primaryCrop);
@@ -599,11 +554,8 @@ export default function IrrigationGenerate({
 		// Calculate total water requirement for all plants using real count
 		const totalWaterRequirement = waterPerPlant * realPlantCount;
 		
-		console.log(`Primary crop: ${primaryCrop}, Water per plant: ${waterPerPlant} ลิตร/ครั้ง/plant`);
-		console.log(`Total plants (real): ${realPlantCount}, Displayed: ${finalPlantPoints.length}`);
-		console.log('Total water requirement:', totalWaterRequirement, 'ลิตร/ครั้ง');
 		return totalWaterRequirement;
-	}, [finalSelectedCrops, realPlantCount, finalPlantPoints.length]);
+	}, [finalSelectedCrops, realPlantCount]);
 
 	const handleBack = () => {
 		// Update completed steps automatically
@@ -629,10 +581,10 @@ export default function IrrigationGenerate({
 			irrigationPositions,
 			mapCenter: parsedMapCenter || finalMapCenter,
 			mapZoom: parsedMapZoom || finalMapZoom,
+			hideAllPoints, // Save hideAllPoints state
 		};
 		try { safeSetItem('fieldCropData', allData); } catch { /* ignore storage errors */ }
 		
-		console.log('Going back to initial-area - preserving all data including irrigation in localStorage');
 		router.get('/step1-field-area', { 
 			crops: crops || selectedCrops.join(','),
 			currentStep: 1,
@@ -693,6 +645,7 @@ export default function IrrigationGenerate({
 				irrigationPositions,
 				mapCenter: calculatedMapCenter,
 				mapZoom: finalMapZoom,
+				hideAllPoints: false, // Default value for new data
 			};
 			fieldData = {
 				...fieldData,
@@ -712,6 +665,7 @@ export default function IrrigationGenerate({
 				irrigationCounts,
 				totalWaterRequirement,
 				irrigationPositions,
+				hideAllPoints, // Save hideAllPoints state
 			};
 			safeSetItem('fieldCropData', fieldData);
 		} catch {
@@ -796,6 +750,7 @@ export default function IrrigationGenerate({
 				irrigationPositions,
 				mapCenter: calculatedMapCenter,
 				mapZoom: finalMapZoom,
+				hideAllPoints: false, // Default value for new data
 			};
 			
 			// เพิ่มข้อมูล irrigation ใหม่
@@ -818,10 +773,10 @@ export default function IrrigationGenerate({
 				irrigationCounts,
 				totalWaterRequirement,
 				irrigationPositions,
+				hideAllPoints, // Save hideAllPoints state
 			};
 			
 			safeSetItem('fieldCropData', fieldData);
-			console.log('Saved irrigation data to localStorage:', fieldData);
 			
 		} catch (error) {
 			console.error('Error saving irrigation data to localStorage:', error);
@@ -838,43 +793,20 @@ export default function IrrigationGenerate({
 			completedSteps: toCompletedStepsCsv([...parseCompletedSteps(updatedCompletedSteps), 2]),
 		};
 		
-		console.log('Navigating to zone-obstacle with minimal params:', params);
 		router.get('/step3-zones-obstacles', params);
 	};
 
 	const handleMapLoad = useCallback((map: google.maps.Map) => {
-		console.log('Map load callback triggered');
 		mapRef.current = map;
 		setIsMapLoaded(true);
-		console.log('Map loaded successfully, map ref:', !!mapRef.current);
 		
-		// Add zoom change listener for LOD
+		// Add zoom change listener
 		map.addListener('zoom_changed', () => {
 			const newZoom = map.getZoom() || 18;
 			setParsedMapZoom(newZoom);
-			
-			// Update LOD level based on zoom
-			const newLodLevel = calculateLodLevel(newZoom);
-			setLodLevel(newLodLevel);
 		});
 	}, []);
 
-	// Update filtered plant points when plantPoints, lodLevel, or hideAllPoints changes
-	const updateFilteredPlantPoints = useCallback(() => {
-		if (hideAllPoints) {
-			setFilteredPlantPoints([]); // Hide all points
-			log(`Hide all points: ${finalPlantPoints.length} -> 0 points`);
-		} else {
-			const filtered = filterPlantPointsByLod(finalPlantPoints, lodLevel);
-			setFilteredPlantPoints(filtered);
-			log(`LOD filtering: ${finalPlantPoints.length} -> ${filtered.length} points (LOD level: ${lodLevel}, Zoom: ${parsedMapZoom})`);
-		}
-	}, [finalPlantPoints, lodLevel, parsedMapZoom, hideAllPoints]);
-
-	// LOD effect: Update filtered plant points when plantPoints or lodLevel changes
-	useEffect(() => {
-		updateFilteredPlantPoints();
-	}, [updateFilteredPlantPoints]);
 
 
 	// Fit map to main area when main area changes
@@ -885,7 +817,6 @@ export default function IrrigationGenerate({
 				bounds.extend(new google.maps.LatLng(coord.lat, coord.lng));
 			});
 			mapRef.current.fitBounds(bounds);
-			console.log('Map fitted to main area bounds');
 		}
 	}, [finalMainArea]);
 
@@ -913,7 +844,6 @@ export default function IrrigationGenerate({
 		});
 		
 		setSelectedIrrigationType(type);
-		console.log('Selected irrigation type:', type, '- cleared all existing overlays');
 	};
 
 	// Function for updating irrigation settings
@@ -960,7 +890,6 @@ export default function IrrigationGenerate({
 		if (!mapRef.current || finalMainArea.length < 3) return;
 		
 		setIsGeneratingIrrigation(true);
-		console.log('Generating sprinkler system with optimized performance - radius:', irrigationSettings.sprinkler_system.coverageRadius, 'overlap:', irrigationSettings.sprinkler_system.overlap, 'rotation angle:', finalRotationAngle);
 		
 		try {
 			// Clear existing irrigation overlays
@@ -1076,7 +1005,6 @@ export default function IrrigationGenerate({
 				}
 			}
 			
-			console.log(`Generated ${allPositions.length} potential sprinkler positions`);
 			
 			// Process positions in batches for better performance
 			const sprinklers: { lat: number; lng: number }[] = [];
@@ -1119,7 +1047,6 @@ export default function IrrigationGenerate({
 				}
 			}
 			
-			console.log(`Total sprinklers generated: ${sprinklers.length}`);
 			
 			// Update irrigation count
 			setIrrigationCounts(prev => ({ ...prev, sprinkler_system: sprinklers.length }));
@@ -1184,7 +1111,6 @@ export default function IrrigationGenerate({
 		if (!mapRef.current || finalMainArea.length < 3) return;
 		
 		setIsGeneratingIrrigation(true);
-		console.log('Generating pivot system using center-first approach - radius:', irrigationSettings.pivot.coverageRadius, 'overlap:', irrigationSettings.pivot.overlap, 'rotation angle:', finalRotationAngle);
 		
 		try {
 			// Clear existing irrigation overlays
@@ -1199,7 +1125,6 @@ export default function IrrigationGenerate({
 			const rotationAngleRad = (finalRotationAngle * Math.PI) / 180;
 			const bufferDistance = effectiveSpacing * 0.3; // Buffer from edges like plant points
 			
-			console.log('Pivot spacing:', effectiveSpacing, 'meters, buffer distance:', bufferDistance, 'meters');
 			
 			// Geometry helper functions (same as plant point generation)
 			const computeCentroid = (points: { lat: number; lng: number }[]) => {
@@ -1299,8 +1224,6 @@ export default function IrrigationGenerate({
 			const minY = Math.min(...ys);
 			const maxY = Math.max(...ys);
 			
-			console.log('Rotated area bounds:', { minX, maxX, minY, maxY });
-			console.log('Grid spacing:', effectiveSpacing, 'meters');
 			
 			// Calculate center Y coordinate for starting from the middle (like plant points)
 			const centerY = (minY + maxY) / 2;
@@ -1311,7 +1234,6 @@ export default function IrrigationGenerate({
 			const rowsAboveCenter = Math.floor(maxRows / 2);
 			const rowsBelowCenter = maxRows - rowsAboveCenter;
 			
-			console.log(`Pivot generation: center Y=${centerY.toFixed(2)}, rows above=${rowsAboveCenter}, rows below=${rowsBelowCenter}`);
 			
 			// Generate rows starting from center and expanding outward
 			const allRowYs: number[] = [];
@@ -1338,7 +1260,6 @@ export default function IrrigationGenerate({
 			// Sort rows from bottom to top for consistent ordering
 			allRowYs.sort((a, b) => a - b);
 			
-			console.log(`Generated ${allRowYs.length} pivot rows starting from center`);
 			
 			// Generate pivots for each row with improved symmetrical placement
 			const pivots: { lat: number; lng: number }[] = [];
@@ -1352,7 +1273,6 @@ export default function IrrigationGenerate({
 			const colsLeftOfCenter = Math.floor(maxCols / 2);
 			const colsRightOfCenter = maxCols - colsLeftOfCenter;
 			
-			console.log(`Pivot generation: center X=${centerX.toFixed(2)}, cols left=${colsLeftOfCenter}, cols right=${colsRightOfCenter}`);
 			
 			// Generate columns starting from center and expanding outward
 			const allColXs: number[] = [];
@@ -1379,7 +1299,6 @@ export default function IrrigationGenerate({
 			// Sort columns from left to right for consistent ordering
 			allColXs.sort((a, b) => a - b);
 			
-			console.log(`Generated ${allColXs.length} pivot columns starting from center`);
 			
 			for (let rowIndex = 0; rowIndex < allRowYs.length; rowIndex++) {
 				const y = allRowYs[rowIndex];
@@ -1403,17 +1322,11 @@ export default function IrrigationGenerate({
 							const latLng = toLatLngFromXY(unrotated, origin);
 							
 							pivots.push(latLng);
-							console.log(`Placed pivot at row ${rowIndex}, col ${colIndex}:`, latLng);
-						} else {
-							console.log(`Skipped pivot at row ${rowIndex}, col ${colIndex} - too close to edge (${distanceFromEdge.toFixed(1)}m < ${bufferDistance}m)`);
 						}
-					} else if (insideAnyHole) {
-						console.log(`Skipped pivot at row ${rowIndex}, col ${colIndex} - inside obstacle`);
 					}
 				}
 			}
 			
-			console.log(`Total pivots generated: ${pivots.length} using center-first approach`);
 			
 			// Update irrigation count
 			setIrrigationCounts(prev => ({ ...prev, pivot: pivots.length }));
@@ -1471,7 +1384,6 @@ export default function IrrigationGenerate({
 		if (!mapRef.current || finalPlantPoints.length === 0) return;
 		
 		setIsGeneratingIrrigation(true);
-		console.log('Generating drip tape with center-first approach - spacing:', irrigationSettings.drip_tape.emitterSpacing, 'placement:', irrigationSettings.drip_tape.placement, 'side:', irrigationSettings.drip_tape.side);
 		
 		try {
 			// Clear existing irrigation overlays
@@ -1532,12 +1444,11 @@ export default function IrrigationGenerate({
 				reorderedRows.push(rows[i]);
 			}
 			
-			console.log(`Reordered ${reorderedRows.length} rows starting from center row ${centerIndex}`);
 			
 			// Generate drip tape positions
 			const dripPositions: { lat: number; lng: number }[] = [];
 			
-			reorderedRows.forEach((row, rowIndex) => {
+			reorderedRows.forEach((row) => {
 				// Sort plants in row by longitude
 				row.sort((a, b) => a.lng - b.lng);
 				
@@ -1558,13 +1469,10 @@ export default function IrrigationGenerate({
 					// Check if position is inside main area and not in any obstacle
 					if (isPointInPolygon({ lat: dripLat, lng: dripLng }, finalMainArea) && !isPointInObstacle({ lat: dripLat, lng: dripLng })) {
 						dripPositions.push({ lat: dripLat, lng: dripLng });
-					} else if (isPointInObstacle({ lat: dripLat, lng: dripLng })) {
-						console.log(`Skipped drip tape at row ${rowIndex} - inside obstacle:`, { lat: dripLat, lng: dripLng });
 					}
 				}
 			});
 			
-			console.log('Generated', dripPositions.length, 'drip tape positions using center-first approach');
 			
 			// Update irrigation count
 			setIrrigationCounts(prev => ({ ...prev, drip_tape: dripPositions.length }));
@@ -1598,14 +1506,13 @@ export default function IrrigationGenerate({
 		} finally {
 			setIsGeneratingIrrigation(false);
 		}
-	}, [finalPlantPoints, finalMainArea, irrigationSettings.drip_tape.emitterSpacing, irrigationSettings.drip_tape.placement, irrigationSettings.drip_tape.side, isPointInObstacle, isPointInPolygon]);
+	}, [finalPlantPoints, finalMainArea, irrigationSettings.drip_tape.emitterSpacing, irrigationSettings.drip_tape.side, isPointInObstacle, isPointInPolygon]);
 	
 	// Updated generateWaterJetTape function to use center-first row placement like plant points
 	const generateWaterJetTape = useCallback(async () => {
 		if (!mapRef.current || finalPlantPoints.length === 0) return;
 		
 		setIsGeneratingIrrigation(true);
-		console.log('Generating water jet tape with center-first approach - spacing:', irrigationSettings.water_jet_tape.emitterSpacing, 'placement:', irrigationSettings.water_jet_tape.placement, 'side:', irrigationSettings.water_jet_tape.side);
 		
 		try {
 			// Clear existing irrigation overlays
@@ -1666,12 +1573,11 @@ export default function IrrigationGenerate({
 				reorderedRows.push(rows[i]);
 			}
 			
-			console.log(`Reordered ${reorderedRows.length} rows starting from center row ${centerIndex}`);
 			
 			// Generate water jet positions
 			const jetPositions: { lat: number; lng: number }[] = [];
 			
-			reorderedRows.forEach((row, rowIndex) => {
+			reorderedRows.forEach((row) => {
 				// Sort plants in row by longitude
 				row.sort((a, b) => a.lng - b.lng);
 				
@@ -1692,13 +1598,10 @@ export default function IrrigationGenerate({
 					// Check if position is inside main area and not in any obstacle
 					if (isPointInPolygon({ lat: jetLat, lng: jetLng }, finalMainArea) && !isPointInObstacle({ lat: jetLat, lng: jetLng })) {
 						jetPositions.push({ lat: jetLat, lng: jetLng });
-					} else if (isPointInObstacle({ lat: jetLat, lng: jetLng })) {
-						console.log(`Skipped water jet at row ${rowIndex} - inside obstacle:`, { lat: jetLat, lng: jetLng });
 					}
 				}
 			});
 			
-			console.log('Generated', jetPositions.length, 'water jet positions using center-first approach');
 			
 			// Update irrigation count
 			setIrrigationCounts(prev => ({ ...prev, water_jet_tape: jetPositions.length }));
@@ -1732,7 +1635,7 @@ export default function IrrigationGenerate({
 		} finally {
 			setIsGeneratingIrrigation(false);
 		}
-	}, [finalPlantPoints, finalMainArea, irrigationSettings.water_jet_tape.emitterSpacing, irrigationSettings.water_jet_tape.placement, irrigationSettings.water_jet_tape.side, isPointInObstacle, isPointInPolygon]);
+	}, [finalPlantPoints, finalMainArea, irrigationSettings.water_jet_tape.emitterSpacing, irrigationSettings.water_jet_tape.side, isPointInObstacle, isPointInPolygon]);
 	
 	// Function to render irrigation settings based on selected type
 	const renderIrrigationSettings = () => {
@@ -2209,19 +2112,7 @@ export default function IrrigationGenerate({
 
 	// Render main area polygon
 	useEffect(() => {
-		console.log('Main area rendering effect:', {
-			mapLoaded: !!mapRef.current,
-			mainAreaLength: finalMainArea.length,
-			isMapLoaded,
-			finalMainArea: finalMainArea.slice(0, 3) // Show first 3 points
-		});
-		
 		if (!mapRef.current || !finalMainArea.length || !isMapLoaded) {
-			console.log('Main area rendering skipped:', {
-				noMap: !mapRef.current,
-				noMainArea: !finalMainArea.length,
-				notMapLoaded: !isMapLoaded
-			});
 			return;
 		}
 
@@ -2291,18 +2182,7 @@ export default function IrrigationGenerate({
 
 	// [FIX] Improved obstacles rendering effect
 	useEffect(() => {
-		console.log('Obstacles rendering effect:', {
-			mapLoaded: !!mapRef.current,
-			obstaclesLength: finalObstacles.length,
-			isMapLoaded,
-			obstacles: finalObstacles.map(o => ({ type: o.type, points: o.coordinates.length }))
-		});
-		
 		if (!mapRef.current || !isMapLoaded) {
-			console.log('Obstacles rendering skipped:', {
-				noMap: !mapRef.current,
-				notMapLoaded: !isMapLoaded
-			});
 			return;
 		}
 
@@ -2389,59 +2269,49 @@ export default function IrrigationGenerate({
 
 	// Render plant points
 	useEffect(() => {
-		console.log('Plant points rendering effect:', {
-			mapLoaded: !!mapRef.current,
-			plantPointsLength: finalPlantPoints.length,
-			isMapLoaded,
-			parsedPlantPointsLength: parsedPlantPoints.length,
-			propsPlantPointsLength: 0 // plantPoints from props is always empty
-		});
-		
 		if (!mapRef.current || !isMapLoaded || finalPlantPoints.length === 0) {
-			console.log('Plant points rendering skipped:', {
-				noMap: !mapRef.current,
-				notMapLoaded: !isMapLoaded,
-				noPlantPoints: finalPlantPoints.length === 0,
-				parsedPlantPointsLength: parsedPlantPoints.length
-			});
 			return;
 		}
 
 		// Clear existing markers
-		clearMarkers(plantPointMarkersRef.current);
+		plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
+		plantPointMarkersRef.current = [];
 		
-		// Don't show points if none are filtered
-		if (filteredPlantPoints.length === 0) return;
+		// Don't show points if hideAllPoints is true
+		console.log('Irrigation - Rendering plant points - hideAllPoints:', hideAllPoints, 'finalPlantPoints.length:', finalPlantPoints.length);
+		if (hideAllPoints) {
+			console.log('Irrigation - Hiding all plant points due to hideAllPoints = true');
+			return;
+		}
 
-		// Create markers for filtered plant points
-		console.log('Creating plant point markers for', filteredPlantPoints.length, 'points (LOD level:', lodLevel, ')');
-		filteredPlantPoints.forEach((point, index) => {
-			const marker = createPlantPointMarker(point, mapRef.current!);
+		// Create markers for all plant points
+		finalPlantPoints.forEach((point, index) => {
+			const marker = new google.maps.Marker({
+				position: { lat: point.lat, lng: point.lng },
+				map: mapRef.current,
+				icon: {
+					url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+						<svg width="6" height="6" viewBox="0 0 6 6" xmlns="http://www.w3.org/2000/svg">
+							<circle cx="3" cy="3" r="2.5" fill="#22C55E" stroke="#16A34A" stroke-width="1"/>
+						</svg>
+					`),
+					scaledSize: new google.maps.Size(6, 6),
+					anchor: new google.maps.Point(3, 3)
+				},
+				title: `Plant ${index + 1}`,
+				optimized: true,
+				clickable: false,
+				zIndex: 1000
+			});
 			plantPointMarkersRef.current.push(marker);
 			
-			// Log first few points for debugging
-			if (index < 5) {
-				console.log(`Created marker ${index + 1}:`, { lat: point.lat, lng: point.lng, cropType: point.cropType });
-			}
 		});
 		
-		console.log(`Successfully created ${filteredPlantPoints.length} plant point markers`);
-		dbg(`Created ${filteredPlantPoints.length} plant point markers`);
-	}, [filteredPlantPoints, isMapLoaded, lodLevel, finalPlantPoints.length, parsedPlantPoints.length]);
+		dbg(`Created ${finalPlantPoints.length} plant point markers`);
+	}, [finalPlantPoints, isMapLoaded, hideAllPoints, parsedPlantPoints.length]);
 
 	// Render irrigation overlays when data is loaded from localStorage
 	useEffect(() => {
-		console.log('Irrigation overlays rendering effect:', {
-			mapLoaded: !!mapRef.current,
-			isMapLoaded,
-			selectedIrrigationType,
-			irrigationPositions: {
-				sprinklers: irrigationPositions.sprinklers.length,
-				pivots: irrigationPositions.pivots.length,
-				dripTapes: irrigationPositions.dripTapes.length,
-				waterJets: irrigationPositions.waterJets.length
-			}
-		});
 		
 		if (!mapRef.current || !isMapLoaded) return;
 
@@ -2453,7 +2323,6 @@ export default function IrrigationGenerate({
 
 		// Recreate sprinkler overlays
 		if (irrigationPositions.sprinklers.length > 0) {
-			console.log('Recreating sprinkler overlays:', irrigationPositions.sprinklers.length);
 			const radius = irrigationSettings.sprinkler_system.coverageRadius;
 			
 			irrigationPositions.sprinklers.forEach((pos, index) => {
@@ -2496,7 +2365,6 @@ export default function IrrigationGenerate({
 
 		// Recreate pivot overlays
 		if (irrigationPositions.pivots.length > 0) {
-			console.log('Recreating pivot overlays:', irrigationPositions.pivots.length);
 			const radius = irrigationSettings.pivot.coverageRadius;
 			
 			irrigationPositions.pivots.forEach((pos, index) => {
@@ -2539,7 +2407,6 @@ export default function IrrigationGenerate({
 
 		// Recreate drip tape overlays
 		if (irrigationPositions.dripTapes.length > 0) {
-			console.log('Recreating drip tape overlays:', irrigationPositions.dripTapes.length);
 			
 			irrigationPositions.dripTapes.forEach((pos, index) => {
 				const marker = new google.maps.Marker({
@@ -2564,7 +2431,6 @@ export default function IrrigationGenerate({
 
 		// Recreate water jet overlays
 		if (irrigationPositions.waterJets.length > 0) {
-			console.log('Recreating water jet overlays:', irrigationPositions.waterJets.length);
 			
 			irrigationPositions.waterJets.forEach((pos, index) => {
 				const marker = new google.maps.Marker({
@@ -2587,7 +2453,6 @@ export default function IrrigationGenerate({
 			});
 		}
 		
-		console.log(`Recreated irrigation overlays: ${irrigationMarkersRef.current.length} markers, ${irrigationCirclesRef.current.length} circles`);
 	}, [
 		isMapLoaded,
 		selectedIrrigationType,
@@ -2609,7 +2474,6 @@ export default function IrrigationGenerate({
 				irrigationPositions.waterJets.length > 0;
 			
 			if (hasIrrigationData) {
-				console.log('Forcing irrigation overlay recreation after data load');
 				
 				// Clear existing irrigation overlays
 				irrigationMarkersRef.current.forEach(marker => marker.setMap(null));
@@ -2619,7 +2483,6 @@ export default function IrrigationGenerate({
 
 				// Recreate sprinkler overlays
 				if (irrigationPositions.sprinklers.length > 0) {
-					console.log('Recreating sprinkler overlays:', irrigationPositions.sprinklers.length);
 					const radius = irrigationSettings.sprinkler_system?.coverageRadius || 8;
 					
 					irrigationPositions.sprinklers.forEach((pos, index) => {
@@ -2661,7 +2524,6 @@ export default function IrrigationGenerate({
 
 				// Recreate pivot overlays
 				if (irrigationPositions.pivots.length > 0) {
-					console.log('Recreating pivot overlays:', irrigationPositions.pivots.length);
 					const radius = irrigationSettings.pivot?.coverageRadius || 165;
 					
 					irrigationPositions.pivots.forEach((pos, index) => {
@@ -2703,7 +2565,6 @@ export default function IrrigationGenerate({
 
 				// Recreate drip tape overlays
 				if (irrigationPositions.dripTapes.length > 0) {
-					console.log('Recreating drip tape overlays:', irrigationPositions.dripTapes.length);
 					
 					irrigationPositions.dripTapes.forEach((pos, index) => {
 						const marker = new google.maps.Marker({
@@ -2728,7 +2589,6 @@ export default function IrrigationGenerate({
 
 				// Recreate water jet overlays
 				if (irrigationPositions.waterJets.length > 0) {
-					console.log('Recreating water jet overlays:', irrigationPositions.waterJets.length);
 					
 					irrigationPositions.waterJets.forEach((pos, index) => {
 						const marker = new google.maps.Marker({
@@ -2751,7 +2611,6 @@ export default function IrrigationGenerate({
 					});
 				}
 				
-				console.log(`Forced recreation completed: ${irrigationMarkersRef.current.length} markers, ${irrigationCirclesRef.current.length} circles`);
 			}
 		}
 	}, [
@@ -3035,7 +2894,6 @@ export default function IrrigationGenerate({
 									
 									<button 
 										onClick={() => {
-											console.log('Resetting irrigation settings - clearing irrigation config but keeping field data');
 											// Clear irrigation settings but keep field data
 											setSelectedIrrigationType('');
 											setIrrigationSettings({
@@ -3111,7 +2969,27 @@ export default function IrrigationGenerate({
 								{realPlantCount > 0 && (
 									<div className="absolute top-2.5 right-60 z-10">
 										<button 
-											onClick={() => setHideAllPoints(!hideAllPoints)}
+											onClick={() => {
+												const newHideState = !hideAllPoints;
+												console.log('Irrigation - Toggling hideAllPoints from', hideAllPoints, 'to', newHideState);
+												setHideAllPoints(newHideState);
+												
+												// Save the new state to localStorage immediately
+												try {
+													const existingData = localStorage.getItem('fieldCropData');
+													if (existingData) {
+														const fieldData = JSON.parse(existingData) as FieldData;
+														const updatedData = {
+															...fieldData,
+															hideAllPoints: newHideState
+														};
+														console.log('Irrigation - Saving hideAllPoints to localStorage:', newHideState);
+														safeSetItem('fieldCropData', updatedData);
+													}
+												} catch (error) {
+													console.error('Error saving hideAllPoints state:', error);
+												}
+											}}
 											className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
 												hideAllPoints 
 													? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
@@ -3144,12 +3022,7 @@ export default function IrrigationGenerate({
 									</div>
 									{finalPlantPoints.length > 0 && (
 										<div className="px-2 py-1 rounded bg-green-900 bg-opacity-70 border border-green-500 text-xs text-white">
-											<div>LOD: {lodLevel} | {filteredPlantPoints.length}/{finalPlantPoints.length} {t('points')}</div>
-											{lodLevel > 1 && (
-												<div className="text-green-200 text-xs">
-													{Math.round((filteredPlantPoints.length / finalPlantPoints.length) * 100)}% {t('visible')}
-												</div>
-											)}
+											<div>{finalPlantPoints.length} {t('points')}</div>
 										</div>
 									)}
 								</div>
