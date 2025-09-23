@@ -29,7 +29,9 @@ export const checkTokens = async (requiredTokens: number): Promise<TokenResponse
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN':
+                    document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+                    '',
             },
             body: JSON.stringify({ tokens: requiredTokens }),
         });
@@ -53,7 +55,9 @@ export const consumeTokens = async (tokens: number, operation: string): Promise<
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN':
+                    document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+                    '',
             },
             body: JSON.stringify({ tokens, operation }),
         });
@@ -77,7 +81,9 @@ export const getTokenStatus = async (): Promise<TokenResponse> => {
         const response = await fetch('/api/tokens/status', {
             method: 'GET',
             headers: {
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN':
+                    document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
+                    '',
             },
         });
 
@@ -94,7 +100,10 @@ export const getTokenStatus = async (): Promise<TokenResponse> => {
 /**
  * Show token-related alert messages
  */
-export const showTokenAlert = (message: string, type: 'success' | 'error' | 'warning' = 'error') => {
+export const showTokenAlert = (
+    message: string,
+    type: 'success' | 'error' | 'warning' = 'error'
+) => {
     // You can customize this to use your preferred notification system
     alert(message);
 };
@@ -109,7 +118,7 @@ export const handleTokenConsumption = async (
 ): Promise<Response> => {
     // First check if user has enough tokens
     const tokenCheck = await checkTokens(requiredTokens);
-    
+
     if (!tokenCheck.success || !tokenCheck.has_enough_tokens) {
         showTokenAlert(
             `Insufficient tokens. You need ${requiredTokens} tokens to perform this action. Current tokens: ${tokenCheck.current_tokens || 0}`,
@@ -126,16 +135,20 @@ export const handleTokenConsumption = async (
     const remainingTokens = response.headers.get('X-Remaining-Tokens');
 
     if (tokensConsumed && remainingTokens) {
-        console.log(`Consumed ${tokensConsumed} tokens for ${operation}. Remaining: ${remainingTokens}`);
-        
+        console.log(
+            `Consumed ${tokensConsumed} tokens for ${operation}. Remaining: ${remainingTokens}`
+        );
+
         // You can dispatch a custom event here to update the navbar token display
-        window.dispatchEvent(new CustomEvent('tokensUpdated', {
-            detail: {
-                consumed: parseInt(tokensConsumed),
-                remaining: parseInt(remainingTokens),
-                operation
-            }
-        }));
+        window.dispatchEvent(
+            new CustomEvent('tokensUpdated', {
+                detail: {
+                    consumed: parseInt(tokensConsumed),
+                    remaining: parseInt(remainingTokens),
+                    operation,
+                },
+            })
+        );
     }
 
     return response;

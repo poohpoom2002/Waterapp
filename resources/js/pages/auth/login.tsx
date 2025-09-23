@@ -360,7 +360,12 @@ export default function Login({ status }: LoginProps) {
                         </div>
                     </div>
                 )}
-                    <div className="text-center mb-4 text-5xl font-bold text-green-700 ">ยินดีต้อนรับเข้าสู่ <br /> <p className="mt-4 text-2xl font-bold text-green-700">บจก. ไชโยไปป์แอนด์ฟิตติ้ง จำกัด</p></div>
+                <div className="mb-4 text-center text-5xl font-bold text-green-700 ">
+                    ยินดีต้อนรับเข้าสู่ <br />{' '}
+                    <p className="mt-4 text-2xl font-bold text-green-700">
+                        บจก. ไชโยไปป์แอนด์ฟิตติ้ง จำกัด
+                    </p>
+                </div>
 
                 {/* Login Form */}
                 <div className="relative rounded-2xl border border-white/20 bg-white/80 p-8 shadow-xl backdrop-blur-sm">
@@ -474,9 +479,7 @@ export default function Login({ status }: LoginProps) {
                             )}
                         </Button>
                     </div>
-
                 </div>
-
             </div>
         </div>
     );

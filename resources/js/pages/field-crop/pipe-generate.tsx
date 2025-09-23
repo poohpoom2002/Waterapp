@@ -6,6 +6,7 @@ import HorticultureMapComponent from '../../components/horticulture/Horticulture
 import NotificationModal from '../../components/NotificationModal';
 import { isPointInPolygonEnhanced } from '../../utils/fieldCropData';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
+import { getCropByValue } from './choose-crop';
 
 // ===== TYPES =====
 // ... (ส่วนนี้เหมือนเดิมทั้งหมด) ...
@@ -234,6 +235,7 @@ export interface FieldData {
   irrigationPositions: IrrigationPositions;
   mapCenter: { lat: number; lng: number };
   mapZoom: number;
+  hideAllPoints?: boolean;
 }
 
 interface DrawingState {
@@ -1078,6 +1080,7 @@ const useMapManager = () => {
     overlays.distanceLine?.setMap(null);
     overlays.distanceLine = undefined;
     
+    
     // Reset refs ให้เป็น Map ว่าง
     overlaysRef.current = { 
         zones: new Map(), 
@@ -1095,6 +1098,7 @@ const useMapManager = () => {
         connectionPoints: new Map(),
         connectionLines: new Map()
     };
+    
   }, []);
 
   // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
@@ -1119,7 +1123,6 @@ const useMapManager = () => {
       }
     });
     
-    console.log(`🗑️ Removed ${linesToRemove.length} connection lines for pipe ${pipeId}`);
   }, []);
 
   const clearPipeOverlays = useCallback((type?: PipeType) => {
@@ -1480,47 +1483,9 @@ const useMapManager = () => {
       }
     });
   }, []);
-  
-  // ปรับปรุง drawPlantPoints ให้มีประสิทธิภาพ
-  const drawPlantPoints = useCallback((plants: PlantPoint[]) => {
-    if (!mapRef.current) return;
-    
-    const currentPlantMap = overlaysRef.current.plants;
-    const newPlantIds = new Set(plants.map(p => p.id));
-    
-    // 1. ลบ Markers ที่ไม่มีในข้อมูลชุดใหม่
-    currentPlantMap.forEach((marker, plantId) => {
-        if (!newPlantIds.has(plantId)) {
-            marker.setMap(null);
-            currentPlantMap.delete(plantId);
-        }
-    });
 
-    // 2. เพิ่ม Markers ใหม่
-    const plantIcon = {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="4" cy="4" r="3" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
-          </svg>
-        `),
-        scaledSize: new google.maps.Size(8, 8),
-        anchor: new google.maps.Point(4, 4)
-    };
-      
-    plants.forEach(plant => {
-        if (!currentPlantMap.has(plant.id)) {
-            const marker = new google.maps.Marker({
-                position: { lat: plant.lat, lng: plant.lng },
-                map: mapRef.current,
-                icon: plantIcon,
-                title: `Plant: ${plant.cropType}`,
-                optimized: true, // เปิดใช้งาน optimized rendering
-                clickable: false
-            });
-            currentPlantMap.set(plant.id, marker);
-        }
-    });
-  }, []);
+  
+
 
   // irrigation และ pumps จะยังคงใช้ logic เดิมก่อนเพื่อความง่าย แต่สามารถปรับปรุงได้เช่นกัน
   //...
@@ -1651,6 +1616,126 @@ const useMapManager = () => {
     if (!mapRef.current) return;
     createIrrigationMarkers(mapRef.current, positions, settings);
   }, [createIrrigationMarkers]);
+
+  // Helper function to calculate point size based on point count
+  const calculatePointSize = useCallback((pointCount: number): number => {
+    if (pointCount >= 5000) {
+      return 8 * 0.4; // 60% reduction (40% of original size)
+    } else if (pointCount >= 2000) {
+      return 8 * 0.6; // 40% reduction (60% of original size)
+    } else if (pointCount >= 800) {
+      return 8 * 0.8; // 20% reduction (80% of original size)
+    } else {
+      return 8; // Original size
+    }
+  }, []);
+
+  // Helper function to filter points based on zoom level and total point count
+  const filterPointsByZoom = useCallback((points: PlantPoint[], zoom: number, totalPointCount: number): PlantPoint[] => {
+    // If we have fewer than 800 points, show all points regardless of zoom
+    if (totalPointCount < 800) {
+      return points;
+    }
+
+    // Calculate maximum reduction factor based on total point count
+    let maxReductionFactor = 1; // No reduction by default
+    
+    if (totalPointCount >= 5000) {
+      maxReductionFactor = 4; // Up to 4x reduction (show 1/4 of points)
+    } else if (totalPointCount >= 2000) {
+      maxReductionFactor = 3; // Up to 3x reduction (show 1/3 of points)
+    } else if (totalPointCount >= 800) {
+      maxReductionFactor = 2; // Up to 2x reduction (show 1/2 of points)
+    }
+
+    // Calculate zoom-based reduction (5 levels: zoom 20, 19, 18, 17, 16)
+    let reductionFactor = 1;
+    
+    if (zoom >= 20) {
+      // Zoom 20+: show all points
+      reductionFactor = 1;
+    } else if (zoom >= 19) {
+      // Zoom 19: 25% of max reduction
+      reductionFactor = 1 + (maxReductionFactor - 1) * 0.25;
+    } else if (zoom >= 18) {
+      // Zoom 18: 50% of max reduction
+      reductionFactor = 1 + (maxReductionFactor - 1) * 0.5;
+    } else if (zoom >= 17) {
+      // Zoom 17: 75% of max reduction
+      reductionFactor = 1 + (maxReductionFactor - 1) * 0.75;
+    } else {
+      // Zoom < 17: maximum reduction
+      reductionFactor = maxReductionFactor;
+    }
+
+    // If no reduction needed, return all points
+    if (reductionFactor <= 1) {
+      return points;
+    }
+
+    // Sample points based on reduction factor
+    const step = Math.ceil(reductionFactor);
+    return points.filter((_, index) => index % step === 0);
+  }, []);
+
+  // Draw plant points
+  const drawPlantPoints = useCallback((plantPoints: PlantPoint[], hideAll: boolean = false, currentZoom: number = 18) => {
+    if (!mapRef.current) return;
+    
+    const currentPlantMap = overlaysRef.current.plants;
+    
+    if (hideAll) {
+      // Hide all plant points
+      currentPlantMap.forEach((marker) => {
+        marker.setMap(null);
+      });
+      currentPlantMap.clear();
+      return;
+    }
+    
+    // Filter points based on zoom level and total point count
+    const filteredPoints = filterPointsByZoom(plantPoints, currentZoom, plantPoints.length);
+    const newPlantIds = new Set(filteredPoints.map(p => p.id));
+
+    // Remove plants that no longer exist
+    currentPlantMap.forEach((marker, plantId) => {
+      if (!newPlantIds.has(plantId)) {
+        marker.setMap(null);
+        currentPlantMap.delete(plantId);
+      }
+    });
+
+    // Calculate dynamic point size based on total point count (not filtered count)
+    const pointSize = calculatePointSize(plantPoints.length);
+    const anchorPoint = pointSize / 2;
+
+    // Add new plants
+    filteredPoints.forEach(plant => {
+      if (!currentPlantMap.has(plant.id)) {
+        const plantIcon = {
+          url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+            <svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.75}" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
+            </svg>
+          `),
+          scaledSize: new google.maps.Size(pointSize, pointSize),
+          anchor: new google.maps.Point(anchorPoint, anchorPoint)
+        };
+
+        const marker = new google.maps.Marker({
+          position: { lat: plant.lat, lng: plant.lng },
+          map: mapRef.current,
+          icon: plantIcon,
+          title: `Plant: ${plant.cropType}`,
+          optimized: true,
+          clickable: false,
+          zIndex: 1
+        });
+
+        currentPlantMap.set(plant.id, marker);
+      }
+    });
+  }, [filterPointsByZoom, calculatePointSize]);
 
   // ปรับปรุง drawPumps ให้มีประสิทธิภาพ
   const drawPumps = useCallback((pumps: Pump[], onRemovePump?: (pumpId: string) => void) => {
@@ -1954,7 +2039,6 @@ const useMapManager = () => {
       });
     });
     
-    console.log(`🔗 Created ${overlays.connectionLines.size} connection lines for ${lateralPipes.length} lateral pipes, connected ${connectedSprinklers.size} unique sprinklers`);
   }, []);
 
 
@@ -2323,7 +2407,7 @@ const useMapManager = () => {
   }, []);
 
   // updateMapVisuals เรียกใช้ฟังก์ชันที่ปรับปรุงแล้ว
-  const updateMapVisuals = useCallback((fieldData: FieldData) => {
+  const updateMapVisuals = useCallback((fieldData: FieldData, hideAllPoints: boolean = false, currentZoom: number = 18) => {
     if (!mapRef.current) return;
     
     if (fieldData.mainArea.length > 0) {
@@ -2336,12 +2420,12 @@ const useMapManager = () => {
         drawObstacles(fieldData.obstacles);
     }
     if (fieldData.plantPoints.length > 0) {
-        drawPlantPoints(fieldData.plantPoints);
+        drawPlantPoints(fieldData.plantPoints, hideAllPoints, currentZoom);
     }
     if (fieldData.irrigationPositions) {
         drawIrrigation(fieldData.irrigationPositions, fieldData.irrigationSettings);
     }
-  }, [drawMainArea, drawZones, drawObstacles, drawPlantPoints, drawIrrigation]);
+  }, [drawMainArea, drawZones, drawObstacles, drawIrrigation, drawPlantPoints]);
 
   const exposeOverlaysRef = useCallback(() => {
     return overlaysRef as React.MutableRefObject<{
@@ -2510,7 +2594,11 @@ export default function PipeGenerate(props: PipeGenerateProps) {
   const [pumps, setPumps] = useState<Pump[]>([]);
   const [isPlacingPump, setIsPlacingPump] = useState(false);
   const isPlacingPumpRef = useRef(false);
+  const [hideAllPoints, setHideAllPoints] = useState<boolean>(false); // Hide all points toggle
+  const [mapZoom, setMapZoom] = useState<number>(18); // Track map zoom level
+
   const [showLegend, setShowLegend] = useState(true);
+
   
   // Debounce timers - moved to top level to follow React Hook rules
   const zoomDebounceTimer = useRef<NodeJS.Timeout | null>(null);
@@ -2605,6 +2693,9 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           if(storageData.mapCenter && storageData.mapZoom) {
             setMapStatus({ center: storageData.mapCenter, zoom: storageData.mapZoom });
           }
+          if (typeof storageData.hideAllPoints === 'boolean') {
+            setHideAllPoints(storageData.hideAllPoints);
+          }
           return;
         }
       }
@@ -2630,6 +2721,9 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           }
         } catch {
           // ignore pump restore errors
+        }
+        if (typeof storageData.hideAllPoints === 'boolean') {
+          setHideAllPoints(storageData.hideAllPoints);
         }
       }
     };
@@ -2680,7 +2774,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       }
       
       mapVisualsDebounceTimer.current = setTimeout(() => {
-        mapManager.updateMapVisuals(fieldData);
+        mapManager.updateMapVisuals(fieldData, hideAllPoints, mapZoom);
       }, 100); // 100ms debounce สำหรับ map visuals
     }
     
@@ -2689,16 +2783,16 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         clearTimeout(mapVisualsDebounceTimer.current);
       }
     };
-  }, [fieldData, createFieldDataHash, mapManager]); // Removed mapManager from dependencies
+  }, [fieldData, createFieldDataHash, mapManager, hideAllPoints, mapZoom]); // Removed mapManager from dependencies
 
   // useEffect แยกสำหรับการโหลดข้อมูลทันทีเมื่อเข้าสู่หน้า
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (fieldData.mainArea.length > 0 && mapManager.mapRef.current) {
       // อัปเดต map visuals ทันทีเมื่อมีข้อมูลและ map พร้อม
-      mapManager.updateMapVisuals(fieldData);
+      mapManager.updateMapVisuals(fieldData, hideAllPoints, mapZoom);
     }
-  }, [fieldData, mapManager]); // Removed mapManager from dependencies
+  }, [fieldData, mapManager, hideAllPoints, mapZoom]); // Removed mapManager from dependencies
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -4139,10 +4233,11 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       clearTimeout(connectionPointsDebounceTimer.current);
     }
     
-    // ใช้ debounce เพื่อลดการอัปเดตที่บ่อยเกินไป และป้องกันการอัปเดตระหว่างการซูม
+    // ใช้ debounce เพื่อลดการอัปเดตที่บ่อยเกินไป
     connectionPointsDebounceTimer.current = setTimeout(() => {
-      // ตรวจสอบว่าแผนที่ยังคงอยู่และไม่มีการซูมอยู่
+      // ตรวจสอบว่าแผนที่ยังคงอยู่
       if (!mapManager.mapRef.current) return;
+      
       
       // ตรวจสอบ zoom level เพื่อป้องกันการอัปเดตระหว่างการซูม
       const currentZoom = mapManager.mapRef.current.getZoom();
@@ -4191,6 +4286,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           overlays.connectionLines.clear();
         }
       }
+      
     }, 200); // 200ms debounce
     
     return () => {
@@ -4337,13 +4433,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     // ถ้ามี selectedPattern ให้ใช้แทนการวิเคราะห์อัตโนมัติ
     const templatePattern = selectedPattern || analyzeTemplatePattern(template, nearestSubmain);
     
-    // Debug logging สำหรับ templatePattern
-    console.log('🔍 Template Pattern Analysis:', {
-      selectedPattern,
-      analyzedPattern: analyzeTemplatePattern(template, nearestSubmain),
-      finalTemplatePattern: templatePattern,
-      mode: pipeManager.lateralMode
-    });
     const subRot = (nearestSubmain.coordinates as Coordinate[]).map(c => rotateXY(toXYm(c)));
     // หา x ที่จุดตัดระหว่างเส้นแนวนอน y=y0 กับเส้น submain ในพิกัดที่หมุนแล้ว
     const horizontalIntersectionsX = (y0: number): number[] => {
@@ -4410,16 +4499,13 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     const mode = pipeManager.lateralMode;
     if (mode === 'betweenRows') {
       // ตรวจสอบ templatePattern ที่ผู้ใช้เลือก
-      console.log('🌾 Between Rows Mode - Template Pattern:', templatePattern);
       if (templatePattern === 'crossing') {
         // รูปแบบ "ลากผ่าน": สร้างท่อย่อยเส้นเดียวผ่านแถว (ระหว่างแถว)
-        console.log('✅ Creating crossing pattern (single line between rows)');
         
         // หาแถวที่ใกล้กับท่อต้นแบบที่สุด
         const minSeparationBase = Math.max(0.8, spacingEst * 0.5);
         
         // สร้างท่อย่อยระหว่างแถว (เว้นแถว - ท่อย่อยหนึ่งเส้นเชื่อมสองแถว)
-        console.log(`📊 Total rows: ${rows.length}, Creating between-rows laterals (skip every other row)`);
         
         // หาแถวที่ใกล้กับท่อต้นแบบที่สุดเพื่อกำหนด parity
         const tStartR = rotateXY(vStart);
@@ -4439,7 +4525,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         
         // กำหนด parity เริ่มต้น (0 หรือ 1) เพื่อเว้นแถว
         const startParity = nearestRowIndex % 2;
-        console.log(`🎯 Template near row ${nearestRowIndex}, starting with parity ${startParity} (skip every other row)`);
         
         for (let r = startParity; r < rows.length - 1; r += 2) {
           const rowA = rows[r];
@@ -4448,14 +4533,12 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           // ตรวจสอบว่าระยะห่างระหว่างแถวเหมาะสม
           const separation = Math.abs(rowB.y - rowA.y);
           if (separation < minSeparationBase) {
-            console.log(`⏭️ Skipping rows ${r}-${r+1}: separation too small (${separation.toFixed(2)}m < ${minSeparationBase.toFixed(2)}m)`);
             continue;
           }
           
           const midY = (rowA.y + rowB.y) / 2;
           const xs = horizontalIntersectionsX(midY);
           if (xs.length === 0) {
-            console.log(`⏭️ Skipping rows ${r}-${r+1}: no submain intersections`);
             continue;
           }
           
@@ -4465,7 +4548,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           const allPts = [...ptsA, ...ptsB];
           
           if (allPts.length < 2) {
-            console.log(`⏭️ Skipping rows ${r}-${r+1}: insufficient points (${allPts.length})`);
             continue;
           }
           
@@ -4473,7 +4555,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           const leftmost = allPts[0];
           const rightmost = allPts[allPts.length - 1];
           
-          console.log(`✅ Processing rows ${r}-${r+1}: ${ptsA.length} + ${ptsB.length} = ${allPts.length} points, separation: ${separation.toFixed(2)}m`);
           
           // สร้างท่อย่อยเส้นเดียวจากจุดซ้ายสุดไปจุดขวาสุด (ระหว่างแถว)
           const startXY = unrotateXY({ x: leftmost.xy.x, y: midY });
@@ -4507,19 +4588,14 @@ export default function PipeGenerate(props: PipeGenerateProps) {
               const lengthM = calculateDistance([start, end]);
               if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
                 generated.push({ id: `lateral-betweenrows-${Date.now()}-${generated.length}-crossing`, type: 'lateral', coordinates: [start, end], length: lengthM });
-                console.log(`🎯 Created between-rows lateral: ${lengthM.toFixed(2)}m, rows ${r}-${r+1} (connects 2 rows, skips next 2 rows)`);
-              } else {
-                console.log(`❌ Failed to create lateral: length=${lengthM.toFixed(2)}m, overlapsGenerated=${overlapsGenerated}, overlapsExisting=${overlapsExisting}`);
               }
             }
           }
         }
         
         // แสดงสรุปการสร้างท่อย่อยระหว่างแถว
-        console.log(`📋 Between-rows crossing pattern summary: Created ${generated.length} laterals, skipped every other row pair`);
       } else {
         // รูปแบบ "ออกจากด้านใดด้านหนึ่ง": สร้างท่อย่อยแยกเป็นสองเส้น (ด้านละเส้น)
-        console.log('✅ Creating extending pattern (split lines left-right)');
         // Determine which adjacent-row parity to use so that we alternate relative to the template line
         const tStartR = rotateXY(vStart);
         const tEndR = rotateXY(vEnd);
@@ -4901,6 +4977,9 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     mapManager.mapRef.current = loadedMap;
 
     loadedMap.addListener('zoom_changed', () => {
+        const newZoom = loadedMap.getZoom() || 18;
+        setMapZoom(newZoom);
+        
         if (zoomDebounceTimer.current) {
             clearTimeout(zoomDebounceTimer.current);
         }
@@ -4929,7 +5008,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     }
 
     // Initial draw
-    mapManager.updateMapVisuals(fieldData);
+    mapManager.updateMapVisuals(fieldData, hideAllPoints);
 
     // Ensure pipes are drawn on first map load with currently loaded state
     try {
@@ -4938,7 +5017,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       console.warn('drawPipes on initial map load failed:', err);
     }
 
-  }, [fieldData, mapManager, handleMapClick, pipeManager]);
+  }, [fieldData, mapManager, handleMapClick, pipeManager, hideAllPoints]);
   // ======================== MODIFIED SECTION END ========================
 
   const steps = [
@@ -5161,57 +5240,22 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                         {t('Selected Crops')}
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {fieldData.selectedCrops.map((crop, idx) => (
-                          <span key={idx} className="bg-blue-600 text-white px-2 py-1 rounded text-xs border border-white">
-                            {crop}
-                          </span>
-                        ))}
+                        {fieldData.selectedCrops.map((crop, idx) => {
+                          const cropData = getCropByValue(crop);
+                          return (
+                            <span key={idx} className="bg-blue-600 text-white px-3 py-1 rounded text-xs border border-white flex items-center gap-1">
+                              <span className="text-sm">{cropData?.icon || '🌱'}</span>
+                              <span>{cropData?.name || crop}</span>
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
 
-                  {fieldData.mainArea.length > 0 && (
-                    <div className="rounded-lg p-4 border border-white" style={{ backgroundColor: '#000005' }}>
-                      <h3 className="text-sm font-semibold text-white mb-3">
-                        📊 {t('Field Information')}
-                      </h3>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between text-gray-400">
-                          <span>{t('Total Area')}:</span>
-                          <span className="text-green-400">
-                            {fieldData.areaRai !== null ? fieldData.areaRai.toFixed(2) : '--'} {t('rai')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-gray-400">
-                          <span>{t('Perimeter')}:</span>
-                          <span className="text-green-400">
-                            {fieldData.perimeterMeters !== null ? fieldData.perimeterMeters.toFixed(1) : '--'} {t('meters')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-gray-400">
-                          <span>{t('Plant Points')}:</span>
-                          <span className="text-green-400">
-                            {fieldData.plantPoints.length} {t('points')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-gray-400">
-                          <span>{t('Zones')}:</span>
-                          <span className="text-green-400">
-                            {fieldData.zones.length} {t('zones')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-gray-400">
-                          <span>{t('Obstacles')}:</span>
-                          <span className="text-green-400">
-                            {fieldData.obstacles.length} {t('items')}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
                   {fieldData.selectedIrrigationType && (
-                    <div className="rounded-lg p-4 border border-white" style={{ backgroundColor: '#000005' }}>
+                    <div className="rounded-lg p-4 border border-white">
                       <h3 className="text-sm font-semibold text-white mb-3">
                         💧 {t('Irrigation Information')}
                       </h3>
@@ -5222,43 +5266,79 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                             {fieldData.selectedIrrigationType.replace('_', ' ')}
                           </span>
                         </div>
-                        <div className="flex justify-between text-gray-400">
-                          <span>{t('Total Water Requirement')}:</span>
-                          <span className="text-blue-400">
-                            {fieldData.totalWaterRequirement.toFixed(1)} ลิตร/ครั้ง
-                          </span>
-                        </div>
-                        
+
+                        {Object.entries(fieldData.irrigationCounts).map(([type, count]) => (
+                          count > 0 && type !== 'sprinkler_system' && (
+                            <div key={type} className="flex justify-between text-gray-400">
+                              <span>{t(type.replace('_', ' '))}:</span>
+                              <span className="text-blue-400">
+                                {count} {t('units')}
+                              </span>
+                            </div>
+                          )
+                        ))}
+
                         <div className="border-t border-gray-600 pt-2 mt-2">
                           <div className="text-xs font-semibold text-blue-300 mb-2">
                             {t('Equipment on Map')}:
                           </div>
-                          <div className="text-xs text-green-400 mb-2">
-                            🎯 {t('Total connection points')}: {
-                              fieldData.irrigationPositions.sprinklers.length + 
-                              fieldData.irrigationPositions.pivots.length + 
-                              fieldData.irrigationPositions.dripTapes.length + 
-                              fieldData.irrigationPositions.waterJets.length
-                            }
-                          </div>
                           {fieldData.irrigationPositions.sprinklers.length > 0 && (
+                            <>
+                              <div className="flex justify-between text-gray-400">
+                                <span>🌊 {t('Sprinklers')}:</span>
+                                <span className="text-blue-400">
+                                  {fieldData.irrigationPositions.sprinklers.length} {t('units')}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-gray-400">
+                                <span>💦 {t('Flow per Sprinkler')}:</span>
+                                <span className="text-green-400">
+                                  {(fieldData.irrigationSettings?.sprinkler_system?.flow as number) || 10} L/min
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-gray-400">
+                                <span>📊 {t('Total Flow')}:</span>
+                                <span className="text-green-400">
+                                  {fieldData.irrigationPositions.sprinklers.length * ((fieldData.irrigationSettings?.sprinkler_system?.flow as number) || 10)} L/min
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          {fieldData.irrigationPositions.pivots.length > 0 && (
+                            <>
+                              <div className="flex justify-between text-gray-400">
+                                <span>🔄 {t('Pivots')}:</span>
+                                <span className="text-orange-400">
+                                  {fieldData.irrigationPositions.pivots.length} {t('units')}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-gray-400">
+                                <span>💦 {t('Flow per Pivot')}:</span>
+                                <span className="text-green-400">
+                                  {(fieldData.irrigationSettings?.pivot?.flow as number) || 15} L/min
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-gray-400">
+                                <span>📊 {t('Total Flow')}:</span>
+                                <span className="text-green-400">
+                                  {fieldData.irrigationPositions.pivots.length * ((fieldData.irrigationSettings?.pivot?.flow as number) || 15)} L/min
+                                </span>
+                              </div>
+                            </>
+                          )}
+                          {fieldData.irrigationPositions.dripTapes.length > 0 && (
                             <div className="flex justify-between text-gray-400">
-                              <span>🌊 {t('Sprinklers')}:</span>
+                              <span>💧 {t('Drip Tapes')}:</span>
                               <span className="text-blue-400">
-                                {fieldData.irrigationPositions.sprinklers.length} {t('units')}
+                                {fieldData.irrigationPositions.dripTapes.length} {t('units')}
                               </span>
                             </div>
                           )}
-                          {fieldData.irrigationPositions.sprinklers.length > 0 && (
-                            <div className="flex justify-between text-gray-400 mt-1">
-                              <span>💧 {t('Total Sprinkler Flow')}:</span>
-                              <span className="text-blue-400">
-                                {(() => {
-                                  const flowCfg = (fieldData.irrigationSettings?.sprinkler_system as { flow?: number } | undefined);
-                                  const perSprinkler = typeof flowCfg?.flow === 'number' ? flowCfg.flow : 10;
-                                  const total = fieldData.irrigationPositions.sprinklers.length * perSprinkler;
-                                  return total.toFixed(0);
-                                })()} L/min
+                          {fieldData.irrigationPositions.waterJets.length > 0 && (
+                            <div className="flex justify-between text-gray-400">
+                              <span>🌊 {t('Water Jets')}:</span>
+                              <span className="text-orange-400">
+                                {fieldData.irrigationPositions.waterJets.length} {t('units')}
                               </span>
                             </div>
                           )}
@@ -5755,6 +5835,56 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                   </div>
                 </div>
                 
+                {/* Hide/Show Points Button */}
+                {fieldData.plantPoints.length > 0 && (
+                  <div className="absolute top-1.5 right-44 z-10">
+                    <button 
+                      onClick={() => {
+                        const newHideState = !hideAllPoints;
+                        setHideAllPoints(newHideState);
+                        
+                        // Save the new state to localStorage immediately
+                        try {
+                          const existingData = localStorage.getItem('fieldCropData');
+                          if (existingData) {
+                            const storageData = JSON.parse(existingData) as FieldData;
+                            const updatedData = {
+                              ...storageData,
+                              hideAllPoints: newHideState
+                            };
+                            localStorage.setItem('fieldCropData', JSON.stringify(updatedData));
+                          }
+                        } catch (error) {
+                          console.error('Error saving hideAllPoints state:', error);
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
+                        hideAllPoints 
+                          ? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
+                          : 'bg-green-600 text-white border-green-500 hover:bg-green-500'
+                      }`}
+                      title={hideAllPoints ? t('Show All Points') : t('Hide All Points')}
+                    >
+                      {hideAllPoints ? (
+                        <div className="flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          {t('Show')}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                          </svg>
+                          {t('Hide')}
+                        </div>
+                      )}
+                    </button>
+                  </div>
+                )}
+                
                 {pipeManager.isDrawing && (
                   <div className="absolute top-11 left-1 z-10 bg-blue-600 bg-opacity-90 rounded-lg border border-blue-400 p-3 text-xs">
                     <div className="text-white font-bold">
@@ -5909,6 +6039,42 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Zoom Level and Points Information */}
+                <div className="absolute bottom-4 right-20 z-10 pointer-events-none">
+                  <div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
+                    {t('Zoom Level')}: {mapZoom}
+                  </div>
+                  {fieldData.plantPoints.length > 0 && (
+                    <div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
+                      {t('Points')}: {fieldData.plantPoints.length.toLocaleString()} / {fieldData.plantPoints.length.toLocaleString()}
+                      {fieldData.plantPoints.length > fieldData.plantPoints.length && (
+                        <span className="text-yellow-300 ml-1">
+                          ({Math.round((1 - fieldData.plantPoints.length / fieldData.plantPoints.length) * 100)}% {t('reduced')})
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {fieldData.plantPoints.length > 0 && fieldData.plantPoints.length >= 800 && (
+                    <div className="px-2 py-1 rounded bg-blue-900 bg-opacity-70 border border-blue-500 text-xs text-white mb-1">
+                      {mapZoom >= 20 && <span className="text-green-300">{t('All points visible')}</span>}
+                      {mapZoom >= 19 && mapZoom < 20 && <span className="text-yellow-300">{t('25% reduction')}</span>}
+                      {mapZoom >= 18 && mapZoom < 19 && <span className="text-orange-300">{t('50% reduction')}</span>}
+                      {mapZoom >= 17 && mapZoom < 18 && <span className="text-red-300">{t('75% reduction')}</span>}
+                      {mapZoom < 17 && <span className="text-red-500">{t('Maximum reduction')}</span>}
+                    </div>
+                  )}
+                  {fieldData.plantPoints.length > 0 && (
+                    <div className="px-2 py-1 rounded bg-green-900 bg-opacity-70 border border-green-500 text-xs text-white">
+                      <div>{fieldData.plantPoints.length} {t('points')} {t('visible')}</div>
+                      {fieldData.plantPoints.length > fieldData.plantPoints.length && (
+                        <div className="text-yellow-200 text-xs">
+                          {t('Performance optimized')}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {showLegend ? (

@@ -41,15 +41,9 @@ interface ProfileProps {
 export default function Profile() {
     const { t } = useLanguage();
 
-    // Defensive usePage call with error handling
-    let auth;
-    try {
-        auth = usePage<ProfileProps>().props.auth;
-    } catch (error) {
-        console.warn('Inertia context not available in Profile, using fallback values');
-        auth = { user: null };
-    }
-
+    // Always call usePage hook unconditionally
+    const page = usePage<ProfileProps>();
+    const auth = page?.props?.auth || { user: null };
     const user = auth.user;
 
     // Helper function to get tier display information
@@ -61,7 +55,7 @@ export default function Profile() {
                     color: 'text-gray-400',
                     bgColor: 'bg-gray-900/30',
                     icon: '🆓',
-                    description: 'Basic features with limited tokens'
+                    description: 'Basic features with limited tokens',
                 };
             case 'pro':
                 return {
@@ -69,7 +63,7 @@ export default function Profile() {
                     color: 'text-blue-400',
                     bgColor: 'bg-blue-900/30',
                     icon: '⭐',
-                    description: 'Advanced features with more tokens'
+                    description: 'Advanced features with more tokens',
                 };
             case 'advanced':
                 return {
@@ -77,7 +71,7 @@ export default function Profile() {
                     color: 'text-purple-400',
                     bgColor: 'bg-purple-900/30',
                     icon: '💎',
-                    description: 'Premium features with maximum tokens'
+                    description: 'Premium features with maximum tokens',
                 };
             default:
                 return {
@@ -85,7 +79,7 @@ export default function Profile() {
                     color: 'text-gray-400',
                     bgColor: 'bg-gray-900/30',
                     icon: '🆓',
-                    description: 'Basic features with limited tokens'
+                    description: 'Basic features with limited tokens',
                 };
         }
     };
@@ -97,8 +91,8 @@ export default function Profile() {
     const [showPhotoModal, setShowPhotoModal] = useState(false);
 
     const { data, setData, patch, processing, errors } = useForm({
-        name: user.name,
-        email: user.email,
+        name: user?.name || '',
+        email: user?.email || '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -121,10 +115,29 @@ export default function Profile() {
 
     const handlePhotoUploaded = (photoUrl: string) => {
         // Update the user object with the new photo URL
-        user.profile_photo_url = photoUrl;
+        if (user) {
+            user.profile_photo_url = photoUrl;
+        }
         // Force a re-render by updating the page props
         router.reload();
     };
+
+    // Early return if no user data is available
+    if (!user) {
+        return (
+            <div className="min-h-screen bg-gray-900">
+                <Head title="Profile" />
+                <Navbar />
+                <div className="flex items-center justify-center min-h-[50vh]">
+                    <div className="text-center">
+                        <h1 className="text-2xl font-bold text-white mb-4">Loading Profile...</h1>
+                        <p className="text-gray-400">Please wait while we load your profile information.</p>
+                    </div>
+                </div>
+                <Footer />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-900">
@@ -186,9 +199,11 @@ export default function Profile() {
                                                     👑 Super User
                                                 </span>
                                             )}
-                                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${tierInfo.bgColor} ${tierInfo.color}`}>
-                                                    {tierInfo.icon} {tierInfo.name} Plan
-                                                </span>
+                                            <span
+                                                className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${tierInfo.bgColor} ${tierInfo.color}`}
+                                            >
+                                                {tierInfo.icon} {tierInfo.name} Plan
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -261,8 +276,8 @@ export default function Profile() {
                                                     onClick={() => {
                                                         setIsEditing(false);
                                                         setData({
-                                                            name: user.name,
-                                                            email: user.email,
+                                                            name: user?.name || '',
+                                                            email: user?.email || '',
                                                         });
                                                     }}
                                                     className="rounded-lg bg-gray-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-gray-700"
@@ -298,10 +313,14 @@ export default function Profile() {
                                 </h3>
                                 <div className="space-y-4">
                                     <div className="text-center">
-                                        <div className={`inline-flex items-center gap-2 rounded-lg ${tierInfo.bgColor} px-4 py-3`}>
+                                        <div
+                                            className={`inline-flex items-center gap-2 rounded-lg ${tierInfo.bgColor} px-4 py-3`}
+                                        >
                                             <span className="text-2xl">{tierInfo.icon}</span>
                                             <div>
-                                                <div className={`text-lg font-bold ${tierInfo.color}`}>
+                                                <div
+                                                    className={`text-lg font-bold ${tierInfo.color}`}
+                                                >
                                                     {tierInfo.name} Plan
                                                 </div>
                                                 <div className="text-xs text-gray-400">
@@ -310,7 +329,7 @@ export default function Profile() {
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Monthly tokens:</span>
@@ -320,9 +339,7 @@ export default function Profile() {
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Current tokens:</span>
-                                            <span className="text-white">
-                                                {user?.tokens || 0}
-                                            </span>
+                                            <span className="text-white">{user?.tokens || 0}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Total used:</span>
@@ -334,7 +351,9 @@ export default function Profile() {
                                             <div className="flex justify-between">
                                                 <span className="text-gray-400">Expires:</span>
                                                 <span className="text-white">
-                                                    {new Date(user.tier_expires_at).toLocaleDateString()}
+                                                    {new Date(
+                                                        user.tier_expires_at
+                                                    ).toLocaleDateString()}
                                                 </span>
                                             </div>
                                         )}

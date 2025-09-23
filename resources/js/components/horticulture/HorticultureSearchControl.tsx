@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     FaSearch,
@@ -19,7 +17,7 @@ import {
     formatCoordinatesDisplay,
     createMapsUrlFromCoordinates,
     SearchResult as PlacesSearchResult,
-    SearchError
+    SearchError,
 } from '../../utils/placesApiUtils';
 
 interface SearchResult {
@@ -32,7 +30,7 @@ interface SearchResult {
     types: string[];
     rating?: number;
     user_ratings_total?: number;
-    photos?: any[];
+    photos?: google.maps.places.PlacePhoto[];
     opening_hours?: {
         open_now?: boolean;
         weekday_text?: string[];
@@ -107,9 +105,8 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
-                setRecentSearches(parsed.slice(0, 5)); 
+                setRecentSearches(parsed.slice(0, 5));
             } catch (e) {
-                console.error('Error loading recent searches:', e);
             }
         }
     }, []);
@@ -159,7 +156,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 document.body.removeChild(mapDiv);
             };
         } catch (error) {
-            console.error('❌ Error initializing search services:', error);
             setError('ไม่สามารถเริ่มต้นระบบค้นหาได้');
         }
     }, [isGoogleMapsReady]);
@@ -313,7 +309,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
 
         const request: google.maps.places.TextSearchRequest = {
             query: query,
-                language: 'th',
+            language: 'th',
         };
 
         searchServiceRef.current.textSearch(request, (results, status) => {
@@ -473,13 +469,13 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
             if (isCoordinate) {
                 // ถ้าเป็นพิกัด ไม่ต้องทำ autocomplete
                 setAutocompletePredictions([]);
-                
+
                 searchTimeoutRef.current = setTimeout(async () => {
                     setIsLoading(true);
                     try {
                         const result = await universalSearch(value);
                         setLastSearchType(result.searchType);
-                        
+
                         if (result.error) {
                             setError(result.error.message);
                             setSearchResults([]);
@@ -498,12 +494,11 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                     business_status: place.business_status,
                                 })
                             );
-                            
+
                             setSearchResults(convertedResults);
                             setShowResults(true);
                         }
                     } catch (err) {
-                        console.error('Search error:', err);
                         setError('เกิดข้อผิดพลาดในการค้นหา');
                         setSearchResults([]);
                     } finally {
@@ -519,7 +514,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                     try {
                         const result = await universalSearch(value);
                         setLastSearchType(result.searchType);
-                        
+
                         if (result.error) {
                             setError(result.error.message);
                             setSearchResults([]);
@@ -538,12 +533,11 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                     business_status: place.business_status,
                                 })
                             );
-                            
+
                             setSearchResults(convertedResults);
                             setShowResults(true);
                         }
                     } catch (err) {
-                        console.error('Search error:', err);
                         setError('เกิดข้อผิดพลาดในการค้นหา');
                         setSearchResults([]);
                     } finally {
@@ -655,7 +649,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const getPhotoUrl = (photos?: any[]): string | null => {
+    const getPhotoUrl = (photos?: google.maps.places.PlacePhoto[]): string | null => {
         if (!photos || photos.length === 0) return null;
         try {
             return photos[0].getUrl({ maxWidth: 100, maxHeight: 100 });
@@ -680,7 +674,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
     return (
         <div className="enhanced-search-container absolute left-4 top-4 z-[1000] w-[420px] max-w-[calc(100vw-2rem)]">
             <div className="relative">
-
                 <div className="relative">
                     <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 transform text-gray-400" />
                     <input
@@ -843,11 +836,10 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                         <div className="font-medium text-blue-900">
                                             ค้นหาด้วยพิกัด
                                         </div>
-                                        <div className="text-sm text-blue-700">
-                                            {searchQuery}
-                                        </div>
-                                        <div className="text-xs text-blue-600 mt-1">
-                                            รูปแบบที่รองรับ: 13.7563,100.5018 • lat:13.7563,lng:100.5018 • (13.7563,100.5018)
+                                        <div className="text-sm text-blue-700">{searchQuery}</div>
+                                        <div className="mt-1 text-xs text-blue-600">
+                                            รูปแบบที่รองรับ: 13.7563,100.5018 •
+                                            lat:13.7563,lng:100.5018 • (13.7563,100.5018)
                                         </div>
                                     </div>
                                 </div>
@@ -1012,10 +1004,12 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                     {isCoordinateSearch ? (
                                         <div>
                                             <FaCrosshairs className="mx-auto mb-3 text-3xl text-gray-400" />
-                                            <p className="text-gray-500 mb-2">
+                                            <p className="mb-2 text-gray-500">
                                                 ไม่พบข้อมูลสถานที่สำหรับพิกัด
                                             </p>
-                                            <p className="text-sm text-gray-400 mb-4">"{searchQuery}"</p>
+                                            <p className="mb-4 text-sm text-gray-400">
+                                                "{searchQuery}"
+                                            </p>
                                             <div className="text-xs text-gray-500">
                                                 <p className="mb-1">รูปแบบพิกัดที่รองรับ:</p>
                                                 <div className="space-y-1">
@@ -1032,8 +1026,9 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                             <p className="text-gray-500">
                                                 ไม่พบผลการค้นหาสำหรับ "{searchQuery}"
                                             </p>
-                                            <p className="text-xs text-gray-400 mt-2">
-                                                ลองใช้คำค้นหาอื่น หรือใส่พิกัดแทน เช่น 13.7563,100.5018
+                                            <p className="mt-2 text-xs text-gray-400">
+                                                ลองใช้คำค้นหาอื่น หรือใส่พิกัดแทน เช่น
+                                                13.7563,100.5018
                                             </p>
                                         </div>
                                     )}

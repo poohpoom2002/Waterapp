@@ -35,18 +35,18 @@ export const CONNECTION_POINT_CONFIG: ConnectionPointConfig = {
     mainToSubMain: {
         color: '#DC2626', // สีแดงเข้มสำหรับท่อเมน-เมนรอง
         title: 'จุดเชื่อมต่อท่อเมน → ท่อเมนรอง',
-        zIndex: 2001
+        zIndex: 2001,
     },
     subMainToMainMid: {
         color: '#8B5CF6', // สีม่วงเข้มสำหรับเมนรอง-กลางเมน
         title: 'จุดเชื่อมท่อเมนรอง → กลางท่อเมน',
-        zIndex: 2004
+        zIndex: 2004,
     },
     subMainToMainIntersection: {
         color: '#3B82F6', // สีน้ำเงินสำหรับตัดเมนรอง-เมน
         title: 'จุดตัดท่อเมนรอง ↔ ท่อเมน',
-        zIndex: 2003
-    }
+        zIndex: 2003,
+    },
 };
 
 // ฟังก์ชันสร้างจุดเชื่อมต่อสำหรับท่อเมน-เมนรอง
@@ -58,10 +58,10 @@ export const createMainToSubMainConnectionPoints = (
     snapThreshold: number = 15
 ): ConnectionPoint[] => {
     const connectionPoints: ConnectionPoint[] = [];
-    
+
     // Import ฟังก์ชันที่จำเป็น
     const { findMainToSubMainConnections } = require('./lateralPipeUtils');
-    
+
     const connections = findMainToSubMainConnections(
         mainPipes,
         subMainPipes,
@@ -79,7 +79,7 @@ export const createMainToSubMainConnectionPoints = (
             subMainPipeId: connection.subMainPipeId,
             color: CONNECTION_POINT_CONFIG.mainToSubMain.color,
             title: CONNECTION_POINT_CONFIG.mainToSubMain.title,
-            zIndex: CONNECTION_POINT_CONFIG.mainToSubMain.zIndex
+            zIndex: CONNECTION_POINT_CONFIG.mainToSubMain.zIndex,
         });
     });
 
@@ -95,10 +95,10 @@ export const createSubMainToMainMidConnectionPoints = (
     snapThreshold: number = 15
 ): ConnectionPoint[] => {
     const connectionPoints: ConnectionPoint[] = [];
-    
+
     // Import ฟังก์ชันที่จำเป็น
     const { findMidConnections } = require('./lateralPipeUtils');
-    
+
     const connections = findMidConnections(
         subMainPipes,
         mainPipes,
@@ -116,7 +116,7 @@ export const createSubMainToMainMidConnectionPoints = (
             subMainPipeId: connection.sourcePipeId,
             color: CONNECTION_POINT_CONFIG.subMainToMainMid.color,
             title: CONNECTION_POINT_CONFIG.subMainToMainMid.title,
-            zIndex: CONNECTION_POINT_CONFIG.subMainToMainMid.zIndex
+            zIndex: CONNECTION_POINT_CONFIG.subMainToMainMid.zIndex,
         });
     });
 
@@ -131,10 +131,10 @@ export const createSubMainToMainIntersectionPoints = (
     irrigationZones?: any[]
 ): ConnectionPoint[] => {
     const connectionPoints: ConnectionPoint[] = [];
-    
+
     // Import ฟังก์ชันที่จำเป็น
     const { findSubMainToMainIntersections } = require('./lateralPipeUtils');
-    
+
     const intersections = findSubMainToMainIntersections(
         subMainPipes,
         mainPipes,
@@ -151,7 +151,7 @@ export const createSubMainToMainIntersectionPoints = (
             subMainPipeId: intersection.subMainPipeId,
             color: CONNECTION_POINT_CONFIG.subMainToMainIntersection.color,
             title: CONNECTION_POINT_CONFIG.subMainToMainIntersection.title,
-            zIndex: CONNECTION_POINT_CONFIG.subMainToMainIntersection.zIndex
+            zIndex: CONNECTION_POINT_CONFIG.subMainToMainIntersection.zIndex,
         });
     });
 
@@ -167,31 +167,32 @@ export const createAllConnectionPoints = (
     snapThreshold: number = 15
 ): ConnectionPoint[] => {
     const allConnectionPoints: ConnectionPoint[] = [];
-    
+
     // เพิ่มจุดเชื่อมต่อแต่ละประเภท
-    allConnectionPoints.push(...createMainToSubMainConnectionPoints(
-        mainPipes,
-        subMainPipes,
-        zones,
-        irrigationZones,
-        snapThreshold
-    ));
-    
-    allConnectionPoints.push(...createSubMainToMainMidConnectionPoints(
-        subMainPipes,
-        mainPipes,
-        zones,
-        irrigationZones,
-        snapThreshold
-    ));
-    
-    allConnectionPoints.push(...createSubMainToMainIntersectionPoints(
-        subMainPipes,
-        mainPipes,
-        zones,
-        irrigationZones
-    ));
-    
+    allConnectionPoints.push(
+        ...createMainToSubMainConnectionPoints(
+            mainPipes,
+            subMainPipes,
+            zones,
+            irrigationZones,
+            snapThreshold
+        )
+    );
+
+    allConnectionPoints.push(
+        ...createSubMainToMainMidConnectionPoints(
+            subMainPipes,
+            mainPipes,
+            zones,
+            irrigationZones,
+            snapThreshold
+        )
+    );
+
+    allConnectionPoints.push(
+        ...createSubMainToMainIntersectionPoints(subMainPipes, mainPipes, zones, irrigationZones)
+    );
+
     return allConnectionPoints;
 };
 
@@ -215,7 +216,7 @@ export const createConnectionPointMarker = (
             strokeWeight: 2, // ขอบสีขาว
         },
         zIndex: connectionPoint.zIndex,
-        title: connectionPoint.title
+        title: connectionPoint.title,
     });
 };
 
@@ -228,22 +229,22 @@ export const createConnectionPointInfoWindow = (
             <h4 class="font-bold text-gray-800 mb-2">🔗 ${connectionPoint.title}</h4>
             <div class="space-y-1 text-sm">
     `;
-    
+
     if (connectionPoint.mainPipeId) {
         content += `<p><strong>ท่อเมน:</strong> ${connectionPoint.mainPipeId}</p>`;
     }
-    
+
     if (connectionPoint.subMainPipeId) {
         content += `<p><strong>ท่อเมนรอง:</strong> ${connectionPoint.subMainPipeId}</p>`;
     }
-    
+
     content += `
             </div>
         </div>
     `;
-    
+
     return new google.maps.InfoWindow({
-        content: content
+        content: content,
     });
 };
 
@@ -260,12 +261,12 @@ export const displayConnectionPointsOnMap = (
     connectionPoints.forEach((connectionPoint) => {
         const marker = createConnectionPointMarker(connectionPoint, map);
         const infoWindow = createConnectionPointInfoWindow(connectionPoint);
-        
+
         // เพิ่ม event listener สำหรับการคลิก
         marker.addListener('click', () => {
             infoWindow.open(map, marker);
         });
-        
+
         // เก็บ reference
         overlaysRef.current.markers.set(connectionPoint.id, marker);
         overlaysRef.current.infoWindows.set(connectionPoint.id, infoWindow);
@@ -285,7 +286,7 @@ export const clearConnectionPointsFromMap = (
         marker.setMap(null);
     });
     overlaysRef.current.markers.clear();
-    
+
     // ลบ info windows
     overlaysRef.current.infoWindows.forEach((infoWindow) => {
         infoWindow.close();
@@ -306,9 +307,9 @@ export const countConnectionPointsByType = (
         mainToSubMain: 0,
         subMainToMainMid: 0,
         subMainToMainIntersection: 0,
-        total: 0
+        total: 0,
     };
-    
+
     connectionPoints.forEach((point) => {
         switch (point.type) {
             case 'main-to-submain':
@@ -322,8 +323,9 @@ export const countConnectionPointsByType = (
                 break;
         }
     });
-    
-    counts.total = counts.mainToSubMain + counts.subMainToMainMid + counts.subMainToMainIntersection;
-    
+
+    counts.total =
+        counts.mainToSubMain + counts.subMainToMainMid + counts.subMainToMainIntersection;
+
     return counts;
 };

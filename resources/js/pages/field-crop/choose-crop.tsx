@@ -2,7 +2,11 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { router } from '@inertiajs/react';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { cropTranslations, categoryTranslations, irrigationNeedsTranslations } from '../../contexts/translations/cropts';
+import {
+    cropTranslations,
+    categoryTranslations,
+    irrigationNeedsTranslations,
+} from '../../contexts/translations/cropts';
 
 // INTERFACES & TYPES (ย้ายมาจาก cropData.ts)
 export interface Crop {
@@ -20,7 +24,8 @@ export interface Crop {
     price: number; // Price (THB/kg)
 }
 
-export interface TranslatedCrop extends Omit<Crop, 'name' | 'description' | 'category' | 'irrigationNeeds'> {
+export interface TranslatedCrop
+    extends Omit<Crop, 'name' | 'description' | 'category' | 'irrigationNeeds'> {
     name: string;
     description: string;
     category: string;
@@ -52,7 +57,8 @@ export const cropTypes: Crop[] = [
         value: 'cassava',
         name: 'Cassava',
         icon: '🍠',
-        description: 'A major economic root crop, very drought-tolerant, used in starch and energy industries.',
+        description:
+            'A major economic root crop, very drought-tolerant, used in starch and energy industries.',
         category: 'root',
         irrigationNeeds: 'low',
         growthPeriod: 300,
@@ -66,7 +72,8 @@ export const cropTypes: Crop[] = [
         value: 'sweet_potato',
         name: 'Sweet Potato',
         icon: '🍠',
-        description: 'A highly nutritious root crop with both domestic and international market demand.',
+        description:
+            'A highly nutritious root crop with both domestic and international market demand.',
         category: 'root',
         irrigationNeeds: 'medium',
         growthPeriod: 110,
@@ -80,7 +87,8 @@ export const cropTypes: Crop[] = [
         value: 'taro',
         name: 'Taro',
         icon: '🌿',
-        description: 'A nutritious root vegetable that grows well in wet conditions and is popular in Thai cuisine.',
+        description:
+            'A nutritious root vegetable that grows well in wet conditions and is popular in Thai cuisine.',
         category: 'root',
         irrigationNeeds: 'high',
         growthPeriod: 240,
@@ -96,7 +104,8 @@ export const cropTypes: Crop[] = [
         value: 'soybean',
         name: 'Soybean',
         icon: '🫘',
-        description: 'A high-protein, soil-improving crop that requires care during flowering and podding.',
+        description:
+            'A high-protein, soil-improving crop that requires care during flowering and podding.',
         category: 'legume',
         irrigationNeeds: 'medium',
         growthPeriod: 95,
@@ -124,7 +133,8 @@ export const cropTypes: Crop[] = [
         value: 'peanut',
         name: 'Peanut',
         icon: '🥜',
-        description: 'An oil and protein crop grown in loamy soil, requiring consistent water during pod formation.',
+        description:
+            'An oil and protein crop grown in loamy soil, requiring consistent water during pod formation.',
         category: 'legume',
         irrigationNeeds: 'medium',
         growthPeriod: 100,
@@ -154,7 +164,8 @@ export const cropTypes: Crop[] = [
         value: 'pineapple',
         name: 'Pineapple',
         icon: '🍍',
-        description: 'A tropical fruit crop with high economic value, suitable for both fresh consumption and processing.',
+        description:
+            'A tropical fruit crop with high economic value, suitable for both fresh consumption and processing.',
         category: 'industrial',
         irrigationNeeds: 'medium',
         growthPeriod: 540,
@@ -182,7 +193,8 @@ export const cropTypes: Crop[] = [
         value: 'asparagus',
         name: 'Asparagus',
         icon: '🌱',
-        description: 'A high-value perennial vegetable crop popular in export markets and fine dining.',
+        description:
+            'A high-value perennial vegetable crop popular in export markets and fine dining.',
         category: 'industrial',
         irrigationNeeds: 'medium',
         growthPeriod: 365,
@@ -196,7 +208,8 @@ export const cropTypes: Crop[] = [
         value: 'chili',
         name: 'Chili Pepper',
         icon: '🌶️',
-        description: 'A spicy vegetable crop essential in Thai cuisine with high market demand both fresh and dried.',
+        description:
+            'A spicy vegetable crop essential in Thai cuisine with high market demand both fresh and dried.',
         category: 'industrial',
         irrigationNeeds: 'medium',
         growthPeriod: 120,
@@ -212,7 +225,8 @@ export const cropTypes: Crop[] = [
         value: 'oil_palm',
         name: 'Oil Palm',
         icon: '🌴',
-        description: 'The oilseed crop with the highest yield per rai. Begins to bear fruit 3 years after planting.',
+        description:
+            'The oilseed crop with the highest yield per rai. Begins to bear fruit 3 years after planting.',
         category: 'oilseed',
         irrigationNeeds: 'high',
         growthPeriod: 1095,
@@ -226,7 +240,8 @@ export const cropTypes: Crop[] = [
         value: 'sunflower',
         name: 'Sunflower',
         icon: '🌻',
-        description: 'A short-lived, drought-tolerant oilseed crop grown for supplemental income and tourism.',
+        description:
+            'A short-lived, drought-tolerant oilseed crop grown for supplemental income and tourism.',
         category: 'oilseed',
         irrigationNeeds: 'low',
         growthPeriod: 90,
@@ -248,7 +263,10 @@ export function getCropByValue(value: string): Crop | undefined {
 }
 
 // Find a crop by its value with translation
-export function getTranslatedCropByValue(value: string, language: 'en' | 'th' = 'en'): TranslatedCrop | undefined {
+export function getTranslatedCropByValue(
+    value: string,
+    language: 'en' | 'th' = 'en'
+): TranslatedCrop | undefined {
     const crop = getCropByValue(value);
     if (!crop) return undefined;
 
@@ -269,7 +287,7 @@ export function getTranslatedCropByValue(value: string, language: 'en' | 'th' = 
 
 // Get all crops with translation
 export function getTranslatedCrops(language: 'en' | 'th' = 'en'): TranslatedCrop[] {
-    return cropTypes.map(crop => {
+    return cropTypes.map((crop) => {
         const translation = cropTranslations[language][crop.value];
         const categoryTranslation = categoryTranslations[language][crop.category];
         const irrigationTranslation = irrigationNeedsTranslations[language][crop.irrigationNeeds];
@@ -287,30 +305,39 @@ export function getTranslatedCrops(language: 'en' | 'th' = 'en'): TranslatedCrop
 }
 
 // Search crops by name or description
-export function searchTranslatedCrops(query: string, language: 'en' | 'th' = 'en'): TranslatedCrop[] {
+export function searchTranslatedCrops(
+    query: string,
+    language: 'en' | 'th' = 'en'
+): TranslatedCrop[] {
     const translatedCrops = getTranslatedCrops(language);
     const searchTerm = query.toLowerCase().trim();
-    
-    return translatedCrops.filter(crop => 
-        crop.name.toLowerCase().includes(searchTerm) ||
-        crop.description.toLowerCase().includes(searchTerm) ||
-        crop.category.toLowerCase().includes(searchTerm)
+
+    return translatedCrops.filter(
+        (crop) =>
+            crop.name.toLowerCase().includes(searchTerm) ||
+            crop.description.toLowerCase().includes(searchTerm) ||
+            crop.category.toLowerCase().includes(searchTerm)
     );
 }
 
 // Get crops by category
-export function getCropsByCategory(category: 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed', language: 'en' | 'th' = 'en'): TranslatedCrop[] {
+export function getCropsByCategory(
+    category: 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed',
+    language: 'en' | 'th' = 'en'
+): TranslatedCrop[] {
     const translatedCrops = getTranslatedCrops(language);
-    return translatedCrops.filter(crop => crop.categoryKey === category);
+    return translatedCrops.filter((crop) => crop.categoryKey === category);
 }
 
 // Get available categories
-export function getAvailableCategories(language: 'en' | 'th' = 'en'): Array<{key: string, name: string}> {
+export function getAvailableCategories(
+    language: 'en' | 'th' = 'en'
+): Array<{ key: string; name: string }> {
     const categories = ['cereal', 'root', 'legume', 'industrial', 'oilseed'] as const;
-    
-    return categories.map(category => ({
+
+    return categories.map((category) => ({
         key: category,
-        name: categoryTranslations[language][category] || category
+        name: categoryTranslations[language][category] || category,
     }));
 }
 
@@ -374,7 +401,10 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
         if (selectedCategory === 'all') {
             crops = getTranslatedCrops(language);
         } else {
-            crops = getCropsByCategory(selectedCategory as 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed', language);
+            crops = getCropsByCategory(
+                selectedCategory as 'cereal' | 'root' | 'legume' | 'industrial' | 'oilseed',
+                language
+            );
         }
 
         // Apply search filter
@@ -390,7 +420,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
     }, [selectedCrops.length]);
 
     const handleBackToPlanner = () => {
-        router.get("/");
+        router.get('/');
     };
 
     const handleContinueToMap = () => {
@@ -398,36 +428,42 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
     };
 
     const getSelectedCropsText = () => {
-        return selectedCrops.length > 0 
-            ? t('Selected Crop')
-            : t('No Crop Selected');
+        return selectedCrops.length > 0 ? t('Selected Crop') : t('No Crop Selected');
     };
 
     const getContinueDescription = () => {
-        return selectedCrops.length > 0 
+        return selectedCrops.length > 0
             ? t("You've selected a crop. Continue to the field mapping tool.")
-            : t("Please select a crop to continue.");
+            : t('Please select a crop to continue.');
     };
 
     return (
         <div className="min-h-screen bg-gray-900 text-white">
             <Navbar />
-            
+
             <div className="container mx-auto px-4 py-8">
                 <div className="mb-8">
                     <button
                         onClick={handleBackToPlanner}
                         className="mb-4 flex items-center text-blue-400 hover:text-blue-300"
                     >
-                        <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        <svg
+                            className="mr-2 h-4 w-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 19l-7-7 7-7"
+                            />
                         </svg>
                         {t('Back to Irrigation Planner')}
                     </button>
-                    
-                    <h1 className="text-3xl font-bold text-white">
-                        {t('Select Field Crop')}
-                    </h1>
+
+                    <h1 className="text-3xl font-bold text-white">{t('Select Field Crop')}</h1>
                     <p className="mt-2 text-gray-400">
                         {t('Choose the crop you want to grow in your field')}
                     </p>
@@ -448,7 +484,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                                     className="w-full rounded-lg border border-gray-600 bg-gray-800 px-4 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                                 />
                             </div>
-                            
+
                             {/* Category Filter */}
                             <div className="sm:w-48">
                                 <select
@@ -482,8 +518,8 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                         {/* No results message */}
                         {filteredCrops.length === 0 && (
                             <div className="py-12 text-center">
-                                <div className="text-4xl mb-4">🔍</div>
-                                <h3 className="text-lg font-medium text-gray-300 mb-2">
+                                <div className="mb-4 text-4xl">🔍</div>
+                                <h3 className="mb-2 text-lg font-medium text-gray-300">
                                     {t('No crops found')}
                                 </h3>
                                 <p className="text-gray-500">
@@ -499,7 +535,7 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                             <h3 className="mb-4 text-lg font-semibold text-white">
                                 {getSelectedCropsText()}
                             </h3>
-                            
+
                             <div className="mb-6 max-h-64 overflow-y-auto">
                                 {selectedCrops.length === 0 ? (
                                     <p className="text-sm text-gray-500">{t('No crop selected')}</p>
@@ -527,7 +563,10 @@ export default function FieldCrop({ cropType, crops }: FieldCropProps) {
                                                     <button
                                                         onClick={() => handleCropToggle(crop.value)}
                                                         className="ml-2 text-red-400 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100"
-                                                        title={t('Deselect {cropName}').replace('{cropName}', crop.name)}
+                                                        title={t('Deselect {cropName}').replace(
+                                                            '{cropName}',
+                                                            crop.name
+                                                        )}
                                                     >
                                                         ✕
                                                     </button>
@@ -616,20 +655,22 @@ function CropCard({
             <div className="text-center">
                 <div className="mb-2 text-3xl">{crop.icon}</div>
                 <h4 className="mb-1 text-sm font-semibold text-white">{crop.name}</h4>
-                <p className="line-clamp-2 text-xs text-gray-400 mb-2">{crop.description}</p>
-                
+                <p className="mb-2 line-clamp-2 text-xs text-gray-400">{crop.description}</p>
+
                 {/* Category and Irrigation tags */}
                 <div className="mb-2 flex justify-center gap-1 text-xs">
                     <span className="rounded bg-gray-600 px-2 py-1 text-gray-300">
                         {crop.category}
                     </span>
-                    <span className={`rounded px-2 py-1 ${
-                        crop.irrigationNeedsKey === 'high' 
-                            ? 'bg-red-600 text-red-100'
-                            : crop.irrigationNeedsKey === 'medium'
-                            ? 'bg-yellow-600 text-yellow-100'
-                            : 'bg-green-600 text-green-100'
-                    }`}>
+                    <span
+                        className={`rounded px-2 py-1 ${
+                            crop.irrigationNeedsKey === 'high'
+                                ? 'bg-red-600 text-red-100'
+                                : crop.irrigationNeedsKey === 'medium'
+                                  ? 'bg-yellow-600 text-yellow-100'
+                                  : 'bg-green-600 text-green-100'
+                        }`}
+                    >
                         {crop.irrigationNeeds}
                     </span>
                 </div>
@@ -637,12 +678,20 @@ function CropCard({
                 {/* Technical details */}
                 <div className="space-y-1 text-xs text-gray-400">
                     <div className="flex justify-between">
-                        <span>{t('Growth')}: {crop.growthPeriod}d</span>
-                        <span>{t('Yield')}: {crop.yield}kg/rai</span>
+                        <span>
+                            {t('Growth')}: {crop.growthPeriod}d
+                        </span>
+                        <span>
+                            {t('Yield')}: {crop.yield}kg/rai
+                        </span>
                     </div>
                     <div className="flex justify-between">
-                        <span>{t('Water')}: {crop.waterRequirement}ลิตร/ครั้ง</span>
-                        <span>{t('Price')}: ฿{crop.price}/kg</span>
+                        <span>
+                            {t('Water')}: {crop.waterRequirement}ลิตร/ครั้ง
+                        </span>
+                        <span>
+                            {t('Price')}: ฿{crop.price}/kg
+                        </span>
                     </div>
                 </div>
             </div>

@@ -197,7 +197,7 @@ export const usePipeSystemState = () => {
     const [snapVisualization, setSnapVisualization] = useState(true);
     const [gridEnabled, setGridEnabled] = useState(false);
     const [gridSize, setGridSize] = useState(DEFAULT_GRID_SIZE);
-    
+
     // Pipe history for undo/redo functionality
     const [pipeHistory, setPipeHistory] = useState<any[][]>([[]]);
     const [pipeHistoryIndex, setPipeHistoryIndex] = useState(0);

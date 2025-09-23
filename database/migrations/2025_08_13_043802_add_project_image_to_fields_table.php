@@ -7,12 +7,12 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * Run the migrati
      */
     public function up(): void
     {
         Schema::table('fields', function (Blueprint $table) {
-            $table->string('project_image_type', 50)->nullable()->after('project_image')->comment('image/png, image/jpeg, etc.');
+            $table->string('project_image_type', 50)->nullable()->comment('image/png, image/jpeg, etc.');
         });
     }
 

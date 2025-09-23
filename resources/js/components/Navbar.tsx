@@ -14,7 +14,7 @@ const Navbar: React.FC = () => {
     const auth = (page.props as any).auth;
     const [showFloatingAiChat, setShowFloatingAiChat] = useState(false);
     const [isAiChatMinimized, setIsAiChatMinimized] = useState(false);
-    
+
     // State for token system
     const [tokenStatus, setTokenStatus] = useState<any>(null);
     const [loadingTokens, setLoadingTokens] = useState(false);
@@ -42,14 +42,18 @@ const Navbar: React.FC = () => {
 
         // Listen for token update events from other parts of the app
         const handleTokenUpdate = (event: any) => {
-            setTokenStatus(prev => prev ? {
-                ...prev,
-                current_tokens: event.detail.remaining
-            } : null);
+            setTokenStatus((prev) =>
+                prev
+                    ? {
+                          ...prev,
+                          current_tokens: event.detail.remaining,
+                      }
+                    : null
+            );
         };
 
         window.addEventListener('tokensUpdated', handleTokenUpdate);
-        
+
         return () => {
             window.removeEventListener('tokensUpdated', handleTokenUpdate);
         };
@@ -181,9 +185,9 @@ const Navbar: React.FC = () => {
     // const scrollToFooter = () => {
     //     const footerElement = document.getElementById('contact-footer');
     //     if (footerElement) {
-    //         footerElement.scrollIntoView({ 
-    //             behavior: 'smooth', 
-    //             block: 'start' 
+    //         footerElement.scrollIntoView({
+    //             behavior: 'smooth',
+    //             block: 'start'
     //         });
     //     }
     // };
@@ -207,8 +211,14 @@ const Navbar: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <h1 className="text-xl font-bold">{t('Chaiyo Irrigation Planning System')}</h1>
-                                    <p className="text-sm">{t('บจก.กนกโปรดักส์ จำกัด & บจก.ไชโยไปป์แอนด์ฟิตติ้ง จำกัด')}</p>
+                                    <h1 className="text-xl font-bold">
+                                        {t('Chaiyo Irrigation Planning System')}
+                                    </h1>
+                                    <p className="text-sm">
+                                        {t(
+                                            'บจก.กนกโปรดักส์ จำกัด & บจก.ไชโยไปป์แอนด์ฟิตติ้ง จำกัด'
+                                        )}
+                                    </p>
                                 </div>
                             </Link>
                         </div>
@@ -226,7 +236,6 @@ const Navbar: React.FC = () => {
                                 </Link>
                             )}
 
-
                             <div className="flex items-center gap-3">
                                 <FloatingAiChat
                                     isOpen={showFloatingAiChat}
@@ -236,18 +245,18 @@ const Navbar: React.FC = () => {
                                 />
                                 <button
                                     onClick={() => setShowFloatingAiChat(true)}
-                                    className="rounded-lg bg-gradient-to-r text-white from-green-500 to-blue-500 px-4 py-2 text-sm font-medium transition-all hover:from-green-600 hover:to-blue-600"
+                                    className="rounded-lg bg-gradient-to-r from-green-500 to-blue-500 px-4 py-2 text-sm font-medium text-white transition-all hover:from-green-600 hover:to-blue-600"
                                 >
                                     🤖 {t('AI ช่วยเหลือ')}
                                 </button>
                                 <button
                                     onClick={() => (window.location.href = '/equipment-crud')}
-                                    className="rounded-lg bg-gray-600 text-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-700"
+                                    className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
                                 >
                                     ⚙️ {t('จัดการอุปกรณ์')}
                                 </button>
                             </div>
-                            
+
                             {/* Token Display for Non-Admin Users */}
                             {auth?.user && !auth.user.is_super_user && (
                                 <div className="flex items-center gap-2">
@@ -260,7 +269,7 @@ const Navbar: React.FC = () => {
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => setShowTokenPricingModal(true)}
-                                                className="flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-blue-700 cursor-pointer"
+                                                className="flex cursor-pointer items-center gap-1 rounded-lg bg-blue-600 px-3 py-1 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                                                 title="Click to view token pricing and usage"
                                             >
                                                 <span className="text-lg">🪙</span>
@@ -277,9 +286,10 @@ const Navbar: React.FC = () => {
                             )}
                             <LanguageSwitcher />
 
-
                             {/* User Avatar - Only show if authenticated */}
-                            {auth?.user && <UserAvatar user={auth.user} size="md" className="ml-2" />}
+                            {auth?.user && (
+                                <UserAvatar user={auth.user} size="md" className="ml-2" />
+                            )}
                         </div>
                     </div>
                 </div>
@@ -299,18 +309,30 @@ const Navbar: React.FC = () => {
                                 onClick={() => setShowTokenPricingModal(false)}
                                 className="text-gray-400 transition-colors hover:text-white"
                             >
-                                <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                <svg
+                                    className="h-8 w-8"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M6 18L18 6M6 6l12 12"
+                                    />
                                 </svg>
                             </button>
                         </div>
 
                         {/* Token Packages */}
                         <div className="mb-8">
-                            <h3 className="mb-4 text-xl font-semibold text-white">Buy Token Packages</h3>
+                            <h3 className="mb-4 text-xl font-semibold text-white">
+                                Buy Token Packages
+                            </h3>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                                 {/* Starter Package */}
-                                <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 text-center hover:border-blue-500 transition-colors">
+                                <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 text-center transition-colors hover:border-blue-500">
                                     <div className="mb-4">
                                         <div className="text-3xl font-bold text-blue-400">10</div>
                                         <div className="text-sm text-gray-400">Tokens</div>
@@ -329,11 +351,11 @@ const Navbar: React.FC = () => {
                                         Buy Now
                                     </button>
                                 </div>
-                                
+
                                 {/* Popular Package */}
-                                <div className="rounded-lg border-2 border-green-500 bg-gray-800 p-6 text-center relative">
-                                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                                        <span className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap">
+                                <div className="relative rounded-lg border-2 border-green-500 bg-gray-800 p-6 text-center">
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 transform">
+                                        <span className="whitespace-nowrap rounded-full bg-green-500 px-2 py-1 text-xs font-medium text-white">
                                             Most Popular
                                         </span>
                                     </div>
@@ -356,11 +378,13 @@ const Navbar: React.FC = () => {
                                         Buy Now
                                     </button>
                                 </div>
-                                
+
                                 {/* Premium Package */}
-                                <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 text-center hover:border-purple-500 transition-colors">
+                                <div className="rounded-lg border border-gray-700 bg-gray-800 p-6 text-center transition-colors hover:border-purple-500">
                                     <div className="mb-4">
-                                        <div className="text-3xl font-bold text-purple-400">100</div>
+                                        <div className="text-3xl font-bold text-purple-400">
+                                            100
+                                        </div>
                                         <div className="text-sm text-gray-400">Tokens</div>
                                     </div>
                                     <div className="mb-4">
@@ -379,7 +403,7 @@ const Navbar: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
-                            
+
                             {/* Enterprise Package */}
                             <div className="mt-6 rounded-lg border border-yellow-500 bg-gray-800 p-6 text-center">
                                 <div className="mb-4">
@@ -389,7 +413,9 @@ const Navbar: React.FC = () => {
                                 <div className="mb-4">
                                     <div className="text-2xl font-bold text-white">฿1,500</div>
                                     <div className="text-sm text-gray-400">฿3 per token</div>
-                                    <div className="text-xs text-yellow-400">Best Value - Save ฿1,000</div>
+                                    <div className="text-xs text-yellow-400">
+                                        Best Value - Save ฿1,000
+                                    </div>
                                 </div>
                                 <button 
                                     onClick={() => {
@@ -405,30 +431,36 @@ const Navbar: React.FC = () => {
 
                         {/* Token System Info */}
                         <div className="rounded-lg border border-gray-700 bg-gray-800 p-6">
-                            <h3 className="mb-4 text-xl font-semibold text-white">How Token System Works</h3>
+                            <h3 className="mb-4 text-xl font-semibold text-white">
+                                How Token System Works
+                            </h3>
                             <div className="space-y-3 text-gray-300">
                                 <div className="flex items-start gap-3">
                                     <span className="text-green-400">✅</span>
                                     <div>
-                                        <strong>Starting Tokens:</strong> New users get 100 tokens to begin
+                                        <strong>Starting Tokens:</strong> New users get 100 tokens
+                                        to begin
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
                                     <span className="text-purple-400">💳</span>
                                     <div>
-                                        <strong>Buy More Tokens:</strong> Purchase additional tokens anytime with secure payment
+                                        <strong>Buy More Tokens:</strong> Purchase additional tokens
+                                        anytime with secure payment
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
                                     <span className="text-yellow-400">👑</span>
                                     <div>
-                                        <strong>Admin Users:</strong> Super users have unlimited access
+                                        <strong>Admin Users:</strong> Super users have unlimited
+                                        access
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
                                     <span className="text-orange-400">💡</span>
                                     <div>
-                                        <strong>Smart Usage:</strong> Tokens are only consumed on successful operations
+                                        <strong>Smart Usage:</strong> Tokens are only consumed on
+                                        successful operations
                                     </div>
                                 </div>
                             </div>
@@ -437,11 +469,17 @@ const Navbar: React.FC = () => {
                         {/* Usage Statistics */}
                         {tokenStatus && (
                             <div className="mt-6 rounded-lg border border-gray-700 bg-gray-800 p-6">
-                                <h3 className="mb-4 text-xl font-semibold text-white">Your Usage Statistics</h3>
+                                <h3 className="mb-4 text-xl font-semibold text-white">
+                                    Your Usage Statistics
+                                </h3>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <div className="text-2xl font-bold text-blue-400">{tokenStatus.total_used || 0}</div>
-                                        <div className="text-sm text-gray-400">Total tokens used</div>
+                                        <div className="text-2xl font-bold text-blue-400">
+                                            {tokenStatus.total_used || 0}
+                                        </div>
+                                        <div className="text-sm text-gray-400">
+                                            Total tokens used
+                                        </div>
                                     </div>
                                 </div>
                             </div>

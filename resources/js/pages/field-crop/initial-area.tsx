@@ -9,14 +9,102 @@ import DistanceMeasurementOverlay from '../../components/horticulture/DistanceMe
 import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 
-// Lightweight env-aware logger to reduce noisy logs in production
-const __DEV__ = typeof import.meta !== 'undefined' ? ((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV ?? true) : (typeof process !== 'undefined' ? process.env.NODE_ENV !== 'production' : true);
-const log = (...args: unknown[]) => { if (__DEV__) console.log(...args); };
-const warn = (...args: unknown[]) => { if (__DEV__) console.warn(...args); };
-const errorLog = (...args: unknown[]) => { console.error(...args); };
 
 // Yield back to the browser between heavy batches without blocking UI
 const yieldToFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+// Helper function to safely save data to localStorage with size optimization
+const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
+	try {
+		const dataString = JSON.stringify(data);
+		const dataSizeKB = new Blob([dataString]).size / 1024;
+		
+		if (dataSizeKB > maxSizeKB) {
+			console.warn(`Data size (${dataSizeKB.toFixed(2)}KB) exceeds limit (${maxSizeKB}KB), optimizing...`);
+			
+			// Optimize by reducing precision
+			const dataObj = data as Record<string, unknown>;
+			const optimizedData = {
+				...dataObj,
+				mainArea: Array.isArray(dataObj.mainArea) ? dataObj.mainArea.map((coord: unknown) => {
+					const c = coord as { lat: number; lng: number };
+					return {
+						lat: Math.round(c.lat * 1000000) / 1000000,
+						lng: Math.round(c.lng * 1000000) / 1000000
+					};
+				}) : [],
+				obstacles: Array.isArray(dataObj.obstacles) ? dataObj.obstacles.map((obs: unknown) => {
+					const o = obs as { coordinates: unknown[]; [key: string]: unknown };
+					return {
+						...o,
+						coordinates: Array.isArray(o.coordinates) ? o.coordinates.map((coord: unknown) => {
+							const c = coord as { lat: number; lng: number };
+							return {
+								lat: Math.round(c.lat * 1000000) / 1000000,
+								lng: Math.round(c.lng * 1000000) / 1000000
+							};
+						}) : []
+					};
+				}) : [],
+				plantPoints: Array.isArray(dataObj.plantPoints) ? dataObj.plantPoints.map((point: unknown) => {
+					const p = point as { lat: number; lng: number; cropType: string; isValid: boolean };
+					return {
+						lat: Math.round(p.lat * 1000000) / 1000000,
+						lng: Math.round(p.lng * 1000000) / 1000000,
+						cropType: p.cropType,
+						isValid: p.isValid
+					};
+				}) : []
+			};
+			
+			const optimizedString = JSON.stringify(optimizedData);
+			const optimizedSizeKB = new Blob([optimizedString]).size / 1024;
+			
+			if (optimizedSizeKB > maxSizeKB) {
+				console.warn('Data still too large after optimization, further reducing plant points...');
+				// Further reduce plant points precision
+				const dataObj = optimizedData as Record<string, unknown>;
+				const furtherOptimizedData = {
+					...dataObj,
+					plantPoints: Array.isArray(dataObj.plantPoints) ? dataObj.plantPoints.map((point: unknown) => {
+						const p = point as { lat: number; lng: number; cropType: string; isValid: boolean };
+						return {
+							lat: Math.round(p.lat * 100000) / 100000, // 5 decimal places
+							lng: Math.round(p.lng * 100000) / 100000,
+							cropType: p.cropType,
+							isValid: p.isValid
+						};
+					}) : []
+				};
+				
+				const furtherOptimizedString = JSON.stringify(furtherOptimizedData);
+				const furtherOptimizedSizeKB = new Blob([furtherOptimizedString]).size / 1024;
+				
+				if (furtherOptimizedSizeKB > maxSizeKB) {
+					console.warn('Data still too large, sampling plant points...');
+					// Sample plant points (keep every 2nd point)
+					const sampledPlantPoints = Array.isArray(furtherOptimizedData.plantPoints) ? 
+						furtherOptimizedData.plantPoints.filter((_, index) => index % 2 === 0) : [];
+					const finalData = {
+						...furtherOptimizedData,
+						plantPoints: sampledPlantPoints
+					};
+					localStorage.setItem(key, JSON.stringify(finalData));
+				} else {
+					localStorage.setItem(key, furtherOptimizedString);
+				}
+			} else {
+				localStorage.setItem(key, optimizedString);
+			}
+		} else {
+			localStorage.setItem(key, dataString);
+		}
+		return true;
+	} catch (error) {
+		console.error('Error saving to localStorage:', error);
+		return false;
+	}
+};
 
 // Type guard and helper to safely detach Google Maps overlays without TS errors
 const hasSetMap = (obj: unknown): obj is { setMap: (map: google.maps.Map | null) => void } => {
@@ -56,6 +144,23 @@ interface PlantPoint {
     cropType: string;
     isValid: boolean;
 }
+
+// Type for plant point arrays that can carry real count and real points information
+type PlantPointArrayWithRealCount = PlantPoint[] & { __realCount?: number; __realPoints?: PlantPoint[] };
+
+// Helper function to safely extract real count
+const extractRealCount = (plantPoints: PlantPoint[]): number => {
+    const pointsWithRealCount = plantPoints as PlantPointArrayWithRealCount;
+    return pointsWithRealCount.__realCount || plantPoints.length;
+};
+
+// Helper function to safely extract real points
+const extractRealPoints = (plantPoints: PlantPoint[]): PlantPoint[] => {
+    const pointsWithRealCount = plantPoints as PlantPointArrayWithRealCount;
+    return pointsWithRealCount.__realPoints || plantPoints;
+};
+
+
 
 interface Obstacle {
     id: string;
@@ -99,7 +204,10 @@ export default function InitialArea({
     const [drawnPolygon, setDrawnPolygon] = useState<google.maps.Polygon | null>(null);
 
     // Plant and Obstacle States
-    const [plantPoints, setPlantPoints] = useState<PlantPoint[]>([]);
+    const [plantPoints, setPlantPoints] = useState<PlantPoint[]>([]); // Display points (limited to 500)
+    const [realPlantPoints, setRealPlantPoints] = useState<PlantPoint[]>([]); // All real plant points
+    const [realPlantCount, setRealPlantCount] = useState<number>(0); // Track real point count for calculations
+    const [hideAllPoints, setHideAllPoints] = useState<boolean>(false); // Hide all points toggle
     const [isGeneratingPlants, setIsGeneratingPlants] = useState<boolean>(false);
     const [obstacles, setObstacles] = useState<Obstacle[]>([]);
     const [isDrawingObstacle, setIsDrawingObstacle] = useState<boolean>(false);
@@ -118,6 +226,9 @@ export default function InitialArea({
     const [tempPlantSpacing, setTempPlantSpacing] = useState<Record<string, string>>({});
     const [editingRowSpacingForCrop, setEditingRowSpacingForCrop] = useState<string | null>(null);
     const [editingPlantSpacingForCrop, setEditingPlantSpacingForCrop] = useState<string | null>(null);
+
+    // Plant points state
+
 
     // Refs for state synchronization
     const mainAreaRef = useRef<Coordinate[]>(mainArea);
@@ -149,7 +260,6 @@ export default function InitialArea({
     useEffect(() => {
         const startingGenerationId = currentGenerationIdRef.current;
         return () => {
-            log("Cleaning up InitialArea component...");
             
             // Cancel any pending rotation timer
             if (rotationTimerRef.current) {
@@ -176,12 +286,12 @@ export default function InitialArea({
             });
             plantPointMarkersRef.current = [];
             
+            
             Object.values(distanceOverlaysByObstacleRef.current).forEach(({ lines, labels }) => {
                 lines.forEach(l => l.setMap(null));
                 labels.forEach(lb => lb.setMap(null));
             });
             drawingManagerObjRef.current?.setMap(null);
-            log("Cleanup complete.");
         };
     }, []);
 
@@ -210,8 +320,7 @@ export default function InitialArea({
             const perimeter = google.maps.geometry.spherical.computeLength(pathForPerimeter);
             setAreaRai(areaSqm > 0 ? areaSqm / 1600 : 0);
             setPerimeterMeters(perimeter);
-        } catch(e) {
-            errorLog("Error computing area and perimeter:", e);
+        } catch {
             setAreaRai(null);
             setPerimeterMeters(null);
         }
@@ -331,30 +440,112 @@ export default function InitialArea({
 		};
 	}, [rowSpacing, plantSpacing, language]);
 
+    // ===== LOD (LEVEL OF DETAIL) FUNCTIONS =====
+    // Using utility functions from lodClusteringUtils.ts
+
+    // Function to update displayed points based on hideAllPoints setting
+    const updateDisplayedPoints = useCallback(() => {
+        if (hideAllPoints) {
+            setPlantPoints([]); // Hide all points
+        } else {
+            setPlantPoints(realPlantPoints); // Show all real points
+        }
+    }, [realPlantPoints, hideAllPoints]);
+
+    // Effect to track map zoom changes
+    useEffect(() => {
+        if (!map) return;
+
+        const handleZoomChanged = () => {
+            const currentZoom = map.getZoom();
+            if (currentZoom !== undefined) {
+                setMapZoom(currentZoom);
+            }
+        };
+
+        // Listen for zoom changes
+        const zoomListener = map.addListener('zoom_changed', handleZoomChanged);
+        
+        // Set initial zoom
+        handleZoomChanged();
+
+        return () => {
+            google.maps.event.removeListener(zoomListener);
+        };
+    }, [map]);
+
     // ===== PLANT POINT FUNCTIONS =====
     
-    // Enhanced function to clear all existing plant markers immediately
-    const clearAllPlantMarkers = useCallback(() => {
-        log('Clearing all existing plant markers...');
-        
-        // Clear markers from the map
-        plantPointMarkersRef.current.forEach(marker => {
-            if (marker && marker.setMap) {
-                marker.setMap(null);
-            }
-        });
-        
-        // Reset the arrays
-        plantPointMarkersRef.current = [];
-        
-        log('All plant markers cleared successfully');
+    // Helper function to calculate point size based on point count
+    const calculatePointSize = useCallback((pointCount: number): number => {
+        if (pointCount >= 5000) {
+            return 8 * 0.4; // 60% reduction (40% of original size)
+        } else if (pointCount >= 2000) {
+            return 8 * 0.6; // 40% reduction (60% of original size)
+        } else if (pointCount >= 800) {
+            return 8 * 0.8; // 20% reduction (80% of original size)
+        } else {
+            return 8; // Original size
+        }
     }, []);
 
-    // [FIX] Create optimized markers for plant points with race condition prevention and validation
+    // Helper function to filter points based on zoom level and total point count
+    const filterPointsByZoom = useCallback((points: PlantPoint[], zoom: number, totalPointCount: number): PlantPoint[] => {
+        // If we have fewer than 800 points, show all points regardless of zoom
+        if (totalPointCount < 800) {
+            return points;
+        }
+
+        // Calculate maximum reduction factor based on total point count
+        let maxReductionFactor = 1; // No reduction by default
+        
+        if (totalPointCount >= 5000) {
+            maxReductionFactor = 4; // Up to 4x reduction (show 1/4 of points)
+        } else if (totalPointCount >= 2000) {
+            maxReductionFactor = 3; // Up to 3x reduction (show 1/3 of points)
+        } else if (totalPointCount >= 800) {
+            maxReductionFactor = 2; // Up to 2x reduction (show 1/2 of points)
+        }
+
+        // Calculate zoom-based reduction (5 levels: zoom 20, 19, 18, 17, 16)
+        let reductionFactor = 1;
+        
+        if (zoom >= 20) {
+            // Zoom 20+: show all points
+            reductionFactor = 1;
+        } else if (zoom >= 19) {
+            // Zoom 19: 25% of max reduction
+            reductionFactor = 1 + (maxReductionFactor - 1) * 0.25;
+        } else if (zoom >= 18) {
+            // Zoom 18: 50% of max reduction
+            reductionFactor = 1 + (maxReductionFactor - 1) * 0.5;
+        } else if (zoom >= 17) {
+            // Zoom 17: 75% of max reduction
+            reductionFactor = 1 + (maxReductionFactor - 1) * 0.75;
+        } else {
+            // Zoom < 17: maximum reduction
+            reductionFactor = maxReductionFactor;
+        }
+
+        // If no reduction needed, return all points
+        if (reductionFactor <= 1) {
+            return points;
+        }
+
+        // Sample points based on reduction factor
+        const step = Math.ceil(reductionFactor);
+        return points.filter((_, index) => index % step === 0);
+    }, []);
+
+    // Enhanced function to clear all existing plant markers immediately
+    const clearAllPlantMarkers = useCallback(() => {
+        plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
+    }, []);
+
+    // Create optimized markers for plant points using utility function
     const createPlantMarkers = useCallback(async (points: PlantPoint[], generationId: number) => {
         if (!map) return [] as google.maps.Marker[];
         
-        log(`Creating ${points.length} plant markers for generation ${generationId}`);
         const markers: google.maps.Marker[] = [];
         
         // Validate input points
@@ -368,50 +559,50 @@ export default function InitialArea({
             point.lng >= -180 && point.lng <= 180
         );
         
-        if (validPoints.length !== points.length) {
-            warn(`Filtered out ${points.length - validPoints.length} invalid points`);
-        }
+        // Filter points based on zoom level and total point count
+        const filteredPoints = filterPointsByZoom(validPoints, mapZoom, validPoints.length);
         
-        const plantIcon = {
-            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="4" cy="4" r="3" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
-                </svg>
-            `),
-            scaledSize: new google.maps.Size(8, 8),
-            anchor: new google.maps.Point(4, 4)
-        };
+        // Calculate dynamic point size based on total point count (not filtered count)
+        const pointSize = calculatePointSize(validPoints.length);
+        const anchorPoint = pointSize / 2;
         
         const batchSize = 100;
-        for (let i = 0; i < validPoints.length; i += batchSize) {
+        for (let i = 0; i < filteredPoints.length; i += batchSize) {
             // Check if this generation is still current
             if (currentGenerationIdRef.current !== generationId) {
-                log(`Generation ${generationId} cancelled, cleaning up partial markers`);
                 markers.forEach(m => m.setMap(null));
                 return [] as google.maps.Marker[];
             }
             
-            const batch = validPoints.slice(i, i + batchSize);
+            const batch = filteredPoints.slice(i, i + batchSize);
             for (const point of batch) {
                 // Double check before creating each marker
                 if (currentGenerationIdRef.current !== generationId) {
-                    log(`Generation ${generationId} cancelled mid-batch`);
                     markers.forEach(m => m.setMap(null));
                     return [] as google.maps.Marker[];
                 }
                 
                 try {
+                    // Create marker directly with dynamic size
                     const marker = new google.maps.Marker({
                         position: { lat: point.lat, lng: point.lng },
                         map: map,
-                        icon: plantIcon,
-                        title: `Plant: ${point.cropType}`,
+                        icon: {
+                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                                <svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.875}" fill="#22C55E" stroke="#16A34A" stroke-width="1"/>
+                                </svg>
+                            `),
+                            scaledSize: new google.maps.Size(pointSize, pointSize),
+                            anchor: new google.maps.Point(anchorPoint, anchorPoint)
+                        },
+                        title: `Plant ${point.id}`,
                         optimized: true,
-                        clickable: false
+                        clickable: false,
+                        zIndex: 1000
                     });
                     markers.push(marker);
-                } catch (error) {
-                    errorLog('Error creating marker for point:', point, error);
+                } catch {
                     // Continue with other markers instead of failing completely
                 }
             }
@@ -420,9 +611,8 @@ export default function InitialArea({
             await yieldToFrame();
         }
         
-        log(`Successfully created ${markers.length} markers for generation ${generationId}`);
         return markers;
-    }, [map]);
+    }, [map, calculatePointSize, filterPointsByZoom, mapZoom]);
 
     // Geometry helpers
     const computeCentroid = useCallback((points: Coordinate[]): Coordinate => {
@@ -471,11 +661,140 @@ export default function InitialArea({
         return distanceToPolygonEdgeGeneric(point, polygon, p => p.x, p => p.y);
     }, [distanceToPolygonEdgeGeneric]);
 
+    // Create even distribution of points across the area
+    const createEvenDistribution = useCallback((
+        originalPoints: PlantPoint[],
+        targetCount: number,
+        rotatedMain: { x: number; y: number }[],
+        rotatedObstacles: { x: number; y: number }[][],
+        angleRad: number,
+        origin: { lat: number; lng: number },
+        primaryCrop: string,
+        generationId: number
+    ): PlantPoint[] => {
+        if (originalPoints.length === 0) return [];
+
+        // Calculate the bounding box of the area
+        const xs = rotatedMain.map(p => p.x);
+        const ys = rotatedMain.map(p => p.y);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+
+        // Calculate optimal grid dimensions for even distribution
+        const aspectRatio = width / height;
+        const cols = Math.ceil(Math.sqrt(targetCount * aspectRatio));
+
+        // Adjust to get exactly targetCount points
+        const actualCols = Math.min(cols, Math.ceil(Math.sqrt(targetCount)));
+        const actualRows = Math.ceil(targetCount / actualCols);
+
+        const stepX = width / (actualCols - 1);
+        const stepY = height / (actualRows - 1);
+
+
+        const distributedPoints: PlantPoint[] = [];
+
+        // Generate points in a grid pattern
+        for (let row = 0; row < actualRows && distributedPoints.length < targetCount; row++) {
+            for (let col = 0; col < actualCols && distributedPoints.length < targetCount; col++) {
+                const x = minX + (col * stepX);
+                const y = minY + (row * stepY);
+                const pt = { x, y };
+
+                // Check if point is inside main area and not in obstacles
+                const insideMain = isPointInPolygonXY(pt, rotatedMain);
+                const insideAnyHole = rotatedObstacles.some(poly => isPointInPolygonXY(pt, poly));
+
+                if (insideMain && !insideAnyHole) {
+                    // Check distance from edges (use a smaller buffer for even distribution)
+                    const distanceFromEdge = Math.min(
+                        distanceToPolygonEdgeXY(pt, rotatedMain),
+                        ...rotatedObstacles.map(poly => distanceToPolygonEdgeXY(pt, poly))
+                    );
+                    
+                    // Use a smaller buffer for even distribution to maximize coverage
+                    const bufferDistance = Math.min(stepX, stepY) * 0.1;
+                    
+                    if (distanceFromEdge >= bufferDistance) {
+                        const unrotated = rotateXY(pt, angleRad);
+                        const latLng = toLatLngFromXY(unrotated, origin);
+                        
+                        distributedPoints.push({
+                            id: `plant_${generationId}_dist_${row}_${col}`,
+                            lat: latLng.lat,
+                            lng: latLng.lng,
+                            cropType: primaryCrop,
+                            isValid: true,
+                        });
+                    }
+                }
+            }
+        }
+
+        // If we still need more points, try to fill gaps
+        if (distributedPoints.length < targetCount) {
+            
+            // Try to add more points by using a finer grid in areas with fewer points
+            const fineStepX = stepX / 2;
+            const fineStepY = stepY / 2;
+            
+            for (let row = 0; row < actualRows * 2 && distributedPoints.length < targetCount; row++) {
+                for (let col = 0; col < actualCols * 2 && distributedPoints.length < targetCount; col++) {
+                    const x = minX + (col * fineStepX);
+                    const y = minY + (row * fineStepY);
+                    const pt = { x, y };
+
+                    const insideMain = isPointInPolygonXY(pt, rotatedMain);
+                    const insideAnyHole = rotatedObstacles.some(poly => isPointInPolygonXY(pt, poly));
+
+                    if (insideMain && !insideAnyHole) {
+                        const distanceFromEdge = Math.min(
+                            distanceToPolygonEdgeXY(pt, rotatedMain),
+                            ...rotatedObstacles.map(poly => distanceToPolygonEdgeXY(pt, poly))
+                        );
+                        
+                        const bufferDistance = Math.min(fineStepX, fineStepY) * 0.1;
+                        
+                        if (distanceFromEdge >= bufferDistance) {
+                            // Check if this point is too close to existing points
+                            const tooClose = distributedPoints.some(existing => {
+                                const existingLatLng = { lat: existing.lat, lng: existing.lng };
+                                const existingXY = toLocalXY(existingLatLng, origin);
+                                const existingRotated = rotateXY(existingXY, -angleRad);
+                                const distance = Math.sqrt((x - existingRotated.x) ** 2 + (y - existingRotated.y) ** 2);
+                                return distance < Math.min(stepX, stepY) * 0.5;
+                            });
+
+                            if (!tooClose) {
+                                const unrotated = rotateXY(pt, angleRad);
+                                const latLng = toLatLngFromXY(unrotated, origin);
+                                
+                                distributedPoints.push({
+                                    id: `plant_${generationId}_fill_${row}_${col}`,
+                                    lat: latLng.lat,
+                                    lng: latLng.lng,
+                                    cropType: primaryCrop,
+                                    isValid: true,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return distributedPoints.slice(0, targetCount); // Ensure we don't exceed target
+    }, [isPointInPolygonXY, distanceToPolygonEdgeXY, rotateXY, toLatLngFromXY, toLocalXY]);
+
     // [FIX] Enhanced oriented generation with center-first row placement for better uniformity
-    const generatePlantPointsOriented = useCallback(async (angleDeg: number, generationId: number): Promise<PlantPoint[]> => {
+    const generatePlantPointsOriented = useCallback(async (angleDeg: number, generationId: number): Promise<PlantPointArrayWithRealCount> => {
         if (mainArea.length < 3 || selectedCrops.length === 0) return [];
 
-        log(`Starting plant generation for angle ${angleDeg}, generation ${generationId}`);
 
         const primaryCrop = selectedCrops[0];
         const cropInfo = getCropSpacingInfo(primaryCrop);
@@ -509,7 +828,6 @@ export default function InitialArea({
         const rowsAboveCenter = Math.floor(maxRows / 2);
         const rowsBelowCenter = maxRows - rowsAboveCenter;
         
-        log(`Plant generation: center Y=${centerY.toFixed(2)}, rows above=${rowsAboveCenter}, rows below=${rowsBelowCenter}`);
         
         // Generate rows starting from center and expanding outward
         const allRowYs: number[] = [];
@@ -536,7 +854,6 @@ export default function InitialArea({
         // Sort rows from bottom to top for consistent ordering
         allRowYs.sort((a, b) => a - b);
         
-        log(`Generated ${allRowYs.length} rows starting from center`);
         
         // Generate plants for each row
         for (let rowIndex = 0; rowIndex < allRowYs.length; rowIndex++) {
@@ -545,7 +862,6 @@ export default function InitialArea({
             // Check generation ID frequently during long operations
             if (rowIndex % 10 === 0) {
                 if (currentGenerationIdRef.current !== generationId) { 
-                    log(`Plant generation ${generationId} cancelled at row ${rowIndex}`);
                     return []; 
                 }
                 await yieldToFrame();
@@ -555,7 +871,6 @@ export default function InitialArea({
             for (let x = minX; x <= maxX; x += plantSpacingM) {
                 // Additional check for very long rows
                 if (plantIndex % 50 === 0 && currentGenerationIdRef.current !== generationId) {
-                    log(`Plant generation ${generationId} cancelled at plant ${plantIndex} in row ${rowIndex}`);
                     return [];
                 }
                 
@@ -583,9 +898,39 @@ export default function InitialArea({
             }
         }
         
-        log(`Plant generation ${generationId} completed with ${plantPointsOut.length} points using center-first approach`);
+        
+        // Store the real point count for calculations
+        const realCount = plantPointsOut.length;
+        
+        // Limit to maximum 500 points per area with even distribution for display only
+        const MAX_POINTS = 500;
+        if (plantPointsOut.length > MAX_POINTS) {
+            
+            // Create even distribution across the area for display
+            const evenlyDistributedPoints = createEvenDistribution(
+                plantPointsOut, 
+                MAX_POINTS, 
+                rotatedMain, 
+                rotatedObstacles, 
+                angleRad, 
+                origin, 
+                primaryCrop, 
+                generationId
+            );
+            
+            
+            // Store real count and real points in a way that can be accessed by the calling function
+            (evenlyDistributedPoints as PlantPointArrayWithRealCount).__realCount = realCount;
+            (evenlyDistributedPoints as PlantPointArrayWithRealCount).__realPoints = plantPointsOut;
+            
+            return evenlyDistributedPoints;
+        }
+        
+        // Store real count and real points for cases where we don't need to limit
+        (plantPointsOut as PlantPointArrayWithRealCount).__realCount = realCount;
+        (plantPointsOut as PlantPointArrayWithRealCount).__realPoints = plantPointsOut;
         return plantPointsOut;
-    }, [mainArea, selectedCrops, obstacles, getCropSpacingInfo, computeCentroid, toLocalXY, rotateXY, isPointInPolygonXY, distanceToPolygonEdgeXY, toLatLngFromXY]);
+    }, [mainArea, selectedCrops, obstacles, getCropSpacingInfo, computeCentroid, toLocalXY, rotateXY, isPointInPolygonXY, distanceToPolygonEdgeXY, toLatLngFromXY, createEvenDistribution]);
 
     // Create distance overlays (lines + labels) for a water obstacle
     const createDistanceOverlaysForWaterObstacle = useCallback((obstacle: Obstacle) => {
@@ -740,6 +1085,7 @@ export default function InitialArea({
                 editable: false,
                 draggable: false,
                 clickable: true,
+                zIndex: 1000,
             });
 
             styledPolygon.setMap(map);
@@ -774,7 +1120,6 @@ export default function InitialArea({
         setDrawnPolygon(styledPolygon);
         drawnPolygonRef.current = styledPolygon;
 
-        log('Recreated main area polygon from localStorage data');
     }, [map, isMainAreaSet, mainArea, computeAreaAndPerimeter, isEditingMainArea]);
 
     // Obstacle overlays rendering effect
@@ -817,8 +1162,14 @@ export default function InitialArea({
         });
 
         setObstacleOverlays(newObstacleOverlays);
-        log('Recreated obstacle overlays from localStorage data:', obstacles.length, 'obstacles');
     }, [map, obstacles, createDistanceOverlaysForWaterObstacle]);
+
+    // Effect: Update displayed points when density changes
+    useEffect(() => {
+        updateDisplayedPoints();
+    }, [updateDisplayedPoints]);
+
+
 
     // Plant points markers rendering effect
     useEffect(() => {
@@ -827,25 +1178,32 @@ export default function InitialArea({
         // Always clear existing markers first
         clearAllPlantMarkers();
         
-        if (plantPoints.length === 0) return;
+        // Don't show points if hideAllPoints is true
+        if (hideAllPoints) return;
 
-        log('Recreating plant point markers from localStorage data:', plantPoints.length, 'points');
 
         // Increment generation ID for this recreation
         const generationId = ++currentGenerationIdRef.current;
 
+        // Filter points based on zoom level and total point count
+        const filteredPoints = filterPointsByZoom(plantPoints, mapZoom, plantPoints.length);
+
+        // Calculate dynamic point size based on total point count (not filtered count)
+        const pointSize = calculatePointSize(plantPoints.length);
+        const anchorPoint = pointSize / 2;
+
         const plantIcon = {
             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="4" cy="4" r="3" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
+                <svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.75}" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
                 </svg>
             `),
-            scaledSize: new google.maps.Size(8, 8),
-            anchor: new google.maps.Point(4, 4)
+            scaledSize: new google.maps.Size(pointSize, pointSize),
+            anchor: new google.maps.Point(anchorPoint, anchorPoint)
         };
 
         const newMarkers: google.maps.Marker[] = [];
-        plantPoints.forEach((point) => {
+        filteredPoints.forEach((point) => {
             // Check if still current generation
             if (currentGenerationIdRef.current !== generationId) {
                 // Clean up any markers created so far
@@ -867,22 +1225,19 @@ export default function InitialArea({
         // Only update if still current generation
         if (currentGenerationIdRef.current === generationId) {
             plantPointMarkersRef.current = newMarkers;
-            log('Successfully recreated plant point markers');
         } else {
             // Clean up if generation was cancelled
             newMarkers.forEach(m => m.setMap(null));
         }
-    }, [map, plantPoints, clearAllPlantMarkers]);
+    }, [map, plantPoints, clearAllPlantMarkers, hideAllPoints, calculatePointSize, filterPointsByZoom, mapZoom]);
     
     // [FIX] Enhanced plant generation logic with proper race condition handling and error recovery
     const runPlantGeneration = useCallback(async (angle: number) => {
-        log(`Starting plant generation for angle ${angle}`);
         setIsGeneratingPlants(true);
         
         try {
             // Increment generation ID to start a new generation, invalidating previous ones
             const generationId = ++currentGenerationIdRef.current;
-            log(`New generation started: ${generationId}`);
 
             // Clear previous markers immediately for better UX
             clearAllPlantMarkers();
@@ -890,40 +1245,49 @@ export default function InitialArea({
             // Generate new plant points with timeout protection
             const points = await Promise.race([
                 generatePlantPointsOriented(angle, generationId),
-                new Promise<PlantPoint[]>((_, reject) => 
+                new Promise<PlantPointArrayWithRealCount>((_, reject) => 
                     setTimeout(() => reject(new Error('Plant generation timeout')), 30000)
                 )
             ]);
             
             // Check if this is still the latest request before proceeding
             if (currentGenerationIdRef.current !== generationId) {
-                log(`Generation ${generationId} was cancelled, aborting`);
                 return;
             }
 
             // Validate generated points
             if (!Array.isArray(points) || points.length === 0) {
-                warn(`Generation ${generationId} produced no valid points`);
                 setPlantPoints([]);
+                setRealPlantPoints([]);
+                setRealPlantCount(0);
                 return;
             }
 
-            // Update plant points state
-            setPlantPoints(points);
+            // Extract real count if available
+            const realCount = (points as PlantPointArrayWithRealCount).__realCount || points.length;
+            setRealPlantCount(realCount);
+            
+            // Store the real plant points (all generated points)
+            const realPoints = (points as PlantPointArrayWithRealCount).__realPoints || points;
+            setRealPlantPoints(realPoints);
+            
+            // Apply hideAllPoints setting to get display points
+            if (hideAllPoints) {
+                setPlantPoints([]); // Hide all points
+            } else {
+                setPlantPoints(realPoints); // Show all real points
+            }
             
             // Create markers for the new points with batch processing
-            const markers = await createPlantMarkers(points, generationId);
+            const markers = await createPlantMarkers(realPoints, generationId);
             
             // Final check before rendering markers
             if (currentGenerationIdRef.current === generationId) {
                 plantPointMarkersRef.current = markers;
-                log(`Generation ${generationId} completed successfully with ${markers.length} markers`);
             } else {
-                log(`Generation ${generationId} was cancelled during marker creation, cleaning up`);
                 markers.forEach(m => m.setMap(null));
             }
         } catch (error) {
-            errorLog('Error generating plant points:', error);
             if (error instanceof Error && error.message === 'Plant generation timeout') {
                 alert(t('Plant generation took too long. Please try with a smaller area or different spacing.'));
             } else {
@@ -931,11 +1295,12 @@ export default function InitialArea({
             }
             // Clear any partial results
             setPlantPoints([]);
+            setRealPlantPoints([]);
             clearAllPlantMarkers();
         } finally {
             setIsGeneratingPlants(false);
         }
-    }, [generatePlantPointsOriented, createPlantMarkers, clearAllPlantMarkers, t]);
+    }, [generatePlantPointsOriented, createPlantMarkers, clearAllPlantMarkers, t, hideAllPoints]);
 
     // Handle plant point generation
     const handleGeneratePlantPoints = useCallback(async () => {
@@ -948,19 +1313,20 @@ export default function InitialArea({
 
     // [FIX] Enhanced clear plant points with proper cleanup
     const clearPlantPoints = useCallback(() => {
-        log('Clearing plant points...');
         
         // Increment generation ID to cancel any ongoing operations
         currentGenerationIdRef.current++;
         
         // Clear states
         setPlantPoints([]);
+        setRealPlantPoints([]);
+        setRealPlantCount(0);
         setRotationAngle(0);
+        setHideAllPoints(false);
         
         // Clear all markers
         clearAllPlantMarkers();
         
-        log('Plant points cleared successfully');
     }, [clearAllPlantMarkers]);
 
     // [FIX] Enhanced rotation change handler with proper throttling and cancellation
@@ -989,9 +1355,9 @@ export default function InitialArea({
         const primary = getCropByValue(selectedCrops[0]);
         if (!primary) return { perPlant: null as number | null, total: null as number | null };
         const perPlant = primary.waterRequirement; // liters/plant/day
-        const total = plantPoints.length * perPlant;
+        const total = realPlantCount * perPlant; // Use real plant count for accurate calculation
         return { perPlant, total };
-    }, [selectedCrops, plantPoints.length]);
+    }, [selectedCrops, realPlantCount]);
 
     // ===== OBSTACLE FUNCTIONS =====
     
@@ -1174,14 +1540,16 @@ export default function InitialArea({
 		})();
 		if (isReload) {
 				if (!currentStepParamPresent) {
-					log('Page reload detected - applying Reset behavior for Initial Area');
 					localStorage.removeItem('fieldCropData');
 					setMainArea([]);
 					setAreaRai(null);
 					setPerimeterMeters(null);
 					setIsMainAreaSet(false);
 					setPlantPoints([]);
+					setRealPlantPoints([]);
+					setRealPlantCount(0);
 					setRotationAngle(0);
+					setHideAllPoints(false);
 					setObstacles([]);
 					setRowSpacing({});
 					setPlantSpacing({});
@@ -1198,8 +1566,6 @@ export default function InitialArea({
 						});
 						setDistanceOverlaysByObstacle({});
 					}
-				} else {
-					log('Reload detected but currentStep present - skipping reset to preserve state');
 				}
 		}
 
@@ -1207,7 +1573,6 @@ export default function InitialArea({
 		const hasUrlParams = crops || completedSteps || mainAreaData || obstaclesData || plantPointsData || areaRaiData || perimeterMetersData || rotationAngleData || rowSpacingData || plantSpacingData || currentStepParamPresent;
 		
 		if (!hasUrlParams) {
-			log('Fresh page load detected - clearing localStorage');
 			// Only clear storage if not navigating within flow
 			if (!currentStepParamPresent) {
 				localStorage.removeItem('fieldCropData');
@@ -1218,7 +1583,10 @@ export default function InitialArea({
 			setPerimeterMeters(null);
 			setIsMainAreaSet(false);
 			setPlantPoints([]);
+			setRealPlantPoints([]);
+			setRealPlantCount(0);
 			setRotationAngle(0);
+			setHideAllPoints(false);
 			setObstacles([]);
 			setRowSpacing({});
 			setPlantSpacing({});
@@ -1279,7 +1647,6 @@ export default function InitialArea({
 				const fieldDataStr = localStorage.getItem('fieldCropData');
 				if (fieldDataStr) {
 					const fieldData = JSON.parse(fieldDataStr);
-					log('Loading field data from localStorage for back navigation:', fieldData);
 					
 					// Validate and load main area data
 					if (fieldData.mainArea && Array.isArray(fieldData.mainArea) && fieldData.mainArea.length >= 3) {
@@ -1297,8 +1664,6 @@ export default function InitialArea({
 						if (validMainArea.length >= 3) {
 							setMainArea(validMainArea);
 							setIsMainAreaSet(true);
-						} else {
-							warn('Invalid main area coordinates found, skipping');
 						}
 					}
 					
@@ -1324,8 +1689,6 @@ export default function InitialArea({
 						
 						if (validObstacles.length > 0) {
 							setObstacles(validObstacles);
-						} else {
-							warn('Invalid obstacles data found, skipping');
 						}
 					}
 					
@@ -1343,10 +1706,14 @@ export default function InitialArea({
 								pt.lng >= -180 && pt.lng <= 180;
 						}) as PlantPoint[];
 						
-						if (validPlantPoints.length > 0) {
-							setPlantPoints(validPlantPoints);
-						} else {
-							warn('Invalid plant points data found, skipping');
+                        if (validPlantPoints.length > 0) {
+                            // Extract real count and real points if available
+                            const realCount = extractRealCount(validPlantPoints);
+                            const realPoints = extractRealPoints(validPlantPoints);
+                            setRealPlantCount(realCount);
+                            setRealPlantPoints(realPoints);
+                            
+                            // Don't set plantPoints here - let the effect handle it based on density and hideAllPoints settings
 						}
 					}
 					
@@ -1361,6 +1728,10 @@ export default function InitialArea({
 					
 					if (fieldData.rotationAngle !== null && fieldData.rotationAngle !== undefined && !isNaN(fieldData.rotationAngle)) {
 						setRotationAngle(fieldData.rotationAngle);
+					}
+					
+					if (typeof fieldData.hideAllPoints === 'boolean') {
+						setHideAllPoints(fieldData.hideAllPoints);
 					}
 					
 					// Validate and load spacing data
@@ -1405,8 +1776,7 @@ export default function InitialArea({
 					
 					return;
 				}
-			} catch (e) {
-				errorLog('Error loading field data from localStorage:', e);
+			} catch {
 				// Clear corrupted data
 				localStorage.removeItem('fieldCropData');
 			}
@@ -1417,21 +1787,31 @@ export default function InitialArea({
 				const parsed = JSON.parse(mainAreaData);
 				setMainArea(parsed);
 				setIsMainAreaSet(true);
-			} catch (e) { errorLog('Error parsing mainAreaData:', e); }
+			} catch {
+				// Error parsing mainAreaData
+			}
 		}
 		
 		if (obstaclesData) {
 			try {
 				const parsed = JSON.parse(obstaclesData);
 				setObstacles(parsed);
-			} catch (e) { errorLog('Error parsing obstaclesData:', e); }
+			} catch {
+				// Error parsing obstaclesData
+			}
 		}
 		
 		if (plantPointsData) {
 			try {
 				const parsed = JSON.parse(plantPointsData);
 				setPlantPoints(parsed);
-			} catch (e) { errorLog('Error parsing plantPointsData:', e); }
+				
+				// Extract real count if available, otherwise use displayed count
+				const realCount = extractRealCount(parsed);
+				setRealPlantCount(realCount);
+			} catch {
+				// Error parsing plantPointsData
+			}
 		}
 		
 		if (areaRaiData) { setAreaRai(parseFloat(areaRaiData)); }
@@ -1442,14 +1822,18 @@ export default function InitialArea({
 			try {
 				const parsed = JSON.parse(rowSpacingData);
 				setRowSpacing(parsed);
-			} catch (e) { errorLog('Error parsing rowSpacingData:', e); }
+			} catch {
+				// Error parsing rowSpacingData
+			}
 		}
 		
 		if (plantSpacingData) {
 			try {
 				const parsed = JSON.parse(plantSpacingData);
 				setPlantSpacing(parsed);
-			} catch (e) { errorLog('Error parsing plantSpacingData:', e); }
+			} catch {
+				// Error parsing plantSpacingData
+			}
 		}
 	}, [crops, completedSteps, mainAreaData, obstaclesData, plantPointsData, areaRaiData, perimeterMetersData, rotationAngleData, rowSpacingData, plantSpacingData, map, clearAllPlantMarkers]);
 
@@ -1546,12 +1930,13 @@ export default function InitialArea({
         setMap(loadedMap);
         listenersRef.current.push(
             loadedMap.addListener('zoom_changed', () => {
-                setMapZoom(loadedMap.getZoom() || 16);
+                const newZoom = loadedMap.getZoom() || 16;
+                setMapZoom(newZoom);
+                
             })
         );
         
         if (!window.google?.maps?.drawing) {
-            console.error("Google Maps Drawing library not available.");
             alert("Drawing tools could not be loaded. Please refresh the page.");
             return;
         }
@@ -1605,6 +1990,7 @@ export default function InitialArea({
                 editable: isEditable,
                 draggable: false, 
                 clickable: true,
+                zIndex: 1000,
             });
             styledPolygon.setMap(loadedMap);
 
@@ -1684,8 +2070,8 @@ export default function InitialArea({
                                 return d > thresholdMeters;
                             });
                         });
-                    } catch (e) {
-                        console.warn('Failed to remove overlapped plant points:', e);
+                    } catch {
+                        // Error removing overlapped plant points
                     }
                     computeAreaAndPerimeter(mainAreaRef.current, []);
                 } else {
@@ -1756,8 +2142,8 @@ export default function InitialArea({
                                 return d > thresholdMeters;
                             });
                         });
-                    } catch (e) {
-                        console.warn('Failed to remove overlapped plant points:', e);
+                    } catch {
+                        // Error removing overlapped plant points
                     }
                     computeAreaAndPerimeter(mainAreaRef.current, []);
                 } else {
@@ -1820,8 +2206,8 @@ export default function InitialArea({
                                 return d > thresholdMeters;
                             });
                         });
-                    } catch (e) {
-                        console.warn('Failed to remove overlapped plant points:', e);
+                    } catch {
+                        // Error removing overlapped plant points
                     }
                     computeAreaAndPerimeter(mainAreaRef.current, []);
                 } else {
@@ -1935,13 +2321,11 @@ export default function InitialArea({
     }, [computeAreaAndPerimeter]);
 
     const handleBackToCropSelection = () => {
-        log('Going back to choose-crop - clearing localStorage');
         localStorage.removeItem('fieldCropData');
         router.get('/choose-crop', { crops: selectedCrops.join(',') });
     };
 
     const handleBack = () => {
-        log('Going back to previous step - preserving data');
         // Don't clear localStorage when going back to previous step
         // The data should be preserved for navigation between steps
         router.get('/choose-crop', { crops: selectedCrops.join(',') });
@@ -1960,12 +2344,20 @@ export default function InitialArea({
             const fieldData = {
                 mainArea: mainArea.length >= 3 ? mainArea : [],
                 obstacles: obstacles.filter(obs => obs.coordinates.length >= 3),
-                plantPoints: plantPoints.filter(point => 
-                    point && typeof point.lat === 'number' && typeof point.lng === 'number' && !isNaN(point.lat) && !isNaN(point.lng)
-                ),
+                plantPoints: (() => {
+                    // Always save the real plant points, not the display points
+                    const filteredPoints = realPlantPoints.filter(point => 
+                        point && typeof point.lat === 'number' && typeof point.lng === 'number' && !isNaN(point.lat) && !isNaN(point.lng)
+                    );
+                    // Preserve real count and real points in the plant points data
+                    (filteredPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
+                    (filteredPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
+                    return filteredPoints;
+                })(),
                 areaRai: typeof areaRai === 'number' && !isNaN(areaRai) ? areaRai : null,
                 perimeterMeters: typeof perimeterMeters === 'number' && !isNaN(perimeterMeters) ? perimeterMeters : null,
                 rotationAngle: typeof rotationAngle === 'number' && !isNaN(rotationAngle) ? rotationAngle : 0,
+                hideAllPoints: hideAllPoints,
                 rowSpacing: Object.fromEntries(
                     Object.entries(rowSpacing).filter(([, value]) => typeof value === 'number' && !isNaN(value) && value > 0)
                 ),
@@ -1978,9 +2370,9 @@ export default function InitialArea({
                 } : { lat: 13.7563, lng: 100.5018 },
                 mapZoom: map ? Math.max(1, Math.min(22, map.getZoom() || 16)) : 16
             };
-            localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
-        } catch (e) {
-            errorLog('Error saving field data before navigation:', e);
+            safeSetItem('fieldCropData', fieldData);
+        } catch {
+            // Error saving field data before navigation
         }
 
         const params = {
@@ -1993,7 +2385,7 @@ export default function InitialArea({
 
     const handleContinue = () => {
         // Enforce: 1) main area set, 2) at least one water source, 3) generated plant points
-        if (mainArea.length < 3 || !hasWaterSource || plantCount === 0) {
+        if (mainArea.length < 3 || !hasWaterSource || realPlantCount === 0) {
             alert(t('Please set main area, add a water source, and generate plant points before continuing'));
             return;
         }
@@ -2004,13 +2396,20 @@ export default function InitialArea({
         const fieldData = {
             mainArea: mainArea.length >= 3 ? mainArea : [],
             obstacles: obstacles.filter(obs => obs.coordinates.length >= 3),
-            plantPoints: plantPoints.filter(point => 
-                point && 
-                typeof point.lat === 'number' && 
-                typeof point.lng === 'number' && 
-                !isNaN(point.lat) && 
-                !isNaN(point.lng)
-            ),
+            plantPoints: (() => {
+                // Always save the real plant points, not the display points
+                const filteredPoints = realPlantPoints.filter(point => 
+                    point && 
+                    typeof point.lat === 'number' && 
+                    typeof point.lng === 'number' && 
+                    !isNaN(point.lat) && 
+                    !isNaN(point.lng)
+                );
+                // Preserve real count and real points in the plant points data
+                (filteredPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
+                (filteredPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
+                return filteredPoints;
+            })(),
             areaRai: typeof areaRai === 'number' && !isNaN(areaRai) ? areaRai : null,
             perimeterMeters: typeof perimeterMeters === 'number' && !isNaN(perimeterMeters) ? perimeterMeters : null,
             rotationAngle: typeof rotationAngle === 'number' && !isNaN(rotationAngle) ? rotationAngle : 0,
@@ -2032,11 +2431,164 @@ export default function InitialArea({
         };
         
         try {
-            localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
-            log('Field data saved successfully:', fieldData);
-        } catch (error) {
-            errorLog('Error saving field data to localStorage:', error);
-            // Continue without saving if localStorage fails
+            // Check data size before saving
+            const dataString = JSON.stringify(fieldData);
+            const dataSizeKB = new Blob([dataString]).size / 1024;
+            
+            if (dataSizeKB > 5000) { // 5MB limit
+                
+                // Optimize data by reducing precision and removing unnecessary data
+                const optimizedPlantPoints = fieldData.plantPoints.map(point => ({
+                    lat: Math.round(point.lat * 1000000) / 1000000, // 6 decimal places
+                    lng: Math.round(point.lng * 1000000) / 1000000,
+                    cropType: point.cropType,
+                    isValid: point.isValid
+                }));
+                // Preserve real count and real points in optimized data
+                (optimizedPlantPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
+                (optimizedPlantPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
+                
+                const optimizedData = {
+                    ...fieldData,
+                    plantPoints: optimizedPlantPoints,
+                    mainArea: fieldData.mainArea.map(coord => ({
+                        lat: Math.round(coord.lat * 1000000) / 1000000,
+                        lng: Math.round(coord.lng * 1000000) / 1000000
+                    })),
+                    obstacles: fieldData.obstacles.map(obs => ({
+                        ...obs,
+                        coordinates: obs.coordinates.map(coord => ({
+                            lat: Math.round(coord.lat * 1000000) / 1000000,
+                            lng: Math.round(coord.lng * 1000000) / 1000000
+                        }))
+                    }))
+                };
+                
+                const optimizedString = JSON.stringify(optimizedData);
+                const optimizedSizeKB = new Blob([optimizedString]).size / 1024;
+                
+                if (optimizedSizeKB > 5000) {
+                    // Further optimize by reducing plant points precision and removing some data
+                    const furtherOptimizedPlantPoints = optimizedData.plantPoints.map(point => ({
+                        lat: Math.round(point.lat * 100000) / 100000, // 5 decimal places
+                        lng: Math.round(point.lng * 100000) / 100000,
+                        cropType: point.cropType,
+                        isValid: point.isValid
+                    }));
+                    // Preserve real count and real points in further optimized data
+                    (furtherOptimizedPlantPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
+                    (furtherOptimizedPlantPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
+                    
+                    const furtherOptimizedData = {
+                        ...optimizedData,
+                        plantPoints: furtherOptimizedPlantPoints
+                    };
+                    
+                    const furtherOptimizedString = JSON.stringify(furtherOptimizedData);
+                    const furtherOptimizedSizeKB = new Blob([furtherOptimizedString]).size / 1024;
+                    
+                    if (furtherOptimizedSizeKB > 5000) {
+                        // Sample plant points to reduce size (keep every 2nd point)
+                        const sampledPlantPoints = furtherOptimizedData.plantPoints.filter((_, index) => index % 2 === 0);
+                        // Preserve real count and real points in sampled data
+                        (sampledPlantPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
+                        (sampledPlantPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
+                        const finalData = {
+                            ...furtherOptimizedData,
+                            plantPoints: sampledPlantPoints
+                        };
+                        safeSetItem('fieldCropData', finalData);
+                    } else {
+                        localStorage.setItem('fieldCropData', furtherOptimizedString);
+                    }
+                } else {
+                    localStorage.setItem('fieldCropData', optimizedString);
+                }
+            } else {
+                localStorage.setItem('fieldCropData', dataString);
+            }
+        } catch {
+            // Error saving field data to localStorage
+            
+            // Try to save minimal data as fallback
+            try {
+                // Try to save with optimized plant points first
+                const optimizedPlantPoints = fieldData.plantPoints.map(point => ({
+                    lat: Math.round(point.lat * 100000) / 100000, // 5 decimal places
+                    lng: Math.round(point.lng * 100000) / 100000,
+                    cropType: point.cropType,
+                    isValid: point.isValid
+                }));
+                // Preserve real count and real points in fallback optimized data
+                (optimizedPlantPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
+                (optimizedPlantPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
+                
+                const minimalData = {
+                    mainArea: fieldData.mainArea.map(coord => ({
+                        lat: Math.round(coord.lat * 100000) / 100000,
+                        lng: Math.round(coord.lng * 100000) / 100000
+                    })),
+                    obstacles: fieldData.obstacles.map(obs => ({
+                        ...obs,
+                        coordinates: obs.coordinates.map(coord => ({
+                            lat: Math.round(coord.lat * 100000) / 100000,
+                            lng: Math.round(coord.lng * 100000) / 100000
+                        }))
+                    })),
+                    areaRai: fieldData.areaRai,
+                    perimeterMeters: fieldData.perimeterMeters,
+                    rotationAngle: fieldData.rotationAngle,
+                    rowSpacing: fieldData.rowSpacing,
+                    plantSpacing: fieldData.plantSpacing,
+                    mapCenter: fieldData.mapCenter,
+                    mapZoom: fieldData.mapZoom,
+                    plantPoints: optimizedPlantPoints // Keep optimized plant points
+                };
+                safeSetItem('fieldCropData', minimalData);
+            } catch {
+                // Failed to save even minimal data
+                // Clear localStorage and try again
+                try {
+                    localStorage.clear();
+                    // Try with heavily optimized plant points
+                    const heavilyOptimizedPlantPoints = fieldData.plantPoints
+                        .filter((_, index) => index % 4 === 0) // Keep every 4th point
+                        .map(point => ({
+                            lat: Math.round(point.lat * 10000) / 10000, // 4 decimal places
+                            lng: Math.round(point.lng * 10000) / 10000,
+                            cropType: point.cropType,
+                            isValid: point.isValid
+                        }));
+                    // Preserve real count and real points in heavily optimized data
+                    (heavilyOptimizedPlantPoints as PlantPointArrayWithRealCount).__realCount = realPlantCount;
+                    (heavilyOptimizedPlantPoints as PlantPointArrayWithRealCount).__realPoints = realPlantPoints;
+                    
+                    const minimalData = {
+                        mainArea: fieldData.mainArea.map(coord => ({
+                            lat: Math.round(coord.lat * 100000) / 100000,
+                            lng: Math.round(coord.lng * 100000) / 100000
+                        })),
+                        obstacles: fieldData.obstacles.map(obs => ({
+                            ...obs,
+                            coordinates: obs.coordinates.map(coord => ({
+                                lat: Math.round(coord.lat * 100000) / 100000,
+                                lng: Math.round(coord.lng * 100000) / 100000
+                            }))
+                        })),
+                        areaRai: fieldData.areaRai,
+                        perimeterMeters: fieldData.perimeterMeters,
+                        rotationAngle: fieldData.rotationAngle,
+                        rowSpacing: fieldData.rowSpacing,
+                        plantSpacing: fieldData.plantSpacing,
+                        mapCenter: fieldData.mapCenter,
+                        mapZoom: fieldData.mapZoom,
+                        plantPoints: heavilyOptimizedPlantPoints // Keep heavily optimized plant points
+                    };
+                    safeSetItem('fieldCropData', minimalData);
+                } catch {
+                    // Failed to clear localStorage
+                }
+            }
         }
         
         const params = {
@@ -2044,7 +2596,6 @@ export default function InitialArea({
             currentStep: 2,
             completedSteps: toCompletedStepsCsv(newCompleted)
         };
-        log('Sending data to irrigation-generate:', params);
         router.get('/step2-irrigation-system', params);
     };
 
@@ -2062,7 +2613,6 @@ export default function InitialArea({
         return 'disabled';
     };
     
-    const plantCount = useMemo(() => plantPoints.length, [plantPoints]);
     const obstacleCount = useMemo(() => obstacles.length, [obstacles]);
     const hasWaterSource = useMemo(() => obstacles.some(o => o.type === 'water_source'), [obstacles]);
 
@@ -2138,11 +2688,16 @@ export default function InitialArea({
                                         <div className="rounded-lg p-4 border border-white">
                                             <h3 className="text-sm font-semibold text-white mb-3">{t('Selected Crops')}</h3>
                                             <div className="flex flex-wrap gap-2">
-                                                {selectedCrops.map((crop, idx) => (
-                                                    <span key={idx} className="bg-blue-600 text-white px-2 py-1 rounded text-xs">
-                                                        {getTranslatedCropByValue(crop, language as 'en' | 'th')?.name || crop}
-                                                    </span>
-                                                ))}
+                                                {selectedCrops.map((crop, idx) => {
+                                                    const cropData = getCropByValue(crop);
+                                                    const translatedCrop = getTranslatedCropByValue(crop, language as 'en' | 'th');
+                                                    return (
+                                                        <span key={idx} className="bg-blue-600 text-white px-3 py-1 rounded text-xs border border-white flex items-center gap-1">
+                                                            <span className="text-sm">{cropData?.icon || '🌱'}</span>
+                                                            <span>{translatedCrop?.name || crop}</span>
+                                                        </span>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -2313,21 +2868,29 @@ export default function InitialArea({
                                         <div className="space-y-3">
                                             <div className="flex gap-2">
                                                 <button onClick={handleGeneratePlantPoints} disabled={isGeneratingPlants || !isMainAreaSet} className="flex-1 bg-green-600 text-white px-3 py-2 rounded text-xs hover:bg-green-700 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">{isGeneratingPlants ? t('Generating...') : t('Generate Plants')}</button>
-                                                {plantCount > 0 && (<button onClick={clearPlantPoints} className="bg-red-600 text-white px-3 py-2 rounded text-xs hover:bg-red-700 transition-colors">{t('Clear')}</button>)}
+                                                {realPlantCount > 0 && (<button onClick={clearPlantPoints} className="bg-red-600 text-white px-3 py-2 rounded text-xs hover:bg-red-700 transition-colors">{t('Clear')}</button>)}
                                             </div>
                                             {!isMainAreaSet && (
                                                 <div className="text-xs text-orange-300 bg-orange-900 bg-opacity-30 p-2 rounded">🔒 {t('Please set main area before generating plants')}</div>
                                             )}
-                                            <div className="flex items-center justify-between text-xs"><span className="text-gray-400">{t('Generated Points')}:</span><span className="text-green-300">{plantCount}</span></div>
+                                            <div className="flex items-center justify-between text-xs"><span className="text-gray-400">{t('Total Plant Points')}:</span><span className="text-green-300">{realPlantCount}</span></div>
+                                            {realPlantCount > 0 && (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between text-xs">
+                                                        <span className="text-gray-400">{t('Points Display')}:</span>
+                                                        <span className="text-blue-300">{hideAllPoints ? '0' : plantPoints.length} {t('points shown')}</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                             {waterRequirementInfo.total !== null && (<div className="text-xs text-blue-300 bg-blue-900 bg-opacity-30 p-2 rounded">💧 {t('Total Water Requirement')}: {waterRequirementInfo.total?.toFixed(2)} {t('ลิตร/ครั้ง')}</div>)}
-                                            {plantCount > 0 && (
+                                            {realPlantCount > 0 && (
                                                 <div className="space-y-2">
                                                     <div className="flex items-center justify-between text-xs"><span className="text-gray-400">{t('Rotate Plants')}:</span><span className="text-yellow-300">{rotationAngle.toFixed(0)}°</span></div>
                                                     <input type="range" min={-180} max={180} step={1} value={rotationAngle} onChange={(e) => handleRotationChange(parseInt(e.target.value))} className="w-full" />
                                                 </div>
                                             )}
-                                            {plantCount > 0 && (<div className="text-xs text-blue-300 bg-blue-900 bg-opacity-30 p-2 rounded">💡 {t('Points are placed with 30% buffer from edges for optimal growth')}</div>)}
-                                            {plantCount === 0 && (<div className="text-xs text-green-300 bg-green-900 bg-opacity-30 p-2 rounded">🌱 {t('Generate optimal planting positions based on your crop spacing settings')}</div>)}
+                                            {realPlantCount > 0 && (<div className="text-xs text-blue-300 bg-blue-900 bg-opacity-30 p-2 rounded">💡 {t('Points are placed with 30% buffer from edges for optimal growth')}</div>)}
+                                            {realPlantCount === 0 && (<div className="text-xs text-green-300 bg-green-900 bg-opacity-30 p-2 rounded">🌱 {t('Generate optimal planting positions based on your crop spacing settings')}</div>)}
                                         </div>
                                     </div>
                                 </div>
@@ -2338,9 +2901,8 @@ export default function InitialArea({
 								<div className="flex gap-2">
 									<button onClick={handleBack} className="flex-1 px-4 py-2 bg-gray-600 text-white rounded text-sm hover:bg-gray-500 transition-colors">{t('Back')}</button>
 									<button onClick={() => {
-                                            log('Resetting initial area - clearing drawn areas but keeping crops');
                                             setMainArea([]); setAreaRai(null); setPerimeterMeters(null);
-                                            setIsMainAreaSet(false); setPlantPoints([]); setRotationAngle(0);
+                                            setIsMainAreaSet(false); setPlantPoints([]); setRealPlantPoints([]); setRealPlantCount(0); setRotationAngle(0); setHideAllPoints(false);
                                             setObstacles([]); setRowSpacing({}); setPlantSpacing({});
                                             setMapCenter([13.7563, 100.5018]); setMapZoom(16);
                                             if (map) {
@@ -2357,7 +2919,7 @@ export default function InitialArea({
                                         }} className="flex-1 px-4 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-500 transition-colors">
 										{t('Reset')}
 									</button>
-                                    <button onClick={handleContinue} disabled={mainArea.length < 3 || !hasWaterSource || plantCount === 0} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">{t('Next')}</button>
+                                    <button onClick={handleContinue} disabled={mainArea.length < 3 || !hasWaterSource || realPlantCount === 0} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed">{t('Next')}</button>
                                 </div>
                             </div>
                         </div>
@@ -2365,7 +2927,7 @@ export default function InitialArea({
                         {/* Right Side - Google Map */}
                         <div className="flex-1 relative">
                             <div className="absolute inset-0 border border-white" style={{ backgroundColor: '#000005' }}>
-                                <HorticultureMapComponent center={mapCenter} zoom={mapZoom} onMapLoad={handleMapLoad} mapOptions={{ maxZoom: 22 }} >
+                                <HorticultureMapComponent center={mapCenter} zoom={mapZoom} onMapLoad={handleMapLoad} mapOptions={{ maxZoom: 22, fullscreenControl: true }} >
                                     <EnhancedHorticultureSearchControl onPlaceSelect={handleSearch} placeholder="🔍 ค้นหาสถานที่..." />
                                     <HorticultureDrawingManager editMode={null} onCreated={handleDrawingComplete} isEditModeEnabled={true} mainArea={mainArea} />
 
@@ -2407,7 +2969,97 @@ export default function InitialArea({
                                         </div>
                                     </div>
                                 )}
-                                <div className="absolute bottom-4 right-20 z-10 pointer-events-none"><div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white">{t('Zoom Level')}: {mapZoom}</div></div>
+                                <div className="absolute top-2.5 right-16 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-3 text-xs">
+                                    <div className="text-white flex gap-2">
+                                        <span>Lat: {mapCenter[0].toFixed(4)}</span>
+                                        <span>Lng: {mapCenter[1].toFixed(4)}</span>
+                                    </div>
+                                </div>
+                                
+                                {/* Hide/Show Points Button */}
+                                {realPlantCount > 0 && (
+                                    <div className="absolute top-2.5 right-60 z-10">
+                                        <button 
+                                            onClick={() => {
+                                                const newHideState = !hideAllPoints;
+                                                setHideAllPoints(newHideState);
+                                                
+                                                // Save the new state to localStorage immediately
+                                                try {
+                                                    const existingData = localStorage.getItem('fieldCropData');
+                                                    if (existingData) {
+                                                        const fieldData = JSON.parse(existingData) as Record<string, unknown>;
+                                                        const updatedData = {
+                                                            ...fieldData,
+                                                            hideAllPoints: newHideState
+                                                        };
+                                                        // Use safeSetItem to ensure consistency with irrigation-generate.tsx
+                                                        safeSetItem('fieldCropData', updatedData);
+                                                    }
+                                                } catch (error) {
+                                                    console.error('Error saving hideAllPoints state:', error);
+                                                }
+                                            }}
+                                            className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
+                                                hideAllPoints 
+                                                    ? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
+                                                    : 'bg-green-600 text-white border-green-500 hover:bg-green-500'
+                                            }`}
+                                            title={hideAllPoints ? t('Show All Points') : t('Hide All Points')}
+                                        >
+                                            {hideAllPoints ? (
+                                                <div className="flex items-center gap-1">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                    {t('Show')}
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-1">
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                                                    </svg>
+                                                    {t('Hide')}
+                                                </div>
+                                            )}
+                                        </button>
+                                    </div>
+                                )}
+                                <div className="absolute bottom-4 right-20 z-10 pointer-events-none">
+                                    <div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
+                                        {t('Zoom Level')}: {mapZoom}
+                                    </div>
+                                    {plantPoints.length > 0 && (
+                                        <div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
+                                            {t('Points')}: {plantPoints.length.toLocaleString()} / {realPlantCount.toLocaleString()}
+                                            {realPlantCount > plantPoints.length && (
+                                                <span className="text-yellow-300 ml-1">
+                                                    ({Math.round((1 - plantPoints.length / realPlantCount) * 100)}% {t('reduced')})
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                    {plantPoints.length > 0 && realPlantCount >= 800 && (
+                                        <div className="px-2 py-1 rounded bg-blue-900 bg-opacity-70 border border-blue-500 text-xs text-white mb-1">
+                                            {mapZoom >= 20 && <span className="text-green-300">{t('All points visible')}</span>}
+                                            {mapZoom >= 19 && mapZoom < 20 && <span className="text-yellow-300">{t('25% reduction')}</span>}
+                                            {mapZoom >= 18 && mapZoom < 19 && <span className="text-orange-300">{t('50% reduction')}</span>}
+                                            {mapZoom >= 17 && mapZoom < 18 && <span className="text-red-300">{t('75% reduction')}</span>}
+                                            {mapZoom < 17 && <span className="text-red-500">{t('Maximum reduction')}</span>}
+                                        </div>
+                                    )}
+                                    {plantPoints.length > 0 && (
+                                        <div className="px-2 py-1 rounded bg-green-900 bg-opacity-70 border border-green-500 text-xs text-white">
+                                            <div>{plantPoints.length} {t('points')} {t('visible')}</div>
+                                            {realPlantCount > plantPoints.length && (
+                                                <div className="text-yellow-200 text-xs">
+                                                    {t('Performance optimized')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                                 {isDrawingObstacle && (
                                     <div className="absolute left-4 bottom-4 z-10 bg-purple-900 bg-opacity-90 rounded-lg border border-purple-500 p-3 shadow-lg pointer-events-none">
                                         <div className="text-sm text-white text-center">

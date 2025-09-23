@@ -5,21 +5,22 @@ import { useLanguage } from '../contexts/LanguageContext'; // Import useLanguage
 // ==================== CHAIYO AI CONFIGURATION ====================
 const CHAIYO_AI_CONFIG = {
     API_KEY: 'AIzaSyDVt3FE4zDPWsvJnl-zHe9ypheZPduRrmc', // ใส่ Gemini API key ของคุณที่นี่
-    API_URL: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
+    API_URL:
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
     COMPANY_KNOWLEDGE: {
         chaiyo_pipe_fitting: {
             name: 'บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด',
             founded: '2551 (17 ปี)',
             capital: '35,000,000 บาท',
-            specializes: 'ผลิตภัณฑ์พลาสติกเพื่อการเกษตร'
+            specializes: 'ผลิตภัณฑ์พลาสติกเพื่อการเกษตร',
         },
         kanok_product: {
             name: 'บริษัท กนกส์โปรดัก จำกัด',
             founded: '2541 (27 ปี)',
             specializes: 'ระบบน้ำเพื่อการเกษตรและชลประทาน',
-            products: '6,000+ รายการ'
-        }
-    }
+            products: '6,000+ รายการ',
+        },
+    },
 };
 
 // Define proper types for the component
@@ -46,13 +47,9 @@ interface QuickSuggestion {
 
 // Enhanced ChaiyoAI Icon with company theme
 const ChaiyoAiIcon = () => (
-    <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-lg ring-2 ring-white ring-opacity-30 animate-pulse relative">
-        <img
-            className="h-5 w-5 rounded-full"
-            src="/images/chaiyo-logo.png"
-            alt="ChaiyoAI"
-        />
-        <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-500 rounded-full animate-ping"></div>
+    <div className="relative flex h-6 w-6 flex-shrink-0 animate-pulse items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-lg ring-2 ring-white ring-opacity-30">
+        <img className="h-5 w-5 rounded-full" src="/images/chaiyo-logo.png" alt="ChaiyoAI" />
+        <div className="absolute -right-0.5 -top-0.5 h-2 w-2 animate-ping rounded-full bg-blue-500"></div>
     </div>
 );
 
@@ -84,29 +81,39 @@ const TypingIndicator = () => {
                     style={{ animationDelay: '0.2s' }}
                 ></div>
             </div>
-            <span className="text-xs font-medium text-gray-600">{t('ChaiyoAI กำลังวิเคราะห์...')}</span>
+            <span className="text-xs font-medium text-gray-600">
+                {t('ChaiyoAI กำลังวิเคราะห์...')}
+            </span>
         </div>
     );
 };
 
 // Enhanced Quick Suggestions with company focus
-const QuickSuggestions = ({ onSuggestionSelect }: { onSuggestionSelect: (suggestion: string) => void }) => {
+const QuickSuggestions = ({
+    onSuggestionSelect,
+}: {
+    onSuggestionSelect: (suggestion: string) => void;
+}) => {
     const { t } = useLanguage();
     const suggestions: QuickSuggestion[] = [
         // Company Information
         { icon: '🏢', query: `${t('บริษัทไชโยมีประวัติอย่างไร?')}`, category: 'company' },
-        { icon: '📋', query: `${t('ผลิตภัณฑ์หลักของบริษัทกนกส์โปรดักคืออะไร?')}`, category: 'company' },
+        {
+            icon: '📋',
+            query: `${t('ผลิตภัณฑ์หลักของบริษัทกนกส์โปรดักคืออะไร?')}`,
+            category: 'company',
+        },
         { icon: '📞', query: `${t('ติดต่อบริษัทไชโยได้อย่างไร?')}`, category: 'company' },
-        
+
         // Products
         { icon: '🔧', query: `${t('ท่อ PVC และข้อต่อมีแบบไหนบ้าง?')}`, category: 'products' },
         { icon: '💧', query: `${t('ระบบน้ำหยดทำงานอย่างไร?')}`, category: 'products' },
         { icon: '🌿', query: `${t('แบรนด์ RED HAND คืออะไร?')}`, category: 'products' },
-        
+
         // Irrigation
         { icon: '💦', query: `${t('วิธีคำนวณปริมาณน้ำที่พืชต้องการ')}`, category: 'irrigation' },
         { icon: '🌱', query: `${t('ระบบชลประทานสำหรับสวนขนาดเล็ก')}`, category: 'irrigation' },
-        
+
         // General
         { icon: '⏰', query: `${t('กำหนดเวลาให้น้ำที่เหมาะสม')}`, category: 'general' },
         { icon: '🛠️', query: `${t('แก้ปัญหาระบบน้ำเบื้องต้น')}`, category: 'general' },
@@ -117,37 +124,40 @@ const QuickSuggestions = ({ onSuggestionSelect }: { onSuggestionSelect: (suggest
             <p className="mb-2 text-center text-xs font-medium text-gray-600">
                 🌿 ChaiyoAI พร้อมตอบคำถามเกี่ยวกับ:
             </p>
-            <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto">
+            <div className="grid max-h-48 grid-cols-2 gap-1.5 overflow-y-auto">
                 {suggestions.map((suggestion, index) => (
                     <button
                         key={index}
                         onClick={() => onSuggestionSelect(suggestion.query)}
-                        className={`group flex items-center space-x-1.5 rounded-lg border p-1.5 text-xs transition-all duration-200 hover:shadow-md transform hover:scale-105 ${
-                            suggestion.category === 'company' 
+                        className={`group flex transform items-center space-x-1.5 rounded-lg border p-1.5 text-xs transition-all duration-200 hover:scale-105 hover:shadow-md ${
+                            suggestion.category === 'company'
                                 ? 'border-blue-200 bg-blue-50 hover:border-blue-300 hover:shadow-blue-100'
                                 : suggestion.category === 'products'
-                                ? 'border-purple-200 bg-purple-50 hover:border-purple-300 hover:shadow-purple-100'
-                                : suggestion.category === 'irrigation'
-                                ? 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:shadow-emerald-100'
-                                : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-gray-100'
+                                  ? 'border-purple-200 bg-purple-50 hover:border-purple-300 hover:shadow-purple-100'
+                                  : suggestion.category === 'irrigation'
+                                    ? 'border-emerald-200 bg-emerald-50 hover:border-emerald-300 hover:shadow-emerald-100'
+                                    : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-gray-100'
                         }`}
                         title={`หมวด: ${suggestion.category}`}
                     >
                         <span className="text-sm transition-transform group-hover:scale-110 group-hover:animate-pulse">
                             {suggestion.icon}
                         </span>
-                        <span className="text-xs font-medium text-gray-700 leading-tight">
+                        <span className="text-xs font-medium leading-tight text-gray-700">
                             {suggestion.query}
                         </span>
                     </button>
                 ))}
             </div>
-            
+
             {/* Company Info Footer */}
-            <div className="mt-2 pt-2 border-t border-emerald-200">
-                <div className="flex justify-between items-center text-xs text-gray-500">
+            <div className="mt-2 border-t border-emerald-200 pt-2">
+                <div className="flex items-center justify-between text-xs text-gray-500">
                     <span className="flex items-center">
-                        🏢 <span className="ml-1 font-semibold text-emerald-600">ไชโย & กนกส์โปรดัก</span>
+                        🏢{' '}
+                        <span className="ml-1 font-semibold text-emerald-600">
+                            ไชโย & กนกส์โปรดัก
+                        </span>
                     </span>
                     <span className="flex items-center">
                         📞 <span className="ml-1">02-451-1111</span>
@@ -160,13 +170,12 @@ const QuickSuggestions = ({ onSuggestionSelect }: { onSuggestionSelect: (suggest
 
 // Company branding particles
 const CompanyParticles = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {[...Array(8)].map((_, i) => (
             <div
                 key={i}
-                className={`absolute w-1 h-1 rounded-full animate-float opacity-30 ${
-                    i % 3 === 0 ? 'bg-emerald-300' : 
-                    i % 3 === 1 ? 'bg-blue-300' : 'bg-green-300'
+                className={`animate-float absolute h-1 w-1 rounded-full opacity-30 ${
+                    i % 3 === 0 ? 'bg-emerald-300' : i % 3 === 1 ? 'bg-blue-300' : 'bg-green-300'
                 }`}
                 style={{
                     left: `${10 + i * 12}%`,
@@ -179,16 +188,16 @@ const CompanyParticles = () => (
 );
 
 // Main Component
-const FloatingAiChat = ({ 
-    isOpen, 
-    onClose, 
-    onMinimize, 
-    isMinimized 
-}: { 
-    isOpen: boolean; 
-    onClose: () => void; 
-    onMinimize: () => void; 
-    isMinimized: boolean; 
+const FloatingAiChat = ({
+    isOpen,
+    onClose,
+    onMinimize,
+    isMinimized,
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    onMinimize: () => void;
+    isMinimized: boolean;
 }) => {
     const [message, setMessage] = useState('');
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -204,11 +213,11 @@ const FloatingAiChat = ({
             const windowHeight = window.innerHeight;
             const chatWidth = isMinimized ? 256 : 384; // w-64 = 256px, w-96 = 384px
             const chatHeight = isMinimized ? 56 : 512; // h-14 = 56px, h-[32rem] = 512px
-            
+
             // Calculate center position
             const centerX = Math.max(0, (windowWidth - chatWidth) / 2);
             const centerY = Math.max(0, (windowHeight - chatHeight) / 2);
-            
+
             setPosition({
                 x: centerX,
                 y: centerY,
@@ -251,7 +260,7 @@ const FloatingAiChat = ({
                 y: e.clientY - rect.top,
             });
         }
-        
+
         // Prevent text selection during drag
         e.preventDefault();
         document.body.style.userSelect = 'none';
@@ -266,11 +275,11 @@ const FloatingAiChat = ({
         // Get current window dimensions
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
-        
+
         // Component dimensions - use actual values
         const componentWidth = isMinimized ? 256 : 384;
         const componentHeight = isMinimized ? 56 : 512;
-        
+
         // Calculate boundaries - ensure component stays fully visible
         const minX = 0;
         const minY = 0;
@@ -308,17 +317,17 @@ const FloatingAiChat = ({
     useEffect(() => {
         const handleResize = () => {
             if (!isOpen) return;
-            
+
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
             const componentWidth = isMinimized ? 256 : 384;
             const componentHeight = isMinimized ? 56 : 512;
-            
+
             // Ensure component stays within bounds after resize
             const maxX = windowWidth - componentWidth;
             const maxY = windowHeight - componentHeight;
-            
-            setPosition(prevPosition => ({
+
+            setPosition((prevPosition) => ({
                 x: Math.max(0, Math.min(prevPosition.x, maxX)),
                 y: Math.max(0, Math.min(prevPosition.y, maxY)),
             }));
@@ -411,67 +420,75 @@ const FloatingAiChat = ({
 - มีบุคลิกเป็นมิตร น่าเชื่อถือ และมืออาชีพ`;
 
             // สร้าง conversation history สำหรับ context
-            const conversationText = updatedHistory.map(msg => 
-                `${msg.role === 'user' ? 'ผู้ใช้' : 'ChaiyoAI'}: ${msg.content}`
-            ).join('\n\n');
+            const conversationText = updatedHistory
+                .map((msg) => `${msg.role === 'user' ? 'ผู้ใช้' : 'ChaiyoAI'}: ${msg.content}`)
+                .join('\n\n');
 
             const fullPrompt = `${systemPrompt}\n\nบทสนทนา:\n${conversationText}`;
 
             // Check if it's a company-related query for dynamic temperature
             const isCompanyQuery = isCompanyRelatedQuery(messageToSend);
 
-            const response = await fetch(`${CHAIYO_AI_CONFIG.API_URL}?key=${CHAIYO_AI_CONFIG.API_KEY}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: fullPrompt
-                        }]
-                    }],
-                    generationConfig: {
-                        temperature: isCompanyQuery ? 0.3 : 0.7, // Lower temperature for company info
-                        topP: 0.7,
-                        topK: 20,
-                        maxOutputTokens: 500,
+            const response = await fetch(
+                `${CHAIYO_AI_CONFIG.API_URL}?key=${CHAIYO_AI_CONFIG.API_KEY}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
                     },
-                    safetySettings: [
-                        {
-                            category: "HARM_CATEGORY_HARASSMENT",
-                            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+                    body: JSON.stringify({
+                        contents: [
+                            {
+                                parts: [
+                                    {
+                                        text: fullPrompt,
+                                    },
+                                ],
+                            },
+                        ],
+                        generationConfig: {
+                            temperature: isCompanyQuery ? 0.3 : 0.7, // Lower temperature for company info
+                            topP: 0.7,
+                            topK: 20,
+                            maxOutputTokens: 500,
                         },
-                        {
-                            category: "HARM_CATEGORY_HATE_SPEECH",
-                            threshold: "BLOCK_MEDIUM_AND_ABOVE"
-                        }
-                    ]
-                }),
-            });
+                        safetySettings: [
+                            {
+                                category: 'HARM_CATEGORY_HARASSMENT',
+                                threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+                            },
+                            {
+                                category: 'HARM_CATEGORY_HATE_SPEECH',
+                                threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+                            },
+                        ],
+                    }),
+                }
+            );
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const data = await response.json();
-            
+
             // ดึงข้อความตอบกลับจาก Gemini API
-            let aiReply = data.candidates?.[0]?.content?.parts?.[0]?.text || 
-                           'ขออภัยครับ ไม่สามารถประมวลผลคำถามได้ในขณะนี้';
+            let aiReply =
+                data.candidates?.[0]?.content?.parts?.[0]?.text ||
+                'ขออภัยครับ ไม่สามารถประมวลผลคำถามได้ในขณะนี้';
 
             // Add company signature for company-related queries
             if (isCompanyQuery && !aiReply.includes('ChaiyoAI')) {
-                aiReply += '\n\n🌿 **ChaiyoAI** - ตัวแทน AI ของ บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด และ บริษัท กนกส์โปรดัก จำกัด';
+                aiReply +=
+                    '\n\n🌿 **ChaiyoAI** - ตัวแทน AI ของ บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด และ บริษัท กนกส์โปรดัก จำกัด';
             }
 
             const aiMessage: ChatMessage = { role: 'assistant', content: aiReply };
             setChatHistory((prev) => [...prev, aiMessage]);
-            
         } catch (error) {
             console.error('ChaiyoAI Error:', error);
 
-            const errorMessage = isCompanyRelatedQuery(messageToSend) 
+            const errorMessage = isCompanyRelatedQuery(messageToSend)
                 ? `ขออภัยครับ ขณะนี้ระบบ ChaiyoAI กำลังประมวลผลข้อมูลบริษัท 🔧\n\nสำหรับข้อมูลเพิ่มเติมเกี่ยวกับ:\n🏢 **บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด**\n🏢 **บริษัท กนกส์โปรดัก จำกัด**\n\n📞 **โทรศัพท์:** 02-451-1111\n🌐 **เว็บไซต์:** www.chaiyopipe.co.th\n📧 **อีเมล:** chaiyopipeonline@gmail.com\n\nลองถามใหม่อีกครั้งได้เลยครับ! 😊`
                 : `ขออภัยครับ ตอนนี้ระบบ ChaiyoAI กำลังประมวลผล 🤖\n\nลองถามใหม่ได้เลยครับ! 😊\n\n🌿 **ChaiyoAI** พร้อมช่วยเหลือเรื่อง:\n💧 ระบบน้ำและชลประทาน\n🔧 ผลิตภัณฑ์ของบริษัท\n💡 คำแนะนำทั่วไป`;
 
@@ -484,15 +501,39 @@ const FloatingAiChat = ({
     // Helper function to check if query is company-related
     const isCompanyRelatedQuery = (message: string): boolean => {
         const companyKeywords = [
-            'ไชโย', 'chaiyo', 'กนก', 'kanok', 'บริษัท', 'company',
-            'ท่อ', 'pipe', 'ข้อต่อ', 'fitting', 'pvc', 'pe', 'hdpe',
-            'red hand', 'ตรามือแดง', 'champ', 'แชมป์',
-            'ประวัติ', 'history', 'ก่อตั้ง', 'founded', 'ทุน', 'capital',
-            'ติดต่อ', 'contact', 'โทร', 'phone', 'ราคา', 'price'
+            'ไชโย',
+            'chaiyo',
+            'กนก',
+            'kanok',
+            'บริษัท',
+            'company',
+            'ท่อ',
+            'pipe',
+            'ข้อต่อ',
+            'fitting',
+            'pvc',
+            'pe',
+            'hdpe',
+            'red hand',
+            'ตรามือแดง',
+            'champ',
+            'แชมป์',
+            'ประวัติ',
+            'history',
+            'ก่อตั้ง',
+            'founded',
+            'ทุน',
+            'capital',
+            'ติดต่อ',
+            'contact',
+            'โทร',
+            'phone',
+            'ราคา',
+            'price',
         ];
 
         const lowerMessage = message.toLowerCase();
-        return companyKeywords.some(keyword => lowerMessage.includes(keyword.toLowerCase()));
+        return companyKeywords.some((keyword) => lowerMessage.includes(keyword.toLowerCase()));
     };
 
     const clearChat = () => {
@@ -535,10 +576,10 @@ const FloatingAiChat = ({
                     animation: fade-in 0.3s ease-out;
                 }
             `}</style>
-            
+
             <div
                 ref={windowRef}
-                className={`fixed z-50 flex flex-col overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-2xl transition-all duration-300 animate-glow ${
+                className={`animate-glow fixed z-50 flex flex-col overflow-hidden rounded-xl border border-emerald-200 bg-white shadow-2xl transition-all duration-300 ${
                     isMinimized ? 'h-14 w-64' : 'h-[32rem] w-96'
                 } ${isDragging ? 'shadow-3xl scale-105 cursor-grabbing transition-none' : 'cursor-auto'}`}
                 style={{
@@ -591,22 +632,50 @@ const FloatingAiChat = ({
                 >
                     {/* Company Particles */}
                     <CompanyParticles />
-                    
+
                     {/* Animated Background Shimmer */}
                     <div className="pointer-events-none absolute inset-0 opacity-20">
-                        <div className="absolute inset-0 -skew-x-12 transform animate-shimmer bg-gradient-to-r from-transparent via-white to-transparent"></div>
+                        <div className="animate-shimmer absolute inset-0 -skew-x-12 transform bg-gradient-to-r from-transparent via-white to-transparent"></div>
                     </div>
 
                     {/* Company Neural Network Pattern */}
                     <div className="absolute inset-0 opacity-10">
-                        <svg className="w-full h-full" viewBox="0 0 100 100">
+                        <svg className="h-full w-full" viewBox="0 0 100 100">
                             <defs>
-                                <pattern id="company-neural" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+                                <pattern
+                                    id="company-neural"
+                                    x="0"
+                                    y="0"
+                                    width="20"
+                                    height="20"
+                                    patternUnits="userSpaceOnUse"
+                                >
                                     <circle cx="10" cy="10" r="1" fill="currentColor" opacity="0.3">
-                                        <animate attributeName="r" values="1;2;1" dur="3s" repeatCount="indefinite" />
+                                        <animate
+                                            attributeName="r"
+                                            values="1;2;1"
+                                            dur="3s"
+                                            repeatCount="indefinite"
+                                        />
                                     </circle>
-                                    <line x1="10" y1="10" x2="30" y2="10" stroke="currentColor" strokeWidth="0.5" opacity="0.2" />
-                                    <line x1="10" y1="10" x2="10" y2="30" stroke="currentColor" strokeWidth="0.5" opacity="0.2" />
+                                    <line
+                                        x1="10"
+                                        y1="10"
+                                        x2="30"
+                                        y2="10"
+                                        stroke="currentColor"
+                                        strokeWidth="0.5"
+                                        opacity="0.2"
+                                    />
+                                    <line
+                                        x1="10"
+                                        y1="10"
+                                        x2="10"
+                                        y2="30"
+                                        stroke="currentColor"
+                                        strokeWidth="0.5"
+                                        opacity="0.2"
+                                    />
                                 </pattern>
                             </defs>
                             <rect width="100%" height="100%" fill="url(#company-neural)" />
@@ -616,7 +685,11 @@ const FloatingAiChat = ({
                     {/* Enhanced Drag Handle */}
                     <div className="absolute left-1/2 top-1.5 flex -translate-x-1/2 transform space-x-0.5 opacity-40">
                         {[...Array(6)].map((_, i) => (
-                            <div key={i} className="h-0.5 w-0.5 rounded-full bg-white animate-pulse" style={{animationDelay: `${i * 0.1}s`}}></div>
+                            <div
+                                key={i}
+                                className="h-0.5 w-0.5 animate-pulse rounded-full bg-white"
+                                style={{ animationDelay: `${i * 0.1}s` }}
+                            ></div>
                         ))}
                     </div>
 
@@ -628,14 +701,12 @@ const FloatingAiChat = ({
                                 alt="ChaiyoAI"
                             />
                             <div>
-                                <h1 className="text-sm font-bold flex items-center">
+                                <h1 className="flex items-center text-sm font-bold">
                                     🌿 {aiIdentity}
-                                    <span className="ml-1 inline-block w-2 h-2 bg-green-400 rounded-full animate-ping"></span>
+                                    <span className="ml-1 inline-block h-2 w-2 animate-ping rounded-full bg-green-400"></span>
                                 </h1>
                                 {!isMinimized && (
-                                    <p className="text-xs text-emerald-100">
-                                        ตอบกลับด้วย AI
-                                    </p>
+                                    <p className="text-xs text-emerald-100">ตอบกลับด้วย AI</p>
                                 )}
                             </div>
                         </div>
@@ -644,7 +715,7 @@ const FloatingAiChat = ({
                             {/* Minimize button */}
                             <button
                                 onClick={onMinimize}
-                                className="rounded-full bg-white/20 p-1.5 transition-all duration-200 hover:scale-110 hover:bg-white/30 backdrop-blur-sm"
+                                className="rounded-full bg-white/20 p-1.5 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
                                 title={isMinimized ? 'ขยาย' : 'ย่อ'}
                             >
                                 <svg
@@ -675,7 +746,7 @@ const FloatingAiChat = ({
                             {chatHistory.length > 0 && !isMinimized && (
                                 <button
                                     onClick={clearChat}
-                                    className="rounded-full bg-white/20 p-1.5 transition-all duration-200 hover:scale-110 hover:bg-white/30 backdrop-blur-sm"
+                                    className="rounded-full bg-white/20 p-1.5 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-white/30"
                                     title="เคลียร์แชท"
                                 >
                                     <svg
@@ -697,7 +768,7 @@ const FloatingAiChat = ({
                             {/* Close button */}
                             <button
                                 onClick={onClose}
-                                className="rounded-full bg-white/20 p-1.5 transition-all duration-200 hover:scale-110 hover:bg-red-500/70 backdrop-blur-sm"
+                                className="rounded-full bg-white/20 p-1.5 backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:bg-red-500/70"
                                 title="ปิด"
                             >
                                 <svg
@@ -727,16 +798,19 @@ const FloatingAiChat = ({
                             <div
                                 ref={chatContainerRef}
                                 className="flex-1 space-y-3 overflow-y-auto bg-gradient-to-b from-emerald-50 to-white p-3"
-                                style={{ scrollbarWidth: 'thin', scrollbarColor: '#10b981 #f0fdfa' }}
+                                style={{
+                                    scrollbarWidth: 'thin',
+                                    scrollbarColor: '#10b981 #f0fdfa',
+                                }}
                             >
                                 {chatHistory.length === 0 && (
-                                    <div className="flex h-full flex-col items-center justify-center text-center relative">
+                                    <div className="relative flex h-full flex-col items-center justify-center text-center">
                                         {/* Enhanced Background decoration */}
                                         <div className="absolute inset-0 overflow-hidden">
                                             {[...Array(3)].map((_, i) => (
                                                 <div
                                                     key={i}
-                                                    className="absolute w-32 h-32 border border-emerald-200 rounded-full opacity-20 animate-pulse"
+                                                    className="absolute h-32 w-32 animate-pulse rounded-full border border-emerald-200 opacity-20"
                                                     style={{
                                                         left: `${20 + i * 30}%`,
                                                         top: `${10 + i * 20}%`,
@@ -745,32 +819,32 @@ const FloatingAiChat = ({
                                                 />
                                             ))}
                                         </div>
-                                        
-                                        <div className="relative mb-3 animate-pulse rounded-full bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 text-white shadow-xl p-2">
+
+                                        <div className="relative mb-3 animate-pulse rounded-full bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 p-2 text-white shadow-xl">
                                             <img
                                                 className="h-16 w-16 rounded-full"
                                                 src="/images/chaiyo-logo.png"
                                                 alt="ChaiyoAI"
                                             />
-                                            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-20 animate-spin"></div>
+                                            <div className="absolute inset-0 animate-spin rounded-full bg-gradient-to-r from-transparent via-white to-transparent opacity-20"></div>
                                         </div>
-                                        <h3 className="mb-2 text-lg font-bold text-gray-800 animate-bounce">
+                                        <h3 className="mb-2 animate-bounce text-lg font-bold text-gray-800">
                                             สวัสดีครับ! 🌱
                                         </h3>
                                         <p className="mb-3 max-w-xs text-sm leading-relaxed text-gray-600">
                                             ฉันคือ{' '}
-                                            <span className="font-semibold text-emerald-600 animate-pulse">
+                                            <span className="animate-pulse font-semibold text-emerald-600">
                                                 **{aiIdentity}**
                                             </span>{' '}
                                             ตัวแทน AI ของ
                                         </p>
                                         <div className="mb-3 space-y-1 text-xs text-gray-500">
                                             <div className="flex items-center justify-center space-x-1">
-                                                <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+                                                <span className="h-2 w-2 animate-pulse rounded-full bg-blue-500"></span>
                                                 <span>บริษัท ไชโยไปป์แอนด์ฟิตติ้ง จำกัด</span>
                                             </div>
                                             <div className="flex items-center justify-center space-x-1">
-                                                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                                <span className="h-2 w-2 animate-pulse rounded-full bg-green-500"></span>
                                                 <span>บริษัท กนกส์โปรดัก จำกัด</span>
                                             </div>
                                         </div>
@@ -874,17 +948,19 @@ const FloatingAiChat = ({
 
                         {/* Enhanced Footer with input */}
                         <div className="flex-shrink-0 border-t border-emerald-200 bg-white p-3">
-                            <div className="flex items-end gap-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 transition-all duration-200 focus-within:border-emerald-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-200 focus-within:shadow-lg focus-within:shadow-emerald-100">
+                            <div className="flex items-end gap-2 rounded-lg border border-emerald-300 bg-emerald-50 p-2 transition-all duration-200 focus-within:border-emerald-400 focus-within:bg-white focus-within:shadow-lg focus-within:shadow-emerald-100 focus-within:ring-2 focus-within:ring-emerald-200">
                                 {/* Enhanced Quick Suggestions Toggle Button */}
                                 {chatHistory.length > 0 && (
                                     <button
                                         onClick={toggleSuggestions}
                                         className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md transition-all duration-200 ${
                                             showSuggestions
-                                                ? 'scale-105 bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg animate-pulse'
-                                                : 'bg-emerald-200 text-emerald-600 hover:bg-emerald-300 hover:scale-110'
+                                                ? 'scale-105 animate-pulse bg-gradient-to-r from-emerald-500 to-green-600 text-white shadow-lg'
+                                                : 'bg-emerald-200 text-emerald-600 hover:scale-110 hover:bg-emerald-300'
                                         }`}
-                                        title={showSuggestions ? 'ซ่อนคำถามแนะนำ' : 'แสดงคำถามแนะนำ'}
+                                        title={
+                                            showSuggestions ? 'ซ่อนคำถามแนะนำ' : 'แสดงคำถามแนะนำ'
+                                        }
                                     >
                                         <svg
                                             className="h-3 w-3"
@@ -957,11 +1033,14 @@ const FloatingAiChat = ({
                             {/* Enhanced Footer Info with Company Branding */}
                             <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
                                 <div className="flex items-center space-x-2">
-                                    <span className="text-[10px] flex items-center">
-                                        🌿 <span className="ml-1 font-semibold text-emerald-600">{aiIdentity}</span>
+                                    <span className="flex items-center text-[10px]">
+                                        🌿{' '}
+                                        <span className="ml-1 font-semibold text-emerald-600">
+                                            {aiIdentity}
+                                        </span>
                                     </span>
                                     <span className="text-[10px] text-blue-600">•</span>
-                                    <span className="text-[10px] flex items-center">
+                                    <span className="flex items-center text-[10px]">
                                         🏢 <span className="ml-1">ไชโย & กนกส์โปรดัก</span>
                                     </span>
                                 </div>
@@ -970,15 +1049,17 @@ const FloatingAiChat = ({
                                     <span className="text-[10px]">พร้อมให้บริการ</span>
                                 </div>
                             </div>
-                            
+
                             {/* Company Contact Quick Access */}
-                            <div className="mt-1 pt-1 border-t border-emerald-100">
-                                <div className="flex justify-between items-center text-[10px] text-gray-400">
+                            <div className="mt-1 border-t border-emerald-100 pt-1">
+                                <div className="flex items-center justify-between text-[10px] text-gray-400">
                                     <span>📞 02-451-1111</span>
                                     <span>🌐 kanokgroup.com</span>
                                     <span className="flex items-center">
                                         <span className="mr-1">⚡</span>
-                                        <span className="text-blue-500 font-semibold">Powered by Gemini</span>
+                                        <span className="font-semibold text-blue-500">
+                                            Powered by Gemini
+                                        </span>
                                     </span>
                                 </div>
                             </div>

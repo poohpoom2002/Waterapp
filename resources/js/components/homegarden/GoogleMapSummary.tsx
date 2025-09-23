@@ -296,24 +296,27 @@ const ClippedSprinklerCoverage: React.FC<{
                 for (let i = 0; i < zoneCoordinates.length; i++) {
                     const edgeStart = zoneCoordinates[i];
                     const edgeEnd = zoneCoordinates[(i + 1) % zoneCoordinates.length];
-                    
+
                     // Calculate intersection points between circle and line segment
-                    const intersections = getCircleLineIntersectionsGPS(center, radius, edgeStart, edgeEnd);
+                    const intersections = getCircleLineIntersectionsGPS(
+                        center,
+                        radius,
+                        edgeStart,
+                        edgeEnd
+                    );
                     intersectionPoints.push(...intersections);
                 }
 
                 if (intersectionPoints.length >= 3) {
                     // Remove duplicate points
                     const uniquePoints = removeDuplicatePointsGPS(intersectionPoints);
-                    
+
                     if (uniquePoints.length >= 3) {
                         // Sort points clockwise around the center
                         const centroidLat =
-                            uniquePoints.reduce((sum, p) => sum + p.lat, 0) /
-                            uniquePoints.length;
+                            uniquePoints.reduce((sum, p) => sum + p.lat, 0) / uniquePoints.length;
                         const centroidLng =
-                            uniquePoints.reduce((sum, p) => sum + p.lng, 0) /
-                            uniquePoints.length;
+                            uniquePoints.reduce((sum, p) => sum + p.lng, 0) / uniquePoints.length;
 
                         uniquePoints.sort((a, b) => {
                             const angleA = Math.atan2(a.lat - centroidLat, a.lng - centroidLng);
@@ -674,7 +677,7 @@ const GoogleMapSummary: React.FC<GoogleMapSummaryProps> = (props) => {
     }
 
     return (
-        <SummaryErrorBoundary t={t}>    
+        <SummaryErrorBoundary t={t}>
             <Wrapper
                 apiKey={config.apiKey}
                 render={(status) => renderSummaryMap(status, t)}

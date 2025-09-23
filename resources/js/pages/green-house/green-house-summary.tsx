@@ -82,6 +82,13 @@ interface GreenhouseSummaryData {
     // Flow rate settings from map
     sprinklerFlowRate?: number; // L/min per sprinkler
     dripEmitterFlowRate?: number; // L/min per drip emitter
+    
+    // Pressure settings
+    sprinklerPressure?: number; // Bar for sprinklers
+    dripPressure?: number; // Bar for drip emitters
+    
+    // Sprinkler settings
+    sprinklerRadius?: number; // Radius in meters for sprinklers
 
     // Calculated data
     greenhouseArea?: number;
@@ -664,6 +671,11 @@ export default function GreenhouseSummary() {
                 sprinklerCount: 0,
                 dripEmitterCount: 0,
                 totalEmitters: 0,
+                longestSubPipeEmitters: 0,
+                // เพิ่มข้อมูลอัตราการไหล
+                sprinklerFlowRate: 0,
+                dripEmitterFlowRate: 0,
+                totalFlowRate: 0,
             };
 
             // Find main pipes and sub pipes
@@ -746,44 +758,60 @@ export default function GreenhouseSummary() {
             plotPipeData.maxMainPipeLength = maxMainDistanceForThisPlot;
             plotPipeData.totalMainPipeLength = maxMainDistanceForThisPlot;
 
+            // หาท่อทั้งหมดที่เกี่ยวข้องกับแปลง (ไม่ใช่แค่ส่วนที่อยู่ในแปลง)
+            const allSubPipes = elements.filter((e) => e.type === 'sub-pipe');
+            const relatedSubPipes = allSubPipes.filter((pipe) => {
+                // ตรวจสอบว่าท่อนี้เกี่ยวข้องกับแปลงหรือไม่
+                // โดยดูว่าท่อนี้มีส่วนใดส่วนหนึ่งที่อยู่ในแปลง หรือใกล้กับแปลง
+                return subPipeServesPlot(pipe, plot.points) || 
+                       pipe.points.some(point => isPointInPolygon(point, plot.points)) ||
+                       pipe.points.some(point => {
+                           // ตรวจสอบว่าจุดใดจุดหนึ่งของท่ออยู่ใกล้กับแปลง (ภายในระยะ 50 pixels)
+                           const distanceToPlot = distancePointToPolygon(point, plot.points);
+                           return distanceToPlot <= 50;
+                       });
+            });
+
             let maxSubPipeLength = 0;
             let totalSubLengthInPlot = 0;
 
-            subPipes.forEach((subPipe) => {
-                let subPipeLengthInPlot = 0;
-                let hasSegmentInPlot = false;
-
-                for (let i = 0; i < subPipe.points.length - 1; i++) {
-                    const p1 = subPipe.points[i];
-                    const p2 = subPipe.points[i + 1];
-
-                    // Check if this segment is in the plot
-                    const midPoint = {
-                        x: (p1.x + p2.x) / 2,
-                        y: (p1.y + p2.y) / 2,
-                    };
-
-                    if (
-                        isPointInPolygon(p1, plot.points) ||
-                        isPointInPolygon(p2, plot.points) ||
-                        isPointInPolygon(midPoint, plot.points)
-                    ) {
-                        const segmentLength = distanceBetweenPoints(p1, p2) / 25; // Convert to meters
-                        subPipeLengthInPlot += segmentLength;
-                        hasSegmentInPlot = true;
+            // ใช้ relatedSubPipes แทน subPipes เพื่อคำนวณความยาวท่อที่เกี่ยวข้องกับแปลง
+            if (relatedSubPipes.length > 0) {
+                // ฟังก์ชันคำนวณความยาวของท่อทั้งหมด
+                const lengthOfPolyline = (points: Point[]) => {
+                    if (points.length < 2) return 0;
+                    let len = 0;
+                    for (let i = 0; i < points.length - 1; i++) {
+                        len += distanceBetweenPoints(points[i], points[i + 1]);
                     }
-                }
-
-                if (hasSegmentInPlot) {
-                    totalSubLengthInPlot += subPipeLengthInPlot;
-                    maxSubPipeLength = Math.max(maxSubPipeLength, subPipeLengthInPlot);
-                    plotPipeData.hasPipes = true;
-                }
-            });
+                    return len;
+                };
+                
+                // คำนวณความยาวจริงของท่อทั้งหมดที่เกี่ยวข้องกับแปลง
+                const relatedPipeLengths: number[] = relatedSubPipes.map(sp => lengthOfPolyline(sp.points));
+                const relatedPipeLengthsInMeters = relatedPipeLengths.map(length => length / 25); // Convert pixels to meters
+                
+                // หาท่อที่ยาวที่สุด (ความยาวจริงทั้งหมด)
+                maxSubPipeLength = Math.max(...relatedPipeLengthsInMeters);
+                
+                // คำนวณความยาวรวมของท่อที่เกี่ยวข้องกับแปลง
+                totalSubLengthInPlot = relatedPipeLengthsInMeters.reduce((sum, length) => sum + length, 0);
+                
+                plotPipeData.hasPipes = true;
+                
+                console.log(`📊 ${plotPipeData.plotName} - ความยาวท่อที่เกี่ยวข้อง (เมตร):`, relatedPipeLengthsInMeters);
+                console.log(`📊 ${plotPipeData.plotName} - ท่อที่ยาวที่สุด: ${maxSubPipeLength.toFixed(2)} เมตร`);
+                console.log(`📊 ${plotPipeData.plotName} - ความยาวรวม: ${totalSubLengthInPlot.toFixed(2)} เมตร`);
+            }
 
             // คำนวณจำนวน emitters ในแปลงนี้
             const sprinklers = elements.filter((e) => e.type === 'sprinkler');
             const dripLines = elements.filter((e) => e.type === 'drip-line');
+
+            // คำนวณค่า baseTolerance สำหรับการตรวจจับสปริงเกลอร์ที่อยู่ขอบแปลง
+            const plotWidth = Math.max(...plot.points.map(p => p.x)) - Math.min(...plot.points.map(p => p.x));
+            const plotHeight = Math.max(...plot.points.map(p => p.y)) - Math.min(...plot.points.map(p => p.y));
+            const baseTolerance = Math.min(plotWidth, plotHeight) * 0.05; // 5% ของขนาดแปลง
 
             // นับสปริงเกอร์ในแปลงนี้
             sprinklers.forEach((sprinkler) => {
@@ -793,11 +821,15 @@ export default function GreenhouseSummary() {
                     // ตรวจสอบว่าสปริงเกลอร์อยู่ในแปลงหรือไม่
                     const isInPlot = isPointInPolygon(sprinklerPoint, plot.points);
                     
+                    // ตรวจสอบว่าสปริงเกลอร์อยู่ใกล้ขอบแปลงหรือไม่ (สำหรับสปริงเกลอร์ที่อยู่ขอบ)
+                    const distanceToPlot = distancePointToPolygon(sprinklerPoint, plot.points);
+                    const isNearPlotEdge = distanceToPlot <= baseTolerance * 2; // อยู่ใกล้ขอบแปลง
+                    
                     // ตรวจสอบว่าสปริงเกลอร์อยู่ใกล้กับท่อย่อยในแปลงหรือไม่
                     let isNearSubPipeInPlot = false;
                     const subPipes = elements.filter((e) => e.type === 'sub-pipe');
                     
-                    if (!isInPlot) {
+                    if (!isInPlot && !isNearPlotEdge) {
                         // ตรวจสอบว่าท่อย่อยอยู่ในแปลงหรือไม่ (ปรับปรุงตรรกะให้ครอบคลุมมากขึ้น)
                         subPipes.forEach((subPipe) => {
                             if (subPipeServesPlot(subPipe, plot.points)) {
@@ -817,20 +849,10 @@ export default function GreenhouseSummary() {
                         });
                     }
                     
-                    // นับสปริงเกลอร์ที่อยู่ในแปลงหรืออยู่ใกล้กับท่อย่อยในแปลง
-                    if (isInPlot || isNearSubPipeInPlot) {
+                    // นับสปริงเกลอร์ที่อยู่ในแปลง, อยู่ใกล้ขอบแปลง, หรืออยู่ใกล้กับท่อย่อยในแปลง
+                    if (isInPlot || isNearPlotEdge || isNearSubPipeInPlot) {
                         plotPipeData.sprinklerCount++;
                         
-                        // Debug: ตรวจสอบการนับสปริงเกลอร์ในแต่ละแปลง
-                        console.log(`🔍 Sprinkler counted in ${plotPipeData.plotName}:`, {
-                            plotName: plotPipeData.plotName,
-                            sprinklerId: sprinkler.id,
-                            sprinklerPoint: sprinklerPoint,
-                            isInPlot: isInPlot,
-                            isNearSubPipeInPlot: isNearSubPipeInPlot,
-                            currentCount: plotPipeData.sprinklerCount,
-                            method: isInPlot ? 'inside_plot' : 'near_subpipe_in_plot'
-                        });
                     }
                 }
             });
@@ -851,10 +873,22 @@ export default function GreenhouseSummary() {
                             y: (p1.y + p2.y) / 2,
                         };
 
+                        // ตรวจสอบว่าส่วนของท่อนี้อยู่ในแปลงหรืออยู่ใกล้ขอบแปลง
+                        const p1InPlot = isPointInPolygon(p1, plot.points);
+                        const p2InPlot = isPointInPolygon(p2, plot.points);
+                        const midInPlot = isPointInPolygon(midPoint, plot.points);
+                        
+                        // ตรวจสอบว่าส่วนของท่อนี้อยู่ใกล้ขอบแปลงหรือไม่
+                        const p1DistanceToPlot = distancePointToPolygon(p1, plot.points);
+                        const p2DistanceToPlot = distancePointToPolygon(p2, plot.points);
+                        const midDistanceToPlot = distancePointToPolygon(midPoint, plot.points);
+                        const p1NearPlotEdge = p1DistanceToPlot <= baseTolerance * 2;
+                        const p2NearPlotEdge = p2DistanceToPlot <= baseTolerance * 2;
+                        const midNearPlotEdge = midDistanceToPlot <= baseTolerance * 2;
+
                         if (
-                            isPointInPolygon(p1, plot.points) ||
-                            isPointInPolygon(p2, plot.points) ||
-                            isPointInPolygon(midPoint, plot.points)
+                            p1InPlot || p2InPlot || midInPlot ||
+                            p1NearPlotEdge || p2NearPlotEdge || midNearPlotEdge
                         ) {
                             const segmentLength = distanceBetweenPoints(p1, p2) / 25; // แปลงเป็นเมตร
                             dripLengthInPlot += segmentLength;
@@ -871,13 +905,353 @@ export default function GreenhouseSummary() {
 
             plotPipeData.totalEmitters = plotPipeData.sprinklerCount + plotPipeData.dripEmitterCount;
 
-            // Debug: ตรวจสอบการนับสปริงเกลอร์ในแต่ละแปลง
-            console.log(`🔍 ${plotPipeData.plotName} sprinkler count:`, {
-                plotName: plotPipeData.plotName,
-                sprinklerCount: plotPipeData.sprinklerCount,
-                dripEmitterCount: plotPipeData.dripEmitterCount,
-                totalEmitters: plotPipeData.totalEmitters
-            });
+            // คำนวณจำนวนสปริงเกลอร์และจุดน้ำหยดในท่อย่อยที่ยาวที่สุดสำหรับแปลงปลูกนี้
+            // ปรับลอจิกใหม่: หาท่อทั้งหมดที่เกี่ยวข้องกับแปลงก่อน แล้วจัดอันดับตามความยาวจริง
+            
+            let longestSubPipeEmitters = 0;
+            
+            if (relatedSubPipes.length > 0) {
+                // คำนวณความยาวจริงของท่อทั้งหมดที่เกี่ยวข้องกับแปลง
+                const relatedPipeLengths: number[] = relatedSubPipes.map(sp => {
+                    if (sp.points.length < 2) return 0;
+                    let len = 0;
+                    for (let i = 0; i < sp.points.length - 1; i++) {
+                        len += distanceBetweenPoints(sp.points[i], sp.points[i + 1]);
+                    }
+                    return len;
+                });
+                
+                // หาท่อที่ยาวที่สุดจากท่อทั้งหมดที่เกี่ยวข้อง
+                let longestSubLengthPx = 0;
+                let longestPipeIndex = -1;
+                relatedPipeLengths.forEach((len, idx) => { 
+                    if (len > longestSubLengthPx) {
+                        longestSubLengthPx = len;
+                        longestPipeIndex = idx;
+                    }
+                });
+                
+                // แสดงข้อมูลท่อที่เกี่ยวข้องกับแปลง
+                console.log(`🌱 ${plotPipeData.plotName} - จำนวนท่อที่เกี่ยวข้อง: ${relatedSubPipes.length} เส้น`);
+                console.log(`📏 ${plotPipeData.plotName} - ความยาวท่อแต่ละเส้น (pixels):`, relatedPipeLengths);
+                console.log(`🏆 ${plotPipeData.plotName} - ท่อที่ยาวที่สุด: เส้นที่ ${longestPipeIndex + 1} (${longestSubLengthPx.toFixed(2)} pixels)`);
+                
+                
+                // แสดงข้อมูลสปริงเกลอร์ที่เกี่ยวข้องกับแปลง
+                const sprinklersInPlot = sprinklers.filter(spr => {
+                    const p = spr.points[0];
+                    return p && isPointInPolygon(p, plot.points);
+                }).length;
+                
+                const sprinklersNearEdge = sprinklers.filter(spr => {
+                    const p = spr.points[0];
+                    if (!p) return false;
+                    const distanceToPlot = distancePointToPolygon(p, plot.points);
+                    return distanceToPlot <= baseTolerance * 2;
+                }).length;
+                
+                console.log(`🚿 ${plotPipeData.plotName} - สปริงเกลอร์ในแปลง: ${sprinklersInPlot} ตัว`);
+                console.log(`🚿 ${plotPipeData.plotName} - สปริงเกลอร์ใกล้ขอบแปลง: ${sprinklersNearEdge} ตัว`);
+                console.log(`🚿 ${plotPipeData.plotName} - สปริงเกลอร์รวม: ${sprinklersInPlot + sprinklersNearEdge} ตัว`);
+
+                // หาท่อที่ยาวที่สุด (หรือใกล้เคียงกัน) เพื่อนับสปริงเกลอร์
+                const TOL_PX = 20;
+                const tieIndices: number[] = [];
+                relatedPipeLengths.forEach((len, idx) => {
+                    if (Math.abs(len - longestSubLengthPx) <= TOL_PX) tieIndices.push(idx);
+                });
+                
+                // นับสปริงเกลอร์และจุดน้ำหยดในท่อย่อยที่ยาวที่สุด
+                // ใช้ค่า tolerance แบบ adaptive ตามตำแหน่งท่อย่อย
+                tieIndices.forEach(idx => {
+                    const sp = relatedSubPipes[idx];
+                    let sprCount = 0;
+                    let dripCount = 0;
+                    
+                    // ตรวจสอบว่าสปริงเกลอร์อยู่ในแปลงและเชื่อมต่อกับท่อย่อยนี้
+                    
+                    // คำนวณค่า tolerance แบบ adaptive ตามตำแหน่งท่อย่อย
+                    const subPipeCenterY = sp.points.reduce((sum, p) => sum + p.y, 0) / sp.points.length;
+                    const plotCenterY = plot.points.reduce((sum, p) => sum + p.y, 0) / plot.points.length;
+                    const plotTopY = Math.min(...plot.points.map(p => p.y));
+                    const plotBottomY = Math.max(...plot.points.map(p => p.y));
+                    const plotHeight = plotBottomY - plotTopY;
+                    
+                    // คำนวณระยะห่างจากท่อย่อยไปยังจุดกึ่งกลางแปลง
+                    const distanceFromCenter = Math.abs(subPipeCenterY - plotCenterY);
+                    const centerRatio = distanceFromCenter / (plotHeight / 2); // อัตราส่วนระยะห่างจากจุดกึ่งกลาง
+                    
+                    // ถ้าท่อย่อยอยู่ใกล้ขอบบนหรือขอบล่าง ให้เพิ่ม tolerance
+                    const distanceFromTop = Math.abs(subPipeCenterY - plotTopY);
+                    const distanceFromBottom = Math.abs(subPipeCenterY - plotBottomY);
+                    const minDistanceFromEdge = Math.min(distanceFromTop, distanceFromBottom);
+                    
+                    // คำนวณค่า tolerance แบบ adaptive โดยใช้ทั้งระยะห่างจากขอบและจากจุดกึ่งกลาง
+                    let adaptiveTolerance = baseTolerance;
+                    const attachTolPx = 12; // ค่า tolerance สำหรับการเชื่อมต่อ
+                    
+                    // ตรวจสอบว่าท่อย่อยอยู่ใกล้ขอบบนหรือขอบล่าง
+                    const isNearTop = distanceFromTop < plotHeight * 0.2;
+                    const isNearBottom = distanceFromBottom < plotHeight * 0.2;
+                    
+                    // ถ้าท่อย่อยอยู่ใกล้ขอบใดก็ตาม (บนหรือล่าง) ให้เพิ่ม tolerance
+                    if (isNearTop || isNearBottom) {
+                        adaptiveTolerance = baseTolerance * 2; // เพิ่ม tolerance เป็น 2 เท่า
+                        
+                        // ถ้าอยู่ใกล้ขอบมากๆ ให้เพิ่ม tolerance มากขึ้น
+                        if (minDistanceFromEdge < plotHeight * 0.1) {
+                            adaptiveTolerance = baseTolerance * 3; // เพิ่ม tolerance เป็น 3 เท่า
+                        }
+                    }
+                    
+                    // ถ้าท่อย่อยอยู่ใกล้จุดกึ่งกลางแปลง ให้ลด tolerance เพื่อความแม่นยำ
+                    if (centerRatio < 0.3) { // ถ้าอยู่ใกล้จุดกึ่งกลางมากกว่า 70%
+                        adaptiveTolerance = Math.max(adaptiveTolerance * 0.8, attachTolPx); // ลด tolerance แต่ไม่ต่ำกว่า attachTolPx
+                    }
+                    
+                    // ใช้ค่า tolerance แบบ multi-level ที่ครอบคลุมมากขึ้น
+                    const toleranceLevels = [
+                        attachTolPx, // ค่าต่ำสุด
+                        adaptiveTolerance * 0.5, 
+                        adaptiveTolerance, 
+                        adaptiveTolerance * 1.5,
+                        adaptiveTolerance * 2, // ค่าสูงสุด
+                        baseTolerance * 4, // ค่าสูงสุดสำรอง
+                        baseTolerance * 6, // ค่าสูงสุดเพิ่มเติมสำหรับกรณีที่เจอสปริงเกลอร์ยาก
+                        baseTolerance * 8  // ค่าสูงสุดสุดท้าย
+                    ];
+                    let bestTolerance = toleranceLevels[0];
+                    let bestScore = Infinity;
+                    
+                    // ลองใช้ค่า tolerance หลายระดับเพื่อหาค่าที่เหมาะสม
+                    for (const tolerance of toleranceLevels) {
+                        let tempSprCount = 0;
+                        
+                        sprinklers.forEach((spr) => {
+                            const p = spr.points[0];
+                            if (!p) return;
+                            
+                            // ตรวจสอบว่าสปริงเกลอร์อยู่ในแปลงหรือไม่
+                            const isInPlot = isPointInPolygon(p, plot.points);
+                            
+                            // ตรวจสอบว่าสปริงเกลอร์อยู่ใกล้ขอบแปลงหรือไม่ (สำหรับสปริงเกลอร์ที่อยู่ขอบ)
+                            const distanceToPlot = distancePointToPolygon(p, plot.points);
+                            const isNearPlotEdge = distanceToPlot <= baseTolerance * 2; // อยู่ใกล้ขอบแปลง
+                            
+                            // นับสปริงเกลอร์ที่อยู่ในแปลง หรืออยู่ใกล้ขอบแปลง
+                            if (isInPlot || isNearPlotEdge) {
+                                // ตรวจสอบว่าสปริงเกลอร์เชื่อมต่อกับท่อย่อยนี้
+                                for (let i = 1; i < sp.points.length; i++) {
+                                    const res = closestPointOnLineSegment(p, sp.points[i - 1], sp.points[i]);
+                                    if (res.distance <= tolerance) {
+                                        tempSprCount += 1;
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                        
+                        // คำนวณคะแนนโดยพิจารณาจำนวนสปริงเกลอร์ที่พบและความสมเหตุสมผล
+                        const expectedSprinklers = Math.max(4, Math.min(12, Math.floor(plotWidth / 50))); // คำนวณจำนวนที่คาดหวังตามขนาดแปลง
+                        const countScore = Math.abs(tempSprCount - expectedSprinklers);
+                        
+                        // ปรับปรุงระบบการให้คะแนน - ให้คะแนนดีขึ้นเมื่อเจอสปริงเกลอร์
+                        let reasonablenessScore = 0;
+                        if (tempSprCount === 0) {
+                            reasonablenessScore = 200; // ให้คะแนนแย่มากถ้าไม่เจอเลย
+                        } else if (tempSprCount < 2) {
+                            reasonablenessScore = 50; // ให้คะแนนแย่ถ้าเจอน้อยเกินไป
+                        }
+                        
+                        // เพิ่มคะแนนพิเศษสำหรับการใช้ attachTolPx เมื่อท่อย่อยอยู่ใกล้จุดกึ่งกลาง
+                        let centerBonus = 0;
+                        if (tolerance === attachTolPx && centerRatio < 0.3) {
+                            centerBonus = -10; // ให้คะแนนดีขึ้นเมื่อใช้ attachTolPx กับท่อย่อยที่อยู่ใกล้จุดกึ่งกลาง
+                        }
+                        
+                        // เพิ่มคะแนนพิเศษสำหรับ tolerance ที่ไม่สูงเกินไป
+                        let toleranceBonus = 0;
+                        if (tolerance <= baseTolerance * 2) {
+                            toleranceBonus = -5; // ให้คะแนนดีขึ้นสำหรับ tolerance ที่สมเหตุสมผล
+                        }
+                        
+                        const totalScore = countScore + reasonablenessScore + centerBonus + toleranceBonus;
+                        
+                        // เลือกค่า tolerance ที่ให้คะแนนดีที่สุด
+                        if (totalScore < bestScore) {
+                            sprCount = tempSprCount;
+                            bestTolerance = tolerance;
+                            bestScore = totalScore;
+                        }
+                    }
+                    
+                    // แสดงข้อมูลสปริงเกลอร์และจุดน้ำหยดในท่อย่อยนี้
+                    console.log(`💧 ${plotPipeData.plotName} - ท่อย่อยเส้นที่ ${idx + 1}:`);
+                    console.log(`   📏 ความยาว: ${relatedPipeLengths[idx].toFixed(2)} pixels`);
+                    console.log(`   🚿 จำนวนสปริงเกลอร์: ${sprCount} ตัว`);
+                    console.log(`   💧 จำนวนจุดน้ำหยด: ${dripCount} จุด`);
+                    console.log(`   🎯 Tolerance ที่ใช้: ${bestTolerance.toFixed(2)} pixels`);
+                    
+                    // Debug: ตรวจสอบปัญหาสำหรับแปลงปลูก 2
+                    if (plotPipeData.plotName.includes('2') && sprCount === 0) {
+                        console.log(`🔍 DEBUG - ${plotPipeData.plotName} ท่อย่อย ${idx + 1} ไม่เจอสปริงเกลอร์:`, {
+                            totalSprinklers: sprinklers.length,
+                            sprinklersInPlot: sprinklers.filter(spr => {
+                                const p = spr.points[0];
+                                return p && isPointInPolygon(p, plot.points);
+                            }).length,
+                            sprinklersNearEdge: sprinklers.filter(spr => {
+                                const p = spr.points[0];
+                                if (!p) return false;
+                                const distanceToPlot = distancePointToPolygon(p, plot.points);
+                                return distanceToPlot <= baseTolerance * 2;
+                            }).length,
+                            toleranceLevels: toleranceLevels,
+                            bestTolerance: bestTolerance,
+                            subPipePoints: sp.points.length,
+                            plotPoints: plot.points.length,
+                            baseTolerance: baseTolerance
+                        });
+                        
+                        // ตรวจสอบสปริงเกลอร์ที่ใกล้ที่สุด (รวมสปริงเกลอร์ที่อยู่ขอบแปลง)
+                        interface ClosestSprinkler {
+                            id: string;
+                            point: Point;
+                            distance: number;
+                            tolerance: number;
+                            location: 'inside' | 'near_edge' | 'near_subpipe';
+                        }
+                        let closestSprinkler: ClosestSprinkler | null = null;
+                        let minDistance = Infinity;
+                        sprinklers.forEach((spr) => {
+                            const p = spr.points[0];
+                            if (!p) return;
+                            
+                            const isInPlot = isPointInPolygon(p, plot.points);
+                            const distanceToPlot = distancePointToPolygon(p, plot.points);
+                            const isNearPlotEdge = distanceToPlot <= baseTolerance * 2;
+                            
+                            // ตรวจสอบสปริงเกลอร์ที่อยู่ในแปลง หรืออยู่ใกล้ขอบแปลง
+                            if (isInPlot || isNearPlotEdge) {
+                                for (let i = 1; i < sp.points.length; i++) {
+                                    const res = closestPointOnLineSegment(p, sp.points[i - 1], sp.points[i]);
+                                    if (res.distance < minDistance) {
+                                        minDistance = res.distance;
+                                        let location: 'inside' | 'near_edge' | 'near_subpipe' = 'inside';
+                                        if (isInPlot) {
+                                            location = 'inside';
+                                        } else if (isNearPlotEdge) {
+                                            location = 'near_edge';
+                                        }
+                                        
+                                        closestSprinkler = {
+                                            id: spr.id,
+                                            point: p,
+                                            distance: res.distance,
+                                            tolerance: bestTolerance,
+                                            location: location
+                                        };
+                                    }
+                                }
+                            }
+                        });
+                        
+                        if (closestSprinkler) {
+                            console.log(`🔍 สปริงเกลอร์ที่ใกล้ที่สุด:`, closestSprinkler);
+                            
+                            // ถ้าสปริงเกลอร์ที่ใกล้ที่สุดอยู่ไม่ไกลเกินไป ให้ลองใช้ tolerance ที่ใหญ่ขึ้น
+                            if (closestSprinkler && (closestSprinkler as ClosestSprinkler).distance <= baseTolerance * 10) {
+                                console.log(`💡 แนะนำ: ลองใช้ tolerance = ${(closestSprinkler as ClosestSprinkler).distance + 5} เพื่อเจอสปริงเกลอร์นี้`);
+                            }
+                        } else {
+                            console.log(`❌ ไม่พบสปริงเกลอร์ใดๆ ในแปลงปลูก ${plotPipeData.plotName}`);
+                        }
+                    }
+                    
+                    // ตรวจสอบว่าจุดน้ำหยดอยู่ในแปลงและเชื่อมต่อกับท่อย่อยนี้
+                    dripLines.forEach((dl) => {
+                        if (dl.points.length < 2 || !dl.spacing) return;
+                        let isAttached = false;
+                        
+                        // ตรวจสอบว่า drip line เชื่อมต่อกับท่อย่อยนี้
+                        for (let i = 1; i < dl.points.length && !isAttached; i++) {
+                            for (let j = 1; j < sp.points.length; j++) {
+                                const r1 = closestPointOnLineSegment(dl.points[i - 1], sp.points[j - 1], sp.points[j]);
+                                const r2 = closestPointOnLineSegment(dl.points[i], sp.points[j - 1], sp.points[j]);
+                                if (Math.min(r1.distance, r2.distance) <= attachTolPx) {
+                                    isAttached = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if (isAttached) {
+                            // คำนวณความยาวของ drip line ที่อยู่ในแปลง
+                            let dripLengthInPlot = 0;
+                            for (let i = 1; i < dl.points.length; i++) {
+                                const segmentStart = dl.points[i - 1];
+                                const segmentEnd = dl.points[i];
+                                
+                                // ตรวจสอบว่า segment อยู่ในแปลงหรือไม่
+                                const startInPlot = isPointInPolygon(segmentStart, plot.points);
+                                const endInPlot = isPointInPolygon(segmentEnd, plot.points);
+                                
+                                // ตรวจสอบว่า segment อยู่ใกล้ขอบแปลงหรือไม่ (สำหรับจุดน้ำหยดที่อยู่ขอบ)
+                                const startDistanceToPlot = distancePointToPolygon(segmentStart, plot.points);
+                                const endDistanceToPlot = distancePointToPolygon(segmentEnd, plot.points);
+                                const startNearPlotEdge = startDistanceToPlot <= baseTolerance * 2; // อยู่ใกล้ขอบแปลง
+                                const endNearPlotEdge = endDistanceToPlot <= baseTolerance * 2; // อยู่ใกล้ขอบแปลง
+                                
+                                if (startInPlot && endInPlot) {
+                                    // ทั้ง segment อยู่ในแปลง
+                                    dripLengthInPlot += distanceBetweenPoints(segmentStart, segmentEnd) / 25; // Convert to meters
+                                } else if (startInPlot || endInPlot) {
+                                    // ส่วนหนึ่งของ segment อยู่ในแปลง (ประมาณครึ่งหนึ่ง)
+                                    dripLengthInPlot += (distanceBetweenPoints(segmentStart, segmentEnd) / 25) / 2;
+                                } else if (startNearPlotEdge || endNearPlotEdge) {
+                                    // segment อยู่ใกล้ขอบแปลง (ประมาณครึ่งหนึ่ง)
+                                    dripLengthInPlot += (distanceBetweenPoints(segmentStart, segmentEnd) / 25) / 2;
+                                }
+                            }
+                            
+                            // คำนวณจำนวนจุดน้ำหยดใน drip line นี้
+                            if (dripLengthInPlot > 0 && dl.spacing > 0) {
+                                const emittersInThisLine = Math.floor(dripLengthInPlot / dl.spacing) + 1;
+                                dripCount += emittersInThisLine;
+                            }
+                        }
+                    });
+                    
+                    const totalEmittersForThisPipe = sprCount + dripCount;
+                    if (totalEmittersForThisPipe > longestSubPipeEmitters) {
+                        longestSubPipeEmitters = totalEmittersForThisPipe;
+                    }
+                });
+            }
+            
+            // ใช้จำนวนสปริงเกลอร์และจุดน้ำหยดในท่อย่อยที่ยาวที่สุด
+            // ถ้า longestSubPipeEmitters เป็น 0 แสดงว่าไม่มีสปริงเกลอร์ในท่อย่อยที่ยาวที่สุด
+            // ให้ใช้ 0 แทนที่จะใช้ totalEmitters
+            if (longestSubPipeEmitters === 0 && relatedSubPipes.length > 0) {
+                plotPipeData.longestSubPipeEmitters = 0;
+            } else {
+                plotPipeData.longestSubPipeEmitters = longestSubPipeEmitters;
+            }
+
+            // คำนวณอัตราการไหลสำหรับแปลงปลูกนี้
+            const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10; // L/min per sprinkler
+            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24; // L/min per drip emitter
+            
+            // คำนวณอัตราการไหลแยกตามประเภท
+            const plotSprinklerFlowRate = plotPipeData.sprinklerCount * sprinklerFlowRate;
+            const plotDripEmitterFlowRate = plotPipeData.dripEmitterCount * dripEmitterFlowRate;
+            const plotTotalFlowRate = plotSprinklerFlowRate + plotDripEmitterFlowRate;
+            
+            // เพิ่มข้อมูลอัตราการไหลใน plotPipeData
+            plotPipeData.sprinklerFlowRate = plotSprinklerFlowRate;
+            plotPipeData.dripEmitterFlowRate = plotDripEmitterFlowRate;
+            plotPipeData.totalFlowRate = plotTotalFlowRate;
+
 
             plotPipeData.maxSubPipeLength = Math.round(maxSubPipeLength * 100) / 100;
             plotPipeData.maxTotalPipeLength =
@@ -1039,7 +1413,7 @@ export default function GreenhouseSummary() {
             }
         });
 
-        // Count connections for the longest main
+        // Count connections for the longest main pipe
         let longestMainConnections = 0;
         if (longestMainIndex >= 0) {
             const mp = mainPipes[longestMainIndex];
@@ -1078,6 +1452,7 @@ export default function GreenhouseSummary() {
         const attachTolPx = 12;
         let bestEmitters = 0;
         let bestFlow = 0;
+        
         tieIndices.forEach(idx => {
             const sp = subPipes[idx];
             let sprCount = 0;
@@ -1124,6 +1499,9 @@ export default function GreenhouseSummary() {
 
             const flowForThis = sprCount * sprinklerFlowRate + dripEmitterCount * dripEmitterFlowRate;
             const emittersForThis = sprCount + dripEmitterCount;
+            
+            // ใช้จำนวนสปริงเกลอร์และจุดน้ำหยดในท่อย่อยที่ยาวที่สุดเป็นจำนวนทางออก
+            // หากมีท่อย่อยหลายเส้นที่มีความยาวเท่ากัน ให้เลือกเส้นที่มี emitters มากที่สุด
             if (emittersForThis > bestEmitters) {
                 bestEmitters = emittersForThis;
                 bestFlow = flowForThis;
@@ -1139,7 +1517,10 @@ export default function GreenhouseSummary() {
         const longestMainLengthM = longestMainLengthPx / 25;
         const longestSubLengthM = longestSubLengthPx / 25;
 
+        // คำนวณอัตราการไหลของท่อเมนที่ยาวที่สุดโดยใช้จำนวนท่อย่อยที่เชื่อมต่อ
         const longestMainFlow = flowRatePerSubPipe * longestMainConnections;
+        
+        // ใช้จำนวนสปริงเกลอร์ในท่อย่อยที่ยาวที่สุดเป็นจำนวนทางออก
         const longestSubEmitters = bestEmitters;
         const longestSubFlow = bestFlow;
 
@@ -2628,7 +3009,7 @@ export default function GreenhouseSummary() {
                                         <div className="grid grid-cols-2 gap-2 print:gap-3">
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-blue-400 print:text-sm print:text-black">
-                                                    {pipeFlowData.mainPipeCount} {t('เส้น')}
+                                                    {pipeFlowData.mainPipeCount}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('จำนวนท่อเมน')}
@@ -2636,7 +3017,7 @@ export default function GreenhouseSummary() {
                                             </div>
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-green-400 print:text-sm print:text-black">
-                                                    {pipeFlowData.subPipeCount} {t('เส้น')}
+                                                    {pipeFlowData.subPipeCount}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
                                                     {t('จำนวนท่อเมนย่อย')}
@@ -2647,10 +3028,10 @@ export default function GreenhouseSummary() {
                                         <div className="grid grid-cols-1 gap-2 print:gap-3">
                                             <div className="rounded bg-gray-700 p-2 text-center print:border print:border-gray-200 print:bg-gray-50 print:p-3">
                                                 <div className="text-sm font-bold text-purple-400 print:text-sm print:text-black">
-                                                    {pipeFlowData.totalEmitters} {t('ตัว')}
+                                                    {pipeFlowData.longest.sub.emitters}
                                                 </div>
                                                 <div className="text-xs text-gray-400 print:text-xs print:text-gray-600">
-                                                    {t('จำนวนสปริงเกลอร์และจุดน้ำหยด')}
+                                                    {t('จำนวนสปริงเกลอร์และจุดน้ำหยดในท่อย่อยที่ยาวที่สุด')}
                                                 </div>
                                             </div>
                                         </div>
@@ -2674,12 +3055,12 @@ export default function GreenhouseSummary() {
                                                         <tr>
                                                             <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
                                                             <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-blue-400">{pipeFlowData.longest.main.flowRate.toFixed(2)} {t('L/min')}</td>
-                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-blue-400">{pipeFlowData.longest.main.connections} {t('เส้น')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-blue-400">{pipeFlowData.longest.main.connections}</td>
                                                         </tr>
                                                         <tr>
                                                             <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs">{t('ท่อเมนย่อย')}</td>
                                                             <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-green-400">{pipeFlowData.longest.sub.flowRate.toFixed(2)} {t('L/min')}</td>
-                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-green-400">{pipeFlowData.longest.sub.emitters} {t('ตัว')}</td>
+                                                            <td className="border border-gray-600/50 print:border-gray-300 px-2 py-1 text-xs font-bold text-green-400">{pipeFlowData.longest.sub.emitters}</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
@@ -2758,20 +3139,46 @@ export default function GreenhouseSummary() {
                                                 </div>
                                             </div>
                                             
-                                            {/* Flow Rate Settings */}
+                                            {/* Equipment Settings */}
                                             <div className="mt-3 border-t border-gray-600 pt-2">
                                                 <h5 className="mb-1 text-xs font-semibold text-yellow-400">
-                                                    {t('การตั้งค่าอัตราการไหล')}
+                                                    {t('การตั้งค่าอุปกรณ์')}
                                                 </h5>
                                                 <div className="space-y-1 text-xs">
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-gray-300">{t('สปริงเกลอร์ 1 ตัว')}</span>
-                                                        <span className="font-bold text-blue-400">{(summaryData?.sprinklerFlowRate || 10).toFixed(2)} {t('ลิตร/นาที')}</span>
+                                                        <span className="text-gray-300">{t('ระบบที่เลือก')}:</span>
+                                                        <span className="font-bold text-blue-400">
+                                                            {summaryData?.irrigationMethod === 'mini-sprinkler'
+                                                                ? t('สปริงเกลอร์')
+                                                                : summaryData?.irrigationMethod === 'drip'
+                                                                  ? t('เทปน้ำหยด')
+                                                                  : t('แบบผสม')}
+                                                        </span>
                                                     </div>
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-gray-300">{t('จุดน้ำหยด 1 ตัว')}</span>
-                                                        <span className="font-bold text-cyan-400">{(summaryData?.dripEmitterFlowRate || 0.24).toFixed(2)} {t('ลิตร/นาที')}</span>
+                                                        <span className="text-gray-300">{t('อัตราการไหล')}:</span>
+                                                        <span className="font-bold text-green-400">
+                                                            {summaryData?.irrigationMethod === 'drip'
+                                                                ? `${(summaryData?.dripEmitterFlowRate || 0.24).toFixed(2)} ${t('ลิตร/นาที')}`
+                                                                : `${(summaryData?.sprinklerFlowRate || 10).toFixed(2)} ${t('ลิตร/นาที')}`}
+                                                        </span>
                                                     </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-gray-300">{t('แรงดัน')}:</span>
+                                                        <span className="font-bold text-purple-400">
+                                                            {summaryData?.irrigationMethod === 'drip'
+                                                                ? `${(summaryData?.dripPressure || 1.0).toFixed(1)} ${t('บาร์')}`
+                                                                : `${(summaryData?.sprinklerPressure || 2.0).toFixed(1)} ${t('บาร์')}`}
+                                                        </span>
+                                                    </div>
+                                                    {summaryData?.irrigationMethod === 'mini-sprinkler' && (
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-gray-300">{t('รัศมีสปริงเกลอร์')}:</span>
+                                                            <span className="font-bold text-orange-400">
+                                                                {summaryData?.sprinklerRadius ? `${summaryData.sprinklerRadius.toFixed(1)} ${t('เมตร')}` : '1.5 เมตร'}
+                                                            </span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -3393,10 +3800,25 @@ export default function GreenhouseSummary() {
                                                                                                     y: (p1.y + p2.y) / 2,
                                                                                                 };
 
+                                                                                                // ตรวจสอบว่าส่วนของท่อนี้อยู่ในแปลงหรืออยู่ใกล้ขอบแปลง
+                                                                                                const p1InPlot = isPointInPolygon(p1, plotShape.points);
+                                                                                                const p2InPlot = isPointInPolygon(p2, plotShape.points);
+                                                                                                const midInPlot = isPointInPolygon(midPoint, plotShape.points);
+                                                                                                
+                                                                                                // ตรวจสอบว่าส่วนของท่อนี้อยู่ใกล้ขอบแปลงหรือไม่
+                                                                                                const plotWidth = Math.max(...plotShape.points.map(p => p.x)) - Math.min(...plotShape.points.map(p => p.x));
+                                                                                                const plotHeight = Math.max(...plotShape.points.map(p => p.y)) - Math.min(...plotShape.points.map(p => p.y));
+                                                                                                const baseTolerance = Math.min(plotWidth, plotHeight) * 0.05; // 5% ของขนาดแปลง
+                                                                                                const p1DistanceToPlot = distancePointToPolygon(p1, plotShape.points);
+                                                                                                const p2DistanceToPlot = distancePointToPolygon(p2, plotShape.points);
+                                                                                                const midDistanceToPlot = distancePointToPolygon(midPoint, plotShape.points);
+                                                                                                const p1NearPlotEdge = p1DistanceToPlot <= baseTolerance * 2;
+                                                                                                const p2NearPlotEdge = p2DistanceToPlot <= baseTolerance * 2;
+                                                                                                const midNearPlotEdge = midDistanceToPlot <= baseTolerance * 2;
+
                                                                                                 if (
-                                                                                                    isPointInPolygon(p1, plotShape.points) ||
-                                                                                                    isPointInPolygon(p2, plotShape.points) ||
-                                                                                                    isPointInPolygon(midPoint, plotShape.points)
+                                                                                                    p1InPlot || p2InPlot || midInPlot ||
+                                                                                                    p1NearPlotEdge || p2NearPlotEdge || midNearPlotEdge
                                                                                                 ) {
                                                                                                     const segmentLength = distanceBetweenPoints(p1, p2) / 25;
                                                                                                     dripLengthInPlot += segmentLength;
@@ -3442,9 +3864,11 @@ export default function GreenhouseSummary() {
                                                                                     <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-blue-600">
                                                                                         {(() => {
                                                                                             const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
-                                                                                            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
-                                                                                            const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
-                                                                                            return totalFlowRate.toFixed(2);
+                                                                                            const longestSubPipeEmitters = plotPipe?.longestSubPipeEmitters || 0;
+                                                                                            
+                                                                                            // คำนวณอัตราการไหลจากจำนวนทางออกในท่อย่อยที่ยาวที่สุด
+                                                                                            const flowRate = longestSubPipeEmitters * sprinklerFlowRate;
+                                                                                            return flowRate.toFixed(2);
                                                                                         })()} {t('L/min')}
                                                                                     </td>
                                                                                     <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-blue-600">
@@ -3458,7 +3882,7 @@ export default function GreenhouseSummary() {
                                                                                                 return subPipes.filter(subPipe => subPipeServesPlot(subPipe, plotShape.points)).length;
                                                                                             }
                                                                                             return 0;
-                                                                                        })()} {t('เส้น')}
+                                                                                        })()}
                                                                                     </td>
                                                                                 </tr>
                                                                                 <tr>
@@ -3466,12 +3890,14 @@ export default function GreenhouseSummary() {
                                                                                     <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">
                                                                                         {(() => {
                                                                                             const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
-                                                                                            const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
-                                                                                            const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
-                                                                                            return totalFlowRate.toFixed(2);
+                                                                                            const longestSubPipeEmitters = plotPipe?.longestSubPipeEmitters || 0;
+                                                                                            
+                                                                                            // คำนวณอัตราการไหลจากจำนวนทางออกในท่อย่อยที่ยาวที่สุด
+                                                                                            const flowRate = longestSubPipeEmitters * sprinklerFlowRate;
+                                                                                            return flowRate.toFixed(2);
                                                                                         })()} {t('L/min')}
                                                                                     </td>
-                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">{plotPipe.totalEmitters} {t('ตัว')}</td>
+                                                                                    <td className="border border-gray-300 px-2 py-1 text-xs font-bold text-green-600">{plotPipe.longestSubPipeEmitters}</td>
                                                                                 </tr>
                                                                             </tbody>
                                                                         </table>
@@ -3794,10 +4220,25 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                     y: (p1.y + p2.y) / 2,
                                                                 };
 
+                                                                // ตรวจสอบว่าส่วนของท่อนี้อยู่ในแปลงหรืออยู่ใกล้ขอบแปลง
+                                                                const p1InPlot = isPointInPolygon(p1, plotShape.points);
+                                                                const p2InPlot = isPointInPolygon(p2, plotShape.points);
+                                                                const midInPlot = isPointInPolygon(midPoint, plotShape.points);
+                                                                
+                                                                // ตรวจสอบว่าส่วนของท่อนี้อยู่ใกล้ขอบแปลงหรือไม่
+                                                                const plotWidth = Math.max(...plotShape.points.map(p => p.x)) - Math.min(...plotShape.points.map(p => p.x));
+                                                                const plotHeight = Math.max(...plotShape.points.map(p => p.y)) - Math.min(...plotShape.points.map(p => p.y));
+                                                                const baseTolerance = Math.min(plotWidth, plotHeight) * 0.05; // 5% ของขนาดแปลง
+                                                                const p1DistanceToPlot = distancePointToPolygon(p1, plotShape.points);
+                                                                const p2DistanceToPlot = distancePointToPolygon(p2, plotShape.points);
+                                                                const midDistanceToPlot = distancePointToPolygon(midPoint, plotShape.points);
+                                                                const p1NearPlotEdge = p1DistanceToPlot <= baseTolerance * 2;
+                                                                const p2NearPlotEdge = p2DistanceToPlot <= baseTolerance * 2;
+                                                                const midNearPlotEdge = midDistanceToPlot <= baseTolerance * 2;
+
                                                                 if (
-                                                                    isPointInPolygon(p1, plotShape.points) ||
-                                                                    isPointInPolygon(p2, plotShape.points) ||
-                                                                    isPointInPolygon(midPoint, plotShape.points)
+                                                                    p1InPlot || p2InPlot || midInPlot ||
+                                                                    p1NearPlotEdge || p2NearPlotEdge || midNearPlotEdge
                                                                 ) {
                                                                     const segmentLength = distanceBetweenPoints(p1, p2) / 25; // แปลงเป็นเมตร
                                                                     dripLengthInPlot += segmentLength;
@@ -3826,14 +4267,8 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                     });
                                                 }
                                                 
-                                                let calculatedFlowRate = 0;
-                                                if (summaryData?.irrigationMethod === 'drip') {
-                                                    calculatedFlowRate = actualDripCount * 0.24;
-                                                } else {
-                                                    // คำนวณอัตราการไหลโดยตรง: จำนวนสปริงเกลอร์ทั้งหมด × อัตราการไหลต่อตัว
-                                                    calculatedFlowRate = actualSprinklerCount * flowRatePerUnit; // L/min per sprinkler
-                                                }
-                                                
+                                                // ใช้ข้อมูลอัตราการไหลจาก plotPipeData ที่คำนวณไว้แล้ว
+                                                const calculatedFlowRate = plotPipe?.totalFlowRate || 0;
                                                 const totalFlowRate = calculatedFlowRate.toFixed(1);
                                                 
                                                 // Debug: ตรวจสอบการคำนวณอัตราการไหลในแต่ละแปลง
@@ -3941,7 +4376,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                  <>
                                                                      <div className="rounded bg-gray-500 p-2 text-center">
                                                                          <div className="text-sm font-bold text-cyan-400">
-                                                                             {actualDripCount}
+                                                                             {plotPipe?.dripEmitterCount || 0}
                                                                          </div>
                                                                          <div className="text-xs text-gray-300">
                                                                              {t('จุดน้ำหยด')}
@@ -3949,7 +4384,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                      </div>
                                                                      <div className="rounded bg-gray-500 p-2 text-center">
                                                                          <div className="text-sm font-bold text-blue-400">
-                                                                             {flowRatePerUnit} {t('ลิตร/นาที')}
+                                                                             {(summaryData?.dripEmitterFlowRate || 0.24).toFixed(2)} {t('ลิตร/นาที')}
                                                                          </div>
                                                                          <div className="text-xs text-gray-300">
                                                                              {t('ต่อจุด')}
@@ -3960,7 +4395,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                  <>
                                                                      <div className="rounded bg-gray-500 p-2 text-center">
                                                                          <div className="text-sm font-bold text-cyan-400">
-                                                                             {actualSprinklerCount}
+                                                                             {plotPipe?.sprinklerCount || 0}
                                                                          </div>
                                                                          <div className="text-xs text-gray-300">
                                                                              {t('สปริงเกลอร์')}
@@ -3968,7 +4403,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                      </div>
                                                                      <div className="rounded bg-gray-500 p-2 text-center">
                                                                          <div className="text-sm font-bold text-blue-400">
-                                                                             {flowRatePerUnit} {t('ลิตร/นาที')}
+                                                                             {(summaryData?.sprinklerFlowRate || 10).toFixed(2)} {t('ลิตร/นาที')}
                                                                          </div>
                                                                          <div className="text-xs text-gray-300">
                                                                              {t('ต่อตัว')}
@@ -3998,12 +4433,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                          <tr>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs">{t('ท่อเมน')}</td>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
-                                                                                 {(() => {
-                                                                                     const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
-                                                                                     const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
-                                                                                     const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
-                                                                                     return totalFlowRate.toFixed(2);
-                                                                                 })()} {t('L/min')}
+                                                                                 {(plotPipe?.totalFlowRate || 0).toFixed(2)} {t('L/min')}
                                                                              </td>
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-blue-400">
                                                                                  {(() => {
@@ -4016,7 +4446,7 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                                          return subPipes.filter(subPipe => subPipeServesPlot(subPipe, plotShape.points)).length;
                                                                                      }
                                                                                      return 0;
-                                                                                 })()} {t('เส้น')}
+                                                                                 })()}
                                                                              </td>
                                                                          </tr>
                                                                          <tr>
@@ -4024,12 +4454,15 @@ if (subPipeServesPlot(subPipe, plotShape.points)) {
                                                                              <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">
                                                                                  {(() => {
                                                                                      const sprinklerFlowRate = summaryData?.sprinklerFlowRate || 10;
-                                                                                     const dripEmitterFlowRate = summaryData?.dripEmitterFlowRate || 0.24;
-                                                                                     const totalFlowRate = (plotPipe.sprinklerCount * sprinklerFlowRate) + (plotPipe.dripEmitterCount * dripEmitterFlowRate);
-                                                                                     return totalFlowRate.toFixed(2);
+                                                                                     const longestSubPipeEmitters = plotPipe?.longestSubPipeEmitters || 0;
+                                                                                     
+                                                                                     // คำนวณอัตราการไหลจากจำนวนทางออกในท่อย่อยที่ยาวที่สุด
+                                                                                     // สมมติว่าเป็นสปริงเกลอร์ทั้งหมด (หรือปรับตาม irrigation method)
+                                                                                     const flowRate = longestSubPipeEmitters * sprinklerFlowRate;
+                                                                                     return flowRate.toFixed(2);
                                                                                  })()} {t('L/min')}
                                                                              </td>
-                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">{plotPipe.totalEmitters} {t('ตัว')}</td>
+                                                                             <td className="border border-gray-500/50 px-2 py-1 text-xs font-bold text-green-400">{plotPipe.longestSubPipeEmitters}</td>
                                                                          </tr>
                                                                      </tbody>
                                                                  </table>
