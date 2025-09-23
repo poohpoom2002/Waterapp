@@ -1617,8 +1617,69 @@ const useMapManager = () => {
     createIrrigationMarkers(mapRef.current, positions, settings);
   }, [createIrrigationMarkers]);
 
+  // Helper function to calculate point size based on point count
+  const calculatePointSize = useCallback((pointCount: number): number => {
+    if (pointCount >= 5000) {
+      return 8 * 0.4; // 60% reduction (40% of original size)
+    } else if (pointCount >= 2000) {
+      return 8 * 0.6; // 40% reduction (60% of original size)
+    } else if (pointCount >= 800) {
+      return 8 * 0.8; // 20% reduction (80% of original size)
+    } else {
+      return 8; // Original size
+    }
+  }, []);
+
+  // Helper function to filter points based on zoom level and total point count
+  const filterPointsByZoom = useCallback((points: PlantPoint[], zoom: number, totalPointCount: number): PlantPoint[] => {
+    // If we have fewer than 800 points, show all points regardless of zoom
+    if (totalPointCount < 800) {
+      return points;
+    }
+
+    // Calculate maximum reduction factor based on total point count
+    let maxReductionFactor = 1; // No reduction by default
+    
+    if (totalPointCount >= 5000) {
+      maxReductionFactor = 4; // Up to 4x reduction (show 1/4 of points)
+    } else if (totalPointCount >= 2000) {
+      maxReductionFactor = 3; // Up to 3x reduction (show 1/3 of points)
+    } else if (totalPointCount >= 800) {
+      maxReductionFactor = 2; // Up to 2x reduction (show 1/2 of points)
+    }
+
+    // Calculate zoom-based reduction (5 levels: zoom 20, 19, 18, 17, 16)
+    let reductionFactor = 1;
+    
+    if (zoom >= 20) {
+      // Zoom 20+: show all points
+      reductionFactor = 1;
+    } else if (zoom >= 19) {
+      // Zoom 19: 25% of max reduction
+      reductionFactor = 1 + (maxReductionFactor - 1) * 0.25;
+    } else if (zoom >= 18) {
+      // Zoom 18: 50% of max reduction
+      reductionFactor = 1 + (maxReductionFactor - 1) * 0.5;
+    } else if (zoom >= 17) {
+      // Zoom 17: 75% of max reduction
+      reductionFactor = 1 + (maxReductionFactor - 1) * 0.75;
+    } else {
+      // Zoom < 17: maximum reduction
+      reductionFactor = maxReductionFactor;
+    }
+
+    // If no reduction needed, return all points
+    if (reductionFactor <= 1) {
+      return points;
+    }
+
+    // Sample points based on reduction factor
+    const step = Math.ceil(reductionFactor);
+    return points.filter((_, index) => index % step === 0);
+  }, []);
+
   // Draw plant points
-  const drawPlantPoints = useCallback((plantPoints: PlantPoint[], hideAll: boolean = false) => {
+  const drawPlantPoints = useCallback((plantPoints: PlantPoint[], hideAll: boolean = false, currentZoom: number = 18) => {
     if (!mapRef.current) return;
     
     const currentPlantMap = overlaysRef.current.plants;
@@ -1632,7 +1693,9 @@ const useMapManager = () => {
       return;
     }
     
-    const newPlantIds = new Set(plantPoints.map(p => p.id));
+    // Filter points based on zoom level and total point count
+    const filteredPoints = filterPointsByZoom(plantPoints, currentZoom, plantPoints.length);
+    const newPlantIds = new Set(filteredPoints.map(p => p.id));
 
     // Remove plants that no longer exist
     currentPlantMap.forEach((marker, plantId) => {
@@ -1642,17 +1705,21 @@ const useMapManager = () => {
       }
     });
 
+    // Calculate dynamic point size based on total point count (not filtered count)
+    const pointSize = calculatePointSize(plantPoints.length);
+    const anchorPoint = pointSize / 2;
+
     // Add new plants
-    plantPoints.forEach(plant => {
+    filteredPoints.forEach(plant => {
       if (!currentPlantMap.has(plant.id)) {
         const plantIcon = {
           url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-            <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="4" cy="4" r="3" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
+            <svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.75}" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
             </svg>
           `),
-          scaledSize: new google.maps.Size(8, 8),
-          anchor: new google.maps.Point(4, 4)
+          scaledSize: new google.maps.Size(pointSize, pointSize),
+          anchor: new google.maps.Point(anchorPoint, anchorPoint)
         };
 
         const marker = new google.maps.Marker({
@@ -1668,7 +1735,7 @@ const useMapManager = () => {
         currentPlantMap.set(plant.id, marker);
       }
     });
-  }, []);
+  }, [filterPointsByZoom, calculatePointSize]);
 
   // ปรับปรุง drawPumps ให้มีประสิทธิภาพ
   const drawPumps = useCallback((pumps: Pump[], onRemovePump?: (pumpId: string) => void) => {
@@ -2340,7 +2407,7 @@ const useMapManager = () => {
   }, []);
 
   // updateMapVisuals เรียกใช้ฟังก์ชันที่ปรับปรุงแล้ว
-  const updateMapVisuals = useCallback((fieldData: FieldData, hideAllPoints: boolean = false) => {
+  const updateMapVisuals = useCallback((fieldData: FieldData, hideAllPoints: boolean = false, currentZoom: number = 18) => {
     if (!mapRef.current) return;
     
     if (fieldData.mainArea.length > 0) {
@@ -2353,7 +2420,7 @@ const useMapManager = () => {
         drawObstacles(fieldData.obstacles);
     }
     if (fieldData.plantPoints.length > 0) {
-        drawPlantPoints(fieldData.plantPoints, hideAllPoints);
+        drawPlantPoints(fieldData.plantPoints, hideAllPoints, currentZoom);
     }
     if (fieldData.irrigationPositions) {
         drawIrrigation(fieldData.irrigationPositions, fieldData.irrigationSettings);
@@ -2528,6 +2595,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
   const [isPlacingPump, setIsPlacingPump] = useState(false);
   const isPlacingPumpRef = useRef(false);
   const [hideAllPoints, setHideAllPoints] = useState<boolean>(false); // Hide all points toggle
+  const [mapZoom, setMapZoom] = useState<number>(18); // Track map zoom level
 
   const [showLegend, setShowLegend] = useState(true);
 
@@ -2706,7 +2774,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       }
       
       mapVisualsDebounceTimer.current = setTimeout(() => {
-        mapManager.updateMapVisuals(fieldData, hideAllPoints);
+        mapManager.updateMapVisuals(fieldData, hideAllPoints, mapZoom);
       }, 100); // 100ms debounce สำหรับ map visuals
     }
     
@@ -2715,16 +2783,16 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         clearTimeout(mapVisualsDebounceTimer.current);
       }
     };
-  }, [fieldData, createFieldDataHash, mapManager, hideAllPoints]); // Removed mapManager from dependencies
+  }, [fieldData, createFieldDataHash, mapManager, hideAllPoints, mapZoom]); // Removed mapManager from dependencies
 
   // useEffect แยกสำหรับการโหลดข้อมูลทันทีเมื่อเข้าสู่หน้า
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (fieldData.mainArea.length > 0 && mapManager.mapRef.current) {
       // อัปเดต map visuals ทันทีเมื่อมีข้อมูลและ map พร้อม
-      mapManager.updateMapVisuals(fieldData, hideAllPoints);
+      mapManager.updateMapVisuals(fieldData, hideAllPoints, mapZoom);
     }
-  }, [fieldData, mapManager, hideAllPoints]); // Removed mapManager from dependencies
+  }, [fieldData, mapManager, hideAllPoints, mapZoom]); // Removed mapManager from dependencies
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -4909,6 +4977,9 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     mapManager.mapRef.current = loadedMap;
 
     loadedMap.addListener('zoom_changed', () => {
+        const newZoom = loadedMap.getZoom() || 18;
+        setMapZoom(newZoom);
+        
         if (zoomDebounceTimer.current) {
             clearTimeout(zoomDebounceTimer.current);
         }
@@ -5968,6 +6039,42 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Zoom Level and Points Information */}
+                <div className="absolute bottom-4 right-20 z-10 pointer-events-none">
+                  <div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
+                    {t('Zoom Level')}: {mapZoom}
+                  </div>
+                  {fieldData.plantPoints.length > 0 && (
+                    <div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
+                      {t('Points')}: {fieldData.plantPoints.length.toLocaleString()} / {fieldData.plantPoints.length.toLocaleString()}
+                      {fieldData.plantPoints.length > fieldData.plantPoints.length && (
+                        <span className="text-yellow-300 ml-1">
+                          ({Math.round((1 - fieldData.plantPoints.length / fieldData.plantPoints.length) * 100)}% {t('reduced')})
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {fieldData.plantPoints.length > 0 && fieldData.plantPoints.length >= 800 && (
+                    <div className="px-2 py-1 rounded bg-blue-900 bg-opacity-70 border border-blue-500 text-xs text-white mb-1">
+                      {mapZoom >= 20 && <span className="text-green-300">{t('All points visible')}</span>}
+                      {mapZoom >= 19 && mapZoom < 20 && <span className="text-yellow-300">{t('25% reduction')}</span>}
+                      {mapZoom >= 18 && mapZoom < 19 && <span className="text-orange-300">{t('50% reduction')}</span>}
+                      {mapZoom >= 17 && mapZoom < 18 && <span className="text-red-300">{t('75% reduction')}</span>}
+                      {mapZoom < 17 && <span className="text-red-500">{t('Maximum reduction')}</span>}
+                    </div>
+                  )}
+                  {fieldData.plantPoints.length > 0 && (
+                    <div className="px-2 py-1 rounded bg-green-900 bg-opacity-70 border border-green-500 text-xs text-white">
+                      <div>{fieldData.plantPoints.length} {t('points')} {t('visible')}</div>
+                      {fieldData.plantPoints.length > fieldData.plantPoints.length && (
+                        <div className="text-yellow-200 text-xs">
+                          {t('Performance optimized')}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {showLegend ? (
