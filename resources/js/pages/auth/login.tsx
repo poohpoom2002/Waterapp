@@ -303,15 +303,16 @@
 //     );
 // }
 
-import { useForm } from '@inertiajs/react';
+import { useForm, usePage } from '@inertiajs/react';
 import { LoaderCircle, Shield, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import { FormEventHandler, useState } from 'react';
+import { FormEventHandler, useState, useEffect } from 'react';
 
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { updateCsrfTokenFromProps } from '@/bootstrap';
 
 type LoginForm = {
     email: string;
@@ -326,12 +327,20 @@ interface LoginProps {
 
 export default function Login({ status }: LoginProps) {
     const [showPassword, setShowPassword] = useState(false);
+    const { props } = usePage();
 
     const { data, setData, post, processing, errors, reset } = useForm<Required<LoginForm>>({
         email: '',
         password: '',
         remember: false,
     });
+
+    // Update CSRF token when component mounts or when props change
+    useEffect(() => {
+        if (props.csrf_token) {
+            updateCsrfTokenFromProps(props.csrf_token as string);
+        }
+    }, [props.csrf_token]);
 
     const submit: FormEventHandler = (e) => {
         e.preventDefault();

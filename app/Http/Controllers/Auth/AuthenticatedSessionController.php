@@ -46,6 +46,11 @@ class AuthenticatedSessionController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
+        // For Inertia requests, return a proper response with the new CSRF token
+        if ($request->header('X-Inertia')) {
+            return redirect()->route('login')->with('csrf_token', csrf_token());
+        }
+
         return redirect()->route('login');
     }
 }

@@ -43,6 +43,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
+            'csrf_token' => csrf_token(),
             'auth' => [
                 'user' => $request->user() ? [
                     'id' => $request->user()->id,
@@ -57,9 +58,6 @@ class HandleInertiaRequests extends Middleware
                     'monthly_tokens' => $request->user()->monthly_tokens,
                     'tokens' => $request->user()->tokens,
                     'total_tokens_used' => $request->user()->total_tokens_used,
-                    'last_token_refresh' => $request->user()->last_token_refresh,
-                    'token_refresh_count' => $request->user()->token_refresh_count,
-                    'can_refresh_tokens' => $request->user()->canRefreshTokens(),
                     'tier_info' => $request->user()->getTierInfo(),
                 ] : null,
             ],

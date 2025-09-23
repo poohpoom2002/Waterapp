@@ -143,10 +143,18 @@ export default function Profile() {
                                 </p>
                             </div>
                             <button
-                                onClick={() => router.visit('/fields')}
+                                onClick={() => {
+                                    // Check if there's history to go back to
+                                    if (window.history.length > 1) {
+                                        window.history.back();
+                                    } else {
+                                        // Fallback to home page if no history
+                                        router.visit('/');
+                                    }
+                                }}
                                 className="rounded-lg bg-gray-700 px-4 py-2 text-white transition-colors hover:bg-gray-600"
                             >
-                                ← Back to Fields
+                                ← Back
                             </button>
                         </div>
                     </div>
