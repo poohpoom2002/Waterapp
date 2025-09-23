@@ -28,8 +28,6 @@ class User extends Authenticatable
         'monthly_tokens',
         'tokens',
         'total_tokens_used',
-        'last_token_refresh',
-        'token_refresh_count',
     ];
 
     /**
@@ -57,8 +55,6 @@ class User extends Authenticatable
             'monthly_tokens' => 'integer',
             'tokens' => 'integer',
             'total_tokens_used' => 'integer',
-            'last_token_refresh' => 'datetime',
-            'token_refresh_count' => 'integer',
         ];
     }
 
@@ -106,7 +102,6 @@ class User extends Authenticatable
     }
 
     /**
-<<<<<<< HEAD
      * Check if user has enough tokens for an operation.
      */
     public function hasEnoughTokens(int $requiredTokens = 1): bool
@@ -150,32 +145,16 @@ class User extends Authenticatable
     }
 
     /**
-     * Refresh user tokens (daily refresh).
+     * Force remove tokens (admin only) - can go negative if needed.
+     * Use with caution - this is for admin corrections.
      */
-    public function refreshTokens(): bool
+    public function forceRemoveTokens(int $tokensToRemove): void
     {
-        // Super users don't need token refresh
-        if ($this->is_super_user) {
-            return true;
-        }
-
-        $now = now();
-        $lastRefresh = $this->last_token_refresh;
-
-        // Check if it's been at least 24 hours since last refresh
-        if ($lastRefresh && $now->diffInHours($lastRefresh) < 24) {
-            return false;
-        }
-
-        // Add tokens based on tier
-        $tokensToAdd = $this->getDailyTokenAmount();
-        $this->tokens += $tokensToAdd;
-        $this->last_token_refresh = $now;
-        $this->token_refresh_count += 1;
+        $this->tokens -= $tokensToRemove;
+        $this->total_tokens_used += $tokensToRemove;
         $this->save();
-
-        return true;
     }
+
 
     /**
      * Get daily token amount based on user tier.
@@ -219,31 +198,13 @@ class User extends Authenticatable
         return [
             'current_tokens' => $this->tokens,
             'total_used' => $this->total_tokens_used,
-            'last_refresh' => $this->last_token_refresh,
-            'refresh_count' => $this->token_refresh_count,
             'is_super_user' => $this->is_super_user,
-            'can_refresh' => $this->canRefreshTokens(),
             'tier' => $this->tier,
             'daily_tokens' => $this->getDailyTokenAmount(),
             'monthly_allowance' => $this->getMonthlyTokenAllowance(),
         ];
     }
 
-    /**
-     * Check if user can refresh tokens.
-     */
-    public function canRefreshTokens(): bool
-    {
-        if ($this->is_super_user) {
-            return false; // Super users don't need to refresh
-        }
-
-        if (!$this->last_token_refresh) {
-            return true; // Never refreshed before
-        }
-
-        return now()->diffInHours($this->last_token_refresh) >= 24;
-    }
 
     /**
      * Get user tier information.
@@ -315,8 +276,6 @@ class User extends Authenticatable
     }
 
     /**
-=======
->>>>>>> origin/main
      * Get the user's fields.
      */
     public function fields()
@@ -330,5 +289,21 @@ class User extends Authenticatable
     public function folders()
     {
         return $this->hasMany(Folder::class);
+    }
+
+    /**
+     * Get the user's payments.
+     */
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Get payments approved by this user (for super users).
+     */
+    public function approvedPayments()
+    {
+        return $this->hasMany(Payment::class, 'approved_by');
     }
 }
