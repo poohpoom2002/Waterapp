@@ -3633,10 +3633,6 @@ const buildZoneConnectivityLongestFlows = (
 
         debugInfo.totalFlow = totalFlow;
 
-        // Debug logging for troubleshooting
-        if (totalFlow === 0 && latIds.length > 0) {
-        }
-
         return { latCount, flow: totalFlow };
     };
     const subLongestStats = subLongest
