@@ -19,6 +19,7 @@ export default function ChooseIrrigationMethod() {
     const [crops, setCrops] = useState<string>('');
     const [shapes, setShapes] = useState<string>('');
     const [method, setMethod] = useState<string>('');
+    const [sprinklerRadius, setSprinklerRadius] = useState<string>('');
 
     // Define irrigation options with translation
     const irrigationOptions: IrrigationOption[] = [
@@ -50,6 +51,7 @@ export default function ChooseIrrigationMethod() {
         const cropsParam = urlParams.get('crops');
         const shapesParam = urlParams.get('shapes');
         const methodParam = urlParams.get('method');
+        const sprinklerRadiusParam = urlParams.get('sprinklerRadius');
 
         console.log('Choose-irrigation received:', {
             crops: cropsParam,
@@ -62,6 +64,7 @@ export default function ChooseIrrigationMethod() {
         if (cropsParam) setCrops(cropsParam);
         if (shapesParam) setShapes(shapesParam);
         if (methodParam) setMethod(methodParam);
+        if (sprinklerRadiusParam) setSprinklerRadius(sprinklerRadiusParam);
     }, []);
 
     // Function to go back to planner page
@@ -81,6 +84,7 @@ export default function ChooseIrrigationMethod() {
         if (crops) queryParams.set('crops', crops);
         if (shapes) queryParams.set('shapes', shapes); // Add this line
         if (method) queryParams.set('method', method);
+        if (sprinklerRadius) queryParams.set('sprinklerRadius', sprinklerRadius);
 
         window.location.href = `/greenhouse-planner?${queryParams.toString()}`;
     };
@@ -98,6 +102,7 @@ export default function ChooseIrrigationMethod() {
             shapes: shapes,
             method: method,
             selectedIrrigation: selectedMethod,
+            sprinklerRadius: sprinklerRadius,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -110,6 +115,9 @@ export default function ChooseIrrigationMethod() {
         if (shapes) queryParams.set('shapes', shapes);
         if (method) queryParams.set('method', method);
         queryParams.set('irrigation', selectedMethod);
+        if (sprinklerRadius && selectedMethod === 'mini-sprinkler') {
+            queryParams.set('sprinklerRadius', sprinklerRadius);
+        }
 
         // Navigate to greenhouse-map page
         window.location.href = `/greenhouse-map?${queryParams.toString()}`;
