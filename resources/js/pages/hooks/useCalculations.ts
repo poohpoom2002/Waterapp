@@ -15,6 +15,11 @@ import {
     validateHeadLossRatio,
     calculateSafetyFactor,
 } from '../utils/calculations';
+import { 
+    getEnhancedFieldCropData, 
+    calculateEnhancedFieldStats,
+    FieldCropData 
+} from '../../utils/fieldCropData';
 
 export interface ZoneCalculationData {
     zoneId: string;
@@ -61,7 +66,11 @@ interface ProjectSummary {
     criticalGroup?: ZoneOperationGroup;
 }
 
-const calculateSprinklerPressure = (sprinkler: any, defaultPressure: number, projectMode?: string): number => {
+const calculateSprinklerPressure = (
+    sprinkler: any,
+    defaultPressure: number,
+    projectMode?: string
+): number => {
     if (!sprinkler) return defaultPressure;
 
     try {
@@ -100,11 +109,15 @@ const calculateSprinklerPressure = (sprinkler: any, defaultPressure: number, pro
     }
 };
 
-const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput, projectMode?: string) => {
+const calculateSprinklerBasedFlow = (
+    sprinkler: any,
+    input: IrrigationInput,
+    projectMode?: string
+) => {
     let totalWaterPerMinute: number;
     let totalSprinklers: number;
     let flowPerSprinkler: number;
-    
+
     if (projectMode === 'field-crop') {
         // Field-crop: waterPerTreeLiters is LPM per head
         totalSprinklers = input.totalTrees;
@@ -136,7 +149,11 @@ const calculateSprinklerBasedFlow = (sprinkler: any, input: IrrigationInput, pro
     };
 };
 
-const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: any, projectMode?: string) => {
+const calculateFlowRequirements = (
+    input: IrrigationInput,
+    selectedSprinkler: any,
+    projectMode?: string
+) => {
     const sprinklerFlow = calculateSprinklerBasedFlow(selectedSprinkler, input, projectMode);
 
     let totalSprinklers: number;
@@ -144,48 +161,72 @@ const calculateFlowRequirements = (input: IrrigationInput, selectedSprinkler: an
 
     if (projectMode === 'field-crop' || projectMode === 'greenhouse' || projectMode === 'garden') {
         totalSprinklers = sprinklerFlow.sprinklersUsed || input.totalTrees;
-        flowPerSprinklerLPM = sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
+        flowPerSprinklerLPM =
+            sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
     } else {
-        totalSprinklers = sprinklerFlow.sprinklersUsed || Math.ceil(input.totalTrees * (input.sprinklersPerTree || 1));
-        flowPerSprinklerLPM = sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
+        totalSprinklers =
+            sprinklerFlow.sprinklersUsed ||
+            Math.ceil(input.totalTrees * (input.sprinklersPerTree || 1));
+        flowPerSprinklerLPM =
+            sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
     }
 
     let maxSprinklersPerBranch: number;
     if (projectMode === 'field-crop') {
-        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch || input.sprinklersPerBranch, 25);
+        maxSprinklersPerBranch = Math.min(
+            input.sprinklersPerLongestBranch || input.sprinklersPerBranch,
+            25
+        );
     } else if (projectMode === 'greenhouse') {
-        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch || input.sprinklersPerBranch, 15);
+        maxSprinklersPerBranch = Math.min(
+            input.sprinklersPerLongestBranch || input.sprinklersPerBranch,
+            15
+        );
     } else if (projectMode === 'garden') {
-        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch || input.sprinklersPerBranch, 12);
+        maxSprinklersPerBranch = Math.min(
+            input.sprinklersPerLongestBranch || input.sprinklersPerBranch,
+            12
+        );
     } else {
-        maxSprinklersPerBranch = Math.min(input.sprinklersPerLongestBranch || input.sprinklersPerBranch, 20);
+        maxSprinklersPerBranch = Math.min(
+            input.sprinklersPerLongestBranch || input.sprinklersPerBranch,
+            20
+        );
     }
 
     const branchFlowLPM = flowPerSprinklerLPM * maxSprinklersPerBranch;
 
     let maxBranchesPerSecondary: number;
     if (projectMode === 'field-crop') {
-        maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary || input.branchesPerSecondary, 12);
+        maxBranchesPerSecondary = Math.min(
+            input.branchesPerLongestSecondary || input.branchesPerSecondary,
+            12
+        );
     } else if (projectMode === 'greenhouse') {
-        maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary || input.branchesPerSecondary, 8);
+        maxBranchesPerSecondary = Math.min(
+            input.branchesPerLongestSecondary || input.branchesPerSecondary,
+            8
+        );
     } else {
-        maxBranchesPerSecondary = Math.min(input.branchesPerLongestSecondary || input.branchesPerSecondary, 10);
+        maxBranchesPerSecondary = Math.min(
+            input.branchesPerLongestSecondary || input.branchesPerSecondary,
+            10
+        );
     }
 
-    const secondaryFlowLPM = input.longestSecondaryPipeM > 0 
-        ? branchFlowLPM * maxBranchesPerSecondary 
-        : 0;
+    const secondaryFlowLPM =
+        input.longestSecondaryPipeM > 0 ? branchFlowLPM * maxBranchesPerSecondary : 0;
 
-    const mainFlowLPM = input.longestMainPipeM > 0 
-        ? Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2) 
-        : 0;
+    const mainFlowLPM =
+        input.longestMainPipeM > 0 ? Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2) : 0;
 
     // Calculate emitter flow based on plant density and connection method
-    const emitterFlowLPM = (input.longestEmitterPipeM && input.longestEmitterPipeM > 0)
-        ? Math.max(flowPerSprinklerLPM * 0.5, flowPerSprinklerLPM) // Typically 50-100% of single sprinkler flow
-        : 0;
+    const emitterFlowLPM =
+        input.longestEmitterPipeM && input.longestEmitterPipeM > 0
+            ? Math.max(flowPerSprinklerLPM * 0.5, flowPerSprinklerLPM) // Typically 50-100% of single sprinkler flow
+            : 0;
 
-    return {    
+    return {
         totalFlowLPM: sprinklerFlow.totalFlowLPM,
         totalSprinklers,
         sprinklersPerZone: formatNumber(totalSprinklers / input.numberOfZones, 1),
@@ -231,7 +272,8 @@ const calculateZoneResults = (
             projectMode
         );
 
-        const hasValidSecondaryPipe = input.longestSecondaryPipeM > 0 && input.totalSecondaryPipeM > 0;
+        const hasValidSecondaryPipe =
+            input.longestSecondaryPipeM > 0 && input.totalSecondaryPipeM > 0;
         let autoSelectedSecondaryPipe: any = null;
         if (hasValidSecondaryPipe) {
             const analyzedSecondaryPipes = pipeData
@@ -300,30 +342,36 @@ const calculateZoneResults = (
               )
             : { major: 0, minor: 0, total: 0, velocity: 0, C: 135, K: 0 };
 
-        const secondaryLoss = autoSelectedSecondaryPipe && hasValidSecondaryPipe
-            ? calculateImprovedHeadLoss(
-                  flowData.secondaryFlowLPM,
-                  autoSelectedSecondaryPipe.sizeMM,
-                  input.longestSecondaryPipeM,
-                  autoSelectedSecondaryPipe.pipeType,
-                  'secondary',
-                  input.pipeAgeYears || 0
-              )
-            : { major: 0, minor: 0, total: 0, velocity: 0, C: 140, K: 0 };
+        const secondaryLoss =
+            autoSelectedSecondaryPipe && hasValidSecondaryPipe
+                ? calculateImprovedHeadLoss(
+                      flowData.secondaryFlowLPM,
+                      autoSelectedSecondaryPipe.sizeMM,
+                      input.longestSecondaryPipeM,
+                      autoSelectedSecondaryPipe.pipeType,
+                      'secondary',
+                      input.pipeAgeYears || 0
+                  )
+                : { major: 0, minor: 0, total: 0, velocity: 0, C: 140, K: 0 };
 
-        const mainLoss = autoSelectedMainPipe && hasValidMainPipe
-            ? calculateImprovedHeadLoss(
-                  flowData.mainFlowLPM,
-                  autoSelectedMainPipe.sizeMM,
-                  input.longestMainPipeM,
-                  autoSelectedMainPipe.pipeType,
-                  'main',
-                  input.pipeAgeYears || 0
-              )
-            : { major: 0, minor: 0, total: 0, velocity: 0, C: 145, K: 0 };
+        const mainLoss =
+            autoSelectedMainPipe && hasValidMainPipe
+                ? calculateImprovedHeadLoss(
+                      flowData.mainFlowLPM,
+                      autoSelectedMainPipe.sizeMM,
+                      input.longestMainPipeM,
+                      autoSelectedMainPipe.pipeType,
+                      'main',
+                      input.pipeAgeYears || 0
+                  )
+                : { major: 0, minor: 0, total: 0, velocity: 0, C: 145, K: 0 };
 
         // Calculate emitter pipe selection and head loss
-        const hasValidEmitterPipe = input.longestEmitterPipeM && input.longestEmitterPipeM > 0 && input.totalEmitterPipeM && input.totalEmitterPipeM > 0;
+        const hasValidEmitterPipe =
+            input.longestEmitterPipeM &&
+            input.longestEmitterPipeM > 0 &&
+            input.totalEmitterPipeM &&
+            input.totalEmitterPipeM > 0;
         let autoSelectedEmitterPipe: any = null;
         if (hasValidEmitterPipe) {
             const analyzedEmitterPipes = pipeData
@@ -352,19 +400,25 @@ const calculateZoneResults = (
             );
         }
 
-        const emitterLoss = autoSelectedEmitterPipe && hasValidEmitterPipe
-            ? calculateImprovedHeadLoss(
-                  flowData.emitterFlowLPM,
-                  autoSelectedEmitterPipe.sizeMM,
-                  input.longestEmitterPipeM || 0,
-                  autoSelectedEmitterPipe.pipeType,
-                  'emitter',
-                  input.pipeAgeYears || 0
-              )
-            : { major: 0, minor: 0, total: 0, velocity: 0, C: 135, K: 0 };
+        const emitterLoss =
+            autoSelectedEmitterPipe && hasValidEmitterPipe
+                ? calculateImprovedHeadLoss(
+                      flowData.emitterFlowLPM,
+                      autoSelectedEmitterPipe.sizeMM,
+                      input.longestEmitterPipeM || 0,
+                      autoSelectedEmitterPipe.pipeType,
+                      'emitter',
+                      input.pipeAgeYears || 0
+                  )
+                : { major: 0, minor: 0, total: 0, velocity: 0, C: 135, K: 0 };
 
-        const totalHeadLoss = branchLoss.total + secondaryLoss.total + mainLoss.total + emitterLoss.total;
-        const pressureHead = calculateSprinklerPressure(sprinkler, input.pressureHeadM, projectMode);
+        const totalHeadLoss =
+            branchLoss.total + secondaryLoss.total + mainLoss.total + emitterLoss.total;
+        const pressureHead = calculateSprinklerPressure(
+            sprinkler,
+            input.pressureHeadM,
+            projectMode
+        );
         const totalHead = input.staticHeadM + totalHeadLoss + pressureHead;
 
         return {
@@ -420,9 +474,10 @@ const calculateProjectSummary = (
         const groupRequirements = zoneOperationGroups.map((group) => {
             const zonesInGroup = allZoneResults.filter((zr) => group.zones.includes(zr.zoneId));
             const totalFlow = zonesInGroup.reduce((sum, zone) => sum + zone.totalFlowLPM, 0);
-            const maxHead = zonesInGroup.length > 0
-                ? Math.max(...zonesInGroup.map((zone) => zone.totalHead))
-                : 0;
+            const maxHead =
+                zonesInGroup.length > 0
+                    ? Math.max(...zonesInGroup.map((zone) => zone.totalHead))
+                    : 0;
 
             return {
                 group,
@@ -491,8 +546,9 @@ const calculateSystemComplexity = (input: IrrigationInput, projectMode?: string)
         else if (input.farmSizeRai > 5 || input.totalTrees > 500) complexityScore += 1;
     }
 
-    const totalPipeLength = input.totalBranchPipeM + input.totalSecondaryPipeM + input.totalMainPipeM;
-    
+    const totalPipeLength =
+        input.totalBranchPipeM + input.totalSecondaryPipeM + input.totalMainPipeM;
+
     let pipeLengthThresholds = [5000, 2000, 800];
     if (projectMode === 'field-crop') {
         pipeLengthThresholds = [8000, 3000, 1200];
@@ -516,9 +572,9 @@ const calculateSystemComplexity = (input: IrrigationInput, projectMode?: string)
 };
 
 const autoSelectBestPipe = (
-    analyzedPipes: any[], 
-    pipeType: string, 
-    flowLPM: number, 
+    analyzedPipes: any[],
+    pipeType: string,
+    flowLPM: number,
     projectMode?: string
 ): any => {
     if (!analyzedPipes || analyzedPipes.length === 0) return null;
@@ -612,18 +668,63 @@ const autoSelectBestPump = (
     // เลือกปั๊มที่มี Flow Max และ Head Max น้อยที่สุด (ไม่ oversized เกินไป)
     return adequatePumps.sort((a, b) => {
         // เปรียบเทียบ maxFlow ก่อน (น้อยกว่าดีกว่า)
-        if (Math.abs(a.maxFlow - b.maxFlow) > 10) { // ถ้าต่างกันมากกว่า 10 LPM
+        if (Math.abs(a.maxFlow - b.maxFlow) > 10) {
+            // ถ้าต่างกันมากกว่า 10 LPM
             return a.maxFlow - b.maxFlow;
         }
-        
+
         // ถ้า maxFlow ใกล้เคียงกัน ให้เปรียบเทียบ maxHead (น้อยกว่าดีกว่า)
-        if (Math.abs(a.maxHead - b.maxHead) > 5) { // ถ้าต่างกันมากกว่า 5 เมตร
+        if (Math.abs(a.maxHead - b.maxHead) > 5) {
+            // ถ้าต่างกันมากกว่า 5 เมตร
             return a.maxHead - b.maxHead;
         }
-        
+
         // ถ้าใกล้เคียงกันทั้งคู่ ให้เลือกตามราคา (ถูกกว่าดีกว่า)
         return a.price - b.price;
     })[0];
+};
+
+// Helper function to get field-crop data and convert to calculation format
+const getFieldCropCalculationData = (): { 
+    fieldCropData: FieldCropData | null; 
+    convertedInput: IrrigationInput | null;
+} => {
+    try {
+        const fieldCropData = getEnhancedFieldCropData();
+        if (!fieldCropData) {
+            return { fieldCropData: null, convertedInput: null };
+        }
+
+        // Convert field-crop data to IrrigationInput format
+        const convertedInput: IrrigationInput = {
+            farmSizeRai: fieldCropData.area.sizeInRai,
+            totalTrees: fieldCropData.summary.totalPlantingPoints,
+            waterPerTreeLiters: fieldCropData.summary.totalWaterRequirementPerDay / fieldCropData.summary.totalPlantingPoints / 60, // Convert to LPM per plant
+            numberOfZones: fieldCropData.zones.count,
+            sprinklersPerTree: 1, // Default for field-crop
+            longestBranchPipeM: fieldCropData.pipes.stats.lateral.longest,
+            totalBranchPipeM: fieldCropData.pipes.stats.lateral.totalLength,
+            longestSecondaryPipeM: fieldCropData.pipes.stats.submain.longest,
+            totalSecondaryPipeM: fieldCropData.pipes.stats.submain.totalLength,
+            longestMainPipeM: fieldCropData.pipes.stats.main.longest,
+            totalMainPipeM: fieldCropData.pipes.stats.main.totalLength,
+            irrigationTimeMinutes: 30, // Default irrigation time
+            staticHeadM: 5, // Default static head
+            pressureHeadM: 20, // Default pressure head
+            pipeAgeYears: 0, // Default pipe age
+            sprinklersPerBranch: Math.min(25, Math.ceil(fieldCropData.summary.totalPlantingPoints / fieldCropData.zones.count / 10)),
+            branchesPerSecondary: Math.min(12, Math.ceil(fieldCropData.zones.count / 2)),
+            simultaneousZones: 1, // Default simultaneous zones
+            sprinklersPerLongestBranch: Math.min(25, Math.ceil(fieldCropData.summary.totalPlantingPoints / fieldCropData.zones.count / 10)),
+            branchesPerLongestSecondary: Math.min(12, Math.ceil(fieldCropData.zones.count / 2)),
+            secondariesPerLongestMain: Math.min(8, Math.ceil(fieldCropData.zones.count / 3)),
+        };
+
+        return { fieldCropData, convertedInput };
+    } catch (error) {
+        console.error('Error getting field-crop calculation data:', error);
+        return { fieldCropData: null, convertedInput: null };
+    }
 };
 
 export const useCalculations = (
@@ -871,23 +972,34 @@ export const useCalculations = (
         if (!sprinklerData.length || !pumpData.length || !pipeData.length) return null;
         if (!input) return null;
 
-        const projectMode = allZoneData && allZoneData.length > 0 
-            ? allZoneData[0].projectMode 
-            : undefined;
+        const projectMode =
+            allZoneData && allZoneData.length > 0 ? allZoneData[0].projectMode : undefined;
+
+        // For field-crop mode, try to get enhanced data from fieldCropData
+        let workingInput = input;
+        let fieldCropData: FieldCropData | null = null;
+        
+        if (projectMode === 'field-crop') {
+            const { fieldCropData: fcData, convertedInput } = getFieldCropCalculationData();
+            if (fcData && convertedInput) {
+                fieldCropData = fcData;
+                workingInput = convertedInput;
+            }
+        }
 
         const sanitizedInput = {
-            ...input,
+            ...workingInput,
             sprinklersPerLongestBranch: Math.min(
-                Math.max(input.sprinklersPerLongestBranch || 4, 1),
+                Math.max(workingInput.sprinklersPerLongestBranch || 4, 1),
                 projectMode === 'field-crop' ? 25 : projectMode === 'greenhouse' ? 15 : 20
             ),
             branchesPerLongestSecondary: Math.min(
-                Math.max(input.branchesPerLongestSecondary || 1, 1),
+                Math.max(workingInput.branchesPerLongestSecondary || 1, 1),
                 projectMode === 'field-crop' ? 12 : projectMode === 'greenhouse' ? 8 : 10
             ),
-            totalTrees: Math.max(input.totalTrees, 1),
-            waterPerTreeLiters: Math.max(input.waterPerTreeLiters, 0.1),
-            irrigationTimeMinutes: Math.max(input.irrigationTimeMinutes, 5),
+            totalTrees: Math.max(workingInput.totalTrees, 1),
+            waterPerTreeLiters: Math.max(workingInput.waterPerTreeLiters, 0.1),
+            irrigationTimeMinutes: Math.max(workingInput.irrigationTimeMinutes, 5),
         };
 
         const flowData = calculateFlowRequirements(sanitizedInput, selectedSprinkler, projectMode);
@@ -906,10 +1018,37 @@ export const useCalculations = (
             projectSummary = calculateProjectSummary(allZoneResults, zoneOperationGroups || []);
         }
 
+        // Enhanced sprinkler analysis for field-crop mode
         const analyzedSprinklers = sprinklerData
-            .map((sprinkler) => ({
-                ...sprinkler,
-            }))
+            .map((sprinkler) => {
+                let enhancedSprinkler = { ...sprinkler };
+                
+                // For field-crop mode, enhance sprinkler data with field-crop specific calculations
+                if (projectMode === 'field-crop' && fieldCropData) {
+                    // Calculate flow requirements based on field-crop data
+                    const targetFlow = sanitizedInput.waterPerTreeLiters;
+                    const minFlow = targetFlow * 0.8;
+                    const maxFlow = targetFlow * 1.2;
+                    
+                    // Check if sprinkler flow matches field-crop requirements
+                    const sprinklerFlow = sprinkler.waterVolumeLitersPerMinute || sprinkler.flow || 0;
+                    enhancedSprinkler.flowMatch = sprinklerFlow >= minFlow && sprinklerFlow <= maxFlow;
+                    enhancedSprinkler.flowCloseMatch = Math.abs(sprinklerFlow - targetFlow) <= targetFlow * 0.3;
+                    enhancedSprinkler.targetFlow = targetFlow;
+                    enhancedSprinkler.minFlow = minFlow;
+                    enhancedSprinkler.maxFlow = maxFlow;
+                    
+                    // Calculate price per flow efficiency
+                    enhancedSprinkler.pricePerFlow = sprinklerFlow > 0 ? (sprinkler.price || 0) / sprinklerFlow : 0;
+                    
+                    // Set recommendation status based on field-crop criteria
+                    enhancedSprinkler.isRecommended = enhancedSprinkler.flowMatch && (sprinkler.price || 0) < 1000;
+                    enhancedSprinkler.isGoodChoice = enhancedSprinkler.flowCloseMatch && (sprinkler.price || 0) < 2000;
+                    enhancedSprinkler.isUsable = sprinklerFlow >= minFlow * 0.5;
+                }
+                
+                return enhancedSprinkler;
+            })
             .sort((a, b) => {
                 // Sort by recommendation status first, then by price
                 if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
@@ -963,7 +1102,12 @@ export const useCalculations = (
             : [];
 
         const autoSelectedSecondaryPipe = hasValidSecondaryPipe
-            ? autoSelectBestPipe(analyzedSecondaryPipes, 'secondary', flowData.secondaryFlowLPM, projectMode)
+            ? autoSelectBestPipe(
+                  analyzedSecondaryPipes,
+                  'secondary',
+                  flowData.secondaryFlowLPM,
+                  projectMode
+              )
             : null;
 
         const analyzedMainPipes = hasValidMainPipe
@@ -991,9 +1135,11 @@ export const useCalculations = (
             : null;
 
         // Emitter pipe analysis and selection
-        const hasValidEmitterPipe = 
-            sanitizedInput.longestEmitterPipeM && sanitizedInput.longestEmitterPipeM > 0 && 
-            sanitizedInput.totalEmitterPipeM && sanitizedInput.totalEmitterPipeM > 0;
+        const hasValidEmitterPipe =
+            sanitizedInput.longestEmitterPipeM &&
+            sanitizedInput.longestEmitterPipeM > 0 &&
+            sanitizedInput.totalEmitterPipeM &&
+            sanitizedInput.totalEmitterPipeM > 0;
 
         const analyzedEmitterPipes = hasValidEmitterPipe
             ? pipeData
@@ -1016,7 +1162,12 @@ export const useCalculations = (
             : [];
 
         const autoSelectedEmitterPipe = hasValidEmitterPipe
-            ? autoSelectBestPipe(analyzedEmitterPipes, 'emitter', flowData.emitterFlowLPM, projectMode)
+            ? autoSelectBestPipe(
+                  analyzedEmitterPipes,
+                  'emitter',
+                  flowData.emitterFlowLPM,
+                  projectMode
+              )
             : null;
 
         const branchLoss = autoSelectedBranchPipe
@@ -1066,13 +1217,19 @@ export const useCalculations = (
                   )
                 : { major: 0, minor: 0, total: 0, velocity: 0, C: 135, K: 0 };
 
-        let totalHeadLoss = branchLoss.total + secondaryLoss.total + mainLoss.total + emitterLoss.total;
+        let totalHeadLoss =
+            branchLoss.total + secondaryLoss.total + mainLoss.total + emitterLoss.total;
         const connectionLoss = totalHeadLoss * 0.03;
         totalHeadLoss += connectionLoss;
 
-        const totalMajorLoss = branchLoss.major + secondaryLoss.major + mainLoss.major + emitterLoss.major;
+        const totalMajorLoss =
+            branchLoss.major + secondaryLoss.major + mainLoss.major + emitterLoss.major;
         const totalMinorLoss =
-            branchLoss.minor + secondaryLoss.minor + mainLoss.minor + emitterLoss.minor + connectionLoss;
+            branchLoss.minor +
+            secondaryLoss.minor +
+            mainLoss.minor +
+            emitterLoss.minor +
+            connectionLoss;
 
         const pressureFromSprinkler = calculateSprinklerPressure(
             selectedSprinkler,
@@ -1093,10 +1250,42 @@ export const useCalculations = (
 
         const headLossValidation = validateHeadLossRatio(totalHeadLoss, basePumpHead);
 
+        // Enhanced pump analysis for field-crop mode
         const analyzedPumps = pumpData
-            .map((pump) => evaluatePumpOverall(pump, requiredPumpFlow, pumpHeadRequired))
+            .map((pump) => {
+                let enhancedPump = evaluatePumpOverall(pump, requiredPumpFlow, pumpHeadRequired);
+                
+                // For field-crop mode, enhance pump data with field-crop specific calculations
+                if (projectMode === 'field-crop' && fieldCropData) {
+                    // Calculate flow and head ratios for field-crop requirements
+                    const pumpFlow = pump.flow_rate_lpm || pump.maxFlow || 0;
+                    const pumpHead = pump.head_m || pump.maxHead || 0;
+                    
+                    enhancedPump.flowRatio = pumpFlow > 0 ? pumpFlow / requiredPumpFlow : 0;
+                    enhancedPump.headRatio = pumpHead > 0 ? pumpHead / pumpHeadRequired : 0;
+                    
+                    // Enhanced adequacy check for field-crop
+                    enhancedPump.isFlowAdequate = pumpFlow >= requiredPumpFlow * 0.9; // Allow 10% tolerance
+                    enhancedPump.isHeadAdequate = pumpHead >= pumpHeadRequired * 0.9; // Allow 10% tolerance
+                    
+                    // Calculate efficiency score for field-crop
+                    const flowEfficiency = enhancedPump.isFlowAdequate ? 1 : pumpFlow / requiredPumpFlow;
+                    const headEfficiency = enhancedPump.isHeadAdequate ? 1 : pumpHead / pumpHeadRequired;
+                    enhancedPump.efficiencyScore = (flowEfficiency + headEfficiency) / 2;
+                    
+                    // Set recommendation status based on field-crop criteria
+                    enhancedPump.isRecommended = enhancedPump.isFlowAdequate && enhancedPump.isHeadAdequate && (pump.price || 0) < 50000;
+                    enhancedPump.isGoodChoice = enhancedPump.efficiencyScore > 0.8 && (pump.price || 0) < 100000;
+                    enhancedPump.isUsable = enhancedPump.efficiencyScore > 0.6;
+                }
+                
+                return enhancedPump;
+            })
             .sort((a, b) => {
-                // Sort by recommendation status first, then by price
+                // Sort by adequacy first, then by recommendation status, then by price
+                const aAdequate = a.isFlowAdequate && a.isHeadAdequate;
+                const bAdequate = b.isFlowAdequate && b.isHeadAdequate;
+                if (aAdequate !== bAdequate) return bAdequate ? 1 : -1;
                 if (a.isRecommended !== b.isRecommended) return b.isRecommended ? 1 : -1;
                 if (a.isGoodChoice !== b.isGoodChoice) return b.isGoodChoice ? 1 : -1;
                 return a.price - b.price;
@@ -1129,7 +1318,10 @@ export const useCalculations = (
                 : 0;
         const emitterRolls =
             autoSelectedEmitterPipe && hasValidEmitterPipe
-                ? calculatePipeRolls(sanitizedInput.totalEmitterPipeM || 0, autoSelectedEmitterPipe.lengthM)
+                ? calculatePipeRolls(
+                      sanitizedInput.totalEmitterPipeM || 0,
+                      autoSelectedEmitterPipe.lengthM
+                  )
                 : 0;
 
         const velocityWarnings: string[] = [];
@@ -1245,7 +1437,10 @@ export const useCalculations = (
 
             calculationMetadata: {
                 totalWaterRequiredLPM: flowData.totalFlowLPM,
-                waterPerZoneLPM: formatNumber(flowData.totalFlowLPM / sanitizedInput.numberOfZones, 1),
+                waterPerZoneLPM: formatNumber(
+                    flowData.totalFlowLPM / sanitizedInput.numberOfZones,
+                    1
+                ),
             },
         };
     }, [

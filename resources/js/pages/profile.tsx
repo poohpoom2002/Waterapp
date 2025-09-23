@@ -55,7 +55,7 @@ export default function Profile() {
                     color: 'text-gray-400',
                     bgColor: 'bg-gray-900/30',
                     icon: '🆓',
-                    description: 'Basic features with limited tokens'
+                    description: 'Basic features with limited tokens',
                 };
             case 'pro':
                 return {
@@ -63,7 +63,7 @@ export default function Profile() {
                     color: 'text-blue-400',
                     bgColor: 'bg-blue-900/30',
                     icon: '⭐',
-                    description: 'Advanced features with more tokens'
+                    description: 'Advanced features with more tokens',
                 };
             case 'advanced':
                 return {
@@ -71,7 +71,7 @@ export default function Profile() {
                     color: 'text-purple-400',
                     bgColor: 'bg-purple-900/30',
                     icon: '💎',
-                    description: 'Premium features with maximum tokens'
+                    description: 'Premium features with maximum tokens',
                 };
             default:
                 return {
@@ -79,7 +79,7 @@ export default function Profile() {
                     color: 'text-gray-400',
                     bgColor: 'bg-gray-900/30',
                     icon: '🆓',
-                    description: 'Basic features with limited tokens'
+                    description: 'Basic features with limited tokens',
                 };
         }
     };
@@ -191,9 +191,11 @@ export default function Profile() {
                                                     👑 Super User
                                                 </span>
                                             )}
-                                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${tierInfo.bgColor} ${tierInfo.color}`}>
-                                                    {tierInfo.icon} {tierInfo.name} Plan
-                                                </span>
+                                            <span
+                                                className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${tierInfo.bgColor} ${tierInfo.color}`}
+                                            >
+                                                {tierInfo.icon} {tierInfo.name} Plan
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -303,10 +305,14 @@ export default function Profile() {
                                 </h3>
                                 <div className="space-y-4">
                                     <div className="text-center">
-                                        <div className={`inline-flex items-center gap-2 rounded-lg ${tierInfo.bgColor} px-4 py-3`}>
+                                        <div
+                                            className={`inline-flex items-center gap-2 rounded-lg ${tierInfo.bgColor} px-4 py-3`}
+                                        >
                                             <span className="text-2xl">{tierInfo.icon}</span>
                                             <div>
-                                                <div className={`text-lg font-bold ${tierInfo.color}`}>
+                                                <div
+                                                    className={`text-lg font-bold ${tierInfo.color}`}
+                                                >
                                                     {tierInfo.name} Plan
                                                 </div>
                                                 <div className="text-xs text-gray-400">
@@ -315,7 +321,7 @@ export default function Profile() {
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-2 text-sm">
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Monthly tokens:</span>
@@ -325,9 +331,7 @@ export default function Profile() {
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Current tokens:</span>
-                                            <span className="text-white">
-                                                {user?.tokens || 0}
-                                            </span>
+                                            <span className="text-white">{user?.tokens || 0}</span>
                                         </div>
                                         <div className="flex justify-between">
                                             <span className="text-gray-400">Total used:</span>
@@ -339,7 +343,9 @@ export default function Profile() {
                                             <div className="flex justify-between">
                                                 <span className="text-gray-400">Expires:</span>
                                                 <span className="text-white">
-                                                    {new Date(user.tier_expires_at).toLocaleDateString()}
+                                                    {new Date(
+                                                        user.tier_expires_at
+                                                    ).toLocaleDateString()}
                                                 </span>
                                             </div>
                                         )}

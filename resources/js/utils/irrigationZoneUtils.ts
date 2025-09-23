@@ -40,25 +40,25 @@ export interface ExclusionArea {
 
 export const calculateZoneStats = (zones: IrrigationZone[]) => {
     if (zones.length === 0) return null;
-    
-    const waterNeeds = zones.map(zone => zone.totalWaterNeed);
-    const plantCounts = zones.map(zone => zone.plants.length);
-    
+
+    const waterNeeds = zones.map((zone) => zone.totalWaterNeed);
+    const plantCounts = zones.map((zone) => zone.plants.length);
+
     const avgWaterNeed = waterNeeds.reduce((sum, need) => sum + need, 0) / zones.length;
     const avgPlantCount = plantCounts.reduce((sum, count) => sum + count, 0) / zones.length;
-    
-    const waterVariance = waterNeeds.reduce((sum, need) => sum + Math.pow(need - avgWaterNeed, 2), 0) / zones.length;
+
+    const waterVariance =
+        waterNeeds.reduce((sum, need) => sum + Math.pow(need - avgWaterNeed, 2), 0) / zones.length;
     const waterStdDev = Math.sqrt(waterVariance);
-    
+
     return {
         totalZones: zones.length,
         averageWaterNeed: avgWaterNeed,
         averagePlantCount: avgPlantCount,
         waterNeedVariance: waterVariance,
         waterNeedStdDev: waterStdDev,
-        waterNeedBalance: 1 - (waterStdDev / avgWaterNeed), 
+        waterNeedBalance: 1 - waterStdDev / avgWaterNeed,
         totalPlants: plantCounts.reduce((sum, count) => sum + count, 0),
-        totalWaterNeed: waterNeeds.reduce((sum, need) => sum + need, 0)
+        totalWaterNeed: waterNeeds.reduce((sum, need) => sum + need, 0),
     };
 };
-

@@ -41,7 +41,7 @@ interface Tool {
 const GRID_SIZE = 25; // legacy constant used for meter conversions (25px ≈ 1m)
 const PX_PER_METER = 20;
 const MINOR_GRID_STEP = PX_PER_METER * 0.5; // 0.5m
-const MAJOR_GRID_STEP = PX_PER_METER * 1;   // 1m
+const MAJOR_GRID_STEP = PX_PER_METER * 1; // 1m
 const CANVAS_SIZE = { width: 2400, height: 1600 };
 
 export default function GreenhousePlanner({ crops, method, irrigation }: GreenhousePlannerProps) {
@@ -311,11 +311,15 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         let j = polygon.length - 1;
 
         for (let i = 0; i < polygon.length; i++) {
-            const xi = polygon[i].x, yi = polygon[i].y;
-            const xj = polygon[j].x, yj = polygon[j].y;
+            const xi = polygon[i].x,
+                yi = polygon[i].y;
+            const xj = polygon[j].x,
+                yj = polygon[j].y;
 
-            if (yi > point.y !== yj > point.y && 
-                point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi) {
+            if (
+                yi > point.y !== yj > point.y &&
+                point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi
+            ) {
                 isInside = !isInside;
             }
             j = i;
@@ -327,7 +331,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     // Copy function for plots and sub-plots
     const copySelectedShapes = useCallback(() => {
         if (selectedShape) {
-            const shape = shapes.find(s => s.id === selectedShape);
+            const shape = shapes.find((s) => s.id === selectedShape);
             if (shape && (shape.type === 'plot' || shape.type === 'sub-plot')) {
                 setCopiedShapes([shape]);
                 setIsPasteMode(true);
@@ -337,61 +341,66 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     }, [selectedShape, shapes]);
 
     // Paste function
-    const pasteShapes = useCallback((position: Point) => {
-        if (copiedShapes.length === 0) return;
+    const pasteShapes = useCallback(
+        (position: Point) => {
+            if (copiedShapes.length === 0) return;
 
-        const newShapes: Shape[] = copiedShapes.map((shape, index) => {
-            // Calculate offset from original position
-            const originalCenter = {
-                x: shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length,
-                y: shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length,
-            };
+            const newShapes: Shape[] = copiedShapes
+                .map((shape, index) => {
+                    // Calculate offset from original position
+                    const originalCenter = {
+                        x: shape.points.reduce((sum, p) => sum + p.x, 0) / shape.points.length,
+                        y: shape.points.reduce((sum, p) => sum + p.y, 0) / shape.points.length,
+                    };
 
-            const offset = {
-                x: position.x - originalCenter.x,
-                y: position.y - originalCenter.y,
-            };
+                    const offset = {
+                        x: position.x - originalCenter.x,
+                        y: position.y - originalCenter.y,
+                    };
 
-            // Create new shape with offset points
-            const newPoints = shape.points.map(point => ({
-                x: point.x + offset.x,
-                y: point.y + offset.y,
-            }));
+                    // Create new shape with offset points
+                    const newPoints = shape.points.map((point) => ({
+                        x: point.x + offset.x,
+                        y: point.y + offset.y,
+                    }));
 
-            // Validate sub-plot placement if needed
-            if (shape.type === 'sub-plot') {
-                const mainPlots = shapes.filter(s => s.type === 'plot');
-                if (mainPlots.length === 0) {
-                    alert(t('ไม่สามารถวางแปลงปลูกย่อยได้ เนื่องจากไม่มีแปลงปลูกหลัก'));
-                    return null;
-                }
+                    // Validate sub-plot placement if needed
+                    if (shape.type === 'sub-plot') {
+                        const mainPlots = shapes.filter((s) => s.type === 'plot');
+                        if (mainPlots.length === 0) {
+                            alert(t('ไม่สามารถวางแปลงปลูกย่อยได้ เนื่องจากไม่มีแปลงปลูกหลัก'));
+                            return null;
+                        }
 
-                // Check if all points are inside a main plot
-                const isInsideMainPlot = newPoints.every(point => 
-                    mainPlots.some(mainPlot => isPointInPolygon(point, mainPlot.points))
-                );
+                        // Check if all points are inside a main plot
+                        const isInsideMainPlot = newPoints.every((point) =>
+                            mainPlots.some((mainPlot) => isPointInPolygon(point, mainPlot.points))
+                        );
 
-                if (!isInsideMainPlot) {
-                    alert(t('แปลงปลูกย่อยต้องวางภายในแปลงปลูกหลักเท่านั้น'));
-                    return null;
-                }
+                        if (!isInsideMainPlot) {
+                            alert(t('แปลงปลูกย่อยต้องวางภายในแปลงปลูกหลักเท่านั้น'));
+                            return null;
+                        }
+                    }
+
+                    return {
+                        ...shape,
+                        id: `${shape.type}-${Date.now()}-${index}`,
+                        points: newPoints,
+                    };
+                })
+                .filter(Boolean) as Shape[];
+
+            if (newShapes.length > 0) {
+                const updatedShapes = [...shapes, ...newShapes];
+                setShapes(updatedShapes);
+                addToHistory(updatedShapes);
+                setIsPasteMode(false);
+                setCopiedShapes([]);
             }
-
-            return {
-                ...shape,
-                id: `${shape.type}-${Date.now()}-${index}`,
-                points: newPoints,
-            };
-        }).filter(Boolean) as Shape[];
-
-        if (newShapes.length > 0) {
-            const updatedShapes = [...shapes, ...newShapes];
-            setShapes(updatedShapes);
-            addToHistory(updatedShapes);
-            setIsPasteMode(false);
-            setCopiedShapes([]);
-        }
-    }, [copiedShapes, shapes, addToHistory, isPointInPolygon, t]);
+        },
+        [copiedShapes, shapes, addToHistory, isPointInPolygon, t]
+    );
 
     // Update shape names when language changes (pure mapping, no new refs)
     useEffect(() => {
@@ -406,7 +415,8 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         setShapes((prevShapes) => {
             let changed = false;
             const mapped = prevShapes.map((shape) => {
-                const newName = shapeTypeNames[shape.type as keyof typeof shapeTypeNames] || shape.name;
+                const newName =
+                    shapeTypeNames[shape.type as keyof typeof shapeTypeNames] || shape.name;
                 if (newName !== shape.name) {
                     changed = true;
                     return { ...shape, name: newName };
@@ -624,7 +634,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 ctx.fillStyle = '#000000';
                 ctx.font = 'bold 11px Inter, sans-serif';
                 ctx.textAlign = 'center';
-                ctx.fillText(`${t('เส้นรอบรูป')}: ${perimeter.toFixed(1)}m`, infoX + 80, infoY + 18);
+                ctx.fillText(
+                    `${t('เส้นรอบรูป')}: ${perimeter.toFixed(1)}m`,
+                    infoX + 80,
+                    infoY + 18
+                );
                 ctx.fillText(`${t('พื้นที่')}: ${area.toFixed(1)}m²`, infoX + 80, infoY + 35);
             }
         },
@@ -706,7 +720,10 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 if (isSelected || isSelectedAll) {
                     strokeColor = '#FFD700'; // Gold for selected
                     lineWidth = 4;
-                } else if (isHovered && (selectedTool === 'select' || selectedTool === 'selectAll')) {
+                } else if (
+                    isHovered &&
+                    (selectedTool === 'select' || selectedTool === 'selectAll')
+                ) {
                     strokeColor = '#60A5FA'; // Light blue for hover
                     lineWidth = 3;
                 }
@@ -822,7 +839,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
             // Draw measurements for all selected shapes in selectAll mode
             if (selectedTool === 'selectAll' && selectedShapes.length > 0) {
-                selectedShapes.forEach(shapeId => {
+                selectedShapes.forEach((shapeId) => {
                     const shape = shapes.find((s) => s.id === shapeId);
                     if (shape && shape.type !== 'measurement') {
                         drawSelectedShapeMeasurements(ctx, shape);
@@ -830,7 +847,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 });
             }
         },
-        [shapes, selectedShape, selectedShapes, hoveredShape, selectedTool, drawSelectedShapeMeasurements]
+        [
+            shapes,
+            selectedShape,
+            selectedShapes,
+            hoveredShape,
+            selectedTool,
+            drawSelectedShapeMeasurements,
+        ]
     );
 
     // Draw edge measurements for current path
@@ -964,7 +988,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 ctx.fillStyle = '#FFFFFF';
                 ctx.font = 'bold 13px Inter, sans-serif';
                 ctx.textAlign = 'left';
-                ctx.fillText(`${t('เส้นรอบรูป')}: ${perimeter.toFixed(1)}m`, infoX + 10, infoY + 25);
+                ctx.fillText(
+                    `${t('เส้นรอบรูป')}: ${perimeter.toFixed(1)}m`,
+                    infoX + 10,
+                    infoY + 25
+                );
                 ctx.fillText(`${t('พื้นที่')}: ${area.toFixed(1)}m²`, infoX + 10, infoY + 50);
             }
         },
@@ -1222,28 +1250,31 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     }, []);
 
     // Move all selected shapes by offset
-    const moveAllSelectedShapes = useCallback((offset: Point) => {
-        setShapes((prevShapes) =>
-            prevShapes.map((shape) => {
-                if (selectedShapes.includes(shape.id)) {
-                    return {
-                        ...shape,
-                        points: shape.points.map((point) =>
-                            snapToGrid({
-                                x: point.x + offset.x,
-                                y: point.y + offset.y,
-                            })
-                        ),
-                    };
-                }
-                return shape;
-            })
-        );
-    }, [selectedShapes]);
+    const moveAllSelectedShapes = useCallback(
+        (offset: Point) => {
+            setShapes((prevShapes) =>
+                prevShapes.map((shape) => {
+                    if (selectedShapes.includes(shape.id)) {
+                        return {
+                            ...shape,
+                            points: shape.points.map((point) =>
+                                snapToGrid({
+                                    x: point.x + offset.x,
+                                    y: point.y + offset.y,
+                                })
+                            ),
+                        };
+                    }
+                    return shape;
+                })
+            );
+        },
+        [selectedShapes]
+    );
 
     // Select all shapes
     const selectAllShapes = useCallback(() => {
-        const allShapeIds = shapes.map(shape => shape.id);
+        const allShapeIds = shapes.map((shape) => shape.id);
         setSelectedShapes(allShapeIds);
         setSelectedShape(null); // Clear single selection
     }, [shapes]);
@@ -1255,24 +1286,27 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     }, []);
 
     // Get shapes within drag selection rectangle
-    const getShapesInDragSelection = useCallback((start: Point, end: Point): string[] => {
-        const minX = Math.min(start.x, end.x);
-        const maxX = Math.max(start.x, end.x);
-        const minY = Math.min(start.y, end.y);
-        const maxY = Math.max(start.y, end.y);
+    const getShapesInDragSelection = useCallback(
+        (start: Point, end: Point): string[] => {
+            const minX = Math.min(start.x, end.x);
+            const maxX = Math.max(start.x, end.x);
+            const minY = Math.min(start.y, end.y);
+            const maxY = Math.max(start.y, end.y);
 
-        return shapes
-            .filter(shape => {
-                if (shape.type === 'measurement') return false;
-                
-                // Check if any point of the shape is within the selection rectangle
-                return shape.points.some(point => 
-                    point.x >= minX && point.x <= maxX && 
-                    point.y >= minY && point.y <= maxY
-                );
-            })
-            .map(shape => shape.id);
-    }, [shapes]);
+            return shapes
+                .filter((shape) => {
+                    if (shape.type === 'measurement') return false;
+
+                    // Check if any point of the shape is within the selection rectangle
+                    return shape.points.some(
+                        (point) =>
+                            point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
+                    );
+                })
+                .map((shape) => shape.id);
+        },
+        [shapes]
+    );
 
     // Delete all selected shapes
     const deleteAllSelectedShapes = useCallback(() => {
@@ -1350,11 +1384,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             } else if (clickedShape && selectedShapes.includes(clickedShape.id)) {
                 // Click on already selected shape - start dragging all selected shapes
                 setIsDraggingAll(true);
-                
+
                 // Calculate offset from center of all selected shapes to mouse
-                const allShapes = shapes.filter(shape => selectedShapes.includes(shape.id));
+                const allShapes = shapes.filter((shape) => selectedShapes.includes(shape.id));
                 if (allShapes.length > 0) {
-                    const allPoints = allShapes.flatMap(shape => shape.points);
+                    const allPoints = allShapes.flatMap((shape) => shape.points);
                     const centerX = allPoints.reduce((sum, p) => sum + p.x, 0) / allPoints.length;
                     const centerY = allPoints.reduce((sum, p) => sum + p.y, 0) / allPoints.length;
                     setDragOffset({
@@ -1514,9 +1548,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             }
         } else if (isDraggingAll && selectedShapes.length > 0) {
             // Handle dragging all selected shapes
-            const allShapes = shapes.filter(shape => selectedShapes.includes(shape.id));
+            const allShapes = shapes.filter((shape) => selectedShapes.includes(shape.id));
             if (allShapes.length > 0) {
-                const allPoints = allShapes.flatMap(shape => shape.points);
+                const allPoints = allShapes.flatMap((shape) => shape.points);
                 const centerX = allPoints.reduce((sum, p) => sum + p.x, 0) / allPoints.length;
                 const centerY = allPoints.reduce((sum, p) => sum + p.y, 0) / allPoints.length;
 
@@ -1579,8 +1613,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         };
     }, [isMouseOverCanvas, zoom, pan]);
 
-
-
     const handleMouseEnter = () => {
         setIsMouseOverCanvas(true);
         document.body.style.overflow = 'hidden';
@@ -1603,17 +1635,20 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     // Finish drawing
 
     // Helper function to check if all points of a shape are inside a main plot
-    const isShapeInsideMainPlot = useCallback((shapePoints: Point[]): boolean => {
-        const mainPlots = shapes.filter(s => s.type === 'plot');
-        
-        // If no main plots exist, sub-plots cannot be created
-        if (mainPlots.length === 0) return false;
+    const isShapeInsideMainPlot = useCallback(
+        (shapePoints: Point[]): boolean => {
+            const mainPlots = shapes.filter((s) => s.type === 'plot');
 
-        // Check if all points of the sub-plot are inside at least one main plot
-        return shapePoints.every(point => 
-            mainPlots.some(mainPlot => isPointInPolygon(point, mainPlot.points))
-        );
-    }, [shapes, isPointInPolygon]);
+            // If no main plots exist, sub-plots cannot be created
+            if (mainPlots.length === 0) return false;
+
+            // Check if all points of the sub-plot are inside at least one main plot
+            return shapePoints.every((point) =>
+                mainPlots.some((mainPlot) => isPointInPolygon(point, mainPlot.points))
+            );
+        },
+        [shapes, isPointInPolygon]
+    );
 
     const finishDrawing = useCallback(() => {
         if (currentPath.length < 2) {
@@ -1635,7 +1670,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
         const shapeTypes = {
             greenhouse: { color: '#10B981', fillColor: '#10B98120', name: `🏠 ${t('โรงเรือน')}` },
             plot: { color: '#F59E0B', fillColor: '#F59E0B20', name: `🌱 ${t('แปลงปลูก')}` },
-            'sub-plot': { color: '#22C55E', fillColor: '#22C55E30', name: `🌿 ${t('แปลงปลูกย่อย')}` },
+            'sub-plot': {
+                color: '#22C55E',
+                fillColor: '#22C55E30',
+                name: `🌿 ${t('แปลงปลูกย่อย')}`,
+            },
             walkway: { color: '#6B7280', fillColor: '#6B728020', name: `🚶 ${t('ทางเดิน')}` },
             water: { color: '#3B82F6', fillColor: '#3B82F640', name: `💧 ${t('แหล่งน้ำ')}` },
         };
@@ -1716,7 +1755,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 }
 
                 // Delete all selected shapes with Delete key
-                if (e.key === 'Delete' && selectedShapes.length > 0 && selectedTool === 'selectAll') {
+                if (
+                    e.key === 'Delete' &&
+                    selectedShapes.length > 0 &&
+                    selectedTool === 'selectAll'
+                ) {
                     e.preventDefault();
                     deleteAllSelectedShapes();
                     return;
@@ -1743,7 +1786,20 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [isDrawing, selectedShape, selectedShapes, selectedTool, undo, redo, copySelectedShapes, isPasteMode, copiedShapes, pasteShapes, mousePos, deleteAllSelectedShapes]);
+    }, [
+        isDrawing,
+        selectedShape,
+        selectedShapes,
+        selectedTool,
+        undo,
+        redo,
+        copySelectedShapes,
+        isPasteMode,
+        copiedShapes,
+        pasteShapes,
+        mousePos,
+        deleteAllSelectedShapes,
+    ]);
 
     // Delete selected shape
     const deleteShape = () => {
@@ -1754,7 +1810,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
             setSelectedShape(null);
         }
     };
-
 
     // Clear all shapes
     const clearAll = () => {
@@ -1815,17 +1870,17 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
     };
 
     return (
-        <div className="h-screen bg-gray-900 text-white overflow-hidden">
+        <div className="h-screen overflow-hidden bg-gray-900 text-white">
             {/* Fixed Navbar */}
-            <div className="fixed top-0 left-0 right-0 z-50">
+            <div className="fixed left-0 right-0 top-0 z-50">
                 <Navbar />
             </div>
 
             {/* Main Content with top padding to account for fixed navbar */}
-            <div className="pt-16 h-full flex flex-col">
+            <div className="flex h-full flex-col pt-16">
                 {/* Header */}
                 {!isHeaderCollapsed ? (
-                    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3 relative">
+                    <div className="relative flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                                 <div>
@@ -1833,7 +1888,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         {t('ออกแบบพื้นที่โรงเรือน พร้อมระบบวัดระยะ')}
                                     </h1>
                                     <p className="text-sm text-gray-400">
-                                        {t('วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (เส้นย่อย 0.5 m, เส้นหลัก 1 m)')}
+                                        {t(
+                                            'วาดโครงสร้างโรงเรือนและแปลงปลูกของคุณ - พื้นที่ 2400x1600 pixels (เส้นย่อย 0.5 m, เส้นหลัก 1 m)'
+                                        )}
                                         <span className="ml-2 text-blue-300">
                                             {t('แสดงการวัดระยะแบบ Real-time')}
                                         </span>
@@ -1846,13 +1903,19 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                 <span>→</span>
                                 <span className="text-green-400">✓ {t('เลือกวิธีการวางแผน')}</span>
                                 <span>→</span>
-                                <span className="font-medium text-blue-400">{t('ออกแบบพื้นที่')}</span>
+                                <span className="font-medium text-blue-400">
+                                    {t('ออกแบบพื้นที่')}
+                                </span>
                                 <span>→</span>
                                 <span>{t('ระบบน้ำ')}</span>
                                 {isPasteMode && (
                                     <>
-                                        <span className="ml-4 text-yellow-400">📋 {t('โหมดวาง')}</span>
-                                        <span className="text-yellow-300">{t('คลิกเพื่อวางแปลงที่คัดลอก')}</span>
+                                        <span className="ml-4 text-yellow-400">
+                                            📋 {t('โหมดวาง')}
+                                        </span>
+                                        <span className="text-yellow-300">
+                                            {t('คลิกเพื่อวางแปลงที่คัดลอก')}
+                                        </span>
                                     </>
                                 )}
                             </div>
@@ -1867,7 +1930,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                         </button>
                     </div>
                 ) : (
-                    <div className="flex-shrink-0 border-b border-gray-700 bg-gray-800 px-6 py-1 flex items-center justify-between">
+                    <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-700 bg-gray-800 px-6 py-1">
                         <span className="text-xs text-gray-400">{t('แถบหัวข้อถูกซ่อน')}</span>
                         <button
                             onClick={() => setIsHeaderCollapsed(false)}
@@ -1886,7 +1949,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                         <div className="flex-1 overflow-y-auto p-4">
                             {/* Selected Crops */}
                             <div className="mb-4">
-                                <h3 className="mb-2 text-sm font-medium text-gray-300">{t('พืชที่เลือก')}</h3>
+                                <h3 className="mb-2 text-sm font-medium text-gray-300">
+                                    {t('พืชที่เลือก')}
+                                </h3>
                                 <div className="flex flex-wrap gap-1">
                                     {selectedCrops.map((crop, index) => (
                                         <span
@@ -1901,7 +1966,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                             {/* Tools */}
                             <div className="mb-4">
-                                <h3 className="mb-3 text-sm font-medium text-gray-300">{t('เครื่องมือ')}</h3>
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                    {t('เครื่องมือ')}
+                                </h3>
                                 <div className="space-y-1">
                                     {tools.map((tool) => (
                                         <div key={tool.id} className="relative">
@@ -1929,9 +1996,11 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                         {tool.name}
                                                     </h4>
                                                     <div className="space-y-1 text-xs text-gray-300">
-                                                        {tool.instructions.map((instruction, index) => (
-                                                            <p key={index}>• {instruction}</p>
-                                                        ))}
+                                                        {tool.instructions.map(
+                                                            (instruction, index) => (
+                                                                <p key={index}>• {instruction}</p>
+                                                            )
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
@@ -1950,7 +2019,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                         <div
                                             key={index}
                                             className="flex cursor-help items-center space-x-2 text-xs text-gray-400 transition-colors hover:text-gray-200"
-                                            onMouseEnter={() => setHoveredInstruction(instruction.text)}
+                                            onMouseEnter={() =>
+                                                setHoveredInstruction(instruction.text)
+                                            }
                                             onMouseLeave={() => setHoveredInstruction(null)}
                                         >
                                             <span>{instruction.icon}</span>
@@ -1962,7 +2033,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                             {/* View Controls */}
                             <div className="mb-4 space-y-2">
-                                <h3 className="text-sm font-medium text-gray-300">{t('ตัวเลือกมุมมอง')}</h3>
+                                <h3 className="text-sm font-medium text-gray-300">
+                                    {t('ตัวเลือกมุมมอง')}
+                                </h3>
                                 <div className="flex flex-col space-y-2">
                                     <button
                                         onClick={() => setShowGrid(!showGrid)}
@@ -2005,8 +2078,12 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                     <p>
                                         {t('ขนาด')}: {CANVAS_SIZE.width} × {CANVAS_SIZE.height} px
                                     </p>
-                                    <p>{t('Grid')}: {GRID_SIZE} px = 1 {t('เมตรหน่วย')}</p>
-                                    <p>{t('Zoom')}: {(zoom * 100).toFixed(0)}%</p>
+                                    <p>
+                                        {t('Grid')}: {GRID_SIZE} px = 1 {t('เมตรหน่วย')}
+                                    </p>
+                                    <p>
+                                        {t('Zoom')}: {(zoom * 100).toFixed(0)}%
+                                    </p>
                                     <p>
                                         {t('Pan')}: ({pan.x.toFixed(0)}, {pan.y.toFixed(0)})
                                     </p>
@@ -2071,20 +2148,25 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             style={{
                                 width: '100%',
                                 height: '100%',
-                                cursor: isPasteMode ? 'copy' : 
-                                       isDragging ? 'grabbing' :
-                                       isPanning ? 'grabbing' :
-                                       selectedTool === 'select' && hoveredShape ? 'grab' :
-                                       selectedTool === 'select' ? 'default' :
-                                       'crosshair',
+                                cursor: isPasteMode
+                                    ? 'copy'
+                                    : isDragging
+                                      ? 'grabbing'
+                                      : isPanning
+                                        ? 'grabbing'
+                                        : selectedTool === 'select' && hoveredShape
+                                          ? 'grab'
+                                          : selectedTool === 'select'
+                                            ? 'default'
+                                            : 'crosshair',
                             }}
                         />
 
                         {/* Coordinates Display - bottom left */}
                         {showCoordinates && (
                             <div className="absolute bottom-4 left-4 rounded bg-black/50 px-3 py-1 text-sm text-white">
-                                X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | {t('Zoom')}:{' '}
-                                {(zoom * 100).toFixed(0)}%
+                                X: {mousePos.x.toFixed(0)}, Y: {mousePos.y.toFixed(0)} | {t('Zoom')}
+                                : {(zoom * 100).toFixed(0)}%
                             </div>
                         )}
 
@@ -2116,8 +2198,6 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                             </button>
                         </div>
 
-                        
-
                         {/* Action Buttons */}
                         <div className="absolute right-4 top-4 flex space-x-2">
                             {selectedShape && selectedTool === 'select' && (
@@ -2140,7 +2220,7 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
 
                     {/* Properties Panel */}
                     {!isRightPanelCollapsed && (
-                        <div className="flex w-64 flex-col border-l border-gray-700 bg-gray-800 relative">
+                        <div className="relative flex w-64 flex-col border-l border-gray-700 bg-gray-800">
                             <button
                                 onClick={() => setIsRightPanelCollapsed(true)}
                                 className="absolute -left-3 top-2 rounded bg-gray-700 px-1 py-0.5 text-xs text-gray-200 shadow hover:bg-gray-600"
@@ -2149,210 +2229,269 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                 ▶
                             </button>
                             <div className="flex-1 overflow-y-auto p-4">
-                            <h3 className="mb-3 text-sm font-medium text-gray-300">{t('รายการออบเจ็ค')}</h3>
+                                <h3 className="mb-3 text-sm font-medium text-gray-300">
+                                    {t('รายการออบเจ็ค')}
+                                </h3>
 
-                            {shapes.length === 0 ? (
-                                <p className="text-sm text-gray-500">{t('ยังไม่มีออบเจ็ค')}</p>
-                            ) : (
-                                <div className="mb-4 space-y-2">
-                                    {shapes.map((shape) => (
-                                        <div
-                                            key={shape.id}
-                                            onClick={() => setSelectedShape(shape.id)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Delete' && selectedShape === shape.id) {
-                                                    e.preventDefault();
-                                                    deleteShape();
-                                                }
-                                            }}
-                                            tabIndex={0}
-                                            className={`cursor-pointer rounded p-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                                selectedShape === shape.id
-                                                    ? 'bg-yellow-600 text-white'
-                                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                            }`}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="truncate">{shape.name}</span>
-                                                <div className="flex items-center space-x-2">
-                                                    <span className="ml-2 text-xs text-gray-400">
-                                                        {shape.points.length} {t('จุด')}
-                                                    </span>
-                                                    {selectedShape === shape.id && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                deleteShape();
-                                                            }}
-                                                            className="text-red-400 transition-colors hover:text-red-300"
-                                                            title={t('ลบออบเจ็ค (Delete)')}
-                                                        >
-                                                            🗑️
-                                                        </button>
-                                                    )}
+                                {shapes.length === 0 ? (
+                                    <p className="text-sm text-gray-500">{t('ยังไม่มีออบเจ็ค')}</p>
+                                ) : (
+                                    <div className="mb-4 space-y-2">
+                                        {shapes.map((shape) => (
+                                            <div
+                                                key={shape.id}
+                                                onClick={() => setSelectedShape(shape.id)}
+                                                onKeyDown={(e) => {
+                                                    if (
+                                                        e.key === 'Delete' &&
+                                                        selectedShape === shape.id
+                                                    ) {
+                                                        e.preventDefault();
+                                                        deleteShape();
+                                                    }
+                                                }}
+                                                tabIndex={0}
+                                                className={`cursor-pointer rounded p-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                                                    selectedShape === shape.id
+                                                        ? 'bg-yellow-600 text-white'
+                                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="truncate">{shape.name}</span>
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className="ml-2 text-xs text-gray-400">
+                                                            {shape.points.length} {t('จุด')}
+                                                        </span>
+                                                        {selectedShape === shape.id && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    deleteShape();
+                                                                }}
+                                                                className="text-red-400 transition-colors hover:text-red-300"
+                                                                title={t('ลบออบเจ็ค (Delete)')}
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            {/* Selected Shape Info */}
-                            {selectedShape && (
-                                <div className="mb-4 border-t border-gray-700 pt-4">
-                                    <div className="mb-2 flex items-center justify-between">
-                                        <h4 className="text-sm font-medium text-yellow-300">
-                                            {t('ออบเจ็คที่เลือก')}
-                                        </h4>
-                                        <button
-                                            onClick={deleteShape}
-                                            className="rounded bg-red-900/30 px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
-                                            title={t('ลบออบเจ็ค (Delete)')}
-                                        >
-                                            🗑️ {t('ลบ')}
-                                        </button>
+                                        ))}
                                     </div>
-                                    {(() => {
-                                        const shape = shapes.find((s) => s.id === selectedShape);
-                                        if (!shape) return null;
-                                        return (
-                                            <div className="space-y-1 text-xs text-gray-300">
-                                                <p>
-                                                    <strong>{t('ชื่อ')}:</strong> {shape.name}
-                                                </p>
-                                                <p>
-                                                    <strong>{t('ประเภท')}:</strong> {shape.type}
-                                                </p>
-                                                <p>
-                                                    <strong>{t('จำนวนจุด')}:</strong> {shape.points.length}
-                                                </p>
-                                                {shape.type !== 'measurement' &&
-                                                    shape.points.length >= 2 && (
-                                                        <>
-                                                            {shape.points.length >= 3 && (
-                                                                <>
+                                )}
+
+                                {/* Selected Shape Info */}
+                                {selectedShape && (
+                                    <div className="mb-4 border-t border-gray-700 pt-4">
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <h4 className="text-sm font-medium text-yellow-300">
+                                                {t('ออบเจ็คที่เลือก')}
+                                            </h4>
+                                            <button
+                                                onClick={deleteShape}
+                                                className="rounded bg-red-900/30 px-2 py-1 text-xs text-red-400 transition-colors hover:bg-red-900/50 hover:text-red-300"
+                                                title={t('ลบออบเจ็ค (Delete)')}
+                                            >
+                                                🗑️ {t('ลบ')}
+                                            </button>
+                                        </div>
+                                        {(() => {
+                                            const shape = shapes.find(
+                                                (s) => s.id === selectedShape
+                                            );
+                                            if (!shape) return null;
+                                            return (
+                                                <div className="space-y-1 text-xs text-gray-300">
+                                                    <p>
+                                                        <strong>{t('ชื่อ')}:</strong> {shape.name}
+                                                    </p>
+                                                    <p>
+                                                        <strong>{t('ประเภท')}:</strong> {shape.type}
+                                                    </p>
+                                                    <p>
+                                                        <strong>{t('จำนวนจุด')}:</strong>{' '}
+                                                        {shape.points.length}
+                                                    </p>
+                                                    {shape.type !== 'measurement' &&
+                                                        shape.points.length >= 2 && (
+                                                            <>
+                                                                {shape.points.length >= 3 && (
+                                                                    <>
+                                                                        <p>
+                                                                            <strong>
+                                                                                {t('เส้นรอบรูป')}:
+                                                                            </strong>{' '}
+                                                                            {calculatePerimeter(
+                                                                                shape.points
+                                                                            ).toFixed(1)}
+                                                                            m
+                                                                        </p>
+                                                                        <p>
+                                                                            <strong>
+                                                                                {t('พื้นที่')}:
+                                                                            </strong>{' '}
+                                                                            {calculatePolygonArea(
+                                                                                shape.points
+                                                                            ).toFixed(1)}
+                                                                            m²
+                                                                        </p>
+                                                                    </>
+                                                                )}
+                                                                {shape.points.length === 2 && (
                                                                     <p>
-                                                                        <strong>{t('เส้นรอบรูป')}:</strong>{' '}
-                                                                        {calculatePerimeter(
-                                                                            shape.points
+                                                                        <strong>
+                                                                            {t('ระยะทาง')}:
+                                                                        </strong>{' '}
+                                                                        {calculateDistance(
+                                                                            shape.points[0],
+                                                                            shape.points[1]
                                                                         ).toFixed(1)}
                                                                         m
                                                                     </p>
+                                                                )}
+                                                                <div className="mt-2 space-y-1">
                                                                     <p>
-                                                                        <strong>{t('พื้นที่')}:</strong>{' '}
-                                                                        {calculatePolygonArea(
-                                                                            shape.points
-                                                                        ).toFixed(1)}
-                                                                        m²
+                                                                        <strong>
+                                                                            {t('ขนาดแต่ละด้าน')}:
+                                                                        </strong>
                                                                     </p>
-                                                                </>
-                                                            )}
-                                                            {shape.points.length === 2 && (
-                                                                <p>
-                                                                    <strong>{t('ระยะทาง')}:</strong>{' '}
-                                                                    {calculateDistance(
-                                                                        shape.points[0],
-                                                                        shape.points[1]
-                                                                    ).toFixed(1)}
-                                                                    m
-                                                                </p>
-                                                            )}
-                                                            <div className="mt-2 space-y-1">
-                                                                <p>
-                                                                    <strong>{t('ขนาดแต่ละด้าน')}:</strong>
-                                                                </p>
-                                                                {shape.points.map((point, i) => {
-                                                                    if (
-                                                                        i === shape.points.length - 1 &&
-                                                                        shape.points.length < 3
-                                                                    )
-                                                                        return null;
-                                                                    const nextPoint =
-                                                                        shape.points[
-                                                                            (i + 1) %
-                                                                                shape.points.length
-                                                                        ];
-                                                                    const distance = calculateDistance(
-                                                                        point,
-                                                                        nextPoint
-                                                                    );
-                                                                    return (
-                                                                        <p
-                                                                            key={i}
-                                                                            className="ml-2 text-xs text-gray-400"
-                                                                        >
-                                                                            {t('ด้านที่ {num}:').replace('{num}', (i + 1).toString())}{' '}
-                                                                            {distance.toFixed(1)}m
-                                                                        </p>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                <div className="mt-2 text-xs text-yellow-300">
-                                                    <p>• {t('ลากเพื่อขยับ (ไม่กด Ctrl)')}</p>
-                                                    <p>• {t('Ctrl+คลิกเพื่อเลื่อนมุมมอง')}</p>
-                                                    <p>• {t('กด Delete เพื่อลบ')}</p>
+                                                                    {shape.points.map(
+                                                                        (point, i) => {
+                                                                            if (
+                                                                                i ===
+                                                                                    shape.points
+                                                                                        .length -
+                                                                                        1 &&
+                                                                                shape.points
+                                                                                    .length < 3
+                                                                            )
+                                                                                return null;
+                                                                            const nextPoint =
+                                                                                shape.points[
+                                                                                    (i + 1) %
+                                                                                        shape.points
+                                                                                            .length
+                                                                                ];
+                                                                            const distance =
+                                                                                calculateDistance(
+                                                                                    point,
+                                                                                    nextPoint
+                                                                                );
+                                                                            return (
+                                                                                <p
+                                                                                    key={i}
+                                                                                    className="ml-2 text-xs text-gray-400"
+                                                                                >
+                                                                                    {t(
+                                                                                        'ด้านที่ {num}:'
+                                                                                    ).replace(
+                                                                                        '{num}',
+                                                                                        (
+                                                                                            i + 1
+                                                                                        ).toString()
+                                                                                    )}{' '}
+                                                                                    {distance.toFixed(
+                                                                                        1
+                                                                                    )}
+                                                                                    m
+                                                                                </p>
+                                                                            );
+                                                                        }
+                                                                    )}
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    <div className="mt-2 text-xs text-yellow-300">
+                                                        <p>• {t('ลากเพื่อขยับ (ไม่กด Ctrl)')}</p>
+                                                        <p>• {t('Ctrl+คลิกเพื่อเลื่อนมุมมอง')}</p>
+                                                        <p>• {t('กด Delete เพื่อลบ')}</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            )}
+                                            );
+                                        })()}
+                                    </div>
+                                )}
 
-                            {/* Statistics */}
-                            <div className="border-t border-gray-700 pt-4">
-                                <h4 className="mb-2 text-sm font-medium text-gray-300">{t('สถิติ')}</h4>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">{t('โรงเรือน')}:</span>
-                                        <span>
-                                            {shapes.filter((s) => s.type === 'greenhouse').length}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">{t('แปลงปลูก')}:</span>
-                                        <span>{shapes.filter((s) => s.type === 'plot').length}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">{t('แปลงปลูกย่อย')}:</span>
-                                        <span>{shapes.filter((s) => s.type === 'sub-plot').length}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">{t('ทางเดิน')}:</span>
-                                        <span>{shapes.filter((s) => s.type === 'walkway').length}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">{t('แหล่งน้ำ')}:</span>
-                                        <span>
-                                            {shapes.filter((s) => s.type === 'water-source').length}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">{t('การวัด')}:</span>
-                                        <span>
-                                            {shapes.filter((s) => s.type === 'measurement').length}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-400">{t('รวม')}:</span>
-                                        <span className="font-bold">{shapes.length}</span>
-                                    </div>
+                                {/* Statistics */}
+                                <div className="border-t border-gray-700 pt-4">
+                                    <h4 className="mb-2 text-sm font-medium text-gray-300">
+                                        {t('สถิติ')}
+                                    </h4>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-400">{t('โรงเรือน')}:</span>
+                                            <span>
+                                                {
+                                                    shapes.filter((s) => s.type === 'greenhouse')
+                                                        .length
+                                                }
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-400">{t('แปลงปลูก')}:</span>
+                                            <span>
+                                                {shapes.filter((s) => s.type === 'plot').length}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-400">
+                                                {t('แปลงปลูกย่อย')}:
+                                            </span>
+                                            <span>
+                                                {shapes.filter((s) => s.type === 'sub-plot').length}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-400">{t('ทางเดิน')}:</span>
+                                            <span>
+                                                {shapes.filter((s) => s.type === 'walkway').length}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-400">{t('แหล่งน้ำ')}:</span>
+                                            <span>
+                                                {
+                                                    shapes.filter((s) => s.type === 'water-source')
+                                                        .length
+                                                }
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-400">{t('การวัด')}:</span>
+                                            <span>
+                                                {
+                                                    shapes.filter((s) => s.type === 'measurement')
+                                                        .length
+                                                }
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-gray-400">{t('รวม')}:</span>
+                                            <span className="font-bold">{shapes.length}</span>
+                                        </div>
 
-                                    {/* Total Area Statistics */}
-                                    {shapes.filter(
-                                        (s) => s.type !== 'measurement' && s.points.length >= 3
-                                    ).length > 0 && (
-                                        <>
-                                            <div className="mt-2 border-t border-gray-600 pt-2">
-                                                <h5 className="mb-1 text-xs font-medium text-gray-400">
-                                                    {t('พื้นที่รวม (m²)')}
-                                                </h5>
-                                                {['greenhouse', 'plot', 'sub-plot', 'walkway', 'water-source'].map(
-                                                    (type) => {
+                                        {/* Total Area Statistics */}
+                                        {shapes.filter(
+                                            (s) => s.type !== 'measurement' && s.points.length >= 3
+                                        ).length > 0 && (
+                                            <>
+                                                <div className="mt-2 border-t border-gray-600 pt-2">
+                                                    <h5 className="mb-1 text-xs font-medium text-gray-400">
+                                                        {t('พื้นที่รวม (m²)')}
+                                                    </h5>
+                                                    {[
+                                                        'greenhouse',
+                                                        'plot',
+                                                        'sub-plot',
+                                                        'walkway',
+                                                        'water-source',
+                                                    ].map((type) => {
                                                         const typeShapes = shapes.filter(
                                                             (s) =>
-                                                                s.type === type && s.points.length >= 3
+                                                                s.type === type &&
+                                                                s.points.length >= 3
                                                         );
                                                         const totalArea = typeShapes.reduce(
                                                             (sum, shape) =>
@@ -2389,15 +2528,14 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                                                                 </span>
                                                             </div>
                                                         );
-                                                    }
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
+                                                    })}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
                     )}
                     {isRightPanelCollapsed && (
                         <div className="flex w-6 flex-col items-center justify-center border-l border-gray-700 bg-gray-800">
@@ -2460,7 +2598,9 @@ export default function GreenhousePlanner({ crops, method, irrigation }: Greenho
                 {/* Instruction Tooltip */}
                 {hoveredInstruction && (
                     <div className="fixed bottom-20 left-1/2 z-50 max-w-xs -translate-x-1/2 transform rounded-lg border border-gray-600 bg-gray-800 p-3 shadow-xl">
-                        <div className="text-center text-sm text-gray-300">{hoveredInstruction}</div>
+                        <div className="text-center text-sm text-gray-300">
+                            {hoveredInstruction}
+                        </div>
                     </div>
                 )}
             </div>

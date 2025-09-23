@@ -17,7 +17,7 @@ interface FieldMapCropSpacingProps {
     setEditingPlantSpacingForCrop: (crop: string | null) => void;
     handlePlantSpacingConfirm: (cropValue: string) => void;
     handlePlantSpacingCancel: (cropValue: string) => void;
-    
+
     // NEW: เพิ่ม props ใหม่
     getCropSpacingInfo?: (cropValue: string) => {
         defaultRowSpacing: number;
@@ -71,7 +71,7 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
             </div>
 
             {selectedCropObjects.length === 0 && (
-                <div className="text-center text-gray-400 text-xs py-4">
+                <div className="py-4 text-center text-xs text-gray-400">
                     {t('No crops selected for spacing configuration')}
                 </div>
             )}
@@ -84,7 +84,10 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                 const isPlantEditing = editingPlantSpacingForCrop === crop.value;
 
                 return (
-                    <div key={crop.value} className="rounded border border-gray-600 bg-gray-800/50 p-3">
+                    <div
+                        key={crop.value}
+                        className="rounded border border-gray-600 bg-gray-800/50 p-3"
+                    >
                         {/* Crop Header */}
                         <div className="mb-3 flex items-center space-x-2">
                             <span className="text-lg">{crop.icon}</span>
@@ -111,7 +114,7 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                                     {t('Default')}: {crop.rowSpacing}cm
                                 </div>
                             </div>
-                            
+
                             {isRowEditing ? (
                                 <div className="flex items-center space-x-1">
                                     <input
@@ -174,7 +177,7 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                                     {t('Default')}: {crop.plantSpacing}cm
                                 </div>
                             </div>
-                            
+
                             {isPlantEditing ? (
                                 <div className="flex items-center space-x-1">
                                     <input
@@ -232,8 +235,12 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                             <div className="rounded border border-gray-600 bg-gray-900/50 p-2">
                                 <div className="text-xs text-gray-400">
                                     <div className="grid grid-cols-2 gap-1">
-                                        <span>{t('Water req')}: {cropInfo.waterRequirement}L/day</span>
-                                        <span>{t('Growth')}: {cropInfo.growthPeriod} {t('days')}</span>
+                                        <span>
+                                            {t('Water req')}: {cropInfo.waterRequirement}L/day
+                                        </span>
+                                        <span>
+                                            {t('Growth')}: {cropInfo.growthPeriod} {t('days')}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -243,11 +250,14 @@ const FieldMapCropSpacing: React.FC<FieldMapCropSpacingProps> = ({
                         <div className="mt-2 flex justify-between text-xs">
                             <div className="flex space-x-2">
                                 {currentRowSpacing !== crop.rowSpacing && (
-                                    <span className="text-yellow-400">⚠️ {t('Modified spacing')}</span>
+                                    <span className="text-yellow-400">
+                                        ⚠️ {t('Modified spacing')}
+                                    </span>
                                 )}
                             </div>
                             <div className="text-gray-500">
-                                {t('Plants/m²')}: {Math.round(10000 / (currentRowSpacing * currentPlantSpacing))}
+                                {t('Plants/m²')}:{' '}
+                                {Math.round(10000 / (currentRowSpacing * currentPlantSpacing))}
                             </div>
                         </div>
                     </div>

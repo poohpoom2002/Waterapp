@@ -86,17 +86,18 @@ const MapComponent: React.FC<{
     mapOptions?: Partial<google.maps.MapOptions>;
 }> = ({ center, zoom, onLoad, children, mapOptions }) => {
     // Validate center coordinates
-    const validCenter = (center && 
-        typeof center.lat === 'number' && 
+    const validCenter =
+        center &&
+        typeof center.lat === 'number' &&
         typeof center.lng === 'number' &&
-        !isNaN(center.lat) && 
+        !isNaN(center.lat) &&
         !isNaN(center.lng) &&
-        isFinite(center.lat) && 
-        isFinite(center.lng)) 
-        ? center 
-        : { lat: 13.7563, lng: 100.5018 }; // Default to Bangkok
-    
-    const validZoom = (typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom)) ? zoom : 16;
+        isFinite(center.lat) &&
+        isFinite(center.lng)
+            ? center
+            : { lat: 13.7563, lng: 100.5018 }; // Default to Bangkok
+
+    const validZoom = typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom) ? zoom : 16;
     const ref = useRef<HTMLDivElement>(null);
     const [map, setMap] = useState<google.maps.Map>();
     const [isMapInitialized, setIsMapInitialized] = useState(false);
@@ -226,19 +227,20 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
     }
 
     // Validate center coordinates
-    const validCenter = (center && 
-        Array.isArray(center) && 
+    const validCenter =
+        center &&
+        Array.isArray(center) &&
         center.length === 2 &&
-        typeof center[0] === 'number' && 
+        typeof center[0] === 'number' &&
         typeof center[1] === 'number' &&
-        !isNaN(center[0]) && 
+        !isNaN(center[0]) &&
         !isNaN(center[1]) &&
-        isFinite(center[0]) && 
-        isFinite(center[1])) 
-        ? { lat: center[0], lng: center[1] }
-        : { lat: 13.7563, lng: 100.5018 }; // Default to Bangkok
-    
-    const validZoom = (typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom)) ? zoom : 16;
+        isFinite(center[0]) &&
+        isFinite(center[1])
+            ? { lat: center[0], lng: center[1] }
+            : { lat: 13.7563, lng: 100.5018 }; // Default to Bangkok
+
+    const validZoom = typeof zoom === 'number' && !isNaN(zoom) && isFinite(zoom) ? zoom : 16;
 
     return (
         <Wrapper

@@ -173,7 +173,7 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
         description: t('field_crop_desc'),
         icon: '🌾',
         color: 'from-yellow-600 to-yellow-800',
-	        route: '/choose-crop',
+        route: '/choose-crop',
         features: [
             t('large_scale_planning'),
             t('efficient_irrigation'),
@@ -286,27 +286,44 @@ const FieldCard = ({
                                 <span className="text-white">
                                     {(() => {
                                         // Try multiple sources for area data
-                                        const areaFromStats = field.garden_stats?.summary?.totalArea;
-                                        const areaFromData = field.garden_data?.gardenZones?.reduce((total, zone) => {
-                                            if (zone.coordinates && zone.coordinates.length >= 3) {
-                                                // Use proper area calculation
-                                                const coords = zone.canvasCoordinates || zone.coordinates;
-                                                const scale = field.garden_data?.designMode === 'canvas' || field.garden_data?.designMode === 'image'
-                                                    ? (field.garden_data?.canvasData?.scale || field.garden_data?.imageData?.scale || 20)
-                                                    : undefined;
-                                                return total + calculatePolygonArea(coords, scale);
-                                            }
-                                            return total;
-                                        }, 0);
-                                        
+                                        const areaFromStats =
+                                            field.garden_stats?.summary?.totalArea;
+                                        const areaFromData = field.garden_data?.gardenZones?.reduce(
+                                            (total, zone) => {
+                                                if (
+                                                    zone.coordinates &&
+                                                    zone.coordinates.length >= 3
+                                                ) {
+                                                    // Use proper area calculation
+                                                    const coords =
+                                                        zone.canvasCoordinates || zone.coordinates;
+                                                    const scale =
+                                                        field.garden_data?.designMode ===
+                                                            'canvas' ||
+                                                        field.garden_data?.designMode === 'image'
+                                                            ? field.garden_data?.canvasData
+                                                                  ?.scale ||
+                                                              field.garden_data?.imageData?.scale ||
+                                                              20
+                                                            : undefined;
+                                                    return (
+                                                        total + calculatePolygonArea(coords, scale)
+                                                    );
+                                                }
+                                                return total;
+                                            },
+                                            0
+                                        );
+
                                         if (areaFromStats) {
                                             return `${typeof areaFromStats === 'number' ? areaFromStats.toFixed(2) : parseFloat(areaFromStats || 0).toFixed(2)} ตร.ม.`;
                                         } else if (areaFromData) {
                                             return `${areaFromData.toFixed(2)} ตร.ม.`;
                                         } else if (field.totalArea) {
-                                            const areaInSqM = typeof field.totalArea === 'number' 
-                                                ? field.totalArea * 1600 
-                                                : parseFloat(field.totalArea || 0) * 1600;
+                                            const areaInSqM =
+                                                typeof field.totalArea === 'number'
+                                                    ? field.totalArea * 1600
+                                                    : parseFloat(field.totalArea || 0) * 1600;
                                             return `${areaInSqM.toFixed(2)} ตร.ม.`;
                                         } else {
                                             return 'N/A';
@@ -317,18 +334,24 @@ const FieldCard = ({
                             <div className="flex justify-between">
                                 <span>การออกแบบ:</span>
                                 <span className="text-white">
-                                    {field.garden_data?.designMode === 'image' ? 'ใช้แปลน' : 
-                                     field.garden_data?.designMode === 'canvas' ? 'วาดเอง' :
-                                     field.garden_data?.designMode === 'map' ? 'ใช้แผนที่' : 'N/A'}
+                                    {field.garden_data?.designMode === 'image'
+                                        ? 'ใช้แปลน'
+                                        : field.garden_data?.designMode === 'canvas'
+                                          ? 'วาดเอง'
+                                          : field.garden_data?.designMode === 'map'
+                                            ? 'ใช้แผนที่'
+                                            : 'N/A'}
                                 </span>
                             </div>
                             <div className="flex justify-between">
                                 <span>จำนวนโซน:</span>
                                 <span className="text-white">
                                     {(() => {
-                                        const zonesFromStats = field.garden_stats?.summary?.totalZones;
-                                        const zonesFromData = field.garden_data?.gardenZones?.length;
-                                        
+                                        const zonesFromStats =
+                                            field.garden_stats?.summary?.totalZones;
+                                        const zonesFromData =
+                                            field.garden_data?.gardenZones?.length;
+
                                         if (zonesFromStats) {
                                             return zonesFromStats;
                                         } else if (zonesFromData) {
@@ -343,9 +366,11 @@ const FieldCard = ({
                                 <span>หัวฉีด:</span>
                                 <span className="text-white">
                                     {(() => {
-                                        const sprinklersFromStats = field.garden_stats?.summary?.totalSprinklers;
-                                        const sprinklersFromData = field.garden_data?.sprinklers?.length;
-                                        
+                                        const sprinklersFromStats =
+                                            field.garden_stats?.summary?.totalSprinklers;
+                                        const sprinklersFromData =
+                                            field.garden_data?.sprinklers?.length;
+
                                         if (sprinklersFromStats) {
                                             return sprinklersFromStats;
                                         } else if (sprinklersFromData) {
@@ -364,19 +389,23 @@ const FieldCard = ({
                                 <span>พื้นที่โรงเรือน:</span>
                                 <span className="text-white">
                                     {(() => {
-                                        const areaFromStats = field.greenhouse_data?.summary?.totalGreenhouseArea;
-                                        const areaFromData = field.greenhouse_data?.rawData?.shapes?.filter(s => s.type === 'greenhouse').reduce((total, shape) => {
-                                            return total + 100; // Rough estimate per greenhouse
-                                        }, 0);
-                                        
+                                        const areaFromStats =
+                                            field.greenhouse_data?.summary?.totalGreenhouseArea;
+                                        const areaFromData = field.greenhouse_data?.rawData?.shapes
+                                            ?.filter((s) => s.type === 'greenhouse')
+                                            .reduce((total, shape) => {
+                                                return total + 100; // Rough estimate per greenhouse
+                                            }, 0);
+
                                         if (areaFromStats) {
                                             return `${typeof areaFromStats === 'number' ? areaFromStats.toFixed(2) : parseFloat(areaFromStats || 0).toFixed(2)} ตร.ม.`;
                                         } else if (areaFromData) {
                                             return `${areaFromData.toFixed(2)} ตร.ม.`;
                                         } else if (field.totalArea) {
-                                            const areaInSqM = typeof field.totalArea === 'number' 
-                                                ? field.totalArea * 1600 
-                                                : parseFloat(field.totalArea || 0) * 1600;
+                                            const areaInSqM =
+                                                typeof field.totalArea === 'number'
+                                                    ? field.totalArea * 1600
+                                                    : parseFloat(field.totalArea || 0) * 1600;
                                             return `${areaInSqM.toFixed(2)} ตร.ม.`;
                                         } else {
                                             return 'N/A';
@@ -388,8 +417,11 @@ const FieldCard = ({
                                 <span>จำนวนแปลง:</span>
                                 <span className="text-white">
                                     {(() => {
-                                        const plotsFromData = field.greenhouse_data?.rawData?.shapes?.filter(s => s.type === 'plot').length;
-                                        
+                                        const plotsFromData =
+                                            field.greenhouse_data?.rawData?.shapes?.filter(
+                                                (s) => s.type === 'plot'
+                                            ).length;
+
                                         if (plotsFromData) {
                                             return plotsFromData;
                                         } else if (field.totalPlants) {
@@ -405,7 +437,7 @@ const FieldCard = ({
                                 <span className="text-white">
                                     {(() => {
                                         const cropsFromData = field.greenhouse_data?.selectedCrops;
-                                        
+
                                         if (cropsFromData && cropsFromData.length > 0) {
                                             return cropsFromData.join(', ');
                                         } else {
@@ -418,12 +450,17 @@ const FieldCard = ({
                                 <span>ระบบน้ำ:</span>
                                 <span className="text-white">
                                     {(() => {
-                                        const irrigationFromData = field.greenhouse_data?.irrigationMethod;
-                                        
+                                        const irrigationFromData =
+                                            field.greenhouse_data?.irrigationMethod;
+
                                         if (irrigationFromData) {
-                                            return irrigationFromData === 'mini-sprinkler' ? 'มินิสปริงเกลอร์' :
-                                                   irrigationFromData === 'drip' ? 'น้ำหยด' :
-                                                   irrigationFromData === 'mixed' ? 'ผสม' : 'N/A';
+                                            return irrigationFromData === 'mini-sprinkler'
+                                                ? 'มินิสปริงเกลอร์'
+                                                : irrigationFromData === 'drip'
+                                                  ? 'น้ำหยด'
+                                                  : irrigationFromData === 'mixed'
+                                                    ? 'ผสม'
+                                                    : 'N/A';
                                         } else {
                                             return 'N/A';
                                         }
@@ -434,36 +471,36 @@ const FieldCard = ({
                     ) : (
                         // Default display for other categories
                         <>
-                    <div className="flex justify-between">
-                        <span>{t('plant_type')}:</span>
-                        <span className="text-white">{field.plantType?.name || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span>{t('area')}:</span>
-                        <span className="text-white">
-                            {field.totalArea
-                                ? typeof field.totalArea === 'number'
-                                    ? field.totalArea.toFixed(2)
-                                    : (parseFloat(field.totalArea) || 0).toFixed(2)
-                                : 'N/A'}{' '}
-                            ไร่
-                        </span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span>{t('plants')}:</span>
-                        <span className="text-white">{field.totalPlants || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span>{t('water_need')}:</span>
-                        <span className="text-white">
-                            {field.total_water_need
-                                ? typeof field.total_water_need === 'number'
-                                    ? field.total_water_need.toFixed(2)
-                                    : (parseFloat(field.total_water_need) || 0).toFixed(2)
-                                : 'N/A'}{' '}
-                            ลิตร/ครั้ง
-                        </span>
-                    </div>
+                            <div className="flex justify-between">
+                                <span>{t('plant_type')}:</span>
+                                <span className="text-white">{field.plantType?.name || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>{t('area')}:</span>
+                                <span className="text-white">
+                                    {field.totalArea
+                                        ? typeof field.totalArea === 'number'
+                                            ? field.totalArea.toFixed(2)
+                                            : (parseFloat(field.totalArea) || 0).toFixed(2)
+                                        : 'N/A'}{' '}
+                                    ไร่
+                                </span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>{t('plants')}:</span>
+                                <span className="text-white">{field.totalPlants || 'N/A'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span>{t('water_need')}:</span>
+                                <span className="text-white">
+                                    {field.total_water_need
+                                        ? typeof field.total_water_need === 'number'
+                                            ? field.total_water_need.toFixed(2)
+                                            : (parseFloat(field.total_water_need) || 0).toFixed(2)
+                                        : 'N/A'}{' '}
+                                    ลิตร/ครั้ง
+                                </span>
+                            </div>
                         </>
                     )}
                 </div>
@@ -1037,7 +1074,7 @@ export default function Home() {
         // Fallback function if context is not available
         t = (key: string) => key;
     }
-    
+
     // Defensive usePage call with error handling
     let page: any = { props: {} };
     let auth: any = null;
@@ -1050,7 +1087,7 @@ export default function Home() {
         // Silently handle the error - this is expected during initial render
         // The context will be available after the component mounts
     }
-    
+
     const [fields, setFields] = useState<Field[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1113,14 +1150,12 @@ export default function Home() {
     const getCurrentFields = () => {
         if (!selectedFolder) return fields;
 
-
-
         // Check by folder name since system folders are created in the backend
         if (selectedFolder.name === t('finished') || selectedFolder.name === 'Finished') {
             return fields.filter(
                 (field) =>
-                (field.status === 'finished' || field.isCompleted) && 
-                field.folderId === selectedFolder.id
+                    (field.status === 'finished' || field.isCompleted) &&
+                    field.folderId === selectedFolder.id
             );
         }
         if (selectedFolder.name === t('unfinished') || selectedFolder.name === 'Unfinished') {
@@ -1138,14 +1173,12 @@ export default function Home() {
 
     // Get field count for a specific folder
     const getFieldCountForFolder = (folder: Folder) => {
-
-        
         // Check by folder name since system folders are created in the backend
         if (folder.name === t('finished') || folder.name === 'Finished') {
             return fields.filter(
                 (field) =>
-                (field.status === 'finished' || field.isCompleted) && 
-                field.folderId === folder.id
+                    (field.status === 'finished' || field.isCompleted) &&
+                    field.folderId === folder.id
             ).length;
         }
         if (folder.name === t('unfinished') || folder.name === 'Unfinished') {
@@ -1171,7 +1204,7 @@ export default function Home() {
                     headers: axios.defaults.headers.common,
                     withCredentials: axios.defaults.withCredentials,
                 });
-                
+
                 const [fieldsResponse, foldersResponse] = await Promise.all([
                     axios.get('/fields-api'), // Updated to use new endpoint
                     axios.get('/folders-api'), // Updated to use new route path
@@ -1187,7 +1220,7 @@ export default function Home() {
                 if (foldersResponse.data.folders) {
                     console.log('✅ Setting folders:', foldersResponse.data.folders);
                     setFolders(foldersResponse.data.folders);
-                    
+
                     // Commented out automatic mock field creation to avoid issues
                     // if (fieldsResponse.data.fields.length === 0) {
                     //     createMockField();
@@ -1204,12 +1237,11 @@ export default function Home() {
         };
 
         fetchData();
-        
+
         // Clear navigation history on mount
         setSelectedFolder(null);
         setFolderHistory([]);
     }, []);
-
 
     const handleAddField = () => {
         setShowCategoryModal(true);
@@ -1219,7 +1251,7 @@ export default function Home() {
         // Find the "Unfinished" folder
         const unfinishedFolder = folders.find((f) => f.name === 'Unfinished');
         const folderId = unfinishedFolder ? unfinishedFolder.id : undefined;
-        
+
         const mockField: Field = {
             id: `mock-${Date.now()}`,
             name: 'Test Field',
@@ -1263,7 +1295,7 @@ export default function Home() {
         localStorage.removeItem('currentFieldId'); // Clear current field ID for new projects
         localStorage.removeItem('currentFieldName'); // Clear current field name for new projects
         console.log('🆕 Starting new project - cleared field IDs from localStorage');
-        
+
         // Add a small delay to ensure router is fully initialized
         setTimeout(() => {
             navigateToRoute(category.route);
@@ -1287,24 +1319,27 @@ export default function Home() {
             localStorage.setItem('currentFieldId', field.id);
             localStorage.setItem('currentFieldName', field.name);
             console.log('📋 Opening existing field - set currentFieldId:', field.id);
-            
+
             // Check if field is finished - if so, go directly to product page with appropriate mode
             if (field.status === 'finished' || field.isCompleted) {
                 console.log('🔄 Opening finished field, navigating to product page');
                 const productModeMap: { [key: string]: string } = {
-                    'horticulture': '',
+                    horticulture: '',
                     'home-garden': '?mode=garden',
                     'field-crop': '?mode=field-crop',
-                    'greenhouse': '?mode=greenhouse'
+                    greenhouse: '?mode=greenhouse',
                 };
                 const modeParam = productModeMap[field.category || 'horticulture'] || '';
                 navigateToRoute(`/product${modeParam}`);
                 return;
             }
-            
+
             // For unfinished fields, go to appropriate planner to continue editing
-            console.log('🔄 Opening unfinished field, navigating to planner for category:', field.category);
-            
+            console.log(
+                '🔄 Opening unfinished field, navigating to planner for category:',
+                field.category
+            );
+
             // Route to appropriate planner based on field category
             switch (field.category) {
                 case 'home-garden':
@@ -1312,18 +1347,18 @@ export default function Home() {
                     // The data will be loaded from database using currentFieldId
                     navigateToRoute('/home-garden/planner');
                     break;
-                    
+
                 case 'field-crop':
                     navigateToRoute('/field-crop');
                     break;
-                    
+
                 case 'greenhouse':
                     // Extract crop and method from saved greenhouse data
                     const greenhouseData = field.greenhouse_data;
                     const crops = greenhouseData?.selectedCrops || [];
                     const method = greenhouseData?.planningMethod || 'draw';
                     const lastSavedPage = greenhouseData?.lastSavedPage || 'planner';
-                    
+
                     // Build query parameters
                     const queryParams = new URLSearchParams();
                     if (crops.length > 0) {
@@ -1332,18 +1367,24 @@ export default function Home() {
                     if (method) {
                         queryParams.set('method', method);
                     }
-                    
+
                     // Navigate to the appropriate page based on where the draft was last saved
                     if (lastSavedPage === 'irrigation-selection') {
                         // If saved from irrigation selection page, go to choose-irrigation
                         if (greenhouseData?.shapes) {
-                            queryParams.set('shapes', encodeURIComponent(JSON.stringify(greenhouseData.shapes)));
+                            queryParams.set(
+                                'shapes',
+                                encodeURIComponent(JSON.stringify(greenhouseData.shapes))
+                            );
                         }
                         navigateToRoute(`/choose-irrigation?${queryParams.toString()}`);
                     } else if (lastSavedPage === 'irrigation-design') {
                         // If saved from irrigation design page, go to greenhouse-map
                         if (greenhouseData?.shapes) {
-                            queryParams.set('shapes', encodeURIComponent(JSON.stringify(greenhouseData.shapes)));
+                            queryParams.set(
+                                'shapes',
+                                encodeURIComponent(JSON.stringify(greenhouseData.shapes))
+                            );
                         }
                         if (greenhouseData?.irrigationMethod) {
                             queryParams.set('irrigation', greenhouseData.irrigationMethod);
@@ -1354,18 +1395,18 @@ export default function Home() {
                         navigateToRoute(`/greenhouse-planner?${queryParams.toString()}`);
                     }
                     break;
-                    
+
                 case 'horticulture':
                 default:
                     // Prepare the data in the same format as map-planner for horticulture
-            const params = new URLSearchParams({
-                area: JSON.stringify(field.area),
-                areaType: '',
-                plantType: JSON.stringify(field.plantType),
-                layers: JSON.stringify(field.layers || []),
+                    const params = new URLSearchParams({
+                        area: JSON.stringify(field.area),
+                        areaType: '',
+                        plantType: JSON.stringify(field.plantType),
+                        layers: JSON.stringify(field.layers || []),
                         editFieldId: field.id, // Use editFieldId to match planner expectations
-            });
-            navigateToRoute(`/horticulture/planner?${params.toString()}`);
+                    });
+                    navigateToRoute(`/horticulture/planner?${params.toString()}`);
                     break;
             }
         } catch (error) {
@@ -1398,15 +1439,15 @@ export default function Home() {
                 );
             } else {
                 // For real fields, make API call to update database
-            const response = await axios.put(`/api/fields/${fieldId}/status`, {
-                status,
-                is_completed: isCompleted,
-            });
+                const response = await axios.put(`/api/fields/${fieldId}/status`, {
+                    status,
+                    is_completed: isCompleted,
+                });
 
-            if (response.data.success) {
-                setFields((prev) =>
-                    prev.map((f) => (f.id === fieldId ? { ...f, status, isCompleted } : f))
-                );
+                if (response.data.success) {
+                    setFields((prev) =>
+                        prev.map((f) => (f.id === fieldId ? { ...f, status, isCompleted } : f))
+                    );
                 }
             }
         } catch (error) {
@@ -1442,20 +1483,20 @@ export default function Home() {
                     headers: axios.defaults.headers.common,
                     withCredentials: axios.defaults.withCredentials,
                 });
-            const response = await axios.delete(`/api/fields/${fieldToDelete.id}`);
+                const response = await axios.delete(`/api/fields/${fieldToDelete.id}`);
                 console.log('Delete response:', response.data);
                 console.log('Response status:', response.status);
 
-            if (response.data.success) {
+                if (response.data.success) {
                     console.log('Field deleted successfully, updating UI');
-                // Remove the field from the list
-                setFields((prev) => prev.filter((f) => f.id !== fieldToDelete.id));
-                setShowDeleteConfirm(false);
-                setFieldToDelete(null);
-            } else {
+                    // Remove the field from the list
+                    setFields((prev) => prev.filter((f) => f.id !== fieldToDelete.id));
+                    setShowDeleteConfirm(false);
+                    setFieldToDelete(null);
+                } else {
                     console.error('Backend returned success: false');
-                alert('Failed to delete field');
-            }
+                    alert('Failed to delete field');
+                }
             }
         } catch (error: any) {
             console.error('Error deleting field:', error);
@@ -1488,7 +1529,7 @@ export default function Home() {
                 setShowDeleteConfirm(false);
                 setFieldToDelete(null);
             } else {
-            alert('Error deleting field');
+                alert('Error deleting field');
             }
         } finally {
             setDeleting(false);
@@ -1607,11 +1648,11 @@ export default function Home() {
 
     const handleFolderDrop = async (targetFolderId: string | null) => {
         if (!draggedField) return;
-        
+
         // If targetFolderId is null or "unassigned", remove the field from its current folder
         const newFolderId =
             targetFolderId === null || targetFolderId === 'unassigned' ? null : targetFolderId;
-        
+
         if (draggedField.folderId !== newFolderId) {
             try {
                 // Update field in backend
@@ -1660,10 +1701,6 @@ export default function Home() {
         setFolderHistory((prev) => [...prev, folder]);
     };
 
-
-
-
-
     const handleGoBack = () => {
         if (folderHistory.length > 0) {
             const newHistory = [...folderHistory];
@@ -1681,7 +1718,6 @@ export default function Home() {
         setSelectedFolder(null);
         setFolderHistory([]);
     };
-
 
     if (loading) {
         return (
@@ -1748,13 +1784,13 @@ export default function Home() {
                                         className="flex items-center gap-2 text-blue-400 hover:underline"
                                         onClick={handleGoBack}
                                     >
-                                        <FaArrowLeft /> 
+                                        <FaArrowLeft />
                                         {folderHistory.length > 0 ? 'Back' : t('all_folders')}
                                     </button>
-                                    
+
                                     {/* Breadcrumb */}
                                     {folderHistory.length > 0 && (
-                                        <div 
+                                        <div
                                             className={`flex items-center gap-2 text-gray-400 ${
                                                 isDragging
                                                     ? 'rounded border-2 border-dashed border-blue-500 bg-blue-500/10 p-2'
@@ -1806,8 +1842,8 @@ export default function Home() {
                                         >
                                             {isDragging && (
                                                 <span className="mr-2 text-xs text-blue-400">
-                                                    {folderHistory.length > 1 
-                                                        ? 'Drop here to move to parent folder' 
+                                                    {folderHistory.length > 1
+                                                        ? 'Drop here to move to parent folder'
                                                         : 'Drop here to make unassigned'}
                                                 </span>
                                             )}
@@ -1859,7 +1895,7 @@ export default function Home() {
                                         {t('click_folder_view')}
                                     </div>
                                 </div>
-                                
+
                                 {/* System Folders */}
                                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                     {getAllFolders().map((folder) => (
@@ -1868,16 +1904,22 @@ export default function Home() {
                                             folder={folder}
                                             fieldCount={getFieldCountForFolder(folder)}
                                             onSelect={handleFolderSelect}
-                                            onEdit={folder.type === 'category' ? () => {} : handleEditFolder}
-                                            onDelete={folder.type === 'category' ? () => {} : handleDeleteFolder}
+                                            onEdit={
+                                                folder.type === 'category'
+                                                    ? () => {}
+                                                    : handleEditFolder
+                                            }
+                                            onDelete={
+                                                folder.type === 'category'
+                                                    ? () => {}
+                                                    : handleDeleteFolder
+                                            }
                                             onDrop={handleFolderDrop}
                                             isSelected={false}
                                             t={t}
                                         />
                                     ))}
                                 </div>
-
-
 
                                 {/* Unassigned Fields Section */}
                                 {(() => {
@@ -1979,7 +2021,7 @@ export default function Home() {
                                     const subFolders = folders.filter(
                                         (f) => f.parent_id === selectedFolder.id
                                     );
-                                    
+
                                     return subFolders.length > 0 ? (
                                         <div className="mb-8">
                                             <h3 className="mb-4 text-lg font-semibold text-white">
@@ -2012,45 +2054,64 @@ export default function Home() {
                                         const categoryFields = fields.filter((field) => {
                                             // Check if field is in this folder
                                             const isInFolder = field.folderId === selectedFolder.id;
-                                            
+
                                             // Check if field matches this category
                                             const matchesCategory = field.category === category.id;
-                                            
+
                                             // Special case: if no category is set, treat as horticulture (for existing fields)
-                                            const isLegacyHorticulture = !field.category && category.id === 'horticulture';
-                                            
-                                            return isInFolder && (matchesCategory || isLegacyHorticulture);
+                                            const isLegacyHorticulture =
+                                                !field.category && category.id === 'horticulture';
+
+                                            return (
+                                                isInFolder &&
+                                                (matchesCategory || isLegacyHorticulture)
+                                            );
                                         });
-                                        
+
                                         // Debug logging
-                                        console.log(`🔍 Category ${category.name} (${category.id}):`, {
-                                            totalFields: fields.length,
-                                            categoryFields: categoryFields.length,
-                                            fieldsInFolder: fields.filter(f => f.folderId === selectedFolder.id).length,
-                                            sampleField: fields.find(f => f.folderId === selectedFolder.id)
-                                        });
-                                        
+                                        console.log(
+                                            `🔍 Category ${category.name} (${category.id}):`,
+                                            {
+                                                totalFields: fields.length,
+                                                categoryFields: categoryFields.length,
+                                                fieldsInFolder: fields.filter(
+                                                    (f) => f.folderId === selectedFolder.id
+                                                ).length,
+                                                sampleField: fields.find(
+                                                    (f) => f.folderId === selectedFolder.id
+                                                ),
+                                            }
+                                        );
+
                                         return { category, fields: categoryFields };
                                     });
-                                    
-                                    const hasAnyCategoryFields = categorySections.some(section => section.fields.length > 0);
-                                    
+
+                                    const hasAnyCategoryFields = categorySections.some(
+                                        (section) => section.fields.length > 0
+                                    );
+
                                     return hasAnyCategoryFields ? (
                                         <div className="mb-8">
-                                        <h3 className="mb-4 text-lg font-semibold text-white">
+                                            <h3 className="mb-4 text-lg font-semibold text-white">
                                                 {t('project_categories')}
                                             </h3>
                                             <div className="space-y-6">
                                                 {categorySections.map(({ category, fields }) => {
                                                     if (fields.length === 0) return null;
-                                                    
+
                                                     return (
-                                                        <div key={category.id} className="rounded-lg border border-gray-700 bg-gray-800 p-4">
+                                                        <div
+                                                            key={category.id}
+                                                            className="rounded-lg border border-gray-700 bg-gray-800 p-4"
+                                                        >
                                                             <div className="mb-4 flex items-center justify-between">
                                                                 <div className="flex items-center gap-3">
-                                                                    <span className="text-2xl">{category.icon}</span>
+                                                                    <span className="text-2xl">
+                                                                        {category.icon}
+                                                                    </span>
                                                                     <h4 className="text-lg font-semibold text-white">
-                                                                        {category.name} ({fields.length})
+                                                                        {category.name} (
+                                                                        {fields.length})
                                                                     </h4>
                                                                 </div>
                                                             </div>
@@ -2061,11 +2122,19 @@ export default function Home() {
                                                                         field={field}
                                                                         onSelect={handleFieldSelect}
                                                                         onDelete={handleFieldDelete}
-                                                                        onStatusChange={handleFieldStatusChange}
-                                                                        onDragStart={handleFieldDragStart}
-                                                                        onDragEnd={handleFieldDragEnd}
+                                                                        onStatusChange={
+                                                                            handleFieldStatusChange
+                                                                        }
+                                                                        onDragStart={
+                                                                            handleFieldDragStart
+                                                                        }
+                                                                        onDragEnd={
+                                                                            handleFieldDragEnd
+                                                                        }
                                                                         isDragging={
-                                                                            isDragging && draggedField?.id === field.id
+                                                                            isDragging &&
+                                                                            draggedField?.id ===
+                                                                                field.id
                                                                         }
                                                                         t={t}
                                                                     />
@@ -2081,42 +2150,51 @@ export default function Home() {
 
                                 {/* Uncategorized Fields Section */}
                                 {(() => {
-                                    const uncategorizedFields = getCurrentFields().filter(field => {
-                                        // Check if field has a category
-                                        const hasCategory = field.category && field.category !== '';
-                                        // Check if field is not in any category section
-                                        const isInCategorySection = plantCategories.some(category => {
-                                            const matchesCategory = field.category === category.id;
-                                            const isLegacyHorticulture = !field.category && category.id === 'horticulture';
-                                            return matchesCategory || isLegacyHorticulture;
-                                        });
-                                        
-                                        return !hasCategory && !isInCategorySection;
-                                    });
-                                    
+                                    const uncategorizedFields = getCurrentFields().filter(
+                                        (field) => {
+                                            // Check if field has a category
+                                            const hasCategory =
+                                                field.category && field.category !== '';
+                                            // Check if field is not in any category section
+                                            const isInCategorySection = plantCategories.some(
+                                                (category) => {
+                                                    const matchesCategory =
+                                                        field.category === category.id;
+                                                    const isLegacyHorticulture =
+                                                        !field.category &&
+                                                        category.id === 'horticulture';
+                                                    return matchesCategory || isLegacyHorticulture;
+                                                }
+                                            );
+
+                                            return !hasCategory && !isInCategorySection;
+                                        }
+                                    );
+
                                     return uncategorizedFields.length > 0 ? (
                                         <div className="mb-8">
                                             <h3 className="mb-4 text-lg font-semibold text-white">
                                                 Uncategorized Fields ({uncategorizedFields.length})
-                                        </h3>
-                                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                                            </h3>
+                                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                                                 {uncategorizedFields.map((field) => (
-                                                <FieldCard
-                                                    key={field.id}
-                                                    field={field}
-                                                    onSelect={handleFieldSelect}
-                                                    onDelete={handleFieldDelete}
-                                                    onStatusChange={handleFieldStatusChange}
-                                                    onDragStart={handleFieldDragStart}
-                                                    onDragEnd={handleFieldDragEnd}
-                                                    isDragging={
-                                                        isDragging && draggedField?.id === field.id
-                                                    }
-                                                    t={t}
-                                                />
-                                            ))}
+                                                    <FieldCard
+                                                        key={field.id}
+                                                        field={field}
+                                                        onSelect={handleFieldSelect}
+                                                        onDelete={handleFieldDelete}
+                                                        onStatusChange={handleFieldStatusChange}
+                                                        onDragStart={handleFieldDragStart}
+                                                        onDragEnd={handleFieldDragEnd}
+                                                        isDragging={
+                                                            isDragging &&
+                                                            draggedField?.id === field.id
+                                                        }
+                                                        t={t}
+                                                    />
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
                                     ) : null;
                                 })()}
 
@@ -2305,7 +2383,6 @@ export default function Home() {
                     </div>
                 </div>
             )}
-
         </div>
     );
 }

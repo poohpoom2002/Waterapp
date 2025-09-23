@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Head, usePage, router } from '@inertiajs/react';
+import { useLanguage } from '../contexts/LanguageContext';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import UpgradeTierModal from '../components/UpgradeTierModal';
@@ -20,15 +21,21 @@ interface NewHomeProps {
     auth: {
         user: User;
     };
-    [key: string]: unknown;
+    [key: string]: any;
 }
 
 export default function NewHome() {
-    // Always call usePage at the top level
-    const page = usePage<NewHomeProps>();
-    
-    // Safely access auth with fallback
-    const auth = page?.props?.auth || { user: null };
+    const { t } = useLanguage();
+
+    // Defensive usePage call with error handling
+    let auth;
+    try {
+        auth = usePage<NewHomeProps>().props.auth;
+    } catch (error) {
+        console.warn('Inertia context not available in NewHome, using fallback values');
+        auth = { user: null };
+    }
+
     const user = auth.user;
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -87,6 +94,7 @@ export default function NewHome() {
         }
     };
 
+    const currentTierInfo = getTierDisplayInfo(user?.tier || 'free');
 
     const handleUpgradeTier = async (tier: string, months: number) => {
         try {
@@ -283,30 +291,30 @@ export default function NewHome() {
 
                     <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
                         {/* Free Plan */}
-                        <div className={`rounded-lg border-2 ${getTierDisplayInfo('free').borderColor} bg-gray-800 p-8 text-center shadow-lg hover:shadow-xl transition-shadow flex flex-col`}>
+                        <div className="rounded-lg border-2 border-gray-600 bg-gray-800 p-8 text-center shadow-lg hover:shadow-xl transition-shadow">
                             <div className="mb-6">
-                                <div className="text-4xl mb-2">{getTierDisplayInfo('free').icon}</div>
-                                <div className={`text-2xl font-bold ${getTierDisplayInfo('free').color}`}>{getTierDisplayInfo('free').name}</div>
+                                <div className="text-4xl mb-2">🆓</div>
+                                <div className="text-2xl font-bold text-white">Free</div>
                                 <div className="text-sm text-gray-400">Perfect for getting started</div>
                             </div>
                             
                             <div className="mb-6">
-                                <div className={`text-3xl font-bold ${getTierDisplayInfo('free').color}`}>{getTierDisplayInfo('free').price}</div>
+                                <div className="text-3xl font-bold text-white">Free</div>
                                 <div className="text-sm text-gray-400">Forever</div>
                             </div>
 
-                            <div className="mb-8 space-y-3 text-left flex-grow">
+                            <div className="mb-8 space-y-3 text-left">
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
-                                    {getTierDisplayInfo('free').monthlyTokens} tokens per month
+                                    100 tokens per month
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
-                                    {getTierDisplayInfo('free').dailyTokens} tokens daily refresh
+                                    50 tokens daily refresh
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -324,14 +332,14 @@ export default function NewHome() {
 
                             <button
                                 onClick={handleContinueToApp}
-                                className="w-full rounded-lg bg-gray-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-gray-700 mt-auto"
+                                className="w-full rounded-lg bg-gray-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-gray-700"
                             >
                                 Get Started Free
                             </button>
                         </div>
 
                         {/* Pro Plan */}
-                        <div className={`rounded-lg border-2 ${getTierDisplayInfo('pro').borderColor} bg-gray-800 p-8 text-center relative shadow-lg hover:shadow-xl transition-shadow flex flex-col`}>
+                        <div className="rounded-lg border-2 border-blue-500 bg-gray-800 p-8 text-center relative shadow-lg hover:shadow-xl transition-shadow">
                             <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                                 <span className="bg-blue-500 text-white px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap">
                                     Most Popular
@@ -339,8 +347,8 @@ export default function NewHome() {
                             </div>
 
                             <div className="mb-6">
-                                <div className="text-4xl mb-2">{getTierDisplayInfo('pro').icon}</div>
-                                <div className={`text-2xl font-bold ${getTierDisplayInfo('pro').color}`}>{getTierDisplayInfo('pro').name}</div>
+                                <div className="text-4xl mb-2">⭐</div>
+                                <div className="text-2xl font-bold text-white">Pro</div>
                                 <div className="text-sm text-gray-400">For serious users</div>
                             </div>
                             
@@ -349,18 +357,18 @@ export default function NewHome() {
                                 <div className="text-sm text-gray-400">per month</div>
                             </div>
 
-                            <div className="mb-8 space-y-3 text-left flex-grow">
+                            <div className="mb-8 space-y-3 text-left">
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
-                                    {getTierDisplayInfo('pro').monthlyTokens} tokens per month
+                                    500 tokens per month
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
-                                    {getTierDisplayInfo('pro').dailyTokens} tokens daily refresh
+                                    100 tokens daily refresh
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -390,17 +398,17 @@ export default function NewHome() {
 
                             <button
                                 onClick={() => setShowUpgradeModal(true)}
-                                className="w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-700 mt-auto"
+                                className="w-full rounded-lg bg-blue-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-blue-700"
                             >
                                 Upgrade to Pro
                             </button>
                         </div>
 
                         {/* Advanced Plan */}
-                        <div className={`rounded-lg border-2 ${getTierDisplayInfo('advanced').borderColor} bg-gray-800 p-8 text-center shadow-lg hover:shadow-xl transition-shadow flex flex-col`}>
+                        <div className="rounded-lg border-2 border-purple-500 bg-gray-800 p-8 text-center shadow-lg hover:shadow-xl transition-shadow">
                             <div className="mb-6">
-                                <div className="text-4xl mb-2">{getTierDisplayInfo('advanced').icon}</div>
-                                <div className={`text-2xl font-bold ${getTierDisplayInfo('advanced').color}`}>{getTierDisplayInfo('advanced').name}</div>
+                                <div className="text-4xl mb-2">💎</div>
+                                <div className="text-2xl font-bold text-white">Advanced</div>
                                 <div className="text-sm text-gray-400">For professionals</div>
                             </div>
                             
@@ -409,18 +417,18 @@ export default function NewHome() {
                                 <div className="text-sm text-gray-400">per month</div>
                             </div>
 
-                            <div className="mb-8 space-y-3 text-left flex-grow">
+                            <div className="mb-8 space-y-3 text-left">
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
-                                    {getTierDisplayInfo('advanced').monthlyTokens} tokens per month
+                                    1000 tokens per month
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
-                                    {getTierDisplayInfo('advanced').dailyTokens} tokens daily refresh
+                                    200 tokens daily refresh
                                 </div>
                                 <div className="flex items-center gap-2 text-sm text-gray-300">
                                     <svg className="h-4 w-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -462,7 +470,7 @@ export default function NewHome() {
 
                             <button
                                 onClick={() => setShowUpgradeModal(true)}
-                                className="w-full rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-purple-700 mt-auto"
+                                className="w-full rounded-lg bg-purple-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-purple-700"
                             >
                                 Upgrade to Advanced
                             </button>

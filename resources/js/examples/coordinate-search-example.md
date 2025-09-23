@@ -7,23 +7,27 @@
 ## รูปแบบพิกัดที่รองรับ
 
 ### 1. รูปแบบพื้นฐาน (Decimal Degrees)
+
 ```
 13.7563, 100.5018
 13.7563,100.5018
 ```
 
 ### 2. รูปแบบที่มี Label
+
 ```
 lat: 13.7563, lng: 100.5018
 latitude: 13.7563, longitude: 100.5018
 ```
 
 ### 3. รูปแบบที่มีวงเล็บ
+
 ```
 (13.7563, 100.5018)
 ```
 
 ### 4. รูปแบบ DMS (Degrees, Minutes, Seconds)
+
 ```
 13°45'22.68"N, 100°30'6.48"E
 ```
@@ -31,17 +35,19 @@ latitude: 13.7563, longitude: 100.5018
 ## ตัวอย่างการใช้งาน
 
 ### การนำเข้า Component
+
 ```typescript
 import EnhancedHorticultureSearchControl from '../components/horticulture/HorticultureSearchControl';
 ```
 
 ### การใช้งานใน Component
+
 ```tsx
 function MyMapComponent() {
     const handlePlaceSelect = (lat: number, lng: number, placeDetails?: SearchResult) => {
         console.log('Selected coordinates:', { lat, lng });
         console.log('Place details:', placeDetails);
-        
+
         // ทำสิ่งที่ต้องการกับพิกัดที่ได้รับ
         // เช่น อัปเดตแผนที่, บันทึกตำแหน่ง, ฯลฯ
     };
@@ -52,7 +58,7 @@ function MyMapComponent() {
                 onPlaceSelect={handlePlaceSelect}
                 placeholder="ค้นหาสถานที่หรือใส่พิกัด เช่น 13.7563,100.5018"
             />
-            
+
             {/* แผนที่หรือ content อื่น ๆ */}
         </div>
     );
@@ -82,6 +88,7 @@ function MyMapComponent() {
 ## ข้อผิดพลาดที่อาจเกิดขึ้น
 
 ### พิกัดไม่ถูกต้อง
+
 ```
 รูปแบบพิกัดไม่ถูกต้อง
 
@@ -93,6 +100,7 @@ function MyMapComponent() {
 ```
 
 ### ไม่พบข้อมูลสถานที่
+
 ```
 ไม่พบข้อมูลสถานที่สำหรับพิกัดนี้
 
@@ -120,13 +128,13 @@ const ProductionMapComponent = () => {
         try {
             // บันทึกพิกัดลงฐานข้อมูล
             await saveLocation({ lat, lng, details: placeDetails });
-            
+
             // อัปเดต UI
             updateMapCenter(lat, lng);
-            
+
             // แสดงการแจ้งเตือน
             showNotification('เลือกตำแหน่งเรียบร้อยแล้ว');
-            
+
         } catch (error) {
             console.error('Error saving location:', error);
             showErrorNotification('ไม่สามารถบันทึกตำแหน่งได้');

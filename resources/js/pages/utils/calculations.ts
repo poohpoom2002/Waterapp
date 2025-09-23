@@ -20,10 +20,14 @@ export const getAdjustedC = (pipeType: string, age: number): number => {
         }[pipeType] || 135; // Fix: Increased default value
 
     // Fix: More realistic degradation - PVC degrades slower than other materials
-    const degradationRate = pipeType.includes('PVC') ? 0.3 : 
-                           pipeType.includes('HDPE') ? 0.4 : 
-                           pipeType.includes('PE') ? 0.5 : 1.0;
-    
+    const degradationRate = pipeType.includes('PVC')
+        ? 0.3
+        : pipeType.includes('HDPE')
+          ? 0.4
+          : pipeType.includes('PE')
+            ? 0.5
+            : 1.0;
+
     return Math.max(110, baseC - age * degradationRate);
 };
 
@@ -36,17 +40,17 @@ export const getMinorLossCoefficient = (
 
     // Fix: More realistic base K values for different pipe sections
     const baseK = {
-        branch: 0.2,    // Fix: Increased for branch pipes with sprinklers
+        branch: 0.2, // Fix: Increased for branch pipes with sprinklers
         secondary: 0.15, // Fix: Slightly increased for secondary mains
-        main: 0.1,      // Main pipes typically have fewer fittings
+        main: 0.1, // Main pipes typically have fewer fittings
     };
 
     totalK += baseK[sectionType as keyof typeof baseK] || 0.15;
 
     // Fix: More realistic fitting loss coefficients based on engineering standards
-    totalK += (fittingCount.elbows || 0) * 0.9;  // Fix: Standard 90° elbow K ≈ 0.9
-    totalK += (fittingCount.tees || 0) * 1.8;    // Fix: Tee junction K ≈ 1.8 (through flow)
-    totalK += (fittingCount.valves || 0) * 0.2;  // Fix: Gate valve fully open K ≈ 0.2
+    totalK += (fittingCount.elbows || 0) * 0.9; // Fix: Standard 90° elbow K ≈ 0.9
+    totalK += (fittingCount.tees || 0) * 1.8; // Fix: Tee junction K ≈ 1.8 (through flow)
+    totalK += (fittingCount.valves || 0) * 0.2; // Fix: Gate valve fully open K ≈ 0.2
 
     // Fix: More realistic default fittings for different pipe types
     if (!Object.keys(fittingCount).length) {
@@ -136,7 +140,7 @@ export const calculateImprovedHeadLoss = (
     }
 
     const totalLoss = majorLoss + minorLoss;
-    
+
     return {
         major: formatNumber(majorLoss, 3),
         minor: formatNumber(minorLoss, 3),
@@ -166,8 +170,8 @@ export const checkVelocity = (velocity: number, section: string): string => {
 export const getVelocityScore = (velocity: number): number => {
     // Fix: Updated scoring based on irrigation system standards
     if (velocity >= 0.6 && velocity <= 2.0) return 100; // Optimal range
-    if (velocity >= 0.4 && velocity <= 2.5) return 80;  // Good range  
-    if (velocity >= 0.3 && velocity <= 3.0) return 60;  // Acceptable range
+    if (velocity >= 0.4 && velocity <= 2.5) return 80; // Good range
+    if (velocity >= 0.3 && velocity <= 3.0) return 60; // Acceptable range
     if (velocity > 3.0) return 20; // Too fast - water hammer risk
     if (velocity < 0.3) return 30; // Too slow - sedimentation risk
     return 40; // Outside normal operating range
@@ -176,26 +180,26 @@ export const getVelocityScore = (velocity: number): number => {
 export const calculateOptimalPipeSize = (
     flow_lpm: number,
     targetVelocity: number = 1.2, // Fix: Adjusted target velocity for irrigation systems
-    maxVelocity: number = 2.0     // Fix: Adjusted max velocity based on engineering standards
+    maxVelocity: number = 2.0 // Fix: Adjusted max velocity based on engineering standards
 ): { optimal: number; acceptable: number } => {
     // Convert LPM to m³/s
     const Q_m3s = flow_lpm / 60000;
-    
+
     // Calculate optimal diameter for target velocity
     // A = Q/V, D = sqrt(4A/π) = sqrt(4Q/(πV))
     const optimalArea = Q_m3s / targetVelocity;
     const optimalDiameter = Math.sqrt((4 * optimalArea) / Math.PI) * 1000; // Convert to mm
-    
+
     // Calculate acceptable diameter for max velocity
     const acceptableArea = Q_m3s / maxVelocity;
     const acceptableDiameter = Math.sqrt((4 * acceptableArea) / Math.PI) * 1000; // Convert to mm
-    
+
     // Fix: Ensure minimum practical pipe sizes for irrigation systems
     const minPipeSize = 20; // 20mm minimum for irrigation
-    
+
     return {
         optimal: Math.max(optimalDiameter, minPipeSize),
-        acceptable: Math.max(acceptableDiameter, minPipeSize)
+        acceptable: Math.max(acceptableDiameter, minPipeSize),
     };
 };
 
@@ -376,7 +380,7 @@ export const calculateZoneFlowRate = (
 } => {
     // Flow rate in LPM
     const flowLPM = sprinklerCount * waterPerSprinklerLPM;
-    
+
     // Total water per irrigation session in liters
     const totalWaterPerIrrigation = flowLPM * (irrigationTimeMinutes / 60);
 
@@ -388,7 +392,7 @@ export const calculateZoneFlowRate = (
 
 export const calculateFieldCropZoneFlowRate = (
     sprinklerCount: number,
-    waterPerSprinklerLPM: number = 6.0, 
+    waterPerSprinklerLPM: number = 6.0,
     irrigationTimeMinutes: number = 30
 ): {
     flowLPM: number;
@@ -396,7 +400,7 @@ export const calculateFieldCropZoneFlowRate = (
 } => {
     // Flow rate in liters per minute
     const flowLPM = sprinklerCount * waterPerSprinklerLPM;
-    
+
     // Total water consumed per irrigation session in liters
     const totalWaterPerIrrigation = flowLPM * (irrigationTimeMinutes / 60);
 
@@ -877,7 +881,7 @@ export const convertAreaUnits = {
             return `${formatNumber(rai, 2)} ไร่`;
         }
         return `${formatNumber(sqm, 0)} ตร.ม.`;
-    }
+    },
 };
 
 export const calculatePlantingDensity = (
@@ -918,10 +922,5 @@ export const validateFieldCropInput = (input: any): boolean => {
 };
 
 export const validateGreenhouseInput = (input: any): boolean => {
-    return !!(
-        input &&
-        input.area > 0 &&
-        input.totalPlants > 0 &&
-        input.waterRequirement >= 0
-    );
+    return !!(input && input.area > 0 && input.totalPlants > 0 && input.waterRequirement >= 0);
 };

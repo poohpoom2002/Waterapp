@@ -21,15 +21,17 @@ export const SPRINKLER_STORAGE_KEY = 'sprinklerConfig';
  * @param config ข้อมูลหัวฉีด
  * @returns สำเร็จหรือไม่
  */
-export const saveSprinklerConfig = (config: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'>): boolean => {
+export const saveSprinklerConfig = (
+    config: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'>
+): boolean => {
     try {
         const now = new Date().toISOString();
         const configWithTimestamp: SprinklerConfig = {
             ...config,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
         };
-        
+
         localStorage.setItem(SPRINKLER_STORAGE_KEY, JSON.stringify(configWithTimestamp));
         return true;
     } catch (error) {
@@ -67,7 +69,7 @@ export const clearSprinklerConfig = (): void => {
 };
 
 /**
- * คำนวณปริมาณน้ำรวมทั้งหมด (Q Total) 
+ * คำนวณปริมาณน้ำรวมทั้งหมด (Q Total)
  * @param plantCount จำนวนต้นไม้ทั้งหมด
  * @param flowRatePerMinute อัตราการไหลต่อนาที (ลิตร/นาที)
  * @returns Q Total (ลิตร/นาที)
@@ -92,7 +94,10 @@ export const calculateHourlyFlowRate = (flowRatePerMinute: number): number => {
  * @param hoursPerDay จำนวนชั่วโมงที่ใช้น้ำต่อวัน (ค่าเริ่มต้น 2 ชั่วโมง)
  * @returns ปริมาณน้ำต่อวัน (ลิตร/วัน)
  */
-export const calculateDailyWaterUsage = (flowRatePerMinute: number, hoursPerDay: number = 2): number => {
+export const calculateDailyWaterUsage = (
+    flowRatePerMinute: number,
+    hoursPerDay: number = 2
+): number => {
     return flowRatePerMinute * 60 * hoursPerDay;
 };
 
@@ -110,7 +115,9 @@ export const calculateSprinklerCoverage = (radiusMeters: number): number => {
  * @param config ข้อมูลหัวฉีด
  * @returns ผลตรวจสอบและข้อผิดพลาด
  */
-export const validateSprinklerConfig = (config: SprinklerFormData): {
+export const validateSprinklerConfig = (
+    config: SprinklerFormData
+): {
     isValid: boolean;
     errors: { [key: string]: string };
 } => {
@@ -142,7 +149,7 @@ export const validateSprinklerConfig = (config: SprinklerFormData): {
 
     return {
         isValid: Object.keys(errors).length === 0,
-        errors
+        errors,
     };
 };
 
@@ -190,7 +197,7 @@ export const generateSprinklerSummary = (config: SprinklerConfig, plantCount: nu
     const totalFlowRate = calculateTotalFlowRate(plantCount, config.flowRatePerMinute);
     const dailyUsage = calculateDailyWaterUsage(totalFlowRate);
     const coverage = calculateSprinklerCoverage(config.radiusMeters);
-    
+
     return {
         plantCount,
         flowRatePerPlant: config.flowRatePerMinute,
@@ -226,5 +233,5 @@ export default {
     formatPressure,
     formatRadius,
     generateSprinklerSummary,
-    DEFAULT_SPRINKLER_CONFIG
+    DEFAULT_SPRINKLER_CONFIG,
 };

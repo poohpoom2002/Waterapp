@@ -34,6 +34,7 @@ interface InputFormProps {
     };
     connectionStats?: ConnectionPointStats[];
     onConnectionEquipmentsChange?: (equipments: ConnectionPointEquipment[]) => void;
+    greenhouseData?: any; // เพิ่มสำหรับ greenhouse projectMode
 }
 
 interface BranchPipeStats {
@@ -63,7 +64,12 @@ const hasCategory = (plantData: PlantData): plantData is PlantDataWithCategory =
 interface ConnectionPointEquipment {
     zoneId: string;
     zoneName: string;
-    connectionType: 'mainToSubMain' | 'subMainToMainMid' | 'subMainToLateral' | 'subMainToMainIntersection' | 'lateralToSubMainIntersection';
+    connectionType:
+        | 'mainToSubMain'
+        | 'subMainToMainMid'
+        | 'subMainToLateral'
+        | 'subMainToMainIntersection'
+        | 'lateralToSubMainIntersection';
     connectionTypeName: string;
     color: string;
     count: number;
@@ -89,6 +95,7 @@ const InputForm: React.FC<InputFormProps> = ({
     zoneAreaData,
     connectionStats = [],
     onConnectionEquipmentsChange,
+    greenhouseData,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
@@ -103,14 +110,16 @@ const InputForm: React.FC<InputFormProps> = ({
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
     const [selectedEquipment, setSelectedEquipment] = useState<number | null>(null);
     const [loadingEquipments, setLoadingEquipments] = useState(false);
-    
+
     // State สำหรับจัดการอุปกรณ์จุดเชื่อมต่อ
-    const [connectionPointEquipments, setConnectionPointEquipments] = useState<ConnectionPointEquipment[]>([]);
+    const [connectionPointEquipments, setConnectionPointEquipments] = useState<
+        ConnectionPointEquipment[]
+    >([]);
     const [equipmentCategories, setEquipmentCategories] = useState<EquipmentCategory[]>([]);
     const [connectionEquipments, setConnectionEquipments] = useState<any[]>([]);
     const [loadingConnectionCategories, setLoadingConnectionCategories] = useState(false);
     const [loadingConnectionEquipments, setLoadingConnectionEquipments] = useState(false);
-    
+
     const { t } = useLanguage();
 
     // ฟังก์ชันสำหรับจัดการข้อมูล connection points
@@ -124,28 +133,32 @@ const InputForm: React.FC<InputFormProps> = ({
         const selections = savedSelections ? JSON.parse(savedSelections) : {};
 
         const equipments: ConnectionPointEquipment[] = [];
-        
+
         // กรองเฉพาะโซนที่ active
-        const filteredStats = activeZone 
-            ? connectionStats.filter(zoneStats => zoneStats.zoneId === activeZone.id)
+        const filteredStats = activeZone
+            ? connectionStats.filter((zoneStats) => zoneStats.zoneId === activeZone.id)
             : connectionStats;
-        
-        filteredStats.forEach(zoneStats => {
+
+        filteredStats.forEach((zoneStats) => {
             // สร้างอุปกรณ์สำหรับแต่ละประเภทจุดเชื่อมต่อ (แก้ไขให้ตรงกับการแสดงผลในแผนที่)
             const connectionTypes = [
                 { key: 'mainToSubMain', name: 'ปลาย-ปลาย', color: '#DC2626' }, // สีแดง - endToEndConnections
                 { key: 'subMainToMainMid', name: 'ปลายเมน-ระหว่างเมนรอง', color: '#3B82F6' }, // สีน้ำเงิน - mainToSubMainConnections + subMainToMainIntersections
                 { key: 'subMainToLateral', name: 'เมนรอง-กลางเมน', color: '#8B5CF6' }, // สีม่วง - midConnections
                 { key: 'subMainToMainIntersection', name: 'เมนรอง-ท่อย่อย', color: '#F59E0B' }, // สีเหลือง - subMainToLateralConnections (ลบสีเขียวออกแล้ว)
-                { key: 'lateralToSubMainIntersection', name: 'ตัดท่อย่อย-เมนรอง', color: '#10B981' } // สีเขียว - lateralToSubMainIntersections
+                {
+                    key: 'lateralToSubMainIntersection',
+                    name: 'ตัดท่อย่อย-เมนรอง',
+                    color: '#10B981',
+                }, // สีเขียว - lateralToSubMainIntersections
             ];
 
-            connectionTypes.forEach(type => {
+            connectionTypes.forEach((type) => {
                 const count = zoneStats[type.key as keyof ConnectionPointStats] as number;
                 if (count > 0) {
                     const equipmentId = `${zoneStats.zoneId}-${type.key}`;
                     const savedSelection = selections[equipmentId];
-                    
+
                     const equipmentData = {
                         zoneId: zoneStats.zoneId,
                         zoneName: zoneStats.zoneName,
@@ -154,7 +167,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         color: type.color,
                         count: count,
                         category: savedSelection?.category || null,
-                        equipment: savedSelection?.equipment || null
+                        equipment: savedSelection?.equipment || null,
                     };
                     equipments.push(equipmentData);
                 }
@@ -162,17 +175,17 @@ const InputForm: React.FC<InputFormProps> = ({
         });
 
         setConnectionPointEquipments(equipments);
-        
+
         // Load equipment options for any category that already has selected equipment
         const categoriesToLoad = new Set<string>();
-        equipments.forEach(eq => {
+        equipments.forEach((eq) => {
             if (eq.category && eq.equipment) {
                 categoriesToLoad.add(eq.category);
             }
         });
-        
+
         // Load equipment for each category that has selected equipment
-        categoriesToLoad.forEach(category => {
+        categoriesToLoad.forEach((category) => {
             fetchConnectionEquipments(category);
         });
     }, [connectionStats, activeZone]);
@@ -185,8 +198,9 @@ const InputForm: React.FC<InputFormProps> = ({
             if (response.ok) {
                 const categories = await response.json();
                 // กรองเฉพาะหมวดหมู่ที่ต้องการ
-                const filteredCategories = categories.filter((cat: any) => 
-                    cat.name === 'agricultural_fittings' || cat.name === 'pvc_fittings'
+                const filteredCategories = categories.filter(
+                    (cat: any) =>
+                        cat.name === 'agricultural_fittings' || cat.name === 'pvc_fittings'
                 );
                 setEquipmentCategories(filteredCategories);
             }
@@ -214,35 +228,45 @@ const InputForm: React.FC<InputFormProps> = ({
     };
 
     // ฟังก์ชันอัปเดตหมวดหมู่ของอุปกรณ์
-    const updateConnectionEquipmentCategory = (equipmentId: string, category: 'agricultural_fittings' | 'pvc_fittings') => {
-        setConnectionPointEquipments(prev => {
+    const updateConnectionEquipmentCategory = (
+        equipmentId: string,
+        category: 'agricultural_fittings' | 'pvc_fittings'
+    ) => {
+        setConnectionPointEquipments((prev) => {
             const updated = [...prev];
-            const index = updated.findIndex(eq => `${eq.zoneId}-${eq.connectionType}` === equipmentId);
+            const index = updated.findIndex(
+                (eq) => `${eq.zoneId}-${eq.connectionType}` === equipmentId
+            );
             if (index !== -1) {
                 updated[index].category = category;
                 updated[index].equipment = null; // รีเซ็ตอุปกรณ์เมื่อเปลี่ยนหมวดหมู่
-                
+
                 // บันทึกการเลือกหมวดหมู่
                 const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
                 const selections = savedSelections ? JSON.parse(savedSelections) : {};
                 selections[equipmentId] = { category, equipment: null };
-                localStorage.setItem('connectionPointEquipmentSelections', JSON.stringify(selections));
+                localStorage.setItem(
+                    'connectionPointEquipmentSelections',
+                    JSON.stringify(selections)
+                );
             }
             return updated;
         });
-        
+
         // โหลดอุปกรณ์ในหมวดหมู่ใหม่
         fetchConnectionEquipments(category);
     };
 
     // ฟังก์ชันอัปเดตอุปกรณ์ที่เลือก
     const updateConnectionEquipment = (equipmentId: string, equipment: any) => {
-        setConnectionPointEquipments(prev => {
+        setConnectionPointEquipments((prev) => {
             const updated = [...prev];
-            const index = updated.findIndex(eq => `${eq.zoneId}-${eq.connectionType}` === equipmentId);
+            const index = updated.findIndex(
+                (eq) => `${eq.zoneId}-${eq.connectionType}` === equipmentId
+            );
             if (index !== -1) {
                 updated[index].equipment = equipment;
-                
+
                 // บันทึกการเลือกอุปกรณ์
                 const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
                 const selections = savedSelections ? JSON.parse(savedSelections) : {};
@@ -250,7 +274,10 @@ const InputForm: React.FC<InputFormProps> = ({
                     selections[equipmentId] = {};
                 }
                 selections[equipmentId].equipment = equipment;
-                localStorage.setItem('connectionPointEquipmentSelections', JSON.stringify(selections));
+                localStorage.setItem(
+                    'connectionPointEquipmentSelections',
+                    JSON.stringify(selections)
+                );
             }
             return updated;
         });
@@ -795,7 +822,11 @@ const InputForm: React.FC<InputFormProps> = ({
 
     // Functions for managing sprinkler equipment groups
     const handleSprinklerGroupChange = (groupId: string) => {
-        const selectedGroupId = groupId ? (isNaN(parseInt(groupId)) ? groupId : parseInt(groupId)) : null;
+        const selectedGroupId = groupId
+            ? isNaN(parseInt(groupId))
+                ? groupId
+                : parseInt(groupId)
+            : null;
 
         if (selectedGroupId) {
             const selectedGroup = sprinklerGroups.find((group) => group.id == selectedGroupId);
@@ -871,20 +902,22 @@ const InputForm: React.FC<InputFormProps> = ({
             return;
         }
 
-        const selectedEquipmentData = equipments.find(eq => eq.id === selectedEquipment);
+        const selectedEquipmentData = equipments.find((eq) => eq.id === selectedEquipment);
         if (!selectedEquipmentData) {
             return;
         }
 
-        const selectedCategoryData = categories.find(cat => cat.id === selectedCategory);
-        const isPipe = selectedCategoryData?.name?.toLowerCase() === 'pipe' || 
-                      selectedCategoryData?.name?.toLowerCase().includes('pipe');
-        
+        const selectedCategoryData = categories.find((cat) => cat.id === selectedCategory);
+        const isPipe =
+            selectedCategoryData?.name?.toLowerCase() === 'pipe' ||
+            selectedCategoryData?.name?.toLowerCase().includes('pipe');
+
         const newItem: SprinklerSetItem = {
             id: Date.now(), // temporary ID
-            group_id: typeof input.sprinklerEquipmentSet?.selectedGroupId === 'string' 
-                ? parseInt(input.sprinklerEquipmentSet.selectedGroupId) 
-                : input.sprinklerEquipmentSet?.selectedGroupId || 0,
+            group_id:
+                typeof input.sprinklerEquipmentSet?.selectedGroupId === 'string'
+                    ? parseInt(input.sprinklerEquipmentSet.selectedGroupId)
+                    : input.sprinklerEquipmentSet?.selectedGroupId || 0,
             equipment_id: selectedEquipmentData.id,
             equipment: {
                 id: selectedEquipmentData.id,
@@ -896,8 +929,8 @@ const InputForm: React.FC<InputFormProps> = ({
                 category: {
                     id: selectedCategory,
                     name: selectedCategoryData?.name || '',
-                    display_name: selectedCategoryData?.display_name || ''
-                }
+                    display_name: selectedCategoryData?.display_name || '',
+                },
             },
             quantity: isPipe ? 1.0 : 1, // Default 1.0 for pipe, 1 for others
             unit_price: selectedEquipmentData.price || 0,
@@ -1135,7 +1168,8 @@ const InputForm: React.FC<InputFormProps> = ({
                                     </option>
                                     {sprinklerGroups.map((group, index) => (
                                         <option key={group.id} value={group.id}>
-                                            {t('กลุ่มที่')} {index + 1} - {group.total_price?.toLocaleString()} {t('บาท')}
+                                            {t('กลุ่มที่')} {index + 1} -{' '}
+                                            {group.total_price?.toLocaleString()} {t('บาท')}
                                         </option>
                                     ))}
                                 </select>
@@ -1166,14 +1200,17 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
                                                     <div className="col-span-2 flex items-center justify-center">
                                                         {item.equipment.image ? (
-                                                            <img 
-                                                                src={item.equipment.image} 
-                                                                alt={item.equipment.name || item.equipment.product_code}
-                                                                className="h-16 w-16 rounded-md object-cover border border-gray-500"
+                                                            <img
+                                                                src={item.equipment.image}
+                                                                alt={
+                                                                    item.equipment.name ||
+                                                                    item.equipment.product_code
+                                                                }
+                                                                className="h-16 w-16 rounded-md border border-gray-500 object-cover"
                                                             />
                                                         ) : (
-                                                            <div className="h-16 w-16 rounded-md bg-gray-500 flex items-center justify-center border border-gray-500">
-                                                                <span className="text-xs text-gray-300 text-center">
+                                                            <div className="flex h-16 w-16 items-center justify-center rounded-md border border-gray-500 bg-gray-500">
+                                                                <span className="text-center text-xs text-gray-300">
                                                                     {t('ไม่มีรูป')}
                                                                 </span>
                                                             </div>
@@ -1195,20 +1232,30 @@ const InputForm: React.FC<InputFormProps> = ({
                                                     </div>
                                                     <div className="col-span-2">
                                                         <label className="mb-1 block text-xs text-gray-300">
-                                                            {isPipeEquipment(item) ? t('ความยาว (เมตร)') : t('จำนวน')}
+                                                            {isPipeEquipment(item)
+                                                                ? t('ความยาว (เมตร)')
+                                                                : t('จำนวน')}
                                                         </label>
                                                         <input
                                                             type="number"
-                                                            min={isPipeEquipment(item) ? "0.1" : "1"}
-                                                            step={isPipeEquipment(item) ? "0.1" : "1"}
+                                                            min={
+                                                                isPipeEquipment(item) ? '0.1' : '1'
+                                                            }
+                                                            step={
+                                                                isPipeEquipment(item) ? '0.1' : '1'
+                                                            }
                                                             value={item.quantity}
                                                             onChange={(e) =>
                                                                 updateSprinklerItem(
                                                                     index,
                                                                     'quantity',
-                                                                    isPipeEquipment(item) 
-                                                                        ? parseFloat(e.target.value) || 0.1
-                                                                        : parseInt(e.target.value) || 1
+                                                                    isPipeEquipment(item)
+                                                                        ? parseFloat(
+                                                                              e.target.value
+                                                                          ) || 0.1
+                                                                        : parseInt(
+                                                                              e.target.value
+                                                                          ) || 1
                                                                 )
                                                             }
                                                             className="w-full rounded border border-gray-500 bg-gray-700 p-1 text-sm text-white focus:border-blue-400"
@@ -1226,7 +1273,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                                             ).toLocaleString()}
                                                         </p>
                                                     </div>
-                                                    <div className="flex items-center col-span-1">
+                                                    <div className="col-span-1 flex items-center">
                                                         <button
                                                             type="button"
                                                             onClick={() =>
@@ -1243,15 +1290,12 @@ const InputForm: React.FC<InputFormProps> = ({
                                     </div>
                                 </div>
                             )}
-
                         </div>
                     </div>
                 </div>
 
                 <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-blue-400">🔧 {t('ข้อมูลท่อ')}</h3>
-
-                    
 
                     <div className="rounded-lg bg-gray-700 p-3">
                         <h4 className="mb-2 text-sm font-medium text-purple-300">
@@ -1467,10 +1511,9 @@ const InputForm: React.FC<InputFormProps> = ({
                         )}
                     </div>
 
-                        {input.longestEmitterPipeM && input.longestEmitterPipeM > 0 ? (
-                            <>
-                    <div className="rounded-lg bg-gray-700 p-3">
-
+                    {input.longestEmitterPipeM && input.longestEmitterPipeM > 0 ? (
+                        <>
+                            <div className="rounded-lg bg-gray-700 p-3">
                                 <h4 className="mb-2 text-sm font-medium text-green-300">
                                     🌿 {t('ท่อย่อยแยก (Emitter Pipe)')}
                                 </h4>
@@ -1532,36 +1575,32 @@ const InputForm: React.FC<InputFormProps> = ({
                                         />
                                     </div>
                                 </div>
-                    </div>
-
-                            </>
-                        ) : (
-                            null
-                        )}
+                            </div>
+                        </>
+                    ) : null}
                 </div>
                 {/* ส่วนแสดงและเลือกอุปกรณ์จุดเชื่อมต่อ */}
                 {connectionPointEquipments.length > 0 ? (
-                        <div className="rounded-lg bg-gray-700 p-4 col-span-2">
-                            <h4 className="mb-3 text-sm font-semibold text-green-300">
-                                🔗 {t('อุปกรณ์เชื่อมต่อท่อ')} 
-                                {activeZone && (
-                                    <span className="text-blue-300"> - {activeZone.name}</span>
-                                )}
-                                <span className="text-xs text-gray-400 ml-2">
-                                    (หมวดหมู่: {equipmentCategories.length})
-                                </span>
-                            </h4>
-                            
-                            {/* แสดงจุดเชื่อมต่อของโซนที่เลือก */}
-                            <div className="grid grid-cols-2 gap-3">
-                                {connectionPointEquipments.map((equipment, index) => {
-                                    const equipmentId = `${equipment.zoneId}-${equipment.connectionType}`;
-                                    return (
-                                    <div key={equipmentId} 
-                                         className="rounded bg-gray-600 p-3">
+                    <div className="col-span-2 rounded-lg bg-gray-700 p-4">
+                        <h4 className="mb-3 text-sm font-semibold text-green-300">
+                            🔗 {t('อุปกรณ์เชื่อมต่อท่อ')}
+                            {activeZone && (
+                                <span className="text-blue-300"> - {activeZone.name}</span>
+                            )}
+                            <span className="ml-2 text-xs text-gray-400">
+                                (หมวดหมู่: {equipmentCategories.length})
+                            </span>
+                        </h4>
+
+                        {/* แสดงจุดเชื่อมต่อของโซนที่เลือก */}
+                        <div className="grid grid-cols-2 gap-3">
+                            {connectionPointEquipments.map((equipment, index) => {
+                                const equipmentId = `${equipment.zoneId}-${equipment.connectionType}`;
+                                return (
+                                    <div key={equipmentId} className="rounded bg-gray-600 p-3">
                                         <div className="mb-2 flex items-center gap-2">
-                                            <div 
-                                                className="h-4 w-4 rounded-full" 
+                                            <div
+                                                className="h-4 w-4 rounded-full"
                                                 style={{ backgroundColor: equipment.color }}
                                             ></div>
                                             <span className="text-sm font-medium text-white">
@@ -1571,7 +1610,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 ({equipment.count} {t('จุด')})
                                             </span>
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                                             {/* เลือกหมวดหมู่ */}
                                             <div className="col-span-1">
@@ -1580,22 +1619,29 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 </label>
                                                 {equipmentCategories.length > 0 ? (
                                                     <SearchableDropdown
-                                                        options={equipmentCategories.map(cat => ({
+                                                        options={equipmentCategories.map((cat) => ({
                                                             value: cat.name,
-                                                            label: cat.display_name
+                                                            label: cat.display_name,
                                                         }))}
                                                         value={equipment.category || ''}
-                                                        onChange={(value) => updateConnectionEquipmentCategory(equipmentId, value as any)}
+                                                        onChange={(value) =>
+                                                            updateConnectionEquipmentCategory(
+                                                                equipmentId,
+                                                                value as any
+                                                            )
+                                                        }
                                                         placeholder={t('หมวดหมู่')}
                                                         className="text-sm"
                                                     />
                                                 ) : (
                                                     <div className="rounded border border-gray-500 bg-gray-600 p-2 text-sm text-gray-400">
-                                                        {loadingConnectionCategories ? t('กำลังโหลด...') : t('ไม่พบหมวดหมู่')}
+                                                        {loadingConnectionCategories
+                                                            ? t('กำลังโหลด...')
+                                                            : t('ไม่พบหมวดหมู่')}
                                                     </div>
                                                 )}
                                             </div>
-                                            
+
                                             {/* เลือกอุปกรณ์ */}
                                             <div className="col-span-3">
                                                 <label className="mb-1 block text-xs text-gray-300">
@@ -1603,24 +1649,36 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 </label>
                                                 {equipment.category ? (
                                                     <SearchableDropdown
-                                                        options={connectionEquipments.map(eq => {
+                                                        options={connectionEquipments.map((eq) => {
                                                             // สร้าง label ที่แสดงชื่อ, รหัส, และคุณสมบัติ
                                                             let label = eq.name || eq.product_code;
                                                             if (eq.name && eq.product_code) {
                                                                 label = `${eq.name} (${eq.product_code})`;
                                                             }
-                                                            
+
                                                             // เพิ่มคุณสมบัติที่สำคัญ
                                                             const attributes: string[] = [];
-                                                            if (eq.main_pipe_inch) attributes.push(`ท่อหลัก: ${eq.main_pipe_inch}`);
-                                                            if (eq.branch_pipe_mm) attributes.push(`ท่อแยก: ${eq.branch_pipe_mm}มม.`);
-                                                            if (eq.size_inch) attributes.push(`ขนาด: ${eq.size_inch}`);
-                                                            if (eq.diameter_mm) attributes.push(`เส้นผ่านศูนย์กลาง: ${eq.diameter_mm}มม.`);
-                                                            
+                                                            if (eq.main_pipe_inch)
+                                                                attributes.push(
+                                                                    `ท่อหลัก: ${eq.main_pipe_inch}`
+                                                                );
+                                                            if (eq.branch_pipe_mm)
+                                                                attributes.push(
+                                                                    `ท่อแยก: ${eq.branch_pipe_mm}มม.`
+                                                                );
+                                                            if (eq.size_inch)
+                                                                attributes.push(
+                                                                    `ขนาด: ${eq.size_inch}`
+                                                                );
+                                                            if (eq.diameter_mm)
+                                                                attributes.push(
+                                                                    `เส้นผ่านศูนย์กลาง: ${eq.diameter_mm}มม.`
+                                                                );
+
                                                             if (attributes.length > 0) {
                                                                 label += ` - ${attributes.join(', ')}`;
                                                             }
-                                                            
+
                                                             return {
                                                                 value: String(eq.id), // Convert to string to match localStorage
                                                                 label: label,
@@ -1629,13 +1687,25 @@ const InputForm: React.FC<InputFormProps> = ({
                                                                 image: eq.image,
                                                                 brand: eq.brand,
                                                                 name: eq.name,
-                                                                description: eq.description
+                                                                description: eq.description,
                                                             };
                                                         })}
-                                                        value={equipment.equipment?.id ? String(equipment.equipment.id) : ''}
+                                                        value={
+                                                            equipment.equipment?.id
+                                                                ? String(equipment.equipment.id)
+                                                                : ''
+                                                        }
                                                         onChange={(value) => {
-                                                            const selectedEquipment = connectionEquipments.find(eq => String(eq.id) === String(value));
-                                                            updateConnectionEquipment(equipmentId, selectedEquipment);
+                                                            const selectedEquipment =
+                                                                connectionEquipments.find(
+                                                                    (eq) =>
+                                                                        String(eq.id) ===
+                                                                        String(value)
+                                                                );
+                                                            updateConnectionEquipment(
+                                                                equipmentId,
+                                                                selectedEquipment
+                                                            );
                                                         }}
                                                         placeholder={t('เลือกอุปกรณ์')}
                                                         className="text-sm"
@@ -1647,7 +1717,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 )}
                                             </div>
                                         </div>
-                                        
+
                                         {/* แสดงข้อมูลอุปกรณ์ที่เลือก */}
                                         {equipment.equipment && (
                                             <div className="mt-2 rounded bg-gray-500 p-2">
@@ -1657,10 +1727,14 @@ const InputForm: React.FC<InputFormProps> = ({
                                                         <div className="flex-shrink-0">
                                                             <img
                                                                 src={equipment.equipment.image}
-                                                                alt={equipment.equipment.name || equipment.equipment.product_code}
+                                                                alt={
+                                                                    equipment.equipment.name ||
+                                                                    equipment.equipment.product_code
+                                                                }
                                                                 className="h-16 w-16 rounded border border-gray-400 object-cover"
                                                                 onError={(e) => {
-                                                                    e.currentTarget.style.display = 'none';
+                                                                    e.currentTarget.style.display =
+                                                                        'none';
                                                                 }}
                                                             />
                                                         </div>
@@ -1669,25 +1743,36 @@ const InputForm: React.FC<InputFormProps> = ({
                                                             {t('ไม่มีรูป')}
                                                         </div>
                                                     )}
-                                                    
+
                                                     {/* ข้อมูลอุปกรณ์ */}
                                                     <div className="flex-1 text-xs text-gray-200">
                                                         <div className="flex justify-between">
                                                             <span>{t('รหัสสินค้า')}:</span>
-                                                            <span>{equipment.equipment.product_code}</span>
+                                                            <span>
+                                                                {equipment.equipment.product_code}
+                                                            </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>{t('ราคา')}:</span>
-                                                            <span>{equipment.equipment.price?.toLocaleString()} {t('บาท')}</span>
+                                                            <span>
+                                                                {equipment.equipment.price?.toLocaleString()}{' '}
+                                                                {t('บาท')}
+                                                            </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>{t('จำนวนที่ต้องการ')}:</span>
-                                                            <span>{equipment.count} {t('ชิ้น')}</span>
+                                                            <span>
+                                                                {equipment.count} {t('ชิ้น')}
+                                                            </span>
                                                         </div>
                                                         <div className="flex justify-between">
                                                             <span>{t('ราคารวม')}:</span>
                                                             <span className="font-semibold text-green-300">
-                                                                {(equipment.equipment.price * equipment.count).toLocaleString()} {t('บาท')}
+                                                                {(
+                                                                    equipment.equipment.price *
+                                                                    equipment.count
+                                                                ).toLocaleString()}{' '}
+                                                                {t('บาท')}
                                                             </span>
                                                         </div>
                                                     </div>
@@ -1695,20 +1780,20 @@ const InputForm: React.FC<InputFormProps> = ({
                                             </div>
                                         )}
                                     </div>
-                                    );
-                                })}
-                            </div>
+                                );
+                            })}
                         </div>
-                    ) : (
-                        <div className="rounded-lg bg-gray-700 p-4">
-                            <div className="text-center text-gray-400">
-                                <p className="text-sm">🔗 {t('ไม่มีข้อมูลจุดเชื่อมต่อ')}</p>
-                                <p className="text-xs mt-1">
-                                    {t('กรุณาสร้างโปรเจกต์ที่มีท่อและจุดเชื่อมต่อก่อน')}
-                                </p>
-                            </div>
+                    </div>
+                ) : (
+                    <div className="rounded-lg bg-gray-700 p-4">
+                        <div className="text-center text-gray-400">
+                            <p className="text-sm">🔗 {t('ไม่มีข้อมูลจุดเชื่อมต่อ')}</p>
+                            <p className="mt-1 text-xs">
+                                {t('กรุณาสร้างโปรเจกต์ที่มีท่อและจุดเชื่อมต่อก่อน')}
+                            </p>
                         </div>
-                    )}
+                    </div>
+                )}
             </div>
 
             {/* Add Item Modal */}
@@ -1718,7 +1803,7 @@ const InputForm: React.FC<InputFormProps> = ({
                         <h3 className="mb-4 text-lg font-semibold text-white">
                             {t('เพิ่มรายการใหม่')}
                         </h3>
-                        
+
                         <div className="space-y-4">
                             {/* Category Selection */}
                             <div>
@@ -1727,7 +1812,9 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </label>
                                 <select
                                     value={selectedCategory || ''}
-                                    onChange={(e) => handleCategoryChange(parseInt(e.target.value) || 0)}
+                                    onChange={(e) =>
+                                        handleCategoryChange(parseInt(e.target.value) || 0)
+                                    }
                                     className="w-full rounded border border-gray-500 bg-gray-700 p-2 text-white focus:border-blue-400"
                                 >
                                     <option value="">{t('-- เลือกหมวดหมู่ --')}</option>
@@ -1746,40 +1833,56 @@ const InputForm: React.FC<InputFormProps> = ({
                                 </label>
                                 {!selectedCategory || loadingEquipments ? (
                                     <div className="w-full rounded border border-gray-500 bg-gray-700 p-2 text-gray-400">
-                                        {loadingEquipments 
+                                        {loadingEquipments
                                             ? t('กำลังโหลด...')
-                                            : t('-- เลือกหมวดหมู่ก่อน --')
-                                        }
+                                            : t('-- เลือกหมวดหมู่ก่อน --')}
                                     </div>
                                 ) : (
                                     (() => {
-                                        const mappedOptions = equipments.map(eq => {
+                                        const mappedOptions = equipments.map((eq) => {
                                             // สร้าง label ที่แสดงชื่อ, รหัส, และคุณสมบัติ
                                             let label = eq.name || eq.product_code;
                                             if (eq.name && eq.product_code) {
                                                 label = `${eq.name} (${eq.product_code})`;
                                             }
-                                            
+
                                             // เพิ่มคุณสมบัติที่สำคัญ
                                             const attributes: string[] = [];
                                             if (eq.brand) attributes.push(`ยี่ห้อ: ${eq.brand}`);
-                                            if (eq.waterVolumeLitersPerMinute) attributes.push(`ปริมาณน้ำ: ${eq.waterVolumeLitersPerMinute} ลิตร/นาที`);
-                                            if (eq.radiusMeters) attributes.push(`รัศมี: ${eq.radiusMeters} เมตร`);
-                                            if (eq.pressureBar) attributes.push(`แรงดัน: ${eq.pressureBar} บาร์`);
-                                            if (eq.powerHP) attributes.push(`กำลัง: ${eq.powerHP} แรงม้า`);
-                                            if (eq.powerKW) attributes.push(`กำลัง: ${eq.powerKW} กิโลวัตต์`);
-                                            if (eq.inlet_size_inch) attributes.push(`ขนาดทางเข้า: ${eq.inlet_size_inch} นิ้ว`);
-                                            if (eq.outlet_size_inch) attributes.push(`ขนาดทางออก: ${eq.outlet_size_inch} นิ้ว`);
-                                            if (eq.pipeType) attributes.push(`ประเภทท่อ: ${eq.pipeType}`);
+                                            if (eq.waterVolumeLitersPerMinute)
+                                                attributes.push(
+                                                    `ปริมาณน้ำ: ${eq.waterVolumeLitersPerMinute} ลิตร/นาที`
+                                                );
+                                            if (eq.radiusMeters)
+                                                attributes.push(`รัศมี: ${eq.radiusMeters} เมตร`);
+                                            if (eq.pressureBar)
+                                                attributes.push(`แรงดัน: ${eq.pressureBar} บาร์`);
+                                            if (eq.powerHP)
+                                                attributes.push(`กำลัง: ${eq.powerHP} แรงม้า`);
+                                            if (eq.powerKW)
+                                                attributes.push(`กำลัง: ${eq.powerKW} กิโลวัตต์`);
+                                            if (eq.inlet_size_inch)
+                                                attributes.push(
+                                                    `ขนาดทางเข้า: ${eq.inlet_size_inch} นิ้ว`
+                                                );
+                                            if (eq.outlet_size_inch)
+                                                attributes.push(
+                                                    `ขนาดทางออก: ${eq.outlet_size_inch} นิ้ว`
+                                                );
+                                            if (eq.pipeType)
+                                                attributes.push(`ประเภทท่อ: ${eq.pipeType}`);
                                             if (eq.pn) attributes.push(`PN: ${eq.pn}`);
-                                            if (eq.sizeMM) attributes.push(`ขนาด: ${eq.sizeMM} มม.`);
-                                            if (eq.sizeInch) attributes.push(`ขนาด: ${eq.sizeInch} นิ้ว`);
-                                            if (eq.lengthM) attributes.push(`ความยาว: ${eq.lengthM} เมตร`);
-                                            
+                                            if (eq.sizeMM)
+                                                attributes.push(`ขนาด: ${eq.sizeMM} มม.`);
+                                            if (eq.sizeInch)
+                                                attributes.push(`ขนาด: ${eq.sizeInch} นิ้ว`);
+                                            if (eq.lengthM)
+                                                attributes.push(`ความยาว: ${eq.lengthM} เมตร`);
+
                                             if (attributes.length > 0) {
                                                 label += ` - ${attributes.join(', ')}`;
                                             }
-                                            
+
                                             return {
                                                 value: eq.id,
                                                 label: label,
@@ -1789,27 +1892,32 @@ const InputForm: React.FC<InputFormProps> = ({
                                                 brand: eq.brand,
                                                 name: eq.name,
                                                 description: eq.description,
-                                                searchableText: `${eq.name || ''} ${eq.product_code || ''} ${eq.brand || ''} ${attributes.join(' ')}`
+                                                searchableText: `${eq.name || ''} ${eq.product_code || ''} ${eq.brand || ''} ${attributes.join(' ')}`,
                                             };
                                         });
-                                        
-                                        
+
                                         // ถ้าไม่มีข้อมูลให้แสดงข้อความ
                                         if (mappedOptions.length === 0) {
                                             return (
-                                                <div className="w-full rounded border border-gray-500 bg-gray-700 p-2 text-gray-400 text-sm">
+                                                <div className="w-full rounded border border-gray-500 bg-gray-700 p-2 text-sm text-gray-400">
                                                     {t('ไม่พบอุปกรณ์ในหมวดหมู่นี้')}
                                                 </div>
                                             );
                                         }
-                                        
+
                                         return (
                                             <SearchableDropdown
                                                 options={mappedOptions}
                                                 value={selectedEquipment || ''}
-                                                onChange={(value) => setSelectedEquipment(parseInt(String(value)) || null)}
+                                                onChange={(value) =>
+                                                    setSelectedEquipment(
+                                                        parseInt(String(value)) || null
+                                                    )
+                                                }
                                                 placeholder={t('พิมพ์เพื่อค้นหาสินค้า...')}
-                                                searchPlaceholder={t('พิมพ์เพื่อค้นหาจากชื่อ, รหัสสินค้า, ยี่ห้อ, หรือคุณสมบัติ...')}
+                                                searchPlaceholder={t(
+                                                    'พิมพ์เพื่อค้นหาจากชื่อ, รหัสสินค้า, ยี่ห้อ, หรือคุณสมบัติ...'
+                                                )}
                                                 className="text-sm"
                                             />
                                         );
@@ -1821,13 +1929,26 @@ const InputForm: React.FC<InputFormProps> = ({
                             {selectedEquipment && (
                                 <div className="rounded border border-gray-600 bg-gray-700 p-3">
                                     {(() => {
-                                        const equipment = equipments.find(eq => eq.id === selectedEquipment);
+                                        const equipment = equipments.find(
+                                            (eq) => eq.id === selectedEquipment
+                                        );
                                         return equipment ? (
                                             <div>
-                                                <h4 className="text-sm font-medium text-green-300">{t('ตัวอย่างสินค้าที่เลือก')}</h4>
-                                                <p className="text-sm text-white">{equipment.name || equipment.product_code}</p>
-                                                {equipment.brand && <p className="text-xs text-gray-400">{t('ยี่ห้อ')}: {equipment.brand}</p>}
-                                                <p className="text-xs text-gray-400">{t('ราคา')}: ฿{equipment.price?.toLocaleString()}</p>
+                                                <h4 className="text-sm font-medium text-green-300">
+                                                    {t('ตัวอย่างสินค้าที่เลือก')}
+                                                </h4>
+                                                <p className="text-sm text-white">
+                                                    {equipment.name || equipment.product_code}
+                                                </p>
+                                                {equipment.brand && (
+                                                    <p className="text-xs text-gray-400">
+                                                        {t('ยี่ห้อ')}: {equipment.brand}
+                                                    </p>
+                                                )}
+                                                <p className="text-xs text-gray-400">
+                                                    {t('ราคา')}: ฿
+                                                    {equipment.price?.toLocaleString()}
+                                                </p>
                                             </div>
                                         ) : null;
                                     })()}
@@ -1848,7 +1969,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                 type="button"
                                 onClick={handleAddItemConfirm}
                                 disabled={!selectedCategory || !selectedEquipment}
-                                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                                className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-500"
                             >
                                 {t('เพิ่มรายการ')}
                             </button>

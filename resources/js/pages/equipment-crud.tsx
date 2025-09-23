@@ -1298,14 +1298,21 @@ const EquipmentSetForm: React.FC<{
                                                                     {/* Equipment Image */}
                                                                     <div className="col-span-2 flex items-center justify-center">
                                                                         {item.equipment?.image ? (
-                                                                            <img 
-                                                                                src={item.equipment.image} 
-                                                                                alt={item.equipment?.name || 'Equipment'}
-                                                                                className="h-16 w-16 rounded-md object-cover border border-gray-500"
+                                                                            <img
+                                                                                src={
+                                                                                    item.equipment
+                                                                                        .image
+                                                                                }
+                                                                                alt={
+                                                                                    item.equipment
+                                                                                        ?.name ||
+                                                                                    'Equipment'
+                                                                                }
+                                                                                className="h-16 w-16 rounded-md border border-gray-500 object-cover"
                                                                             />
                                                                         ) : (
-                                                                            <div className="h-16 w-16 rounded-md bg-gray-500 flex items-center justify-center border border-gray-500">
-                                                                                <span className="text-xs text-gray-300 text-center">
+                                                                            <div className="flex h-16 w-16 items-center justify-center rounded-md border border-gray-500 bg-gray-500">
+                                                                                <span className="text-center text-xs text-gray-300">
                                                                                     {t('ไม่มีรูป')}
                                                                                 </span>
                                                                             </div>

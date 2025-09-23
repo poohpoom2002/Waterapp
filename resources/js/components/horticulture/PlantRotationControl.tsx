@@ -1,13 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState } from 'react';
-import { 
-    FaRedo, 
-    FaTimes, 
-    FaUndo,
-    FaCheck,
-    FaSpinner
-} from 'react-icons/fa';
+import { FaRedo, FaTimes, FaUndo, FaCheck, FaSpinner } from 'react-icons/fa';
 
 interface PlantRotationControlProps {
     isVisible: boolean;
@@ -26,7 +20,7 @@ const PlantRotationControl: React.FC<PlantRotationControlProps> = ({
     onRotationChange,
     onApplyRotation,
     isApplying,
-    t
+    t,
 }) => {
     const [localRotationAngle, setLocalRotationAngle] = useState(currentRotationAngle);
 
@@ -68,7 +62,7 @@ const PlantRotationControl: React.FC<PlantRotationControlProps> = ({
                     </div>
                     <button
                         onClick={handleClose}
-                        className="text-blue-200 hover:text-white transition-colors"
+                        className="text-blue-200 transition-colors hover:text-white"
                         title={t('ปิด') || 'ปิด'}
                     >
                         <FaTimes size={16} />
@@ -77,74 +71,76 @@ const PlantRotationControl: React.FC<PlantRotationControlProps> = ({
             </div>
 
             {/* Content */}
-            <div className="p-4 space-y-4">
+            <div className="space-y-4 p-4">
                 {/* Current Status */}
                 <div className="rounded-lg bg-gray-50 p-3">
-                    <div className="text-sm text-gray-600 mb-1">
+                    <div className="mb-1 text-sm text-gray-600">
                         {t('มุมเอียงปัจจุบัน') || 'มุมเอียงปัจจุบัน'}:
                     </div>
-                                         <div className="flex items-center gap-2">
-                         <div className="text-lg font-bold text-gray-800">
-                             {currentRotationAngle.toFixed(1)}°
-                         </div>
-                         {isApplying && (
-                             <FaSpinner size={16} className="animate-spin text-blue-600" />
-                         )}
-                     </div>
+                    <div className="flex items-center gap-2">
+                        <div className="text-lg font-bold text-gray-800">
+                            {currentRotationAngle.toFixed(1)}°
+                        </div>
+                        {isApplying && (
+                            <FaSpinner size={16} className="animate-spin text-blue-600" />
+                        )}
+                    </div>
                 </div>
 
                 {/* Rotation Control */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
                         {t('ปรับมุมเอียง') || 'ปรับมุมเอียง'}
                     </label>
                     <div className="space-y-3">
                         <div>
-                                                         <div className="flex justify-between text-sm text-gray-600 mb-1">
-                                 <span>{t('มุมเอียง') || 'มุมเอียง'}:</span>
-                                 <span className="font-medium">{localRotationAngle.toFixed(1)}°</span>
-                             </div>
-                                                         <input
-                                 type="range"
-                                 min="-90"
-                                 max="90"
-                                 step="0.5"
-                                 value={localRotationAngle}
-                                 onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
-                                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer plant-generation-slider"
-                             />
-                            <div className="flex justify-between text-xs text-gray-400 mt-1">
+                            <div className="mb-1 flex justify-between text-sm text-gray-600">
+                                <span>{t('มุมเอียง') || 'มุมเอียง'}:</span>
+                                <span className="font-medium">
+                                    {localRotationAngle.toFixed(1)}°
+                                </span>
+                            </div>
+                            <input
+                                type="range"
+                                min="-90"
+                                max="90"
+                                step="0.5"
+                                value={localRotationAngle}
+                                onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
+                                className="plant-generation-slider h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200"
+                            />
+                            <div className="mt-1 flex justify-between text-xs text-gray-400">
                                 <span>-90°</span>
                                 <span>0°</span>
                                 <span>90°</span>
                             </div>
                         </div>
-                        
-                                                 {/* Quick Buttons */}
-                         <div className="grid grid-cols-3 gap-2">
-                             <button
-                                 onClick={() => handleSliderChange(localRotationAngle - 0.5)}
-                                 className="px-2 py-1 text-xs rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300"
-                             >
-                                 -0.5°
-                             </button>
-                             <button
-                                 onClick={() => handleSliderChange(0.0)}
-                                 className={`px-2 py-1 text-xs rounded transition-colors ${
-                                     localRotationAngle === 0.0
-                                         ? 'bg-blue-600 text-white'
-                                         : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                 }`}
-                             >
-                                 0°
-                             </button>
-                             <button
-                                 onClick={() => handleSliderChange(localRotationAngle + 0.5)}
-                                 className="px-2 py-1 text-xs rounded transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300"
-                             >
-                                 +0.5°
-                             </button>
-                         </div>
+
+                        {/* Quick Buttons */}
+                        <div className="grid grid-cols-3 gap-2">
+                            <button
+                                onClick={() => handleSliderChange(localRotationAngle - 0.5)}
+                                className="rounded bg-gray-200 px-2 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-300"
+                            >
+                                -0.5°
+                            </button>
+                            <button
+                                onClick={() => handleSliderChange(0.0)}
+                                className={`rounded px-2 py-1 text-xs transition-colors ${
+                                    localRotationAngle === 0.0
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                }`}
+                            >
+                                0°
+                            </button>
+                            <button
+                                onClick={() => handleSliderChange(localRotationAngle + 0.5)}
+                                className="rounded bg-gray-200 px-2 py-1 text-xs text-gray-700 transition-colors hover:bg-gray-300"
+                            >
+                                +0.5°
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -152,14 +148,14 @@ const PlantRotationControl: React.FC<PlantRotationControlProps> = ({
                 <div className="flex gap-2">
                     <button
                         onClick={handleReset}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-gray-100 text-gray-700 rounded-md font-medium hover:bg-gray-200 transition-colors"
+                        className="flex flex-1 items-center justify-center gap-2 rounded-md bg-gray-100 px-3 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-200"
                     >
                         <FaUndo size={14} />
                         {t('รีเซ็ต') || 'รีเซ็ต'}
                     </button>
                     <button
                         onClick={handleClose}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors"
+                        className="flex flex-1 items-center justify-center gap-2 rounded-md bg-blue-600 px-3 py-2 font-medium text-white transition-colors hover:bg-blue-700"
                     >
                         <FaCheck size={14} />
                         {t('ปิด') || 'ปิด'}
