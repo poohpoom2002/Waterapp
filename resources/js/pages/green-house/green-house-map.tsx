@@ -407,6 +407,7 @@ export default function GreenhouseMap() {
         const shapesParam = urlParams.get('shapes');
         const irrigationParam = urlParams.get('irrigation');
         const loadIrrigationParam = urlParams.get('loadIrrigation');
+        const sprinklerRadiusParam = urlParams.get('sprinklerRadius');
 
         console.log('Map received:', {
             crops: cropsParam,
@@ -424,6 +425,13 @@ export default function GreenhouseMap() {
             irrigationMethods[irrigationParam as keyof typeof irrigationMethods]
         ) {
             setSelectedIrrigationMethod(irrigationParam);
+        }
+
+        if (sprinklerRadiusParam) {
+            const radius = parseFloat(sprinklerRadiusParam);
+            if (!isNaN(radius) && radius > 0) {
+                setGlobalRadius(radius);
+            }
         }
 
         if (shapesParam) {
@@ -3788,6 +3796,7 @@ export default function GreenhouseMap() {
                                     shapes: shapes,
                                     irrigationElements: irrigationElements, // Added this line
                                     irrigationMethod: selectedIrrigationMethod,
+                                    sprinklerRadius: globalRadius,
                                     updatedAt: new Date().toISOString(),
                                 };
 
@@ -3803,6 +3812,9 @@ export default function GreenhouseMap() {
                                 }
                                 if (selectedIrrigationMethod) {
                                     queryParams.set('irrigation', selectedIrrigationMethod); // Added this line
+                                }
+                                if (selectedIrrigationMethod === 'mini-sprinkler') {
+                                    queryParams.set('sprinklerRadius', globalRadius.toString());
                                 }
 
                                 window.location.href = `/choose-irrigation?${queryParams.toString()}`;
@@ -3840,6 +3852,9 @@ export default function GreenhouseMap() {
                                     irrigationMethod: selectedIrrigationMethod,
                                     sprinklerFlowRate: sprinklerFlowRate,
                                     dripEmitterFlowRate: dripFlowRate,
+                                    sprinklerPressure: sprinklerPressure,
+                                    dripPressure: dripPressure,
+                                    sprinklerRadius: globalRadius,
                                     createdAt: new Date().toISOString(),
                                     updatedAt: new Date().toISOString(),
                                 };

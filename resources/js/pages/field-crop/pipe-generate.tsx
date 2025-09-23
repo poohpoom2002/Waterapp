@@ -1056,7 +1056,6 @@ const useMapManager = () => {
   });
 
   const clearAllOverlays = useCallback(() => {
-    console.log(`🧹 Clear All Overlays: Starting to clear all overlays (including connection points)`);
     const overlays = overlaysRef.current;
     
     overlays.mainArea?.setMap(null);
@@ -1081,7 +1080,6 @@ const useMapManager = () => {
     overlays.distanceLine?.setMap(null);
     overlays.distanceLine = undefined;
     
-    console.log(`🧹 Clear All Overlays: All overlays cleared, resetting refs`);
     
     // Reset refs ให้เป็น Map ว่าง
     overlaysRef.current = { 
@@ -1101,7 +1099,6 @@ const useMapManager = () => {
         connectionLines: new Map()
     };
     
-    console.log(`🧹 Clear All Overlays: Overlays reset completed`);
   }, []);
 
   // ลบเส้นเชื่อมต่อที่เกี่ยวข้องกับท่อย่อยที่ถูกลบ
@@ -1126,7 +1123,6 @@ const useMapManager = () => {
       }
     });
     
-    console.log(`🗑️ Removed ${linesToRemove.length} connection lines for pipe ${pipeId}`);
   }, []);
 
   const clearPipeOverlays = useCallback((type?: PipeType) => {
@@ -1976,7 +1972,6 @@ const useMapManager = () => {
       });
     });
     
-    console.log(`🔗 Created ${overlays.connectionLines.size} connection lines for ${lateralPipes.length} lateral pipes, connected ${connectedSprinklers.size} unique sprinklers`);
   }, []);
 
 
@@ -4175,7 +4170,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       // ตรวจสอบว่าแผนที่ยังคงอยู่
       if (!mapManager.mapRef.current) return;
       
-      console.log(`🔧 Connection Points System: Starting update`);
       
       // ตรวจสอบ zoom level เพื่อป้องกันการอัปเดตระหว่างการซูม
       const currentZoom = mapManager.mapRef.current.getZoom();
@@ -4183,7 +4177,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         if (lastZoomLevel.current !== null && Math.abs(currentZoom - lastZoomLevel.current) > 0.1) {
           // กำลังมีการซูม ให้ข้ามการอัปเดตครั้งนี้
           lastZoomLevel.current = currentZoom;
-          console.log(`🔧 Connection Points System: Skipping update due to zoom change`);
           return;
         }
         lastZoomLevel.current = currentZoom;
@@ -4199,30 +4192,21 @@ export default function PipeGenerate(props: PipeGenerateProps) {
 
       // สร้างจุดเชื่อมต่อของท่อย่อยกับท่อเมนย่อย
       if (lateralPipes.length > 0) {
-        console.log(`🔧 Connection Points System: Creating lateral connection points for ${lateralPipes.length} lateral pipes`);
         const lateralConnectionPoints = createLateralConnectionPoints(lateralPipes);
-        console.log(`🔧 Connection Points System: Lateral connection points created: ${lateralConnectionPoints.length}`, lateralConnectionPoints);
         allConnectionPoints.push(...lateralConnectionPoints);
         
         // วาดเส้นเชื่อมต่อระหว่างท่อย่อยกับสปริงเกลอร์
         mapManager.drawConnectionLines(lateralPipes, fieldData.irrigationPositions, pipeManager.lateralMode, pipeManager.findNearbyConnectedIrrigationPoints);
-      } else {
-        console.log(`🔧 Connection Points System: No lateral pipes found, skipping lateral connection points creation`);
       }
 
       // สร้างจุดเชื่อมต่อของท่อเมนย่อยกับท่อเมน
-      console.log(`🔧 Connection Points System: Creating submain to main connection points`);
       const submainToMainConnectionPoints = createSubmainToMainConnectionPoints();
-      console.log(`🔧 Connection Points System: Submain to main connection points created: ${submainToMainConnectionPoints.length}`, submainToMainConnectionPoints);
       allConnectionPoints.push(...submainToMainConnectionPoints);
 
       // วาดจุดเชื่อมต่อทั้งหมด
-      console.log(`🔧 Connection Points System: Total connection points to draw: ${allConnectionPoints.length}`, allConnectionPoints);
       if (allConnectionPoints.length > 0) {
-        console.log(`🔧 Connection Points System: Drawing ${allConnectionPoints.length} connection points`);
         mapManager.drawConnectionPoints(allConnectionPoints);
       } else {
-        console.log(`🔧 Connection Points System: No connection points to draw, clearing existing ones`);
         // ลบจุดเชื่อมต่อทั้งหมดเมื่อไม่มีจุดเชื่อมต่อ
         const overlays = mapManager.overlaysRef.current;
         if (overlays.connectionPoints) {
@@ -4235,7 +4219,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         }
       }
       
-      console.log(`🔧 Connection Points System: Update completed`);
     }, 200); // 200ms debounce
     
     return () => {
@@ -4382,13 +4365,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     // ถ้ามี selectedPattern ให้ใช้แทนการวิเคราะห์อัตโนมัติ
     const templatePattern = selectedPattern || analyzeTemplatePattern(template, nearestSubmain);
     
-    // Debug logging สำหรับ templatePattern
-    console.log('🔍 Template Pattern Analysis:', {
-      selectedPattern,
-      analyzedPattern: analyzeTemplatePattern(template, nearestSubmain),
-      finalTemplatePattern: templatePattern,
-      mode: pipeManager.lateralMode
-    });
     const subRot = (nearestSubmain.coordinates as Coordinate[]).map(c => rotateXY(toXYm(c)));
     // หา x ที่จุดตัดระหว่างเส้นแนวนอน y=y0 กับเส้น submain ในพิกัดที่หมุนแล้ว
     const horizontalIntersectionsX = (y0: number): number[] => {
@@ -4455,16 +4431,13 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     const mode = pipeManager.lateralMode;
     if (mode === 'betweenRows') {
       // ตรวจสอบ templatePattern ที่ผู้ใช้เลือก
-      console.log('🌾 Between Rows Mode - Template Pattern:', templatePattern);
       if (templatePattern === 'crossing') {
         // รูปแบบ "ลากผ่าน": สร้างท่อย่อยเส้นเดียวผ่านแถว (ระหว่างแถว)
-        console.log('✅ Creating crossing pattern (single line between rows)');
         
         // หาแถวที่ใกล้กับท่อต้นแบบที่สุด
         const minSeparationBase = Math.max(0.8, spacingEst * 0.5);
         
         // สร้างท่อย่อยระหว่างแถว (เว้นแถว - ท่อย่อยหนึ่งเส้นเชื่อมสองแถว)
-        console.log(`📊 Total rows: ${rows.length}, Creating between-rows laterals (skip every other row)`);
         
         // หาแถวที่ใกล้กับท่อต้นแบบที่สุดเพื่อกำหนด parity
         const tStartR = rotateXY(vStart);
@@ -4484,7 +4457,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         
         // กำหนด parity เริ่มต้น (0 หรือ 1) เพื่อเว้นแถว
         const startParity = nearestRowIndex % 2;
-        console.log(`🎯 Template near row ${nearestRowIndex}, starting with parity ${startParity} (skip every other row)`);
         
         for (let r = startParity; r < rows.length - 1; r += 2) {
           const rowA = rows[r];
@@ -4493,14 +4465,12 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           // ตรวจสอบว่าระยะห่างระหว่างแถวเหมาะสม
           const separation = Math.abs(rowB.y - rowA.y);
           if (separation < minSeparationBase) {
-            console.log(`⏭️ Skipping rows ${r}-${r+1}: separation too small (${separation.toFixed(2)}m < ${minSeparationBase.toFixed(2)}m)`);
             continue;
           }
           
           const midY = (rowA.y + rowB.y) / 2;
           const xs = horizontalIntersectionsX(midY);
           if (xs.length === 0) {
-            console.log(`⏭️ Skipping rows ${r}-${r+1}: no submain intersections`);
             continue;
           }
           
@@ -4510,7 +4480,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           const allPts = [...ptsA, ...ptsB];
           
           if (allPts.length < 2) {
-            console.log(`⏭️ Skipping rows ${r}-${r+1}: insufficient points (${allPts.length})`);
             continue;
           }
           
@@ -4518,7 +4487,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           const leftmost = allPts[0];
           const rightmost = allPts[allPts.length - 1];
           
-          console.log(`✅ Processing rows ${r}-${r+1}: ${ptsA.length} + ${ptsB.length} = ${allPts.length} points, separation: ${separation.toFixed(2)}m`);
           
           // สร้างท่อย่อยเส้นเดียวจากจุดซ้ายสุดไปจุดขวาสุด (ระหว่างแถว)
           const startXY = unrotateXY({ x: leftmost.xy.x, y: midY });
@@ -4552,19 +4520,14 @@ export default function PipeGenerate(props: PipeGenerateProps) {
               const lengthM = calculateDistance([start, end]);
               if (lengthM >= 2 && !overlapsGenerated && !overlapsExisting) {
                 generated.push({ id: `lateral-betweenrows-${Date.now()}-${generated.length}-crossing`, type: 'lateral', coordinates: [start, end], length: lengthM });
-                console.log(`🎯 Created between-rows lateral: ${lengthM.toFixed(2)}m, rows ${r}-${r+1} (connects 2 rows, skips next 2 rows)`);
-              } else {
-                console.log(`❌ Failed to create lateral: length=${lengthM.toFixed(2)}m, overlapsGenerated=${overlapsGenerated}, overlapsExisting=${overlapsExisting}`);
               }
             }
           }
         }
         
         // แสดงสรุปการสร้างท่อย่อยระหว่างแถว
-        console.log(`📋 Between-rows crossing pattern summary: Created ${generated.length} laterals, skipped every other row pair`);
       } else {
         // รูปแบบ "ออกจากด้านใดด้านหนึ่ง": สร้างท่อย่อยแยกเป็นสองเส้น (ด้านละเส้น)
-        console.log('✅ Creating extending pattern (split lines left-right)');
         // Determine which adjacent-row parity to use so that we alternate relative to the template line
         const tStartR = rotateXY(vStart);
         const tEndR = rotateXY(vEnd);
@@ -5805,7 +5768,25 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                 {fieldData.plantPoints.length > 0 && (
                   <div className="absolute top-1.5 right-44 z-10">
                     <button 
-                      onClick={() => setHideAllPoints(!hideAllPoints)}
+                      onClick={() => {
+                        const newHideState = !hideAllPoints;
+                        setHideAllPoints(newHideState);
+                        
+                        // Save the new state to localStorage immediately
+                        try {
+                          const existingData = localStorage.getItem('fieldCropData');
+                          if (existingData) {
+                            const storageData = JSON.parse(existingData) as FieldData;
+                            const updatedData = {
+                              ...storageData,
+                              hideAllPoints: newHideState
+                            };
+                            localStorage.setItem('fieldCropData', JSON.stringify(updatedData));
+                          }
+                        } catch (error) {
+                          console.error('Error saving hideAllPoints state:', error);
+                        }
+                      }}
                       className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
                         hideAllPoints 
                           ? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
