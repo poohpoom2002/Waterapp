@@ -1075,7 +1075,6 @@ export const createVoronoiZones = (
 
             // ตรวจสอบว่าโซนยังใช้ได้
             if (zoneCoordinates.length < 3) {
-                console.warn(`⚠️ Zone ${index + 1} has insufficient points, using fallback...`);
 
                 // Fallback: ใช้ convex hull ของ cluster
                 const plantPositions = cluster.map((plant) => plant.position);
@@ -1170,7 +1169,6 @@ export const createVoronoiZones = (
 
         // Validate that zone is valid
         if (zoneCoordinates.length < 3) {
-            console.warn(`⚠️ Zone ${index + 1} has insufficient points, using fallback method...`);
 
             // Fallback to buffered plant positions
             const plantPositions = cluster.map((plant) => plant.position);

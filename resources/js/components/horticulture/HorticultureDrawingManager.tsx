@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+
 import React, { useEffect, useRef, useState } from 'react';
 import CurvedPipeDrawingManager from './CurvedPipeDrawingManager';
 import CurvedPipeControlPanel from './CurvedPipeControlPanel';
@@ -15,6 +16,14 @@ interface Coordinate {
     lng: number;
 }
 
+interface Pipe {
+    id: string;
+    coordinates: Coordinate[];
+    length?: number;
+    diameter?: number;
+    type?: string;
+}
+
 interface HorticultureDrawingManagerProps {
     map?: google.maps.Map;
     editMode: string | null;
@@ -24,9 +33,9 @@ interface HorticultureDrawingManagerProps {
     isEditModeEnabled?: boolean;
     mainArea?: Coordinate[];
     pump?: Coordinate | null;
-    mainPipes?: any[];
-    subMainPipes?: any[];
-    onMainPipesUpdate?: (updatedMainPipes: any[]) => void;
+    mainPipes?: Pipe[];
+    subMainPipes?: Pipe[];
+    onMainPipesUpdate?: (updatedMainPipes: Pipe[]) => void;
     enableCurvedDrawing?: boolean;
     t?: (key: string) => string;
     onMainPipeClick?: (pipeId: string, clickPosition: Coordinate) => void;
@@ -54,7 +63,7 @@ const snapPointToPump = (
 
 const snapPointToMainPipeEnd = (
     point: Coordinate,
-    mainPipes: any[],
+    mainPipes: Pipe[],
     snapThreshold: number = 5
 ): Coordinate => {
     if (!mainPipes || mainPipes.length === 0) {
@@ -89,7 +98,7 @@ const snapPointToMainPipeEnd = (
 
 const snapPointToSubMainPipe = (
     point: Coordinate,
-    subMainPipes: any[],
+    subMainPipes: Pipe[],
     snapThreshold: number = 5
 ): Coordinate => {
     if (!subMainPipes || subMainPipes.length === 0) {
@@ -264,8 +273,8 @@ const advancedSnapToMainArea = (
     ).length;
 
     if (snappedCount > 0) {
-        if (typeof window !== 'undefined' && (window as any).showSnapNotification) {
-            (window as any).showSnapNotification(
+        if (typeof window !== 'undefined' && (window as unknown as { showSnapNotification?: (message: string) => void }).showSnapNotification) {
+            (window as unknown as { showSnapNotification: (message: string) => void }).showSnapNotification(
                 `${snappedCount} points snapped to main area boundary`
             );
         }
@@ -274,7 +283,7 @@ const advancedSnapToMainArea = (
     return snappedCoordinates;
 };
 
-const extractCoordinatesFromShape = (shape: any): Coordinate[] => {
+const extractCoordinatesFromShape = (shape: google.maps.Polygon | google.maps.Rectangle | google.maps.Circle | google.maps.Polyline): Coordinate[] => {
     try {
         let coordinates: Coordinate[] = [];
 
@@ -468,7 +477,7 @@ const snapMainPipeCoordinates = (
     coordinates: Coordinate[],
     pumpPosition: Coordinate | null,
     mainArea: Coordinate[],
-    subMainPipes: any[] = []
+    subMainPipes: Pipe[] = []
 ): Coordinate[] => {
     if (coordinates.length === 0) {
         return coordinates;
@@ -484,7 +493,7 @@ const snapMainPipeCoordinates = (
 
 const snapSubMainPipeCoordinates = (
     coordinates: Coordinate[],
-    mainPipes: any[],
+    mainPipes: Pipe[],
     mainArea: Coordinate[]
 ): Coordinate[] => {
     // 🚫 ปิดการ snap ท่อ sub main ทั้งหมด - ห้ามขยับท่อ sub main!
@@ -495,7 +504,7 @@ const snapSubMainPipeCoordinates = (
 // ฟังก์ชันใหม่สำหรับ snap ไปยังท่อเมน
 const snapPointToMainPipe = (
     point: Coordinate,
-    mainPipes: any[],
+    mainPipes: Pipe[],
     snapThreshold: number = 10
 ): Coordinate => {
     if (!mainPipes || mainPipes.length === 0) {
@@ -907,6 +916,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         pump,
         mainPipes,
         subMainPipes,
+        onMainPipeClick,
         onLateralPipeClick,
         onLateralPipeMouseMove,
     ]);
@@ -972,7 +982,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         setAnchorPointsCount(0);
 
         // Log completion info for debugging
-        console.log(`PE Pipe completed: ${coordinates.length} points, type: ${pipeType}`);
     };
 
     // ฟังก์ชันอัปเดตจำนวนจุดควบคุม
@@ -993,7 +1002,6 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
         }
     }, [enableCurvedDrawing, editMode]);
 
-    useEffect(() => {}, [editMode, isEditModeEnabled]);
 
     useEffect(() => {
         return () => {
@@ -1003,7 +1011,7 @@ const HorticultureDrawingManager: React.FC<HorticultureDrawingManagerProps> = ({
                     drawingManagerRef.current.setOptions({ drawingControl: false });
                     drawingManagerRef.current.setMap(null);
                 } catch (e) {
-                    console.log('Error cleaning up drawing manager:', e);
+                    // Ignore cleanup errors
                 }
                 drawingManagerRef.current = null;
             }

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React from 'react';
 import {
     FaWater,
@@ -124,7 +122,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                         totalLength += segmentLength;
                     }
                 } catch (error) {
-                    console.warn('Error calculating segment length:', error);
                     continue; // ข้าม segment ที่คำนวณไม่ได้
                 }
             }
@@ -162,7 +159,6 @@ const LateralPipeInfoPanel: React.FC<LateralPipeInfoPanelProps> = ({
                 const distance = R * c;
                 return isFinite(distance) && distance >= 0 && distance < 100000 ? distance : 0;
             } catch (error) {
-                console.warn('Error calculating single-segment length:', error);
                 return 0;
             }
         }

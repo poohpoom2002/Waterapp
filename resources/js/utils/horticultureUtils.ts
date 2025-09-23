@@ -492,7 +492,6 @@ export const calculateAreaFromCoordinates = (coordinates: Coordinate[]): number 
         const areaInSquareMeters = area * latFactor * lngFactor;
         return Math.max(0, areaInSquareMeters);
     } catch (error) {
-        console.error('Error calculating area:', error);
         return 0;
     }
 };
@@ -513,7 +512,6 @@ export const calculateDistanceBetweenPoints = (point1: Coordinate, point2: Coord
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return Math.max(0, R * c);
     } catch (error) {
-        console.error('Error calculating distance:', error);
         return 0;
     }
 };
@@ -528,7 +526,6 @@ export const calculatePipeLength = (coordinates: Coordinate[]): number => {
         }
         return totalLength;
     } catch (error) {
-        console.error('Error calculating pipe length:', error);
         return 0;
     }
 };
@@ -554,7 +551,6 @@ export const isPointInPolygon = (point: Coordinate, polygon: Coordinate[]): bool
         
         return inside;
     } catch (error) {
-        console.error('Error checking point in polygon:', error);
         return false;
     }
 };

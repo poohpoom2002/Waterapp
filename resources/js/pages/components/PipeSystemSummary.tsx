@@ -34,20 +34,49 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
 }) => {
     const { t } = useLanguage();
 
-    // Only show for horticulture and garden modes
-    if (projectMode !== 'horticulture' && projectMode !== 'garden') {
+    // Only show for horticulture, garden, greenhouse and field-crop modes
+    if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'greenhouse' && projectMode !== 'field-crop') {
         return null;
     }
 
     // Don't show if no data
-    const systemData = projectMode === 'garden' ? gardenSystemData : horticultureSystemData;
-    if (!sprinklerPressure || !systemData || !activeZoneId) {
+    const systemData = projectMode === 'garden' ? gardenSystemData : 
+                      projectMode === 'field-crop' ? null : 
+                      projectMode === 'greenhouse' ? null : horticultureSystemData; // field-crop and greenhouse don't use systemData
+    if (!sprinklerPressure || (!systemData && projectMode !== 'field-crop' && projectMode !== 'greenhouse') || !activeZoneId) {
         return null;
     }
 
     const calculationData = useMemo(() => {
-        const zone = systemData.zones?.find((z: any) => z.id === activeZoneId);
-        if (!zone?.bestPipes) return null;
+        let zone: any;
+        
+        // For field-crop and greenhouse modes, we don't need zone data, just use selected pipes directly
+        if (projectMode === 'field-crop') {
+            // Create mock zone data for field-crop mode
+            zone = {
+                bestPipes: {
+                    branch: { length: 50, count: 1, waterFlowRate: 6.0, details: { type: 'branch' } },
+                    subMain: { length: 100, count: 1, waterFlowRate: 60.0, details: { type: 'subMain' } },
+                    main: { length: 200, count: 1, waterFlowRate: 120.0, details: { type: 'main' } },
+                }
+            };
+        } else if (projectMode === 'greenhouse') {
+            // Create mock zone data for greenhouse mode
+            zone = {
+                bestPipes: {
+                    branch: { length: 30, count: 1, waterFlowRate: 6.0, details: { type: 'branch' } },
+                    subMain: { length: 50, count: 1, waterFlowRate: 30.0, details: { type: 'subMain' } },
+                    main: { length: 0, count: 1, waterFlowRate: 0, details: { type: 'main' } }, // greenhouse usually doesn't have main pipe
+                }
+            };
+        } else {
+            // For other modes, use systemData
+            zone = systemData?.zones?.find((z: any) => z.id === activeZoneId);
+        }
+        
+        if (!zone?.bestPipes) {
+            return null;
+        }
 
         // คำนวณ head loss สำหรับแต่ละประเภทท่อ
         const branchCalc =
@@ -88,7 +117,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
 
         // คำนวณ emitter pipe แบบพิเศษ (ใช้ Q หัวฉีด และจำนวนทางออก = 1)
         let emitterCalc: PipeCalculationResult | null = null;
-        if (selectedPipes?.emitter && systemData?.sprinklerConfig) {
+        if (selectedPipes?.emitter && (systemData?.sprinklerConfig || projectMode === 'field-crop' || projectMode === 'greenhouse')) {
             // หา lateral pipe ที่ยาวที่สุดจาก localStorage
             const currentProject = localStorage.getItem('currentHorticultureProject');
             let longestEmitterLength = 10; // default
@@ -122,7 +151,9 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                 id: 'emitter-pipe',
                 length: longestEmitterLength,
                 count: 1, // จำนวนทางออก = 1
-                waterFlowRate: systemData.sprinklerConfig.flowRatePerPlant, // ใช้ Q หัวฉีด
+                waterFlowRate: projectMode === 'field-crop' ? 6.0 : 
+                              projectMode === 'greenhouse' ? 6.0 : 
+                              systemData.sprinklerConfig.flowRatePerPlant, // ใช้ Q หัวฉีด
                 details: { type: 'emitter' },
             };
 
@@ -139,6 +170,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         const branchSubMainCombined = (branchCalc?.headLoss || 0) + (subMainCalc?.headLoss || 0);
         const head20Percent = sprinklerPressure.head20PercentM;
 
+
         return {
             branchCalc,
             subMainCalc,
@@ -147,7 +179,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
             branchSubMainCombined,
             head20Percent,
         };
-    }, [systemData, activeZoneId, selectedPipes, sprinklerPressure]);
+    }, [systemData, activeZoneId, selectedPipes, sprinklerPressure, projectMode]);
 
     if (!calculationData) {
         return null;

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Wrapper, Status } from '@googlemaps/react-wrapper';
 import { GOOGLE_MAPS_CONFIG } from '../../utils/googleMapsConfig';
@@ -31,8 +29,8 @@ const getGoogleMapsConfig = () => {
             fullscreenControl: true,
             mapTypeControl: true,
             mapTypeControlOptions: {
-                position: 'TOP_CENTER' as any,
-                style: 'HORIZONTAL_BAR' as any,
+                position: 'TOP_CENTER' as google.maps.ControlPosition,
+                style: 'HORIZONTAL_BAR' as google.maps.ZoomControlStyle,
                 mapTypeIds: ['roadmap', 'satellite', 'hybrid', 'terrain'],
             },
             gestureHandling: 'greedy' as const,
@@ -193,7 +191,7 @@ const MapComponent: React.FC<{
 
             {React.Children.map(children, (child) => {
                 if (React.isValidElement(child)) {
-                    return React.cloneElement(child, { map } as any);
+                    return React.cloneElement(child, { map });
                 }
             })}
         </>
@@ -246,7 +244,7 @@ const HorticultureMapComponent: React.FC<HorticultureMapComponentProps> = ({
         <Wrapper
             apiKey={config.apiKey}
             render={renderMap}
-            libraries={config.libraries as any}
+            libraries={config.libraries}
             version="weekly"
         >
             <MapComponent

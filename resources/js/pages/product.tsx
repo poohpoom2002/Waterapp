@@ -2332,21 +2332,33 @@ export default function Product() {
                                                       10 *
                                                       0.2,
                                               }
-                                            : horticultureSystemData?.sprinklerConfig?.pressureBar
+                                            : projectMode === 'field-crop'
                                               ? {
-                                                    pressureBar:
-                                                        horticultureSystemData.sprinklerConfig
-                                                            .pressureBar,
-                                                    headM:
-                                                        horticultureSystemData.sprinklerConfig
-                                                            .pressureBar * 10,
-                                                    head20PercentM:
-                                                        horticultureSystemData.sprinklerConfig
-                                                            .pressureBar *
-                                                        10 *
-                                                        0.2,
+                                                    pressureBar: 2.5, // Default pressure for field-crop
+                                                    headM: 25,
+                                                    head20PercentM: 5,
                                                 }
-                                              : undefined
+                                              : projectMode === 'greenhouse'
+                                                ? {
+                                                      pressureBar: 2.0, // Default pressure for greenhouse
+                                                      headM: 20,
+                                                      head20PercentM: 4,
+                                                  }
+                                                : horticultureSystemData?.sprinklerConfig?.pressureBar
+                                                ? {
+                                                      pressureBar:
+                                                          horticultureSystemData.sprinklerConfig
+                                                              .pressureBar,
+                                                      headM:
+                                                          horticultureSystemData.sprinklerConfig
+                                                              .pressureBar * 10,
+                                                      head20PercentM:
+                                                          horticultureSystemData.sprinklerConfig
+                                                              .pressureBar *
+                                                          10 *
+                                                          0.2,
+                                                  }
+                                                : undefined
                                     }
                                     projectMode={projectMode}
                                 />

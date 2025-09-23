@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+
 import {
     HorticultureProjectData,
     ProjectSummaryData,
@@ -56,14 +57,12 @@ export const getProjectStats = (): ProjectSummaryData | null => {
     try {
         const projectData = loadProjectData();
         if (!projectData) {
-            console.warn('ไม่พบข้อมูลโครงการ');
             return null;
         }
 
         const summary = calculateProjectSummary(projectData);
         return summary;
     } catch (error) {
-        console.error('❌ เกิดข้อผิดพลาดในการดึงข้อมูลสถิติ:', error);
         return null;
     }
 };
@@ -187,7 +186,6 @@ export const getLongestBranchPipeStats = ():
     try {
         const projectData = loadProjectData();
         if (!projectData) {
-            console.warn('ไม่พบข้อมูลโครงการ');
             return null;
         }
 
@@ -258,7 +256,6 @@ export const getLongestBranchPipeStats = ():
 
         return stats;
     } catch (error) {
-        console.error('❌ เกิดข้อผิดพลาดในการดึงข้อมูลท่อย่อยที่ยาวที่สุด:', error);
         return null;
     }
 };
@@ -282,7 +279,6 @@ export const getSubMainPipeBranchCount = ():
     try {
         const projectData = loadProjectData();
         if (!projectData) {
-            console.warn('ไม่พบข้อมูลโครงการ');
             return null;
         }
 
@@ -376,7 +372,6 @@ export const getSubMainPipeBranchCount = ():
 
         return stats;
     } catch (error) {
-        console.error('❌ เกิดข้อผิดพลาดในการดึงข้อมูลจำนวนท่อย่อยที่ออกจากท่อเมนรอง:', error);
         return null;
     }
 };
@@ -426,7 +421,6 @@ export const getDetailedBranchPipeStats = ():
 
         return detailedStats;
     } catch (error) {
-        console.error('❌ เกิดข้อผิดพลาดในการดึงข้อมูลสถิติท่อย่อยแบบละเอียด:', error);
         return null;
     }
 };
@@ -479,7 +473,6 @@ export const exportBranchPipeStatsAsCSV = (): string | null => {
 export const downloadBranchPipeStatsAsJSON = (filename: string = 'branch-pipe-stats'): void => {
     const jsonData = exportBranchPipeStatsAsJSON();
     if (!jsonData) {
-        console.error('ไม่มีข้อมูลท่อย่อยให้ดาวน์โหลด');
         return;
     }
 
@@ -499,7 +492,6 @@ export const downloadBranchPipeStatsAsJSON = (filename: string = 'branch-pipe-st
 export const downloadBranchPipeStatsAsCSV = (filename: string = 'branch-pipe-stats'): void => {
     const csvData = exportBranchPipeStatsAsCSV();
     if (!csvData) {
-        console.error('ไม่มีข้อมูลท่อย่อยให้ดาวน์โหลด');
         return;
     }
 
@@ -1045,7 +1037,7 @@ export default {
  * Find which zone a pipe belongs to based on its end point
  * ท่อเริ่มวาดที่โซนไหนไม่สำคัญ แต่ถ้าวาดจบที่โซนไหน ให้ถือว่าเป็นท่อของโซนนั้น
  */
-export const findPipeZoneImproved = (pipe: any, zones: any[], irrigationZones: any[]): string => {
+export const findPipeZoneImproved = (pipe: { coordinates: { lat: number; lng: number }[] }, zones: { id: string; coordinates: { lat: number; lng: number }[] }[], irrigationZones: { id: string; coordinates: { lat: number; lng: number }[] }[]): string => {
     if (!pipe?.coordinates || pipe.coordinates.length === 0) return 'unknown';
 
     // 🎯 ใช้จุดปลายเป็นหลัก - ท่อเริ่มวาดที่โซนไหนไม่สำคัญ แต่ถ้าวาดจบที่โซนไหน ให้ถือว่าเป็นท่อของโซนนั้น
@@ -1076,7 +1068,7 @@ export const findPipeZoneImproved = (pipe: any, zones: any[], irrigationZones: a
  * Find which zone a pipe belongs to for connection counting (same logic as map display)
  * ใช้ฟังก์ชันเดียวกับที่ใช้ในแผนที่เพื่อให้การนับตรงกัน
  */
-export const findPipeZoneForConnection = (pipe: any, zones: any[], irrigationZones: any[]): string | null => {
+export const findPipeZoneForConnection = (pipe: { coordinates: { lat: number; lng: number }[] }, zones: { id: string; coordinates: { lat: number; lng: number }[] }[], irrigationZones: { id: string; coordinates: { lat: number; lng: number }[] }[]): string | null => {
     if (!pipe?.coordinates || pipe.coordinates.length === 0) {
         return null;
     }
@@ -1109,7 +1101,7 @@ export const findPipeZoneForConnection = (pipe: any, zones: any[], irrigationZon
 /**
  * Find which zone a pipe ends in
  */
-export const findPipeEndZone = (pipe: any, zones: any[], irrigationZones: any[]): string => {
+export const findPipeEndZone = (pipe: { coordinates: { lat: number; lng: number }[] }, zones: { id: string; coordinates: { lat: number; lng: number }[] }[], irrigationZones: { id: string; coordinates: { lat: number; lng: number }[] }[]): string => {
     if (!pipe.coordinates || pipe.coordinates.length === 0) return 'unknown';
 
     const endPoint = pipe.coordinates[pipe.coordinates.length - 1];

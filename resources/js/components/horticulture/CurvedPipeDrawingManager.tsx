@@ -1,10 +1,17 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 interface Coordinate {
     lat: number;
     lng: number;
+}
+
+interface GuideData {
+    center: Coordinate;
+    radius: number;
+    tangent1: Coordinate;
+    tangent2: Coordinate;
+    radiusLine1: Coordinate[];
+    radiusLine2: Coordinate[];
 }
 
 interface CurvedPipeDrawingManagerProps {
@@ -147,7 +154,7 @@ const createCircularCorner = (
 const createSimpleDragCurvePipe = (
     anchorPoints: Coordinate[],
     radiusControls: Map<number, number> // lineIndex -> radius
-): { path: Coordinate[]; guides: any[] } => {
+): { path: Coordinate[]; guides: GuideData[] } => {
     if (anchorPoints.length < 2) {
         return { path: anchorPoints, guides: [] };
     }
@@ -159,7 +166,35 @@ const createSimpleDragCurvePipe = (
         const customRadius = radiusControls.get(lineIndex);
 
         if (customRadius && customRadius > 0.000005) {
-            // TODO: implement corner rounding for 2-point lines
+            // For 2-point lines, we can create a simple curved path
+            // This is a simplified implementation for basic corner rounding
+            const midPoint = {
+                lat: (anchorPoints[0].lat + anchorPoints[1].lat) / 2,
+                lng: (anchorPoints[0].lng + anchorPoints[1].lng) / 2,
+            };
+            
+            // Add slight curve by offsetting the midpoint
+            const offset = customRadius * 0.1;
+            const direction = {
+                lat: anchorPoints[1].lat - anchorPoints[0].lat,
+                lng: anchorPoints[1].lng - anchorPoints[0].lng,
+            };
+            const length = Math.sqrt(direction.lat * direction.lat + direction.lng * direction.lng);
+            if (length > 0) {
+                direction.lat /= length;
+                direction.lng /= length;
+                
+                const perpendicular = {
+                    lat: -direction.lng,
+                    lng: direction.lat,
+                };
+                
+                midPoint.lat += perpendicular.lat * offset;
+                midPoint.lng += perpendicular.lng * offset;
+            }
+            
+            path.push(anchorPoints[0], midPoint, anchorPoints[1]);
+            return { path, guides: [] };
         }
 
         // สร้างเส้นตรงปกติ
@@ -175,7 +210,7 @@ const createSimpleDragCurvePipe = (
 
     // 3+ จุด: สร้างเส้นตรงระหว่างจุด + โค้งที่มุม
     const path: Coordinate[] = [];
-    const guides: any[] = [];
+    const guides: GuideData[] = [];
 
     // สร้างเส้นโดย rounding เฉพาะมุม
     path.push(anchorPoints[0]); // เริ่มต้นที่จุดแรก
@@ -246,7 +281,7 @@ const CurvedPipeDrawingManager: React.FC<CurvedPipeDrawingManagerProps> = ({
     const [dragDistances, setDragDistances] = useState<Map<number, Coordinate>>(new Map());
     const [isDragging, setIsDragging] = useState(false);
     const [dragIndex, setDragIndex] = useState<number>(-1);
-    const [guides, setGuides] = useState<any[]>([]);
+    const [guides, setGuides] = useState<GuideData[]>([]);
 
     // Virtual radius control - แยกจาก anchor points ต้นฉบับ
     const [radiusControls, setRadiusControls] = useState<Map<number, number>>(new Map()); // index -> radius
