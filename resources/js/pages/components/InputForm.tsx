@@ -35,6 +35,7 @@ interface InputFormProps {
     connectionStats?: ConnectionPointStats[];
     onConnectionEquipmentsChange?: (equipments: ConnectionPointEquipment[]) => void;
     greenhouseData?: any; // เพิ่มสำหรับ greenhouse projectMode
+    fieldCropSystemData?: any; // เพิ่มสำหรับ field-crop projectMode
 }
 
 interface BranchPipeStats {
@@ -96,6 +97,7 @@ const InputForm: React.FC<InputFormProps> = ({
     connectionStats = [],
     onConnectionEquipmentsChange,
     greenhouseData,
+    fieldCropSystemData,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
@@ -124,6 +126,66 @@ const InputForm: React.FC<InputFormProps> = ({
 
     // ฟังก์ชันสำหรับจัดการข้อมูล connection points
     const initializeConnectionPointEquipments = useCallback(() => {
+        // สำหรับ field-crop mode ให้ใช้ fieldCropSystemData
+        if (projectMode === 'field-crop' && fieldCropSystemData) {
+            const equipments: ConnectionPointEquipment[] = [];
+            
+            // โหลดการเลือกอุปกรณ์ที่เก็บไว้
+            const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
+            const selections = savedSelections ? JSON.parse(savedSelections) : {};
+
+            // หาโซนที่ active
+            const activeZoneData = fieldCropSystemData.zones?.find((z: any) => z.id === activeZone?.id);
+            if (activeZoneData && activeZoneData.connectionPoints) {
+                // สร้างอุปกรณ์สำหรับแต่ละประเภทจุดเชื่อมต่อ
+                const connectionTypes = [
+                    { key: 'junction', name: 'จุดเชื่อมต่อ', color: '#FFD700' },
+                    { key: 'crossing', name: 'จุดข้ามท่อ', color: '#4CAF50' },
+                    { key: 'l_shape', name: 'จุดเชื่อมต่อรูปตัว L', color: '#F44336' },
+                    { key: 't_shape', name: 'จุดเชื่อมต่อรูปตัว T', color: '#2196F3' },
+                    { key: 'cross_shape', name: 'จุดเชื่อมต่อรูปตัว +', color: '#9C27B0' },
+                ];
+
+                connectionTypes.forEach((type) => {
+                    const pointsOfType = activeZoneData.connectionPoints.filter((cp: any) => cp.type === type.key);
+                    if (pointsOfType.length > 0) {
+                        const equipmentId = `${activeZoneData.id}-${type.key}`;
+                        const savedSelection = selections[equipmentId];
+
+                        const equipmentData = {
+                            zoneId: activeZoneData.id,
+                            zoneName: activeZoneData.name,
+                            connectionType: type.key as any,
+                            connectionTypeName: type.name,
+                            color: type.color,
+                            count: pointsOfType.length,
+                            category: savedSelection?.category || null,
+                            equipment: savedSelection?.equipment || null,
+                        };
+                        equipments.push(equipmentData);
+                    }
+                });
+            }
+
+            setConnectionPointEquipments(equipments);
+
+            // Load equipment options for any category that already has selected equipment
+            const categoriesToLoad = new Set<string>();
+            equipments.forEach((eq) => {
+                if (eq.category && eq.equipment) {
+                    categoriesToLoad.add(eq.category);
+                }
+            });
+
+            // Load equipment for each category that has selected equipment
+            categoriesToLoad.forEach((category) => {
+                fetchConnectionEquipments(category);
+            });
+
+            return;
+        }
+
+        // สำหรับ horticulture mode (เดิม)
         if (!connectionStats || connectionStats.length === 0) {
             return;
         }
@@ -188,7 +250,7 @@ const InputForm: React.FC<InputFormProps> = ({
         categoriesToLoad.forEach((category) => {
             fetchConnectionEquipments(category);
         });
-    }, [connectionStats, activeZone]);
+    }, [connectionStats, activeZone, projectMode, fieldCropSystemData]);
 
     // ฟังก์ชันโหลดหมวดหมู่อุปกรณ์ connection points
     const fetchConnectionCategories = useCallback(async () => {

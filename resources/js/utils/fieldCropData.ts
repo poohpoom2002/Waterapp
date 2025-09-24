@@ -858,6 +858,90 @@ export const migrateToEnhancedFieldCropData = (): FieldCropData | null => {
 };
 
 // Compatibility test function to verify integration with summary file
+// Field Crop System Data Interface (similar to horticultureSystemData)
+export interface FieldCropSystemData {
+    sprinklerConfig: {
+        flowRatePerPlant: number;
+        pressureBar: number;
+        radiusMeters: number;
+        totalFlowRatePerMinute: number;
+    };
+    connectionStats: any[];
+    zones: Array<{
+        id: string;
+        name: string;
+        plantCount: number;
+        totalWaterNeed: number;
+        waterPerTree: number;
+        waterNeedPerMinute: number;
+        area: number;
+        color: string;
+        pipes?: {
+            mainPipes: {
+                count: number;
+                totalLength: number;
+                longest: number;
+            };
+            subMainPipes: {
+                count: number;
+                totalLength: number;
+                longest: number;
+            };
+            branchPipes: {
+                count: number;
+                totalLength: number;
+                longest: number;
+            };
+            emitterPipes?: {
+                count: number;
+                totalLength: number;
+                longest: number;
+            };
+        };
+        bestPipes: {
+            main: any;
+            subMain: any;
+            branch: any;
+        };
+        connectionPoints?: Array<{
+            id: string;
+            position: {
+                lat: number;
+                lng: number;
+            };
+            connectedLaterals: string[];
+            submainId: string;
+            type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+            color?: string;
+            size?: number;
+            title?: string;
+        }>;
+    }>;
+    totalPlants: number;
+    isMultipleZones: boolean;
+}
+
+export const getFieldCropSystemData = (): FieldCropSystemData | null => {
+    try {
+        const data = localStorage.getItem('fieldCropSystemData');
+        if (data) {
+            const parsedData = JSON.parse(data);
+            return parsedData;
+        }
+    } catch (error) {
+        console.error('❌ Error loading field crop system data:', error);
+    }
+    return null;
+};
+
+export const saveFieldCropSystemData = (systemData: FieldCropSystemData): void => {
+    try {
+        localStorage.setItem('fieldCropSystemData', JSON.stringify(systemData));
+    } catch (error) {
+        console.error('❌ Error saving field crop system data:', error);
+    }
+};
+
 export const testCompatibilityWithSummary = (): boolean => {
     try {
         // Test coordinate handling

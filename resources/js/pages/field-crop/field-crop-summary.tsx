@@ -15,12 +15,70 @@ import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
+import { 
+    saveFieldCropSystemData, 
+    FieldCropSystemData,
+    getEnhancedFieldCropData,
+    calculateEnhancedFieldStats
+} from '../../utils/fieldCropData';
 
 // Reduce verbose logs in production/dev by toggling these flags
 const DEBUG_ZONE_PIPE_STATS = false as const;
 const DEBUG_SUMMARY_LOGS = true as const; // เปิดใช้งานเพื่อดูการคำนวณ lateral flow
 const dbg = (...args: unknown[]) => {
     if (DEBUG_SUMMARY_LOGS) console.log(...args);
+};
+
+// Helper functions for connection points
+const getConnectionPointColor = (type: string): string => {
+    switch (type) {
+        case 'junction':
+            return '#FFD700'; // สีเหลือง
+        case 'crossing':
+            return '#4CAF50'; // สีเขียว
+        case 'l_shape':
+            return '#F44336'; // สีแดง
+        case 't_shape':
+            return '#2196F3'; // สีน้ำเงิน
+        case 'cross_shape':
+            return '#9C27B0'; // สีม่วง
+        default:
+            return '#FFD700'; // default yellow
+    }
+};
+
+const getConnectionPointSize = (type: string): number => {
+    switch (type) {
+        case 'junction':
+            return 8;
+        case 'crossing':
+            return 7;
+        case 'l_shape':
+            return 8;
+        case 't_shape':
+            return 8;
+        case 'cross_shape':
+            return 9;
+        default:
+            return 8;
+    }
+};
+
+const getConnectionPointTitle = (type: string, connectedCount: number): string => {
+    switch (type) {
+        case 'junction':
+            return `จุดเชื่อมต่อ (${connectedCount} ท่อ)`;
+        case 'crossing':
+            return `จุดข้ามท่อเมนย่อย (${connectedCount} ท่อ)`;
+        case 'l_shape':
+            return 'จุดเชื่อมต่อรูปตัว L (ปลายท่อเมน)';
+        case 't_shape':
+            return 'จุดเชื่อมต่อรูปตัว T (ผ่านปลายท่อเมน)';
+        case 'cross_shape':
+            return 'จุดเชื่อมต่อรูปตัว + (สี่แยกท่อเมน)';
+        default:
+            return 'จุดเชื่อมต่อท่อย่อย';
+    }
 };
 
 // Proper TypeScript interfaces
@@ -5048,6 +5106,181 @@ export default function FieldCropSummary() {
 
     const areaInRai = fieldAreaSize / 1600;
 
+    // Handle export to product page
+    const handleExportToProduct = useCallback(async () => {
+        try {
+            // Capture map image first
+            if (mapContainerRef.current) {
+                setIsCapturingImage(true);
+                setCaptureStatus('กำลังบันทึกภาพแผนที่...');
+                
+                const imageDataUrl = await captureMapImage(mapContainerRef.current, 'field-crop');
+                if (imageDataUrl) {
+                    setMapImageCaptured(true);
+                    setCaptureStatus('บันทึกภาพแผนที่สำเร็จ');
+                } else {
+                    setCaptureStatus('ไม่สามารถบันทึกภาพแผนที่ได้');
+                }
+                setIsCapturingImage(false);
+            }
+
+            // Get enhanced field crop data
+            let fieldData = getEnhancedFieldCropData();
+            if (!fieldData) {
+                // Try to create from summary data
+                fieldData = calculateEnhancedFieldStats(summaryData);
+            }
+
+            if (fieldData) {
+                // Create connection points data from pipes
+                const allConnectionPoints: Array<{
+                    id: string;
+                    position: { lat: number; lng: number };
+                    connectedLaterals: string[];
+                    submainId: string;
+                    type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
+                    zoneId?: string;
+                    color?: string;
+                    size?: number;
+                    title?: string;
+                }> = [];
+
+                // Get pipes from fieldData and convert coordinates
+                const pipes = fieldData.pipes?.details || [];
+                if (pipes.length > 0) {
+                    // Convert pipes to proper format
+                    const convertedPipes = pipes.map((p: { id: string; type: string; coordinates: unknown[]; length: number; zoneId?: string }) => ({
+                        ...p,
+                        coordinates: p.coordinates.map((coord: unknown) => {
+                            if (Array.isArray(coord)) {
+                                return { lat: coord[0], lng: coord[1] };
+                            }
+                            return coord;
+                        })
+                    }));
+
+                    // Create lateral connection points
+                    const lateralPipes = convertedPipes.filter((p: { type: string }) => p.type === 'lateral');
+                    const submainPipes = convertedPipes.filter((p: { type: string }) => p.type === 'submain');
+
+                    if (lateralPipes.length > 0 && submainPipes.length > 0) {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        const lateralConnectionPoints = createLateralConnectionPoints(
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            lateralPipes as any,
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            submainPipes as any
+                        );
+                        allConnectionPoints.push(...lateralConnectionPoints.map(cp => ({
+                            id: cp.id,
+                            position: { lat: cp.position.lat, lng: cp.position.lng },
+                            connectedLaterals: cp.connectedLaterals,
+                            submainId: cp.submainId,
+                            type: cp.type,
+                            color: getConnectionPointColor(cp.type),
+                            size: getConnectionPointSize(cp.type),
+                            title: getConnectionPointTitle(cp.type, cp.connectedLaterals.length)
+                        })));
+                    }
+
+                    // Create submain to main connection points
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const submainToMainConnectionPoints = createSubmainToMainConnectionPoints(convertedPipes as any);
+                    allConnectionPoints.push(...submainToMainConnectionPoints.map(cp => ({
+                        id: cp.id,
+                        position: { lat: cp.position.lat, lng: cp.position.lng },
+                        connectedLaterals: cp.connectedLaterals,
+                        submainId: cp.submainId,
+                        type: cp.type,
+                        color: getConnectionPointColor(cp.type),
+                        size: getConnectionPointSize(cp.type),
+                        title: getConnectionPointTitle(cp.type, cp.connectedLaterals.length)
+                    })));
+                }
+
+                // Create field crop system data similar to horticulture
+                const fieldCropSystemData: FieldCropSystemData = {
+                    sprinklerConfig: {
+                        flowRatePerPlant: 2.5, // Default flow rate for field crops
+                        pressureBar: 2.0, // Default pressure
+                        radiusMeters: 6.0, // Default radius
+                        totalFlowRatePerMinute: totalPlantingPoints * 2.5,
+                    },
+                    connectionStats: allConnectionPoints,
+                    zones: fieldData.zones.info.map((zone) => {
+                        // Get connection points for this zone
+                        const zoneConnectionPoints = allConnectionPoints.filter(() => {
+                            // Check if connection point is within zone coordinates
+                            if (zone.coordinates && zone.coordinates.length > 0) {
+                                // Simple point-in-polygon check (can be enhanced later)
+                                return true; // For now, include all connection points
+                            }
+                            return false;
+                        });
+
+                        return {
+                            id: zone.id,
+                            name: zone.name,
+                            plantCount: zone.totalPlantingPoints,
+                            totalWaterNeed: zone.totalWaterRequirementPerDay,
+                            waterPerTree: zone.totalWaterRequirementPerDay / Math.max(zone.totalPlantingPoints, 1),
+                            waterNeedPerMinute: zone.totalPlantingPoints * 2.5,
+                            area: zone.area,
+                            color: '#22C55E', // Default green color
+                            pipes: {
+                                mainPipes: {
+                                    count: zone.pipeStats?.main?.count || 0,
+                                    totalLength: zone.pipeStats?.main?.totalLength || 0,
+                                    longest: zone.pipeStats?.main?.longestLength || 0,
+                                },
+                                subMainPipes: {
+                                    count: zone.pipeStats?.submain?.count || 0,
+                                    totalLength: zone.pipeStats?.submain?.totalLength || 0,
+                                    longest: zone.pipeStats?.submain?.longestLength || 0,
+                                },
+                                branchPipes: {
+                                    count: zone.pipeStats?.lateral?.count || 0,
+                                    totalLength: zone.pipeStats?.lateral?.totalLength || 0,
+                                    longest: zone.pipeStats?.lateral?.longestLength || 0,
+                                },
+                                emitterPipes: {
+                                    count: 0,
+                                    totalLength: 0,
+                                    longest: 0,
+                                },
+                            },
+                            bestPipes: {
+                                main: null,
+                                subMain: null,
+                                branch: null,
+                            },
+                            connectionPoints: zoneConnectionPoints,
+                        };
+                    }),
+                    totalPlants: totalPlantingPoints,
+                    isMultipleZones: fieldData.zones.info.length > 1,
+                };
+
+                // Save system data
+                saveFieldCropSystemData(fieldCropSystemData);
+                
+                // Set project type
+                localStorage.setItem('projectType', 'field-crop');
+                
+                console.log('✅ Field crop system data saved:', fieldCropSystemData);
+                
+                // Navigate to product page
+                window.location.href = '/product?mode=field-crop';
+            } else {
+                console.error('❌ No field crop data available');
+                alert('ไม่พบข้อมูลโครงการ กรุณากลับไปสร้างโครงการใหม่');
+            }
+        } catch (error) {
+            console.error('❌ Error exporting to product page:', error);
+            alert('เกิดข้อผิดพลาดในการส่งออกข้อมูล กรุณาลองใหม่อีกครั้ง');
+        }
+    }, [summaryData, totalPlantingPoints]);
+
     if (!summaryData) {
         return (
             <div className="min-h-screen bg-gray-900 text-white">
@@ -5208,8 +5441,8 @@ export default function FieldCropSummary() {
                                 {/* Save Project Button (removed by UI simplification request) */}
 
                                 {/* Product Button */}
-                                <Link
-                                    href="/product?mode=field-crop"
+                                <button
+                                    onClick={handleExportToProduct}
                                     className="inline-flex transform items-center rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 px-6 py-3 font-semibold text-white transition-all duration-200 hover:scale-105 hover:from-green-600 hover:to-emerald-600 hover:shadow-lg"
                                 >
                                     <svg
@@ -5226,7 +5459,7 @@ export default function FieldCropSummary() {
                                         />
                                     </svg>
                                     🛒 {t('คำนวณอุปกรณ์')}
-                                </Link>
+                                </button>
 
                                 {/* New Project Button */}
                                 <Link

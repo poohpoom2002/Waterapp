@@ -13,6 +13,7 @@ import {
 interface PipeSystemSummaryProps {
     horticultureSystemData?: any;
     gardenSystemData?: any; // เพิ่มสำหรับ garden mode
+    greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
     activeZoneId?: string;
     selectedPipes?: {
         branch?: any;
@@ -27,6 +28,7 @@ interface PipeSystemSummaryProps {
 const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
     horticultureSystemData,
     gardenSystemData,
+    greenhouseData,
     activeZoneId,
     selectedPipes,
     sprinklerPressure,
@@ -34,18 +36,46 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
 }) => {
     const { t } = useLanguage();
 
-    // Only show for horticulture and garden modes
-    if (projectMode !== 'horticulture' && projectMode !== 'garden') {
+    // Show for horticulture, garden, and greenhouse modes
+    if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'greenhouse') {
         return null;
     }
 
     // Don't show if no data
-    const systemData = projectMode === 'garden' ? gardenSystemData : horticultureSystemData;
-    if (!sprinklerPressure || !systemData || !activeZoneId) {
-        return null;
+    const systemData = projectMode === 'garden' ? gardenSystemData : 
+                      projectMode === 'greenhouse' ? greenhouseData : horticultureSystemData;
+    
+    if (projectMode === 'greenhouse') {
+        // For greenhouse mode, we don't need sprinklerPressure check
+        if (!greenhouseData || !activeZoneId) {
+            return null;
+        }
+    } else {
+        // For horticulture and garden modes, check sprinklerPressure
+        if (!sprinklerPressure || !systemData || !activeZoneId) {
+            return null;
+        }
     }
 
     const calculationData = useMemo(() => {
+        // Handle greenhouse mode differently
+        if (projectMode === 'greenhouse') {
+            const plot = greenhouseData?.summary?.plotStats?.find((p: any) => p.plotId === activeZoneId);
+            if (!plot) return null;
+            
+            return {
+                plotId: plot.plotId,
+                plotName: plot.plotName,
+                pipeStats: plot.pipeStats,
+                equipmentCount: plot.equipmentCount,
+                area: plot.area,
+                effectivePlantingArea: plot.effectivePlantingArea,
+                cropType: plot.cropType,
+                cropIcon: plot.cropIcon,
+                isGreenhouse: true,
+            };
+        }
+        
         const zone = systemData.zones?.find((z: any) => z.id === activeZoneId);
         if (!zone?.bestPipes) return null;
 
@@ -137,7 +167,7 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         }
 
         const branchSubMainCombined = (branchCalc?.headLoss || 0) + (subMainCalc?.headLoss || 0);
-        const head20Percent = sprinklerPressure.head20PercentM;
+        const head20Percent = sprinklerPressure?.head20PercentM || 0;
 
         return {
             branchCalc,
@@ -153,6 +183,131 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         return null;
     }
 
+    // Handle greenhouse mode rendering
+    if (projectMode === 'greenhouse' && calculationData.isGreenhouse) {
+        const { plotId, plotName, pipeStats, equipmentCount, area, effectivePlantingArea, cropType, cropIcon } = calculationData;
+        
+        return (
+            <div className="mt-6 rounded bg-green-900 p-4">
+                <h4 className="mb-3 text-lg font-bold text-green-300">
+                    🔧 ข้อมูลท่อ - {cropIcon} {plotName}
+                </h4>
+
+                <div className="space-y-4">
+                    {/* Basic Plot Information */}
+                    <div className="rounded bg-green-800 p-3">
+                        <h5 className="mb-2 font-medium text-green-200">📊 ข้อมูลพื้นฐาน</h5>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-green-300">พื้นที่แปลง:</span>
+                                <span className="text-white">{area.toFixed(2)} ตร.ม.</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-green-300">พื้นที่ปลูกจริง:</span>
+                                <span className="text-white">{effectivePlantingArea.toFixed(2)} ตร.ม.</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-green-300">พืชที่ปลูก:</span>
+                                <span className="text-white">{cropType || 'ไม่ระบุ'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Pipe Statistics */}
+                    <div className="rounded bg-green-800 p-3">
+                        <h5 className="mb-2 font-medium text-green-200">🔧 สถิติท่อ</h5>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <h6 className="mb-1 text-green-300">ท่อหลัก (Main Pipe)</h6>
+                                <div className="space-y-1 pl-2">
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">ความยาวรวม:</span>
+                                        <span className="text-white">{pipeStats.main.totalLength.toFixed(1)} ม.</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">ท่อที่ยาวที่สุด:</span>
+                                        <span className="text-white">{pipeStats.main.longest.toFixed(1)} ม.</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">จำนวนท่อ:</span>
+                                        <span className="text-white">{pipeStats.main.count} ท่อ</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h6 className="mb-1 text-green-300">ท่อย่อย (Sub Pipe)</h6>
+                                <div className="space-y-1 pl-2">
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">ความยาวรวม:</span>
+                                        <span className="text-white">{pipeStats.sub.totalLength.toFixed(1)} ม.</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">ท่อที่ยาวที่สุด:</span>
+                                        <span className="text-white">{pipeStats.sub.longest.toFixed(1)} ม.</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">จำนวนท่อ:</span>
+                                        <span className="text-white">{pipeStats.sub.count} ท่อ</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h6 className="mb-1 text-green-300">ท่อน้ำหยด (Drip Pipe)</h6>
+                                <div className="space-y-1 pl-2">
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">ความยาวรวม:</span>
+                                        <span className="text-white">{pipeStats.drip.totalLength.toFixed(1)} ม.</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">ท่อที่ยาวที่สุด:</span>
+                                        <span className="text-white">{pipeStats.drip.longest.toFixed(1)} ม.</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">จำนวนท่อ:</span>
+                                        <span className="text-white">{pipeStats.drip.count} ท่อ</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h6 className="mb-1 text-green-300">สรุปท่อ</h6>
+                                <div className="space-y-1 pl-2">
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">ความยาวรวมทั้งหมด:</span>
+                                        <span className="text-white">{pipeStats.totalLength.toFixed(1)} ม.</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-green-200">เส้นทางที่ยาวที่สุด:</span>
+                                        <span className="text-white">{pipeStats.longestPath.toFixed(1)} ม.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Equipment Count */}
+                    <div className="rounded bg-green-800 p-3">
+                        <h5 className="mb-2 font-medium text-green-200">⚙️ จำนวนอุปกรณ์</h5>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-green-300">สปริงเกลอร์:</span>
+                                <span className="text-white">{equipmentCount.sprinklers} ตัว</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-green-300">ปั๊ม:</span>
+                                <span className="text-white">{equipmentCount.pumps} ตัว</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-green-300">วาล์ว:</span>
+                                <span className="text-white">{equipmentCount.valves} ตัว</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // Original horticulture/garden mode rendering
     const { branchCalc, subMainCalc, mainCalc, emitterCalc, branchSubMainCombined, head20Percent } =
         calculationData;
 
@@ -169,21 +324,21 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                     <div className="flex items-center space-x-2">
                         <span className="text-lg text-blue-300">แรงดัน</span>
                         <span className="text-lg font-bold text-white">
-                            {parseFloat(sprinklerPressure.pressureBar.toFixed(2)).toString()}
+                            {parseFloat((sprinklerPressure?.pressureBar || 0).toFixed(2)).toString()}
                         </span>
                         <span className="text-lg text-blue-300">บาร์</span>
                     </div>
                     <div className="flex items-center space-x-2">
                         <span className="text-lg text-blue-300">แปลงเป็น Head</span>
                         <span className="text-lg font-bold text-white">
-                            {parseFloat(sprinklerPressure.headM.toFixed(2)).toString()}
+                            {parseFloat((sprinklerPressure?.headM || 0).toFixed(2)).toString()}
                         </span>
                         <span className="text-lg text-blue-300">ม.</span>
                     </div>
                     <div className="flex items-center space-x-2">
                         <span className="text-lg text-blue-300">20% Head</span>
                         <span className="text-lg font-bold text-yellow-300">
-                            {parseFloat(head20Percent.toFixed(2)).toString()}
+                            {parseFloat((head20Percent || 0).toFixed(2)).toString()}
                         </span>
                         <span className="text-lg text-blue-300">ม.</span>
                     </div>
@@ -242,17 +397,17 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                                                 ขีดจำกัด 20% Head หัวฉีด:
                                             </span>
                                             <span className="font-bold text-yellow-300">
-                                                {head20Percent.toFixed(3)} ม.
+                                                {(head20Percent || 0).toFixed(3)} ม.
                                             </span>
                                         </div>
 
                                         {/* Warning Messages */}
-                                        {mainCalc && mainCalc.headLoss > head20Percent && (
+                                        {mainCalc && mainCalc.headLoss > (head20Percent || 0) && (
                                             <div className="rounded border border-red-700 bg-red-900 p-2">
                                                 <span className="text-xs text-red-300">
                                                     ⚠️ <strong>คำเตือน:</strong> ท่อเมนหลักมี Head
                                                     Loss เกินขีดจำกัด{' '}
-                                                    {(mainCalc.headLoss - head20Percent).toFixed(3)}{' '}
+                                                    {(mainCalc.headLoss - (head20Percent || 0)).toFixed(3)}{' '}
                                                     ม.
                                                 </span>
                                             </div>
