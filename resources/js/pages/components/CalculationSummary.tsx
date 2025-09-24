@@ -58,6 +58,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const actualMainPipe = results.autoSelectedMainPipe;
     const actualEmitterPipe = results.autoSelectedEmitterPipe;
 
+    // Debug logging for field-crop mode
+    useEffect(() => {
+        if (projectMode === 'field-crop') {
+            console.log('🔍 CalculationSummary field-crop debug:');
+            console.log('- results.totalWaterRequiredLPM:', results.totalWaterRequiredLPM);
+            console.log('- results.totalSprinklers:', results.totalSprinklers);
+            console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
+            console.log('- input.totalTrees:', input.totalTrees);
+            console.log('- input object:', input);
+        }
+    }, [projectMode, results.totalWaterRequiredLPM, results.totalSprinklers, input.waterPerTreeLiters, input.totalTrees, input]);
+
     // ฟังก์ชันสำหรับดึงค่า Head Loss จากท่อแต่ละชนิด
     const getActualPipeHeadLoss = useCallback(() => {
         // ลองดึงข้อมูลจาก localStorage ก่อน (สำหรับทุก mode)
@@ -693,6 +705,9 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                             return currentPlot.production.waterRequirementPerIrrigation.toFixed(1);
                                         }
                                     }
+                                    return (results.totalWaterRequiredLPM || 0).toFixed(1);
+                                } else if (projectMode === 'field-crop') {
+                                    // สำหรับ field-crop mode ใช้ข้อมูลจาก input
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);
                                 } else {
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);

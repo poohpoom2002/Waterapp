@@ -5198,13 +5198,33 @@ export default function FieldCropSummary() {
                     })));
                 }
 
+                // Get sprinkler configuration from irrigation settings
+                const irrigationSettings = fieldData.irrigation?.settings || {};
+                const sprinklerSettings = irrigationSettings.sprinkler_system || irrigationSettings.sprinkler || {};
+                const defaultFlowRate = (sprinklerSettings && typeof sprinklerSettings === 'object' && 'flow' in sprinklerSettings) 
+                    ? (sprinklerSettings as { flow: number }).flow 
+                    : 30; // Default 30 L/min
+                const defaultPressure = (sprinklerSettings && typeof sprinklerSettings === 'object' && 'pressure' in sprinklerSettings) 
+                    ? (sprinklerSettings as { pressure: number }).pressure 
+                    : 2.5; // Default 2.5 bar
+                const defaultRadius = (sprinklerSettings && typeof sprinklerSettings === 'object' && 'coverageRadius' in sprinklerSettings) 
+                    ? (sprinklerSettings as { coverageRadius: number }).coverageRadius 
+                    : 8; // Default 8 meters
+
+                console.log('🔍 Field-crop summary sprinkler config:');
+                console.log('- irrigationSettings:', irrigationSettings);
+                console.log('- sprinklerSettings:', sprinklerSettings);
+                console.log('- defaultFlowRate:', defaultFlowRate);
+                console.log('- defaultPressure:', defaultPressure);
+                console.log('- defaultRadius:', defaultRadius);
+
                 // Create field crop system data similar to horticulture
                 const fieldCropSystemData: FieldCropSystemData = {
                     sprinklerConfig: {
-                        flowRatePerPlant: 2.5, // Default flow rate for field crops
-                        pressureBar: 2.0, // Default pressure
-                        radiusMeters: 6.0, // Default radius
-                        totalFlowRatePerMinute: totalPlantingPoints * 2.5,
+                        flowRatePerPlant: defaultFlowRate,
+                        pressureBar: defaultPressure,
+                        radiusMeters: defaultRadius,
+                        totalFlowRatePerMinute: totalPlantingPoints * defaultFlowRate,
                     },
                     connectionStats: allConnectionPoints,
                     zones: fieldData.zones.info.map((zone) => {
@@ -5224,7 +5244,7 @@ export default function FieldCropSummary() {
                             plantCount: zone.totalPlantingPoints,
                             totalWaterNeed: zone.totalWaterRequirementPerDay,
                             waterPerTree: zone.totalWaterRequirementPerDay / Math.max(zone.totalPlantingPoints, 1),
-                            waterNeedPerMinute: zone.totalPlantingPoints * 2.5,
+                            waterNeedPerMinute: zone.totalPlantingPoints * defaultFlowRate,
                             area: zone.area,
                             color: '#22C55E', // Default green color
                             pipes: {
