@@ -7,13 +7,7 @@ import { getCropByValue } from './choose-crop';
 import type { FieldData } from './pipe-generate';
 import { parseCompletedSteps, toCompletedStepsCsv } from '../../utils/stepUtils';
 
-interface Zone {
-	id: string;
-	coordinates: { lat: number; lng: number }[];
-	name: string;
-	area: number;
-	color: string;
-}
+// Zone interface removed - zones are handled in zone-obstacle page only
 
 interface Obstacle {
 	id: string;
@@ -174,7 +168,6 @@ const safeSetItem = (key: string, data: unknown, maxSizeKB: number = 5000) => {
 export default function IrrigationGenerate({
 	selectedCrops = [],
 	mainArea = [],
-	zones = [],
 	obstacles = [],
 	mapCenter = { lat: 13.7563, lng: 100.5018 },
 	mapZoom = 18,
@@ -192,7 +185,6 @@ export default function IrrigationGenerate({
 }: {
 	selectedCrops?: string[];
 	mainArea?: { lat: number; lng: number }[];
-	zones?: Zone[];
 	obstacles?: Obstacle[];
 	mapCenter?: { lat: number; lng: number };
 	mapZoom?: number;
@@ -480,7 +472,6 @@ export default function IrrigationGenerate({
 	// Map references
 	const mapRef = useRef<google.maps.Map | null>(null);
 	const mainAreaPolygonRef = useRef<google.maps.Polygon | null>(null);
-	const zonePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const obstaclePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const plantPointMarkersRef = useRef<google.maps.Marker[]>([]);
 	const distanceOverlaysRef = useRef<Record<string, { lines: google.maps.Polyline[]; labels: google.maps.Marker[] }>>({});
@@ -674,6 +665,23 @@ export default function IrrigationGenerate({
 	};
 
 	const handleStepClick = (step: StepData) => {
+		// Check if all 4 steps are completed
+		const parsedSteps = parseCompletedSteps(completedSteps);
+		const allStepsCompleted = parsedSteps.length >= 4 && parsedSteps.includes(1) && parsedSteps.includes(2) && parsedSteps.includes(3) && parsedSteps.includes(4);
+		
+		// If all steps are completed, allow free navigation
+		if (allStepsCompleted) {
+			persistIrrigation();
+			const params = {
+				crops: crops || selectedCrops.join(','),
+				currentStep: step.id,
+				completedSteps: completedSteps
+			};
+			router.get(step.route, params);
+			return;
+		}
+		
+		// Original logic for incomplete steps
 		// Gate: must generate irrigation before moving to zones
 		if (step.id === 3 && !hasGeneratedIrrigation) {
 			alert(t('Please generate at least one Irrigation Type before continuing to Zones'));
@@ -1129,32 +1137,33 @@ export default function IrrigationGenerate({
 						map: mapRef.current,
 						icon: {
 							url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-								<svg width="10" height="10" viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
-									<circle cx="5" cy="5" r="4" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
-									<circle cx="5" cy="5" r="1.5" fill="#ffffff"/>
+								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+									<circle cx="6" cy="6" r="5" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
+									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
 								</svg>
 							`),
-							scaledSize: new google.maps.Size(10, 10),
-							anchor: new google.maps.Point(5, 5)
+							scaledSize: new google.maps.Size(12, 12),
+							anchor: new google.maps.Point(6, 6)
 						},
 						title: `Sprinkler ${index + 1}`,
 						optimized: true,
-						clickable: false
+						clickable: false,
+						zIndex: 2000
 					});
 					irrigationMarkersRef.current.push(marker);
 					
-					// Create coverage circle with reduced opacity for better performance
+					// Create coverage circle
 					const circle = new google.maps.Circle({
 						center: pos,
 						radius: radius,
 						fillColor: '#3b82f6',
-						fillOpacity: 0.15, // Reduced opacity for better performance
+						fillOpacity: 0.2,
 						strokeColor: '#1d4ed8',
-						strokeOpacity: 0.4, // Reduced opacity
+						strokeOpacity: 0.6,
 						strokeWeight: 1,
 						map: mapRef.current,
 						clickable: false,
-						zIndex: 150000
+						zIndex: 2000
 					});
 					irrigationCirclesRef.current.push(circle);
 				});
@@ -1395,43 +1404,53 @@ export default function IrrigationGenerate({
 			// Save pivot positions
 			setIrrigationPositions(prev => ({ ...prev, pivots }));
 			
-			// Create markers and circles
-			pivots.forEach((pos, index) => {
-				// Create marker
-				const marker = new google.maps.Marker({
-					position: pos,
-					map: mapRef.current,
-					icon: {
-						url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-							<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-								<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-								<circle cx="6" cy="6" r="2" fill="#ffffff"/>
-							</svg>
-						`),
-						scaledSize: new google.maps.Size(12, 12),
-						anchor: new google.maps.Point(6, 6)
-					},
-					title: `Pivot ${index + 1}`,
-					optimized: true,
-					clickable: false
-				});
-				irrigationMarkersRef.current.push(marker);
+			// Create markers and circles in batches for better performance
+			const markerBatchSize = 50;
+			for (let i = 0; i < pivots.length; i += markerBatchSize) {
+				await new Promise(resolve => requestAnimationFrame(resolve));
 				
-				// Create coverage circle
-				const circle = new google.maps.Circle({
-					center: pos,
-					radius: radius,
-					fillColor: '#f97316',
-					fillOpacity: 0.2,
-					strokeColor: '#ea580c',
-					strokeOpacity: 0.6,
-					strokeWeight: 1,
-					map: mapRef.current,
-					clickable: false,
-					zIndex: 15000
+				const batch = pivots.slice(i, i + markerBatchSize);
+				
+				batch.forEach((pos, batchIndex) => {
+					const index = i + batchIndex;
+					
+					// Create marker
+					const marker = new google.maps.Marker({
+						position: pos,
+						map: mapRef.current,
+						icon: {
+							url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+									<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
+									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
+								</svg>
+							`),
+							scaledSize: new google.maps.Size(12, 12),
+							anchor: new google.maps.Point(6, 6)
+						},
+						title: `Pivot ${index + 1}`,
+						optimized: true,
+						clickable: false,
+						zIndex: 2000
+					});
+					irrigationMarkersRef.current.push(marker);
+
+					// Create coverage circle
+					const circle = new google.maps.Circle({
+						center: pos,
+						radius: radius,
+						fillColor: '#f97316',
+						fillOpacity: 0.2,
+						strokeColor: '#ea580c',
+						strokeOpacity: 1.0,
+						strokeWeight: 1,
+						map: mapRef.current,
+						clickable: false,
+						zIndex: 2000
+					});
+					irrigationCirclesRef.current.push(circle);
 				});
-				irrigationCirclesRef.current.push(circle);
-			});
+			}
 			
 		} catch (error) {
 			console.error('Error generating pivot system:', error);
@@ -2184,7 +2203,7 @@ export default function IrrigationGenerate({
 		const polygon = new google.maps.Polygon({
 			paths: [finalMainArea],
 			fillColor: '#86EFAC',
-			fillOpacity: 0.15,
+			fillOpacity: 0.3,
 			strokeColor: '#22C55E',
 			strokeWeight: 2,
 			strokeOpacity: 1,
@@ -2197,30 +2216,9 @@ export default function IrrigationGenerate({
 		dbg('Main area polygon created and added to map');
 	}, [finalMainArea, isMapLoaded]);
 
-	// Render zones
-	useEffect(() => {
-		if (!mapRef.current || !isMapLoaded) return;
-
-		zonePolygonsRef.current.forEach(poly => poly.setMap(null));
-		zonePolygonsRef.current = [];
-
-		setTimeout(() => {
-			zones.forEach((zone) => {
-				const colors = { fill: zone.color, stroke: zone.color };
-				const poly = new google.maps.Polygon({
-					paths: [zone.coordinates],
-					fillColor: colors.fill,
-					fillOpacity: 0.5,
-					strokeColor: colors.stroke,
-					strokeWeight: 2,
-					strokeOpacity: 1,
-					map: mapRef.current,
-					clickable: false,
-				});
-				zonePolygonsRef.current.push(poly);
-			});
-		}, 100);
-	}, [zones, isMapLoaded]);
+	// Note: Zone rendering is removed from irrigation page
+	// Zones should only be displayed in the zone-obstacle page (Step 3)
+	// This page focuses only on irrigation system generation
 
 	// [FIX] Simplified distance overlay creation
 	const createSimpleDistanceOverlays = useCallback((obstacle: Obstacle) => {
@@ -2300,12 +2298,13 @@ export default function IrrigationGenerate({
 					const poly = new google.maps.Polygon({
 						paths: [validCoordinates],
 						fillColor: colors.fill,
-						fillOpacity: 0.4,
+						fillOpacity: 0.3,
 						strokeColor: colors.stroke,
 						strokeWeight: 2,
 						strokeOpacity: 1,
 						map: mapRef.current,
 						clickable: false,
+						zIndex: 1600
 					});
 					obstaclePolygonsRef.current.push(poly);
 					dbg(`Successfully created polygon for obstacle ${index + 1}`);
@@ -2379,8 +2378,7 @@ export default function IrrigationGenerate({
 	}, [finalPlantPoints, isMapLoaded, hideAllPoints, parsedPlantPoints.length, filterPointsByZoom, parsedMapZoom, realPlantCount, calculatePointSize]);
 
 	// Render irrigation overlays when data is loaded from localStorage
-	useEffect(() => {
-		
+	const renderIrrigationOverlays = useCallback(async () => {
 		if (!mapRef.current || !isMapLoaded) return;
 
 		// Clear existing irrigation overlays
@@ -2389,88 +2387,108 @@ export default function IrrigationGenerate({
 		irrigationCirclesRef.current.forEach(circle => circle.setMap(null));
 		irrigationCirclesRef.current = [];
 
-		// Recreate sprinkler overlays
+		// Recreate sprinkler overlays with batch processing
 		if (irrigationPositions.sprinklers.length > 0) {
 			const radius = irrigationSettings.sprinkler_system.coverageRadius;
+			const markerBatchSize = 50;
 			
-			irrigationPositions.sprinklers.forEach((pos, index) => {
-				// Create marker
-				const marker = new google.maps.Marker({
-					position: pos,
-					map: mapRef.current,
-					icon: {
-						url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-							<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-								<circle cx="6" cy="6" r="5" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
-								<circle cx="6" cy="6" r="2" fill="#ffffff"/>
-							</svg>
-						`),
-						scaledSize: new google.maps.Size(12, 12),
-						anchor: new google.maps.Point(6, 6)
-					},
-					title: `Sprinkler ${index + 1}`,
-					optimized: true,
-					clickable: false
-				});
-				irrigationMarkersRef.current.push(marker);
+			for (let i = 0; i < irrigationPositions.sprinklers.length; i += markerBatchSize) {
+				await new Promise(resolve => requestAnimationFrame(resolve));
 				
-				// Create coverage circle
-				const circle = new google.maps.Circle({
-					center: pos,
-					radius: radius,
-					fillColor: '#3b82f6',
-					fillOpacity: 0.2,
-					strokeColor: '#1d4ed8',
-					strokeOpacity: 0.6,
-					strokeWeight: 1,
-					map: mapRef.current,
-					clickable: false,
-					zIndex: 150000
+				const batch = irrigationPositions.sprinklers.slice(i, i + markerBatchSize);
+				
+				batch.forEach((pos, batchIndex) => {
+					const index = i + batchIndex;
+					
+					// Create marker
+					const marker = new google.maps.Marker({
+						position: pos,
+						map: mapRef.current,
+						icon: {
+							url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+									<circle cx="6" cy="6" r="5" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
+									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
+								</svg>
+							`),
+							scaledSize: new google.maps.Size(12, 12),
+							anchor: new google.maps.Point(6, 6)
+						},
+						title: `Sprinkler ${index + 1}`,
+						optimized: true,
+						clickable: false,
+						zIndex: 2000
+					});
+					irrigationMarkersRef.current.push(marker);
+
+					// Create coverage circle
+					const circle = new google.maps.Circle({
+						center: pos,
+						radius: radius,
+						fillColor: '#3b82f6',
+						fillOpacity: 0.2,
+						strokeColor: '#1d4ed8',
+						strokeOpacity: 0.6,
+						strokeWeight: 1,
+						map: mapRef.current,
+						clickable: false,
+						zIndex: 2000
+					});
+					irrigationCirclesRef.current.push(circle);
 				});
-				irrigationCirclesRef.current.push(circle);
-			});
+			}
 		}
 
-		// Recreate pivot overlays
+		// Recreate pivot overlays with batch processing
 		if (irrigationPositions.pivots.length > 0) {
 			const radius = irrigationSettings.pivot.coverageRadius;
+			const markerBatchSize = 50;
 			
-			irrigationPositions.pivots.forEach((pos, index) => {
-				// Create marker
-				const marker = new google.maps.Marker({
-					position: pos,
-					map: mapRef.current,
-					icon: {
-						url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-							<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-								<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-								<circle cx="6" cy="6" r="2" fill="#ffffff"/>
-							</svg>
-						`),
-						scaledSize: new google.maps.Size(12, 12),
-						anchor: new google.maps.Point(6, 6)
-					},
-					title: `Pivot ${index + 1}`,
-					optimized: true,
-					clickable: false
-				});
-				irrigationMarkersRef.current.push(marker);
+			for (let i = 0; i < irrigationPositions.pivots.length; i += markerBatchSize) {
+				await new Promise(resolve => requestAnimationFrame(resolve));
 				
-				// Create coverage circle
-				const circle = new google.maps.Circle({
-					center: pos,
-					radius: radius,
-					fillColor: '#f97316',
-					fillOpacity: 0.2,
-					strokeColor: '#ea580c',
-					strokeOpacity: 0.6,
-					strokeWeight: 1,
-					map: mapRef.current,
-					clickable: false,
-					zIndex: 15000
+				const batch = irrigationPositions.pivots.slice(i, i + markerBatchSize);
+				
+				batch.forEach((pos, batchIndex) => {
+					const index = i + batchIndex;
+					
+					// Create marker
+					const marker = new google.maps.Marker({
+						position: pos,
+						map: mapRef.current,
+						icon: {
+							url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
+									<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
+									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
+								</svg>
+							`),
+							scaledSize: new google.maps.Size(12, 12),
+							anchor: new google.maps.Point(6, 6)
+						},
+						title: `Pivot ${index + 1}`,
+						optimized: true,
+						clickable: false,
+						zIndex: 2000
+					});
+					irrigationMarkersRef.current.push(marker);
+
+					// Create coverage circle
+					const circle = new google.maps.Circle({
+						center: pos,
+						radius: radius,
+						fillColor: '#f97316',
+						fillOpacity: 0.2,
+						strokeColor: '#ea580c',
+						strokeOpacity: 0.6,
+						strokeWeight: 1,
+						map: mapRef.current,
+						clickable: false,
+						zIndex: 2000
+					});
+					irrigationCirclesRef.current.push(circle);
 				});
-				irrigationCirclesRef.current.push(circle);
-			});
+			}
 		}
 
 		// Recreate drip tape overlays
@@ -2523,7 +2541,6 @@ export default function IrrigationGenerate({
 		
 	}, [
 		isMapLoaded,
-		selectedIrrigationType,
 		irrigationSettings.sprinkler_system.coverageRadius,
 		irrigationSettings.pivot.coverageRadius,
 		irrigationPositions.dripTapes,
@@ -2542,143 +2559,7 @@ export default function IrrigationGenerate({
 				irrigationPositions.waterJets.length > 0;
 			
 			if (hasIrrigationData) {
-				
-				// Clear existing irrigation overlays
-				irrigationMarkersRef.current.forEach(marker => marker.setMap(null));
-				irrigationMarkersRef.current = [];
-				irrigationCirclesRef.current.forEach(circle => circle.setMap(null));
-				irrigationCirclesRef.current = [];
-
-				// Recreate sprinkler overlays
-				if (irrigationPositions.sprinklers.length > 0) {
-					const radius = irrigationSettings.sprinkler_system?.coverageRadius || 8;
-					
-					irrigationPositions.sprinklers.forEach((pos, index) => {
-						// Create marker
-						const marker = new google.maps.Marker({
-							position: pos,
-							map: mapRef.current,
-							icon: {
-								url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-									<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-										<circle cx="6" cy="6" r="5" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
-										<circle cx="6" cy="6" r="2" fill="#ffffff"/>
-									</svg>
-								`),
-								scaledSize: new google.maps.Size(12, 12),
-								anchor: new google.maps.Point(6, 6)
-							},
-							title: `Sprinkler ${index + 1}`,
-							optimized: true,
-							clickable: false
-						});
-						irrigationMarkersRef.current.push(marker);
-						
-						// Create coverage circle
-						const circle = new google.maps.Circle({
-							center: pos,
-							radius: radius,
-							fillColor: '#3b82f6',
-							fillOpacity: 0.2,
-							strokeColor: '#1d4ed8',
-							strokeOpacity: 0.6,
-							strokeWeight: 1,
-							map: mapRef.current,
-							clickable: false
-						});
-						irrigationCirclesRef.current.push(circle);
-					});
-				}
-
-				// Recreate pivot overlays
-				if (irrigationPositions.pivots.length > 0) {
-					const radius = irrigationSettings.pivot?.coverageRadius || 165;
-					
-					irrigationPositions.pivots.forEach((pos, index) => {
-						// Create marker
-						const marker = new google.maps.Marker({
-							position: pos,
-							map: mapRef.current,
-							icon: {
-								url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-									<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-										<circle cx="6" cy="6" r="5" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-										<circle cx="6" cy="6" r="2" fill="#ffffff"/>
-									</svg>
-								`),
-								scaledSize: new google.maps.Size(12, 12),
-								anchor: new google.maps.Point(6, 6)
-							},
-							title: `Pivot ${index + 1}`,
-							optimized: true,
-							clickable: false
-						});
-						irrigationMarkersRef.current.push(marker);
-						
-						// Create coverage circle
-						const circle = new google.maps.Circle({
-							center: pos,
-							radius: radius,
-							fillColor: '#f97316',
-							fillOpacity: 0.2,
-							strokeColor: '#ea580c',
-							strokeOpacity: 0.6,
-							strokeWeight: 1,
-							map: mapRef.current,
-							clickable: false
-						});
-						irrigationCirclesRef.current.push(circle);
-					});
-				}
-
-				// Recreate drip tape overlays
-				if (irrigationPositions.dripTapes.length > 0) {
-					
-					irrigationPositions.dripTapes.forEach((pos, index) => {
-						const marker = new google.maps.Marker({
-							position: pos,
-							map: mapRef.current,
-							icon: {
-								url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-									<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-										<circle cx="4" cy="4" r="3" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
-									</svg>
-								`),
-								scaledSize: new google.maps.Size(8, 8),
-								anchor: new google.maps.Point(4, 4)
-							},
-							title: `Drip ${index + 1}`,
-							optimized: true,
-							clickable: false
-						});
-						irrigationMarkersRef.current.push(marker);
-					});
-				}
-
-				// Recreate water jet overlays
-				if (irrigationPositions.waterJets.length > 0) {
-					
-					irrigationPositions.waterJets.forEach((pos, index) => {
-						const marker = new google.maps.Marker({
-							position: pos,
-							map: mapRef.current,
-							icon: {
-								url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-									<svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-										<circle cx="4" cy="4" r="3" fill="#f97316" stroke="#ea580c" stroke-width="1"/>
-									</svg>
-								`),
-								scaledSize: new google.maps.Size(8, 8),
-								anchor: new google.maps.Point(4, 4)
-							},
-							title: `Water Jet ${index + 1}`,
-							optimized: true,
-							clickable: false
-						});
-						irrigationMarkersRef.current.push(marker);
-					});
-				}
-				
+				renderIrrigationOverlays();
 			}
 		}
 	}, [
@@ -2688,7 +2569,8 @@ export default function IrrigationGenerate({
 		irrigationPositions.dripTapes,
 		irrigationPositions.pivots,
 		irrigationPositions.sprinklers,
-		irrigationPositions.waterJets
+		irrigationPositions.waterJets,
+		renderIrrigationOverlays
 	]);
 
 	return (

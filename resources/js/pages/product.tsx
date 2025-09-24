@@ -495,11 +495,11 @@ export default function Product() {
         }
 
         const zonePipeStats = zone.pipeStats;
-        const longestBranch = zonePipeStats.lateral.longest || 30;
+        const longestBranch = zonePipeStats.lateral.longestLength || 30;
         const totalBranchLength = zonePipeStats.lateral.totalLength || 100;
-        const longestSubmain = zonePipeStats.submain.longest || 0;
+        const longestSubmain = zonePipeStats.submain.longestLength || 0;
         const totalSubmainLength = zonePipeStats.submain.totalLength || 0;
-        const longestMain = zonePipeStats.main.longest || 0;
+        const longestMain = zonePipeStats.main.longestLength || 0;
         const totalMainLength = zonePipeStats.main.totalLength || 0;
 
         return {
@@ -566,11 +566,11 @@ export default function Product() {
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
-            longestBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.longest || 30, 3),
+            longestBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.longestLength || 30, 3),
             totalBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.totalLength || 100, 3),
-            longestSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.longest || 0, 3),
+            longestSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.longestLength || 0, 3),
             totalSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.totalLength || 0, 3),
-            longestMainPipeM: formatNumber(fieldData.pipes.stats.main.longest || 0, 3),
+            longestMainPipeM: formatNumber(fieldData.pipes.stats.main.longestLength || 0, 3),
             totalMainPipeM: formatNumber(fieldData.pipes.stats.main.totalLength || 0, 3),
         };
     };

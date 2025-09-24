@@ -1277,7 +1277,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		obstaclePolygonsRef.current.forEach(polygon => polygon.setMap(null));
 		obstaclePolygonsRef.current = [];
 
-		plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
+		// Plant point markers are handled separately to prevent flickering
+		// plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
 
 		irrigationMarkersRef.current.forEach(marker => marker.setMap(null));
 		irrigationMarkersRef.current = [];
@@ -1321,7 +1322,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					title: `Sprinkler ${index + 1}`,
 					optimized: true,
 					clickable: false,
-					zIndex: 2000
+					zIndex: 1700 // Above zones (1500) and obstacles (1600)
 				});
 				irrigationMarkersRef.current.push(marker);
 
@@ -1336,7 +1337,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 						strokeWeight: 1,
 						map: map,
 						clickable: false,
-						zIndex: 2000
+						zIndex: 1700 // Above zones (1500) and obstacles (1600)
 					});
 					irrigationCirclesRef.current.push(circle);
 				}
@@ -1360,7 +1361,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					title: `Pivot ${index + 1}`,
 					optimized: true,
 					clickable: false,
-					zIndex: 2000
+					zIndex: 1700 // Above zones (1500) and obstacles (1600)
 				});
 				irrigationMarkersRef.current.push(marker);
 
@@ -1375,7 +1376,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 						strokeWeight: 1,
 						map: map,
 						clickable: false,
-						zIndex: 2000
+						zIndex: 1700 // Above zones (1500) and obstacles (1600)
 					});
 					irrigationCirclesRef.current.push(circle);
 				}
@@ -1401,7 +1402,8 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 						},
 						title: `${name} ${index + 1}`,
 						optimized: true,
-						clickable: false
+						clickable: false,
+						zIndex: 1700 // Above zones (1500) and obstacles (1600)
 					});
 					irrigationMarkersRef.current.push(marker);
 				});
@@ -1512,7 +1514,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				const poly = new google.maps.Polygon({
 					paths: [fieldData.mainArea],
 					fillColor: '#86EFAC',
-					fillOpacity: 0.15,
+					fillOpacity: 0.2,
 					strokeColor: '#22C55E',
 					strokeWeight: 2,
 					strokeOpacity: 1,
@@ -1523,36 +1525,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				mainPolygonRef.current = poly;
 			}
 
-			// Create plant point markers - only show if not hidden
-			if (!hideAllPoints && fieldData.plantPoints.length > 0) {
-				// Filter points based on zoom level and total point count
-				const filteredPoints = filterPointsByZoom(fieldData.plantPoints, mapZoom, fieldData.plantPoints.length);
-				
-				// Calculate dynamic point size based on total point count (not filtered count)
-				const pointSize = calculatePointSize(fieldData.plantPoints.length);
-				const anchorPoint = pointSize / 2;
-
-				filteredPoints.forEach((point) => {
-					const marker = new google.maps.Marker({
-						position: { lat: point.lat, lng: point.lng },
-						map: map,
-						icon: {
-							url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-								<svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
-									<circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.83}" fill="#22C55E" stroke="#16A34A" stroke-width="1"/>
-								</svg>
-							`),
-							scaledSize: new google.maps.Size(pointSize, pointSize),
-							anchor: new google.maps.Point(anchorPoint, anchorPoint)
-						},
-						title: `Plant ${point.id}`,
-						optimized: true,
-						clickable: false,
-						zIndex: 400
-					});
-					plantPointMarkersRef.current.push(marker);
-				});
-			}
+			// Plant point markers are now handled separately in useEffect to prevent flickering
 
 			createIrrigationMarkers(map);
 
@@ -1568,6 +1541,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					strokeOpacity: 1,
 					map: map,
 					clickable: true,
+					zIndex: 1600, // Above zones (1500)
 				});
 				obstaclePolygonsRef.current.push(poly);
 			});
@@ -1589,7 +1563,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			if (existingPolygon) {
 				existingPolygon.setOptions({
 					fillColor: zone.color,
-					fillOpacity: 0.35,
+					fillOpacity: 0.5,
 					strokeColor: zone.color,
 					strokeWeight: 2,
 					strokeOpacity: 0.9,
@@ -1619,7 +1593,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				const poly = new google.maps.Polygon({
 					paths: [zone.coordinates],
 					fillColor: zone.color,
-					fillOpacity: 0.35,
+					fillOpacity: 0.5,
 					strokeColor: zone.color,
 					strokeWeight: 2,
 					strokeOpacity: 0.9,
@@ -1642,7 +1616,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				});
 			}
 		});
-	}, [fieldData.mainArea, fieldData.obstacles, fieldData.zones, fieldData.plantPoints, zoneEditingState.currentEdit, clearMapObjects, createIrrigationMarkers, updateZoneFromPolygon, hideAllPoints, filterPointsByZoom, mapZoom, calculatePointSize]); // Add necessary dependencies
+	}, [fieldData.mainArea, fieldData.obstacles, fieldData.zones, fieldData.plantPoints, zoneEditingState.currentEdit, clearMapObjects, createIrrigationMarkers, updateZoneFromPolygon, hideAllPoints]); // Remove mapZoom and other unnecessary dependencies to prevent flickering
 
 
 	// Update map visuals when plant points change
@@ -1651,6 +1625,46 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			updateMapVisuals(mapRef.current, true);
 		}
 	}, [fieldData.plantPoints, hideAllPoints, updateMapVisuals]);
+
+	// Update plant points only when zoom changes (to prevent irrigation marker flickering)
+	useEffect(() => {
+		if (mapRef.current && !hideAllPoints && fieldData.plantPoints.length > 0) {
+			// Clear existing plant point markers
+			plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
+			plantPointMarkersRef.current = [];
+
+			// Filter points based on zoom level and total point count
+			const filteredPoints = filterPointsByZoom(fieldData.plantPoints, mapZoom, fieldData.plantPoints.length);
+			
+			// Calculate dynamic point size based on total point count (not filtered count)
+			const pointSize = calculatePointSize(fieldData.plantPoints.length);
+			const anchorPoint = pointSize / 2;
+
+			const plantIcon = {
+				url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+					<svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
+						<circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.75}" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
+					</svg>
+				`),
+				scaledSize: new google.maps.Size(pointSize, pointSize),
+				anchor: new google.maps.Point(anchorPoint, anchorPoint)
+			};
+
+			// Create new plant point markers
+			filteredPoints.forEach((point) => {
+				const marker = new google.maps.Marker({
+					position: { lat: point.lat, lng: point.lng },
+					map: mapRef.current,
+					icon: plantIcon,
+					title: `Plant: ${point.cropType}`,
+					optimized: true,
+					clickable: false,
+					zIndex: 400
+				});
+				plantPointMarkersRef.current.push(marker);
+			});
+		}
+	}, [mapZoom, hideAllPoints, fieldData.plantPoints, filterPointsByZoom, calculatePointSize]);
 
 
 	const handleMapLoad = useCallback((loadedMap: google.maps.Map) => {
@@ -1771,9 +1785,9 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			poly.setEditable(isEditable);
 
 			if (isEditable) {
-				poly.setOptions({ strokeWeight: 3, strokeOpacity: 1.0, fillOpacity: 0.6 });
+				poly.setOptions({ strokeWeight: 3, strokeOpacity: 1.0, fillOpacity: 0.5 });
 			} else {
-				poly.setOptions({ strokeWeight: 2, strokeOpacity: 1.0, fillOpacity: 0.6 });
+				poly.setOptions({ strokeWeight: 2, strokeOpacity: 1.0, fillOpacity: 0.5 });
 			}
 		});
 
@@ -1946,6 +1960,23 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 
 	const handleStepClick = (step: StepData) => {
 		saveState();
+		
+		// Check if all 4 steps are completed
+		const parsedSteps = parseCompletedSteps(completedSteps);
+		const allStepsCompleted = parsedSteps.length >= 4 && parsedSteps.includes(1) && parsedSteps.includes(2) && parsedSteps.includes(3) && parsedSteps.includes(4);
+		
+		// If all steps are completed, allow free navigation
+		if (allStepsCompleted) {
+			const params = {
+				crops: fieldData.selectedCrops.join(','),
+				currentStep: step.id,
+				completedSteps: completedSteps,
+			};
+			router.get(step.route, params);
+			return;
+		}
+		
+		// Original logic for incomplete steps
 		if (step.id === 4) {
 			const hasValidZone = fieldData.zones.some(zone =>
 				zone.coordinates.length >= 3 && zone.coordinates.every(coord => isPointInOrOnPolygon(coord, fieldData.mainArea))
