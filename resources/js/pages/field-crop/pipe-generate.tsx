@@ -1213,7 +1213,7 @@ const useMapManager = () => {
         strokeOpacity: config.opacity,
         map: mapRef.current,
         clickable: false,
-        zIndex: 999
+        zIndex: 2000 // Above zones (1500)
       });
     } else {
       // Ensure style matches current pipe type when reusing preview
@@ -1385,7 +1385,7 @@ const useMapManager = () => {
     }
   }, [mapRef, clearDrawingPreview]);
 
-  // drawMainArea เหมือนเดิม
+  // draw MainArea เหมือนเดิม
   const drawMainArea = useCallback((coordinates: Coordinate[]) => {
     if (!mapRef.current || coordinates.length < 3) return;
 
@@ -1393,13 +1393,13 @@ const useMapManager = () => {
       const polygon = new google.maps.Polygon({
         paths: [coordinates],
         fillColor: '#86EFAC',
-        fillOpacity: 0.15,
+        fillOpacity: 0.3,
         strokeColor: '#22C55E',
         strokeWeight: 2,
         strokeOpacity: 1,
         map: mapRef.current,
         clickable: false,
-        zIndex: 500,
+        zIndex: 1000,
       });
 
       overlaysRef.current.mainArea = polygon;
@@ -1428,25 +1428,25 @@ const useMapManager = () => {
       if (existing) {
         existing.setOptions({
           fillColor: zone.color,
-          fillOpacity: 0.35,
+          fillOpacity: 0.5,
           strokeColor: zone.color,
           strokeWeight: 2,
           strokeOpacity: 0.9,
-          zIndex: 800,
-          clickable: false,
+          zIndex: 1500,
+          clickable: false
         });
         existing.setPaths([zone.coordinates]);
       } else {
         const polygon = new google.maps.Polygon({
           paths: [zone.coordinates],
           fillColor: zone.color,
-          fillOpacity: 0.35,
+          fillOpacity: 0.5,
           strokeColor: zone.color,
           strokeWeight: 2,
           strokeOpacity: 0.9,
           map: mapRef.current,
-          zIndex: 800,
-          clickable: false,
+          zIndex: 1500,
+          clickable: false
         });
         currentZoneMap.set(zone.id, polygon);
       }
@@ -1472,12 +1472,12 @@ const useMapManager = () => {
         const polygon = new google.maps.Polygon({
           paths: [obstacle.coordinates],
           fillColor: colors.fill,
-          fillOpacity: 0.3,
+          fillOpacity: 0.4,
           strokeColor: colors.stroke,
-          strokeWeight: 1,
-          strokeOpacity: 0.8,
+          strokeWeight: 2,
+          strokeOpacity: 1,
           map: mapRef.current,
-          clickable: false,
+          zIndex: 1600
         });
         currentObstacleMap.set(obstacle.id, polygon);
       }
@@ -1521,7 +1521,7 @@ const useMapManager = () => {
           title: `Sprinkler ${index + 1}`,
           optimized: true,
           clickable: false,
-          zIndex: 650
+          zIndex: 1700 // Above zones (1500) and obstacles (1600)
         });
         overlaysRef.current.irrigation.set(id, marker);
 
@@ -1536,7 +1536,7 @@ const useMapManager = () => {
             strokeWeight: 1,
             map: map,
             clickable: false,
-            zIndex: 700
+            zIndex: 1700 // Above zones (1500) and obstacles (1600)
           });
           overlaysRef.current.circles.set(id, circle);
         }
@@ -1561,7 +1561,7 @@ const useMapManager = () => {
           title: `Pivot ${index + 1}`,
           optimized: true,
           clickable: false,
-          zIndex: 650
+          zIndex: 1700 // Above zones (1500) and obstacles (1600)
         });
         overlaysRef.current.irrigation.set(id, marker);
 
@@ -1576,7 +1576,7 @@ const useMapManager = () => {
             strokeWeight: 1,
             map: map,
             clickable: false,
-            zIndex: 700
+            zIndex: 1700 // Above zones (1500) and obstacles (1600)
           });
           overlaysRef.current.circles.set(id, circle);
         }
@@ -1604,7 +1604,7 @@ const useMapManager = () => {
             title: `${name} ${index + 1}`,
             optimized: true,
             clickable: false,
-            zIndex: 650
+            zIndex: 1700 // Above zones (1500) and obstacles (1600)
           });
           overlaysRef.current.irrigation.set(id, marker);
         });
@@ -1729,7 +1729,7 @@ const useMapManager = () => {
           title: `Plant: ${plant.cropType}`,
           optimized: true,
           clickable: false,
-          zIndex: 1
+          zIndex: 400
         });
 
         currentPlantMap.set(plant.id, marker);
@@ -1851,7 +1851,7 @@ const useMapManager = () => {
             existingPolyline.setOptions({
                 strokeWeight: isEditing ? config.weight + 2 : config.weight,
                 strokeOpacity: isEditing ? 1 : config.opacity,
-                zIndex: isEditing ? 3500 : 3200
+                zIndex: isEditing ? 3500 : 2000 // Above zones (1500)
             });
         } else {
             // สร้าง pipe ใหม่
@@ -1862,7 +1862,7 @@ const useMapManager = () => {
                 strokeOpacity: isEditing ? 1 : config.opacity,
                 map: mapRef.current,
                 clickable: true,
-                zIndex: isEditing ? 3500 : 3200
+                zIndex: isEditing ? 3500 : 2000 // Above zones (1500)
             }) as ExtendedPolyline;
 
             polyline.pipeId = pipe.id;
@@ -1941,7 +1941,7 @@ const useMapManager = () => {
         map: mapRef.current,
         icon: icon,
         title: title,
-        zIndex: 650, // ใช้ zIndex เดียวกับจุดสปริงเกลอร์
+        zIndex: 1700, // Above zones (1500) and obstacles (1600)
         optimized: true, // เปิดการปรับปรุงประสิทธิภาพเพื่อลดการกระพริบ
         animation: null, // ปิดการเคลื่อนไหวเพื่อลดการกระพริบ
         clickable: false, // ปิดการคลิกเพื่อลดการกระพริบเหมือนจุดสปริงเกลอร์
@@ -2027,7 +2027,7 @@ const useMapManager = () => {
           strokeOpacity: 0.7,
           map: mapRef.current,
           clickable: false,
-          zIndex: 998
+          zIndex: 2000 // Above zones (1500)
         });
         
         // เก็บเส้นเชื่อมต่อใน Map
@@ -2281,7 +2281,7 @@ const useMapManager = () => {
               strokeColor: '#FFD700',
               strokeOpacity: 0.9,
               strokeWeight: 3,
-              zIndex: 1003,
+              zIndex: 2000, // Above zones (1500)
               clickable: false
             });
           }
@@ -2592,12 +2592,15 @@ export default function PipeGenerate(props: PipeGenerateProps) {
   }, [pipeManager.pipes, lateralReference]);
 
   const [pumps, setPumps] = useState<Pump[]>([]);
+  // History stacks for undo/redo of pump operations
+  const [pumpHistory, setPumpHistory] = useState<Pump[][]>([[]]);
+  const [pumpHistoryIndex, setPumpHistoryIndex] = useState(0);
+  const isApplyingPumpHistoryRef = useRef(false);
   const [isPlacingPump, setIsPlacingPump] = useState(false);
   const isPlacingPumpRef = useRef(false);
   const [hideAllPoints, setHideAllPoints] = useState<boolean>(false); // Hide all points toggle
   const [mapZoom, setMapZoom] = useState<number>(18); // Track map zoom level
 
-  const [showLegend, setShowLegend] = useState(true);
 
   
   // Debounce timers - moved to top level to follow React Hook rules
@@ -2685,7 +2688,11 @@ export default function PipeGenerate(props: PipeGenerateProps) {
               const restored = eq
                 .filter(e => (e?.type === 'pump' || e?.type === 'water_pump') && typeof e?.lat === 'number' && typeof e?.lng === 'number')
                 .map((e, idx) => ({ id: e.id ?? `pump-${idx}`, lat: e.lat as number, lng: e.lng as number, type: 'water_pump', name: e.name ?? `Water Pump ${idx + 1}` } as Pump));
-              if (restored.length > 0) setPumps(restored);
+              if (restored.length > 0) {
+                setPumps(restored);
+                setPumpHistory([[], restored.map(pump => ({ ...pump }))]);
+                setPumpHistoryIndex(1);
+              }
             }
           } catch {
             // ignore pump restore errors
@@ -2717,7 +2724,11 @@ export default function PipeGenerate(props: PipeGenerateProps) {
             const restored = eq
               .filter(e => (e?.type === 'pump' || e?.type === 'water_pump') && typeof e?.lat === 'number' && typeof e?.lng === 'number')
               .map((e, idx) => ({ id: e.id ?? `pump-${idx}`, lat: e.lat as number, lng: e.lng as number, type: 'water_pump', name: e.name ?? `Water Pump ${idx + 1}` } as Pump));
-            if (restored.length > 0) setPumps(restored);
+            if (restored.length > 0) {
+              setPumps(restored);
+              setPumpHistory([[], restored.map(pump => ({ ...pump }))]);
+              setPumpHistoryIndex(1);
+            }
           }
         } catch {
           // ignore pump restore errors
@@ -4950,6 +4961,23 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     // Do not change reference lateral automatically on selection
   }, [pipeManager, mapManager]);
 
+  // Helper function to deep copy pumps
+  const deepCopyPumps = useCallback((pumps: Pump[]): Pump[] => {
+    return pumps.map(pump => ({ ...pump }));
+  }, []);
+
+  // Save current pump state to history
+  const savePumpToHistory = useCallback((newPumps: Pump[]) => {
+    if (isApplyingPumpHistoryRef.current) return;
+    
+    setPumpHistory(prev => {
+      const newHistory = prev.slice(0, pumpHistoryIndex + 1);
+      newHistory.push(deepCopyPumps(newPumps));
+      return newHistory.slice(-50); // Keep only last 50 states
+    });
+    setPumpHistoryIndex(prev => Math.min(prev + 1, 49));
+  }, [pumpHistoryIndex, deepCopyPumps]);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (isPlacingPumpRef.current && e.latLng) {
@@ -4962,13 +4990,15 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           name: `Water Pump ${prev.length + 1}`,
           capacity: 5000
         };
-        return [...prev, newPump];
+        const newPumps = [...prev, newPump];
+        savePumpToHistory(newPumps);
+        return newPumps;
       });
       setIsPlacingPump(false);
     } else if (!pipeManager.isDrawing) {
         pipeManager.setEditingPipeId(null);
     }
-  }, [pipeManager]);
+  }, [pipeManager, savePumpToHistory]);
 
 
   // ======================= MODIFIED SECTION START =======================
@@ -5126,13 +5156,67 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     setIsPlacingPump(true);
   }, [pipeManager.isDrawing, stopDrawing, mapManager]);
 
+  // Undo pump operation
+  const undoPump = useCallback(() => {
+    if (pumpHistoryIndex > 0) {
+      const newIndex = pumpHistoryIndex - 1;
+      isApplyingPumpHistoryRef.current = true;
+      setPumps(deepCopyPumps(pumpHistory[newIndex]));
+      setPumpHistoryIndex(newIndex);
+      isApplyingPumpHistoryRef.current = false;
+    }
+  }, [pumpHistoryIndex, pumpHistory, deepCopyPumps]);
+
+  // Redo pump operation
+  const redoPump = useCallback(() => {
+    if (pumpHistoryIndex < pumpHistory.length - 1) {
+      const newIndex = pumpHistoryIndex + 1;
+      isApplyingPumpHistoryRef.current = true;
+      setPumps(deepCopyPumps(pumpHistory[newIndex]));
+      setPumpHistoryIndex(newIndex);
+      isApplyingPumpHistoryRef.current = false;
+    }
+  }, [pumpHistoryIndex, pumpHistory, deepCopyPumps]);
+
   const removePump = useCallback((pumpId: string) => {
-    setPumps(prev => prev.filter(pump => pump.id !== pumpId));
-  }, []);
+    setPumps(prev => {
+      const newPumps = prev.filter(pump => pump.id !== pumpId);
+      savePumpToHistory(newPumps);
+      return newPumps;
+    });
+  }, [savePumpToHistory]);
 
   const removeAllPumps = useCallback(() => {
     setPumps([]);
-  }, []);
+    savePumpToHistory([]);
+  }, [savePumpToHistory]);
+
+  // Combined undo/redo functions that work with both pipes and pumps
+  const combinedUndo = useCallback(() => {
+    // Check if we can undo pipes
+    if (pipeManager.pipeHistoryIndex > 0) {
+      pipeManager.undo();
+    }
+    // Check if we can undo pumps
+    else if (pumpHistoryIndex > 0) {
+      undoPump();
+    }
+  }, [pipeManager, pumpHistoryIndex, undoPump]);
+
+  const combinedRedo = useCallback(() => {
+    // Check if we can redo pipes
+    if (pipeManager.pipeHistoryIndex < pipeManager.pipeHistoryLength - 1) {
+      pipeManager.redo();
+    }
+    // Check if we can redo pumps
+    else if (pumpHistoryIndex < pumpHistory.length - 1) {
+      redoPump();
+    }
+  }, [pipeManager, pumpHistoryIndex, pumpHistory.length, redoPump]);
+
+  // Check if undo/redo is available
+  const canUndo = pipeManager.pipeHistoryIndex > 0 || pumpHistoryIndex > 0;
+  const canRedo = pipeManager.pipeHistoryIndex < pipeManager.pipeHistoryLength - 1 || pumpHistoryIndex < pumpHistory.length - 1;
 
   useEffect(() => {
     mapManager.drawPumps(pumps, removePump);
@@ -5156,6 +5240,22 @@ export default function PipeGenerate(props: PipeGenerateProps) {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleStepClick = useCallback((step: typeof steps[0]) => {
+    // Check if all 4 steps are completed
+    const parsedSteps = parseCompletedSteps(props.completedSteps);
+    const allStepsCompleted = parsedSteps.length >= 4 && parsedSteps.includes(1) && parsedSteps.includes(2) && parsedSteps.includes(3) && parsedSteps.includes(4);
+    
+    // If all steps are completed, allow free navigation
+    if (allStepsCompleted) {
+      const params = {
+        crops: fieldData.selectedCrops.join(','),
+        currentStep: step.id,
+        completedSteps: props.completedSteps
+      };
+      router.get(step.route, params);
+      return;
+    }
+    
+    // Original logic for incomplete steps
     const params = {
       crops: fieldData.selectedCrops.join(','),
       currentStep: step.id,
@@ -5805,17 +5905,17 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                 <div className="absolute top-1 left-1 z-10">
                   <div className="bg-black bg-opacity-80 rounded-lg border border-white p-1 flex space-x-1">
                     <button
-                      onClick={() => pipeManager.undo()}
-                      disabled={pipeManager.pipeHistoryIndex <= 0}
-                      className={`rounded border border-white px-2 py-1 text-xs text-white ${pipeManager.pipeHistoryIndex <= 0 ? 'bg-gray-500 opacity-50 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'}`}
+                      onClick={combinedUndo}
+                      disabled={!canUndo}
+                      className={`rounded border border-white px-2 py-1 text-xs text-white ${!canUndo ? 'bg-gray-500 opacity-50 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'}`}
                       title={t('Undo')}
                     >
                       ⟲
                     </button>
                     <button
-                      onClick={() => pipeManager.redo()}
-                      disabled={pipeManager.pipeHistoryIndex >= pipeManager.pipeHistoryLength - 1}
-                      className={`rounded border border-white px-2 py-1 text-xs text-white ${(pipeManager.pipeHistoryIndex >= pipeManager.pipeHistoryLength - 1) ? 'bg-gray-500 opacity-50 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'}`}
+                      onClick={combinedRedo}
+                      disabled={!canRedo}
+                      className={`rounded border border-white px-2 py-1 text-xs text-white ${!canRedo ? 'bg-gray-500 opacity-50 cursor-not-allowed' : 'bg-gray-600 hover:bg-gray-700'}`}
                       title={t('Redo')}
                     >
                       ⟳
@@ -6077,76 +6177,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                   )}
                 </div>
 
-                {showLegend ? (
-                  <div className="absolute bottom-4 right-14 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-2 text-[11px] max-w-[365px]">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-white font-bold">{t('Legend')}</div>
-                      <button
-                        onClick={() => setShowLegend(false)}
-                        className="px-1.5 py-0.5 text-[10px] rounded bg-gray-700 text-white border border-gray-500 hover:bg-gray-600"
-                        title={t('Hide Legend')}
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-1 bg-red-600 rounded"></div>
-                      <span className="text-gray-300">{t('Main Pipe')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-1 bg-purple-600 rounded"></div>
-                      <span className="text-gray-300">{t('Submain Pipe')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-1 bg-green-600 rounded"></div>
-                      <span className="text-gray-300">{t('Lateral Pipe')}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                      <span className="text-gray-300">{t('Sprinkler')}</span>
-                    </div>
-                    <div className="border-t border-gray-600 pt-1 mt-2 w-full">
-                      <div className="text-gray-400 text-xs font-semibold mb-1">{t('Curve Types')}:</div>
-                      <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-yellow-400">🎯</span>
-                          <span className="text-gray-300 text-xs">{t('Bezier Curve')}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="text-cyan-400">🌊</span>
-                          <span className="text-gray-300 text-xs">{t('Spline Curve')}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="border-t border-gray-600 pt-1 mt-2 w-full">
-                      <div className="text-gray-400 text-xs font-semibold mb-1">{t('Control Points')}:</div>
-                      <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                          <span className="text-gray-300 text-xs">{t('Start Point')}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                          <span className="text-gray-300 text-xs">{t('End Point')}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                          <span className="text-gray-300 text-xs">{t('Control Points')}</span>
-                        </div>
-                      </div>
-                    </div>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowLegend(true)}
-                    className="absolute bottom-4 right-14 z-10 bg-black bg-opacity-80 rounded border border-white px-2 py-1 text-[11px] text-white hover:bg-opacity-90"
-                    title={t('Show Legend')}
-                  >
-                    {t('Legend')}
-                  </button>
-                )}
               </div>
             </div>
           </div>
