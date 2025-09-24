@@ -2725,36 +2725,21 @@ export default function Product() {
                                                       10 *
                                                       0.2,
                                               }
-                                            : projectMode === 'field-crop' &&
-                                              fieldCropSystemData?.sprinklerConfig?.pressureBar
+                                            : horticultureSystemData?.sprinklerConfig?.pressureBar
                                               ? {
                                                     pressureBar:
-                                                        fieldCropSystemData.sprinklerConfig
+                                                        horticultureSystemData.sprinklerConfig
                                                             .pressureBar,
                                                     headM:
-                                                        fieldCropSystemData.sprinklerConfig
+                                                        horticultureSystemData.sprinklerConfig
                                                             .pressureBar * 10,
                                                     head20PercentM:
-                                                        fieldCropSystemData.sprinklerConfig
+                                                        horticultureSystemData.sprinklerConfig
                                                             .pressureBar *
                                                         10 *
                                                         0.2,
                                                 }
-                                              : horticultureSystemData?.sprinklerConfig?.pressureBar
-                                                ? {
-                                                      pressureBar:
-                                                          horticultureSystemData.sprinklerConfig
-                                                              .pressureBar,
-                                                      headM:
-                                                          horticultureSystemData.sprinklerConfig
-                                                              .pressureBar * 10,
-                                                      head20PercentM:
-                                                          horticultureSystemData.sprinklerConfig
-                                                              .pressureBar *
-                                                          10 *
-                                                          0.2,
-                                                  }
-                                                : undefined
+                                              : undefined
                                     }
                                     projectMode={projectMode}
                                 />

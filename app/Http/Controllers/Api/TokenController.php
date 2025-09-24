@@ -29,34 +29,6 @@ class TokenController extends Controller
         ]);
     }
 
-    /**
-     * Refresh user's tokens (daily refresh).
-     */
-    public function refreshTokens(): JsonResponse
-    {
-        $user = Auth::user();
-        
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'User not authenticated'
-            ], 401);
-        }
-
-        if ($user->refreshTokens()) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Tokens refreshed successfully',
-                'token_status' => $user->getTokenStatus()
-            ]);
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tokens can only be refreshed once every 24 hours',
-                'token_status' => $user->getTokenStatus()
-            ], 400);
-        }
-    }
 
     /**
      * Consume tokens for an operation.

@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     FaSearch,
@@ -32,7 +30,7 @@ interface SearchResult {
     types: string[];
     rating?: number;
     user_ratings_total?: number;
-    photos?: any[];
+    photos?: google.maps.places.PlacePhoto[];
     opening_hours?: {
         open_now?: boolean;
         weekday_text?: string[];
@@ -109,7 +107,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 const parsed = JSON.parse(stored);
                 setRecentSearches(parsed.slice(0, 5));
             } catch (e) {
-                console.error('Error loading recent searches:', e);
             }
         }
     }, []);
@@ -159,7 +156,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 document.body.removeChild(mapDiv);
             };
         } catch (error) {
-            console.error('❌ Error initializing search services:', error);
             setError('ไม่สามารถเริ่มต้นระบบค้นหาได้');
         }
     }, [isGoogleMapsReady]);
@@ -503,7 +499,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setShowResults(true);
                         }
                     } catch (err) {
-                        console.error('Search error:', err);
                         setError('เกิดข้อผิดพลาดในการค้นหา');
                         setSearchResults([]);
                     } finally {
@@ -543,7 +538,6 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                             setShowResults(true);
                         }
                     } catch (err) {
-                        console.error('Search error:', err);
                         setError('เกิดข้อผิดพลาดในการค้นหา');
                         setSearchResults([]);
                     } finally {
@@ -655,7 +649,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const getPhotoUrl = (photos?: any[]): string | null => {
+    const getPhotoUrl = (photos?: google.maps.places.PlacePhoto[]): string | null => {
         if (!photos || photos.length === 0) return null;
         try {
             return photos[0].getUrl({ maxWidth: 100, maxHeight: 100 });

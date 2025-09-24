@@ -1,8 +1,56 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { router, usePage } from '@inertiajs/react';
-import axios from 'axios';
+
+interface LocalCoordinate {
+    lat: number;
+    lng: number;
+}
+
+interface LocalPlantLocation {
+    id: string;
+    position: LocalCoordinate;
+    plantData: {
+        id: number;
+        name: string;
+        plantSpacing: number;
+        rowSpacing: number;
+        waterNeed: number;
+    };
+}
+
+interface LocalLateralPipe {
+    id: string;
+    coordinates: LocalCoordinate[];
+    length: number;
+    plants: LocalPlantLocation[];
+    placementMode: 'over_plants' | 'between_plants';
+    totalFlowRate: number;
+    connectionPoint: LocalCoordinate;
+    intersectionData?: {
+        subMainPipeId: string;
+        point: LocalCoordinate;
+        segmentIndex: number;
+    };
+    emitterLines?: {
+        id: string;
+        lateralPipeId: string;
+        plantId: string;
+        coordinates: LocalCoordinate[];
+        length: number;
+        diameter: number;
+        emitterType?: string;
+    }[];
+}
+
+interface LocalEmitterLine {
+    id: string;
+    lateralPipeId: string;
+    plantId: string;
+    coordinates: LocalCoordinate[];
+    length: number;
+    diameter: number;
+    emitterType?: string;
+}
+import { router } from '@inertiajs/react';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -10,7 +58,6 @@ import HorticultureMapComponent from '../components/horticulture/HorticultureMap
 import SprinklerConfigModal from '../components/horticulture/SprinklerConfigModal';
 
 import {
-    HorticultureProjectData,
     ProjectSummaryData,
     calculateProjectSummary,
     formatAreaInRai,
@@ -19,48 +66,30 @@ import {
     loadProjectData,
     navigateToPlanner,
     EnhancedProjectData,
-    BestPipeInfo,
     IrrigationZoneExtended,
-    LateralPipe,
-    HeadLossResult,
     SprinklerConfig,
-    ZONE_COLORS,
     EXCLUSION_COLORS,
     getZoneColor,
     getExclusionTypeName,
     getPolygonCenter,
-    isPointsClose,
-    findClosestPointOnLineSegmentExtended,
-    isCoordinateInZone,
-    calculateWaterFlowRate,
-    distanceFromPointToLineSegment,
-    calculateDistanceBetweenPoints,
-    Coordinate,
 } from '../utils/horticultureUtils';
 
-import { IrrigationZone } from '../utils/irrigationZoneUtils';
 import {
     findMainToSubMainConnections,
     findEndToEndConnections,
     findMidConnections,
     findSubMainToLateralStartConnections,
-    findLateralSubMainIntersection,
     findSubMainToMainIntersections,
     findLateralToSubMainIntersections,
 } from '../utils/lateralPipeUtils';
 
 import {
-    getProjectStats,
     getOverallStats,
-    getPipeStats,
-    findPipeZoneImproved,
-    findPipeEndZone,
-    findBestBranchPipeInZone,
-    findBestSubMainPipeInZone,
-    findBestMainPipeInZone,
-    findMainToSubMainConnectionsInResults,
     countConnectionPointsByZone,
-    ConnectionPointStats,
+    findBestMainPipeInZone,
+    findBestSubMainPipeInZone,
+    findBestBranchPipeInZone,
+    findPipeZoneImproved,
 } from '../utils/horticultureProjectStats';
 
 // Helper function to calculate distance between two coordinates
@@ -95,16 +124,12 @@ const calculatePipeLength = (coordinates: { lat: number; lng: number }[]): numbe
 import {
     loadSprinklerConfig,
     calculateTotalFlowRate,
-    calculateHourlyFlowRate,
-    formatFlowRate,
-    formatFlowRatePerHour,
 } from '../utils/sprinklerUtils';
 
-import { AutoZoneResult, createAutomaticZones, validateZones } from '../utils/autoZoneUtils';
 
 const createAreaTextOverlay = (
     map: google.maps.Map,
-    coordinates: Coordinate[],
+    coordinates: LocalCoordinate[],
     labelText: string,
     color: string
 ): google.maps.OverlayView => {
@@ -188,7 +213,7 @@ const GoogleMapsResultsOverlays: React.FC<{
     pipeSize: number;
     iconSize: number;
     irrigationZones: IrrigationZoneExtended[];
-    lateralPipes: LateralPipe[];
+    lateralPipes: LocalLateralPipe[];
     t: (key: string) => string;
 }> = ({ map, projectData, mapRotation, pipeSize, iconSize, irrigationZones, lateralPipes, t }) => {
     const overlaysRef = useRef<{
@@ -343,7 +368,7 @@ const GoogleMapsResultsOverlays: React.FC<{
         });
 
         // Enhanced irrigation zones display
-        irrigationZones?.forEach((zone, index) => {
+        irrigationZones?.forEach((zone) => {
             const irrigationZonePolygon = new google.maps.Polygon({
                 paths: zone.coordinates.map((coord) => ({ lat: coord.lat, lng: coord.lng })),
                 fillColor: zone.color,
@@ -453,46 +478,44 @@ const GoogleMapsResultsOverlays: React.FC<{
             }
 
             // Display emitter lines (ท่อย่อยแยก) for this lateral pipe
+            if (lateralPipe.emitterLines && lateralPipe.emitterLines.length > 0) {
+                lateralPipe.emitterLines.forEach((emitterLine) => {
+                    const emitterPolyline = new google.maps.Polyline({
+                        path: emitterLine.coordinates.map((coord) => ({
+                            lat: coord.lat,
+                            lng: coord.lng,
+                        })),
+                        strokeColor: '#FFB347', // ใช้สีเดียวกับหน้า Planner
+                        strokeWeight: 2 * pipeSize, // ใช้ขนาดเดียวกับหน้า Planner
+                        strokeOpacity: 0.8, // ใช้ความชัดเดียวกับหน้า Planner
+                    });
+                    emitterPolyline.setMap(map);
+                    overlaysRef.current.polylines.set(`emitter-${emitterLine.id}`, emitterPolyline);
 
-            // 🚫 ซ่อนจุดปลายท่อแยกย่อย (emitter lines) ตามคำขอของผู้ใช้
-            // if (lateralPipe.emitterLines && lateralPipe.emitterLines.length > 0) {
-            //     lateralPipe.emitterLines.forEach((emitterLine) => {
-            //         const emitterPolyline = new google.maps.Polyline({
-            //             path: emitterLine.coordinates.map((coord) => ({
-            //                 lat: coord.lat,
-            //                 lng: coord.lng,
-            //             })),
-            //             strokeColor: '#FFB347', // ใช้สีเดียวกับหน้า Planner
-            //             strokeWeight: 2 * pipeSize, // ใช้ขนาดเดียวกับหน้า Planner
-            //             strokeOpacity: 0.8, // ใช้ความชัดเดียวกับหน้า Planner
-            //         });
-            //         emitterPolyline.setMap(map);
-            //         overlaysRef.current.polylines.set(`emitter-${emitterLine.id}`, emitterPolyline);
-
-            //         // Add small marker at plant connection point
-            //         if (emitterLine.coordinates.length > 1) {
-            //             const plantConnectionPoint =
-            //                 emitterLine.coordinates[emitterLine.coordinates.length - 1];
-            //             const emitterMarker = new google.maps.Marker({
-            //                 position: plantConnectionPoint,
-            //                 map: map,
-            //                 icon: {
-            //                     path: google.maps.SymbolPath.CIRCLE,
-            //                     scale: 3, // ปรับให้เท่ากับจุดเชื่อมต่ออื่นๆ
-            //                     fillColor: '#FFB347',
-            //                     fillOpacity: 1,
-            //                     strokeColor: '#ffffff',
-            //                     strokeWeight: 1,
-            //                 },
-            //                 title: `Emitter to Plant (${emitterLine.length.toFixed(1)}m)`,
-            //             });
-            //             overlaysRef.current.markers.set(
-            //                 `emitter-connection-${emitterLine.id}`,
-            //                 emitterMarker
-            //             );
-            //         }
-            //     });
-            // }
+                    // Add small marker at plant connection point
+                    if (emitterLine.coordinates.length > 1) {
+                        const plantConnectionPoint =
+                            emitterLine.coordinates[emitterLine.coordinates.length - 1];
+                        const emitterMarker = new google.maps.Marker({
+                            position: plantConnectionPoint,
+                            map: map,
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                scale: 3, // ปรับให้เท่ากับจุดเชื่อมต่ออื่นๆ
+                                fillColor: '#FFB347',
+                                fillOpacity: 1,
+                                strokeColor: '#ffffff',
+                                strokeWeight: 1,
+                            },
+                            title: `Emitter to Plant (${emitterLine.length.toFixed(1)}m)`,
+                        });
+                        overlaysRef.current.markers.set(
+                            `emitter-connection-${emitterLine.id}`,
+                            emitterMarker
+                        );
+                    }
+                });
+            }
         });
 
         // 🔥 แสดงจุดเชื่อมต่อปลาย-ปลาย (End-to-End) - สีแดง
@@ -808,14 +831,14 @@ const GoogleMapsResultsOverlays: React.FC<{
 
         projectData.plants?.forEach((plant) => {
             // ใช้การแสดงผลต้นไม้เหมือนกับหน้า Planner
-            let plantColor = '#22C55E';
+            // let plantColor = '#22C55E';
             const plantSymbol = '🌳';
 
             if (plant.zoneId && irrigationZones.length > 0) {
-                const zone = irrigationZones.find((z) => z.id === plant.zoneId);
-                if (zone) {
-                    plantColor = zone.color;
-                }
+                // const zone = irrigationZones.find((z) => z.id === plant.zoneId);
+                // if (zone) {
+                //     plantColor = zone.color;
+                // }
             }
 
             const plantMarker = new google.maps.Marker({
@@ -859,7 +882,7 @@ const GoogleMapsResultsOverlays: React.FC<{
 
 // ฟังก์ชันสร้าง emitterLines สำหรับ lateral pipes ที่มีอยู่แล้ว
 // 🔧 แก้ไขให้สร้างเฉพาะ placementMode: 'between_plants' เท่านั้น
-const generateEmitterLinesForExistingPipes = (lateralPipe: any): any[] => {
+const generateEmitterLinesForExistingPipes = (lateralPipe: LocalLateralPipe): LocalEmitterLine[] => {
     // ⚠️ สร้างเฉพาะโหมด 'between_plants' เท่านั้น
     if (
         !lateralPipe.plants ||
@@ -869,9 +892,9 @@ const generateEmitterLinesForExistingPipes = (lateralPipe: any): any[] => {
         return [];
     }
 
-    const emitterLines: any[] = [];
+    const emitterLines: LocalEmitterLine[] = [];
 
-    lateralPipe.plants.forEach((plant: any, index: number) => {
+    lateralPipe.plants.forEach((plant: LocalPlantLocation, index: number) => {
         // หาจุดที่ใกล้ที่สุดบนท่อย่อยสำหรับแต่ละต้นไม้
         const closestPointOnLateral = findClosestPointOnLineSegment(
             plant.position,
@@ -939,8 +962,8 @@ const findClosestPointOnLineSegment = (
 };
 
 function EnhancedHorticultureResultsPageContent() {
-    const page = usePage();
-    const auth = (page.props as any).auth;
+    // const page = usePage();
+    // const auth = (page.props as { auth: { user: { id: number; name: string; email: string } } }).auth;
     const { t } = useLanguage();
     const [projectData, setProjectData] = useState<EnhancedProjectData | null>(null);
     const [projectSummary, setProjectSummary] = useState<ProjectSummaryData | null>(null);
@@ -950,29 +973,44 @@ function EnhancedHorticultureResultsPageContent() {
     const [mapZoom, setMapZoom] = useState<number>(16);
 
     const [mapRotation, setMapRotation] = useState<number>(0);
-    const [isMapLocked, setIsMapLocked] = useState<boolean>(false);
+    const [isMapLocked, setIsMapLocked] = useState<boolean>(true);
     const [pipeSize, setPipeSize] = useState<number>(1);
     const [iconSize, setIconSize] = useState<number>(1);
 
     const [isCreatingImage, setIsCreatingImage] = useState(false);
 
     // Enhanced features states
-    const [showHeadLossModal, setShowHeadLossModal] = useState(false);
+    // const [showHeadLossModal, setShowHeadLossModal] = useState(false);
     const [showSprinklerConfigModal, setShowSprinklerConfigModal] = useState(false);
-    const [selectedPipeForHeadLoss, setSelectedPipeForHeadLoss] = useState<{
-        pipeId: string;
-        pipeType: 'mainPipe' | 'subMainPipe' | 'branchPipe';
-        zoneName: string;
-        zoneId: string;
-        length: number;
-        pipeName?: string;
-    } | null>(null);
+    // const [selectedPipeForHeadLoss, setSelectedPipeForHeadLoss] = useState<{
+    //     pipeId: string;
+    //     pipeType: 'mainPipe' | 'subMainPipe' | 'branchPipe';
+    //     zoneName: string;
+    //     zoneId: string;
+    //     length: number;
+    //     pipeName?: string;
+    // } | null>(null);
 
-    const [headLossResults, setHeadLossResults] = useState<HeadLossResult[]>([]);
+    // const [headLossResults, setHeadLossResults] = useState<HeadLossResult[]>([]);
     const [sprinklerConfig, setSprinklerConfig] = useState<SprinklerConfig | null>(null);
     const [irrigationZones, setIrrigationZones] = useState<IrrigationZoneExtended[]>([]);
-    const [lateralPipes, setLateralPipes] = useState<LateralPipe[]>([]);
-    const [enhancedStats, setEnhancedStats] = useState<any>(null);
+    const [lateralPipes, setLateralPipes] = useState<LocalLateralPipe[]>([]);
+    const [enhancedStats, setEnhancedStats] = useState<{
+        totalAreaInRai: number;
+        totalZones: number;
+        totalPlants: number;
+        totalWaterNeedPerSession: number;
+        longestPipesCombined: number;
+        sprinklerFlowRate?: {
+            totalFlowRatePerMinute: number;
+            totalFlowRatePerHour: number;
+            formattedFlowRatePerMinute: string;
+            formattedFlowRatePerHour: string;
+            flowRatePerPlant: number;
+            pressureBar: number;
+            radiusMeters: number;
+        };
+    } | null>(null);
     const [collapsedZones, setCollapsedZones] = useState<Set<string>>(new Set());
 
     const mapRef = useRef<google.maps.Map | null>(null);
@@ -987,10 +1025,10 @@ function EnhancedHorticultureResultsPageContent() {
                 // 🔍 Debug localStorage data
                 const rawProjectData = localStorage.getItem('currentHorticultureProject');
                 if (rawProjectData) {
-                    const parsedData = JSON.parse(rawProjectData);
+                    // const parsedData = JSON.parse(rawProjectData);
                 }
 
-                let allLateralPipes: LateralPipe[] = [];
+                let allLateralPipes: LocalLateralPipe[] = [];
 
                 // 1. ลองโหลด lateralPipes ที่บันทึกไว้ก่อน (วิธีใหม่)
                 if (data.lateralPipes && data.lateralPipes.length > 0) {
@@ -1117,7 +1155,7 @@ function EnhancedHorticultureResultsPageContent() {
                     setEnhancedStats(updatedStats);
 
                 } else {
-                    console.warn('⚠️ No sprinkler config found in localStorage');
+                    // No enhanced stats available
                 }
 
                 if (data.mainArea && data.mainArea.length > 0) {
@@ -1150,11 +1188,9 @@ function EnhancedHorticultureResultsPageContent() {
                     setMapZoom(initialZoom);
                 }
             } else {
-                console.warn('❌ No project data found, redirecting to planner');
                 navigateToPlanner();
             }
-        } catch (error) {
-            console.error('❌ Error loading project data:', error);
+        } catch {
             navigateToPlanner();
         }
         setLoading(false);
@@ -1169,9 +1205,11 @@ function EnhancedHorticultureResultsPageContent() {
     };
 
     const toggleMapLock = () => {
-        setIsMapLocked(!isMapLocked);
+        const newLockState = !isMapLocked;
+        setIsMapLocked(newLockState);
         if (mapRef.current) {
-            if (!isMapLocked) {
+            if (newLockState) {
+                // ล็อก map
                 mapRef.current.setOptions({
                     draggable: false,
                     zoomControl: false,
@@ -1179,6 +1217,7 @@ function EnhancedHorticultureResultsPageContent() {
                     disableDoubleClickZoom: true,
                 });
             } else {
+                // ปลดล็อก map
                 mapRef.current.setOptions({
                     draggable: true,
                     zoomControl: true,
@@ -1220,31 +1259,41 @@ function EnhancedHorticultureResultsPageContent() {
     const handleMapLoad = useCallback((map: google.maps.Map) => {
         mapRef.current = map;
         setMapLoaded(true);
-    }, []);
+        
+        // ตั้งค่า map options ตาม isMapLocked state เริ่มต้น
+        if (isMapLocked) {
+            map.setOptions({
+                draggable: false,
+                zoomControl: false,
+                scrollwheel: false,
+                disableDoubleClickZoom: true,
+            });
+        }
+    }, [isMapLocked]);
 
     // Enhanced feature handlers
-    const handleHeadLossCalculation = (pipeInfo: {
-        pipeId: string;
-        pipeType: 'mainPipe' | 'subMainPipe' | 'branchPipe';
-        zoneName: string;
-        zoneId: string;
-        length: number;
-        pipeName?: string;
-    }) => {
-        setSelectedPipeForHeadLoss(pipeInfo);
-        setShowHeadLossModal(true);
-    };
+    // const handleHeadLossCalculation = (pipeInfo: {
+    //     pipeId: string;
+    //     pipeType: 'mainPipe' | 'subMainPipe' | 'branchPipe';
+    //     zoneName: string;
+    //     zoneId: string;
+    //     length: number;
+    //     pipeName?: string;
+    // }) => {
+    //     setSelectedPipeForHeadLoss(pipeInfo);
+    //     setShowHeadLossModal(true);
+    // };
 
-    const handleHeadLossSave = (result: HeadLossResult) => {
-        setHeadLossResults((prev) => [...prev, result]);
-        setShowHeadLossModal(false);
-        setSelectedPipeForHeadLoss(null);
-        // อัพเดท localStorage
-        const updatedData = { ...projectData, headLossResults: [...headLossResults, result] };
-        localStorage.setItem('horticultureIrrigationData', JSON.stringify(updatedData));
-    };
+    // const handleHeadLossSave = (result: HeadLossResult) => {
+    //     setHeadLossResults((prev) => [...prev, result]);
+    //     setShowHeadLossModal(false);
+    //     setSelectedPipeForHeadLoss(null);
+    //     // อัพเดท localStorage
+    //     const updatedData = { ...projectData, headLossResults: [...headLossResults, result] };
+    //     localStorage.setItem('horticultureIrrigationData', JSON.stringify(updatedData));
+    // };
 
-    const handleSprinklerConfigSave = (config: any) => {
+    const handleSprinklerConfigSave = () => {
         const sprinklerConfig = loadSprinklerConfig();
         if (sprinklerConfig) {
             setSprinklerConfig(sprinklerConfig);
@@ -1353,8 +1402,8 @@ function EnhancedHorticultureResultsPageContent() {
                             htmlEl.style.removeProperty('border-color');
                             htmlEl.style.removeProperty('outline-color');
                         });
-                    } catch (error) {
-                        console.warn('⚠️ คำเตือนใน onclone:', error);
+                    } catch {
+                        // Ignore cleanup errors
                     }
                 },
             });
@@ -1381,7 +1430,7 @@ function EnhancedHorticultureResultsPageContent() {
                     projectDataIrrigationZones: projectData?.irrigationZones,
                 });
 
-                if (enhancedStats && enhancedStats.sprinklerFlowRate && projectData) {
+                if (enhancedStats && enhancedStats?.sprinklerFlowRate && projectData) {
                     // คำนวณ connection stats
                     const connectionStats = countConnectionPointsByZone(
                         projectData,
@@ -1391,25 +1440,25 @@ function EnhancedHorticultureResultsPageContent() {
                     const horticultureSystemData = {
                         // ข้อมูลระบบหัวฉีด
                         sprinklerConfig: {
-                            flowRatePerPlant: enhancedStats.sprinklerFlowRate.flowRatePerPlant,
-                            pressureBar: enhancedStats.sprinklerFlowRate.pressureBar,
-                            radiusMeters: enhancedStats.sprinklerFlowRate.radiusMeters,
+                            flowRatePerPlant: enhancedStats?.sprinklerFlowRate.flowRatePerPlant,
+                            pressureBar: enhancedStats?.sprinklerFlowRate.pressureBar,
+                            radiusMeters: enhancedStats?.sprinklerFlowRate.radiusMeters,
                             totalFlowRatePerMinute:
-                                enhancedStats.sprinklerFlowRate.totalFlowRatePerMinute,
+                                enhancedStats?.sprinklerFlowRate.totalFlowRatePerMinute,
                         },
                         // ข้อมูลจุดเชื่อมต่อ
                         connectionStats: connectionStats,
                         // ข้อมูลโซน
                         zones:
                             irrigationZones && irrigationZones.length > 0
-                                ? irrigationZones.map((zone: any) => {
+                                ? irrigationZones.map((zone: IrrigationZoneExtended) => {
                                       const zoneData = projectSummary?.zoneDetails?.find(
-                                          (z: any) => z.zoneId === zone.id
+                                          (z: { zoneId: string }) => z.zoneId === zone.id
                                       );
                                       const plantCount = zone.plants ? zone.plants.length : 0;
                                       const waterNeedPerMinute = calculateTotalFlowRate(
                                           plantCount,
-                                          enhancedStats.sprinklerFlowRate.flowRatePerPlant
+                                          enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5
                                       );
                                       // น้ำต่อต้น = totalWaterNeed / plantCount (เหมือนใน Zone Details Section)
                                       const waterPerTree =
@@ -1532,7 +1581,7 @@ function EnhancedHorticultureResultsPageContent() {
                                           waterPerTree: 0,
                                           waterNeedPerMinute: calculateTotalFlowRate(
                                               projectData.plants ? projectData.plants.length : 0,
-                                              enhancedStats.sprinklerFlowRate.flowRatePerPlant
+                                              enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5
                                           ),
                                           area: projectData.totalArea || 0,
                                           color: '#22c55e',
@@ -1629,7 +1678,7 @@ function EnhancedHorticultureResultsPageContent() {
                 } else {
                     console.warn('Missing data for horticultureSystemData:', {
                         hasEnhancedStats: !!enhancedStats,
-                        hasSprinklerFlowRate: !!(enhancedStats && enhancedStats.sprinklerFlowRate),
+                        hasSprinklerFlowRate: !!(enhancedStats && enhancedStats?.sprinklerFlowRate),
                         hasProjectData: !!projectData,
                     });
                 }
@@ -2301,12 +2350,12 @@ function EnhancedHorticultureResultsPageContent() {
                                 </div>
 
                                 {/* Enhanced Statistics */}
-                                {enhancedStats && enhancedStats.sprinklerFlowRate && (
+                                {enhancedStats && enhancedStats?.sprinklerFlowRate && (
                                     <div className="mt-6 rounded border border-blue-700/50 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 p-4">
                                         <h4 className="mb-3 text-lg font-semibold text-cyan-300">
                                             🚿 {t('ข้อมูลระบบหัวฉีดของพื้นที่รวมทั้ังหมด')} (แรงดัน{' '}
-                                            {enhancedStats.sprinklerFlowRate.pressureBar} บาร์ /
-                                            รัศมี {enhancedStats.sprinklerFlowRate.radiusMeters} ม.)
+                                            {enhancedStats?.sprinklerFlowRate.pressureBar} บาร์ /
+                                            รัศมี {enhancedStats?.sprinklerFlowRate.radiusMeters} ม.)
                                         </h4>
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                             <div className="text-center">
@@ -2315,7 +2364,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                 </div>
                                                 <div className="text-lg font-bold text-cyan-400">
                                                     {
-                                                        enhancedStats.sprinklerFlowRate
+                                                        enhancedStats?.sprinklerFlowRate
                                                             .flowRatePerPlant
                                                     }{' '}
                                                     L/M
@@ -2327,7 +2376,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                 </div>
                                                 <div className="text-lg font-bold text-blue-400">
                                                     {
-                                                        enhancedStats.sprinklerFlowRate
+                                                        enhancedStats?.sprinklerFlowRate
                                                             .formattedFlowRatePerMinute
                                                     }
                                                 </div>
@@ -2338,7 +2387,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                 </div>
                                                 <div className="text-lg font-bold text-purple-400">
                                                     {
-                                                        enhancedStats.sprinklerFlowRate
+                                                        enhancedStats?.sprinklerFlowRate
                                                             .formattedFlowRatePerHour
                                                     }
                                                 </div>
@@ -2583,7 +2632,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                                   {formatWaterVolume(
                                                                                       zone.totalWaterNeed
                                                                                   )}
-                                                                                  /ตรั้ง
+                                                                                  /ครั้ง
                                                                               </div>
                                                                           </div>
                                                                           <div>
@@ -3045,11 +3094,11 @@ function EnhancedHorticultureResultsPageContent() {
                                               })
                                             : // แสดงข้อมูลโซนปกติ/พื้นที่หลัก
                                               projectSummary.zoneDetails.map((zone, index) => {
-                                                  const plantInfo = zone.plantData || null;
-                                                  const plantName = plantInfo?.name || 'ไม่ระบุ';
+                                                  // const plantInfo = zone.plantData || null;
+                                                  // const plantName = plantInfo?.name || 'ไม่ระบุ';
                                                   const waterPerPlant = zone.waterPerPlant || 0;
-                                                  const plantSpacing = plantInfo?.plantSpacing || 0;
-                                                  const rowSpacing = plantInfo?.rowSpacing || 0;
+                                                  // const plantSpacing = plantInfo?.plantSpacing || 0;
+                                                  // const rowSpacing = plantInfo?.rowSpacing || 0;
                                                   const isCollapsed = collapsedZones.has(
                                                       zone.zoneId
                                                   );
@@ -3151,9 +3200,7 @@ function EnhancedHorticultureResultsPageContent() {
                                                                               </span>
                                                                               <div className="font-bold text-cyan-400">
                                                                                   {zone.plantCount *
-                                                                                      enhancedStats
-                                                                                          .sprinklerFlowRate
-                                                                                          .flowRatePerPlant}{' '}
+                                                                                      (enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5)}{' '}
                                                                                   ลิตร/นาที
                                                                               </div>
                                                                           </div>

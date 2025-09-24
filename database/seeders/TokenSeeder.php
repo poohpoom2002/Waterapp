@@ -17,7 +17,6 @@ class TokenSeeder extends Seeder
         User::where('tokens', 0)->orWhereNull('tokens')->update([
             'tokens' => 100,
             'total_tokens_used' => 0,
-            'token_refresh_count' => 0,
         ]);
 
         $this->command->info('Token seeder completed. All users now have 100 tokens.');

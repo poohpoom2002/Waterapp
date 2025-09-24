@@ -27,6 +27,16 @@ Route::middleware(['web', 'auth'])->get('/user', function (Request $request) {
     return $request->user();
 });
 
+// Test authentication endpoint
+Route::middleware(['web', 'auth'])->get('/test-auth', function (Request $request) {
+    return response()->json([
+        'success' => true,
+        'user' => $request->user(),
+        'session_id' => session()->getId(),
+        'auth_check' => Auth::check()
+    ]);
+});
+
 // ==================================================
 // 🤖 CHAIYO AI ROUTES (Enhanced Company Representative)
 // ==================================================
@@ -637,8 +647,6 @@ Route::middleware(['web', 'auth'])->prefix('tokens')->group(function () {
     // Get current user's token status
     Route::get('/status', [TokenController::class, 'getTokenStatus']);
     
-    // Refresh user's tokens (daily refresh)
-    Route::post('/refresh', [TokenController::class, 'refreshTokens']);
     
     // Consume tokens for an operation
     Route::post('/consume', [TokenController::class, 'consumeTokens']);
@@ -654,6 +662,51 @@ Route::middleware(['web', 'auth'])->prefix('tokens')->group(function () {
         // Get token usage statistics (admin only)
         Route::get('/stats', [TokenController::class, 'getTokenStats']);
     });
+});
+
+// ==================================================
+// 💳 PAYMENT SYSTEM ROUTES
+// ==================================================
+
+use App\Http\Controllers\PaymentController;
+
+// Public routes (no authentication required)
+Route::get('/pricing-plans', [PaymentController::class, 'getPricingPlans']);
+
+// User payment routes (authentication required)
+Route::middleware(['web', 'auth'])->prefix('payments')->group(function () {
+    // Purchase plan with tokens
+    Route::post('/purchase-plan', [PaymentController::class, 'purchasePlanWithTokens']);
+    
+    // Buy tokens directly
+    Route::post('/buy-tokens', [PaymentController::class, 'createTokenPurchaseRequest']);
+    
+    // Create a payment request
+    Route::post('/create', [PaymentController::class, 'createPaymentRequest']);
+    
+    // Get user's payment history
+    Route::get('/my-payments', [PaymentController::class, 'getUserPayments']);
+});
+
+// Super user payment management routes
+Route::middleware(['web', 'auth'])->prefix('admin/payments')->group(function () {
+    // Get all pending payments
+    Route::get('/pending', [PaymentController::class, 'getPendingPayments']);
+    
+    // Get all payments
+    Route::get('/all', [PaymentController::class, 'getAllPayments']);
+    
+    // Get payment statistics
+    Route::get('/stats', [PaymentController::class, 'getPaymentStats']);
+    
+    // Approve a payment
+    Route::post('/{paymentId}/approve', [PaymentController::class, 'approvePayment']);
+    
+    // Reject a payment
+    Route::post('/{paymentId}/reject', [PaymentController::class, 'rejectPayment']);
+    
+    // Update a payment (edit status and notes)
+    Route::put('/{paymentId}', [PaymentController::class, 'updatePayment']);
 });
 
 // ==================================================

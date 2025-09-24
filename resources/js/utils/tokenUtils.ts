@@ -5,10 +5,10 @@
 export interface TokenStatus {
     current_tokens: number;
     total_used: number;
-    last_refresh: string | null;
-    refresh_count: number;
     is_super_user: boolean;
-    can_refresh: boolean;
+    tier: string;
+    daily_tokens: number;
+    monthly_allowance: number;
 }
 
 export interface TokenResponse {
@@ -72,30 +72,6 @@ export const consumeTokens = async (tokens: number, operation: string): Promise<
     }
 };
 
-/**
- * Refresh user tokens
- */
-export const refreshTokens = async (): Promise<TokenResponse> => {
-    try {
-        const response = await fetch('/api/tokens/refresh', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN':
-                    document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ||
-                    '',
-            },
-        });
-
-        return await response.json();
-    } catch (error) {
-        console.error('Error refreshing tokens:', error);
-        return {
-            success: false,
-            message: 'Failed to refresh tokens',
-        };
-    }
-};
 
 /**
  * Get current token status

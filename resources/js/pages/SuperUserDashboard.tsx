@@ -6,6 +6,8 @@ import axios from 'axios';
 import { useLanguage } from '../contexts/LanguageContext';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
+import PaymentReviewModal from '../components/PaymentReviewModal';
+import PaymentEditModal from '../components/PaymentEditModal';
 import {
     FaUsers,
     FaFolder,
@@ -15,6 +17,9 @@ import {
     FaTrash,
     FaEye,
     FaChartBar,
+    FaCreditCard,
+    FaCheck,
+    FaTimes,
 } from 'react-icons/fa';
 
 // Types
@@ -49,6 +54,26 @@ type Folder = {
     created_at: string;
 };
 
+type Payment = {
+    id: number;
+    user_id: number;
+    plan_type: string;
+    months: number;
+    amount: number;
+    currency: string;
+    tokens_purchased: number;
+    status: 'pending' | 'approved' | 'rejected';
+    payment_proof?: string;
+    notes?: string;
+    admin_notes?: string;
+    approved_by?: number;
+    approved_at?: string;
+    created_at: string;
+    updated_at: string;
+    user: User;
+    approver?: User;
+};
+
 type DashboardStats = {
     total_users: number;
     total_fields: number;
@@ -64,14 +89,19 @@ export default function SuperUserDashboard() {
     const [users, setUsers] = useState<User[]>([]);
     const [fields, setFields] = useState<Field[]>([]);
     const [folders, setFolders] = useState<Folder[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'fields' | 'folders'>(
-        'dashboard'
+    const [activeTab, setActiveTab] = useState<'users' | 'fields' | 'folders' | 'payments'>(
+        'payments'
     );
+    const [activePaymentTab, setActivePaymentTab] = useState<'management' | 'history'>('management');
     const [showCreateUserModal, setShowCreateUserModal] = useState(false);
     const [showEditUserModal, setShowEditUserModal] = useState(false);
     const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showPaymentEditModal, setShowPaymentEditModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 
     useEffect(() => {
         loadDashboardData();
@@ -79,12 +109,13 @@ export default function SuperUserDashboard() {
 
     const loadDashboardData = async () => {
         try {
-            const [statsResponse, usersResponse, fieldsResponse, foldersResponse] =
+            const [statsResponse, usersResponse, fieldsResponse, foldersResponse, paymentsResponse] =
                 await Promise.all([
                     axios.get('/super/dashboard'),
                     axios.get('/super/users'),
                     axios.get('/super/fields'),
                     axios.get('/super/folders'),
+                    axios.get('/api/admin/payments/all'),
                 ]);
 
             if (statsResponse.data.success) {
@@ -98,6 +129,9 @@ export default function SuperUserDashboard() {
             }
             if (foldersResponse.data.success) {
                 setFolders(foldersResponse.data.folders);
+            }
+            if (paymentsResponse.data.success) {
+                setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
             }
         } catch (error) {
             console.error('Error loading dashboard data:', error);
@@ -206,6 +240,93 @@ export default function SuperUserDashboard() {
         }
     };
 
+    const handleApprovePayment = async (paymentId: number, adminNotes?: string) => {
+        try {
+            const response = await axios.post(`/api/admin/payments/${paymentId}/approve`, {
+                admin_notes: adminNotes
+            });
+            if (response.data.success) {
+                // Reload payments
+                const paymentsResponse = await axios.get('/api/admin/payments/all');
+                if (paymentsResponse.data.success) {
+                    setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
+                }
+                setShowPaymentModal(false);
+                setSelectedPayment(null);
+                alert('Payment approved successfully');
+            }
+        } catch (error) {
+            console.error('Error approving payment:', error);
+            alert('Error approving payment');
+        }
+    };
+
+    const handleRejectPayment = async (paymentId: number, adminNotes: string) => {
+        try {
+            console.log('Rejecting payment:', { paymentId, adminNotes });
+            
+            const response = await axios.post(`/api/admin/payments/${paymentId}/reject`, {
+                admin_notes: adminNotes
+            });
+            
+            console.log('Reject payment response:', response.data);
+            
+            if (response.data.success) {
+                // Reload payments
+                const paymentsResponse = await axios.get('/api/admin/payments/all');
+                if (paymentsResponse.data.success) {
+                    setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
+                }
+                setShowPaymentModal(false);
+                setSelectedPayment(null);
+                alert('Payment rejected successfully');
+            } else {
+                alert(response.data.message || 'Error rejecting payment');
+            }
+        } catch (error: any) {
+            console.error('Error rejecting payment:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            
+            const errorMessage = error.response?.data?.message || 'Error rejecting payment. Please try again.';
+            alert(errorMessage);
+        }
+    };
+
+    const handleUpdatePayment = async (paymentId: number, updateData: {
+        status: string;
+        admin_notes?: string;
+        force_remove_tokens?: boolean;
+    }) => {
+        try {
+            console.log('Updating payment:', { paymentId, updateData });
+            
+            const response = await axios.put(`/api/admin/payments/${paymentId}`, updateData);
+            
+            console.log('Update payment response:', response.data);
+            
+            if (response.data.success) {
+                // Reload payments
+                const paymentsResponse = await axios.get('/api/admin/payments/all');
+                if (paymentsResponse.data.success) {
+                    setPayments(paymentsResponse.data.payments.data || paymentsResponse.data.payments);
+                }
+                setShowPaymentEditModal(false);
+                setSelectedPayment(null);
+                alert('Payment updated successfully');
+            } else {
+                alert(response.data.message || 'Error updating payment');
+            }
+        } catch (error: any) {
+            console.error('Error updating payment:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            
+            const errorMessage = error.response?.data?.message || 'Error updating payment. Please try again.';
+            alert(errorMessage);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-gray-900">
@@ -232,7 +353,7 @@ export default function SuperUserDashboard() {
                         <div className="mb-6">
                             <nav className="flex space-x-8">
                                 {[
-                                    { id: 'dashboard', label: t('dashboard'), icon: FaChartBar },
+                                    { id: 'payments', label: 'Payments', icon: FaCreditCard },
                                     { id: 'users', label: t('users'), icon: FaUsers },
                                     { id: 'fields', label: t('fields'), icon: FaMap },
                                     { id: 'folders', label: t('folders'), icon: FaFolder },
@@ -254,127 +375,325 @@ export default function SuperUserDashboard() {
                         </div>
 
                         {/* Content */}
-                        {activeTab === 'dashboard' && stats && (
-                            <div className="space-y-6">
-                                {/* Stats Cards */}
-                                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                                    <div className="rounded-lg bg-blue-600 p-6 text-white">
+                        {activeTab === 'payments' && (
+                            <div>
+                                <div className="mb-6">
+                                    <h2 className="text-xl font-semibold text-white">
+                                        Payment Dashboard
+                                    </h2>
+                                </div>
+
+                                {/* Payment Stats */}
+                                <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+                                    <div className="rounded-lg bg-yellow-600 p-4 text-white">
                                         <div className="flex items-center">
-                                            <FaUsers className="h-8 w-8" />
-                                            <div className="ml-4">
-                                                <p className="text-sm opacity-90">
-                                                    {t('total_users')}
-                                                </p>
-                                                <p className="text-2xl font-bold">
-                                                    {stats.total_users}
+                                            <FaCreditCard className="h-6 w-6" />
+                                            <div className="ml-3">
+                                                <p className="text-sm opacity-90">Pending Payments</p>
+                                                <p className="text-xl font-bold">
+                                                    {payments.filter(p => p.status === 'pending').length}
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="rounded-lg bg-green-600 p-6 text-white">
+                                    <div className="rounded-lg bg-green-600 p-4 text-white">
                                         <div className="flex items-center">
-                                            <FaMap className="h-8 w-8" />
-                                            <div className="ml-4">
-                                                <p className="text-sm opacity-90">
-                                                    {t('total_fields')}
-                                                </p>
-                                                <p className="text-2xl font-bold">
-                                                    {stats.total_fields}
+                                            <FaCheck className="h-6 w-6" />
+                                            <div className="ml-3">
+                                                <p className="text-sm opacity-90">Approved</p>
+                                                <p className="text-xl font-bold">
+                                                    {payments.filter(p => p.status === 'approved').length}
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="rounded-lg bg-purple-600 p-6 text-white">
+                                    <div className="rounded-lg bg-red-600 p-4 text-white">
                                         <div className="flex items-center">
-                                            <FaFolder className="h-8 w-8" />
-                                            <div className="ml-4">
-                                                <p className="text-sm opacity-90">
-                                                    {t('total_folders')}
+                                            <FaTimes className="h-6 w-6" />
+                                            <div className="ml-3">
+                                                <p className="text-sm opacity-90">Rejected</p>
+                                                <p className="text-xl font-bold">
+                                                    {payments.filter(p => p.status === 'rejected').length}
                                                 </p>
-                                                <p className="text-2xl font-bold">
-                                                    {stats.total_folders}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="rounded-lg bg-blue-600 p-4 text-white">
+                                        <div className="flex items-center">
+                                            <FaChartBar className="h-6 w-6" />
+                                            <div className="ml-3">
+                                                <p className="text-sm opacity-90">Total Revenue</p>
+                                                <p className="text-xl font-bold">
+                                                    ฿{payments.filter(p => p.status === 'approved').reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* Recent Activity */}
-                                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                                    <div className="rounded-lg bg-gray-800 p-6">
-                                        <h3 className="mb-4 text-lg font-semibold text-white">
-                                            {t('recent_users')}
+                                {/* Payment Sub-tabs */}
+                                <div className="mb-6">
+                                    <nav className="flex space-x-8">
+                                        {[
+                                            { id: 'management', label: 'Payment Management', icon: FaCreditCard },
+                                            { id: 'history', label: 'Payment History', icon: FaChartBar },
+                                        ].map((tab) => (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setActivePaymentTab(tab.id as 'management' | 'history')}
+                                                className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
+                                                    activePaymentTab === tab.id
+                                                        ? 'bg-blue-600 text-white'
+                                                        : 'text-gray-400 hover:bg-gray-700 hover:text-white'
+                                                }`}
+                                            >
+                                                <tab.icon className="h-4 w-4" />
+                                                {tab.label}
+                                            </button>
+                                        ))}
+                                    </nav>
+                                </div>
+
+                                {/* Payment Management Tab - Pending Payments Only */}
+                                {activePaymentTab === 'management' && (
+                                    <div>
+                                        <div className="mb-4">
+                                            <h3 className="text-lg font-semibold text-white">
+                                                Pending Payments - Awaiting Review
                                         </h3>
-                                        <div className="space-y-3">
-                                            {stats.recent_users.map((user) => (
+                                            <p className="text-sm text-gray-400">
+                                                Review and approve or reject pending payment requests
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {payments.filter(p => p.status === 'pending').map((payment) => (
                                                 <div
-                                                    key={user.id}
-                                                    className="flex items-center justify-between"
+                                                    key={payment.id}
+                                                    className="rounded-lg border border-yellow-500 bg-gray-800 p-6"
                                                 >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-4">
                                                     <div>
-                                                        <p className="text-white">{user.name}</p>
+                                                                    <h3 className="text-lg font-semibold text-white">
+                                                                        {payment.user.name}
+                                                                    </h3>
                                                         <p className="text-sm text-gray-400">
-                                                            {user.email}
+                                                                        {payment.user.email}
                                                         </p>
                                                     </div>
-                                                    {user.is_super_user && (
-                                                        <span className="rounded bg-yellow-600 px-2 py-1 text-xs text-white">
-                                                            {t('super_user')}
-                                                        </span>
-                                                    )}
+                                                                <div className="text-center">
+                                                                    <div className="text-2xl font-bold text-white">
+                                                                        ฿{payment.amount.toLocaleString()}
                                                 </div>
-                                            ))}
+                                                                    <div className="text-sm text-gray-400">
+                                                                        {payment.plan_type === 'token_purchase' 
+                                                                            ? 'TOKEN PURCHASE' 
+                                                                            : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`
+                                                                        }
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-center">
+                                                                    <div className="text-lg font-semibold text-blue-400">
+                                                                        {payment.tokens_purchased.toLocaleString()} tokens
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-400">
+                                                                        {new Date(payment.created_at).toLocaleDateString()}
+                                                                    </div>
                                         </div>
                                     </div>
 
-                                    <div className="rounded-lg bg-gray-800 p-6">
-                                        <h3 className="mb-4 text-lg font-semibold text-white">
-                                            {t('recent_fields')}
-                                        </h3>
-                                        <div className="space-y-3">
-                                            {stats.recent_fields.map((field) => (
-                                                <div
-                                                    key={field.id}
-                                                    className="flex items-center justify-between"
-                                                >
-                                                    <div>
-                                                        <p className="text-white">{field.name}</p>
-                                                        <p className="text-sm text-gray-400">
-                                                            {field.user.name}
+                                                            {payment.notes && (
+                                                                <div className="mt-3">
+                                                                    <p className="text-sm text-gray-300">
+                                                                        <strong>User Notes:</strong> {payment.notes}
                                                         </p>
                                                     </div>
-                                                    <span className="text-sm text-gray-400">
-                                                        {field.totalArea?.toFixed(2)} ไร่
+                                                            )}
+                                                            
+                                                            {payment.payment_proof && (
+                                                                <div className="mt-3">
+                                                                    <p className="text-sm text-gray-300 mb-2">
+                                                                        <strong>Payment Proof:</strong>
+                                                                    </p>
+                                                                    {payment.payment_proof.startsWith('payment_proofs/') ? (
+                                                                        <div className="relative inline-block">
+                                                                            <img 
+                                                                                src={`/storage/${payment.payment_proof}`}
+                                                                                alt="Payment proof"
+                                                                                className="max-w-xs max-h-48 rounded-lg border border-gray-600 cursor-pointer hover:opacity-80 transition-opacity"
+                                                                                onClick={() => window.open(`/storage/${payment.payment_proof}`, '_blank')}
+                                                                                onError={(e) => {
+                                                                                    const target = e.target as HTMLImageElement;
+                                                                                    target.style.display = 'none';
+                                                                                    const fallback = target.nextElementSibling as HTMLElement;
+                                                                                    if (fallback) fallback.style.display = 'block';
+                                                                                }}
+                                                                            />
+                                                                            <div className="max-w-xs max-h-48 bg-gray-700 border border-gray-600 rounded-lg flex items-center justify-center text-gray-400 text-sm" style={{ display: 'none' }}>
+                                                                                <div className="text-center">
+                                                                                    <div className="text-2xl mb-2">📷</div>
+                                                                                    <div>Image not found</div>
+                                                                                    <div className="text-xs">{payment.payment_proof}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <p className="text-sm text-gray-300">
+                                                                            {payment.payment_proof}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <div className="ml-6 flex flex-col items-end gap-2">
+                                                            <span className="rounded-full bg-yellow-600 px-3 py-1 text-xs font-medium text-white">
+                                                                PENDING
                                                     </span>
+                                                            
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedPayment(payment);
+                                                                    setShowPaymentModal(true);
+                                                                }}
+                                                                className="rounded bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
+                                                            >
+                                                                Review
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             ))}
+                                            
+                                            {payments.filter(p => p.status === 'pending').length === 0 && (
+                                                <div className="text-center py-8">
+                                                    <FaCreditCard className="mx-auto h-12 w-12 text-gray-400" />
+                                                    <p className="mt-2 text-gray-400">No pending payments</p>
+                                                    <p className="text-sm text-gray-500">All payments have been processed</p>
                                         </div>
+                                            )}
                                     </div>
+                                    </div>
+                                )}
 
-                                    <div className="rounded-lg bg-gray-800 p-6">
-                                        <h3 className="mb-4 text-lg font-semibold text-white">
-                                            {t('recent_folders')}
+                                {/* Payment History Tab - All Processed Payments */}
+                                {activePaymentTab === 'history' && (
+                                    <div>
+                                        <div className="mb-4">
+                                            <h3 className="text-lg font-semibold text-white">
+                                                Payment History - All Processed Payments
                                         </h3>
-                                        <div className="space-y-3">
-                                            {stats.recent_folders.map((folder) => (
+                                            <p className="text-sm text-gray-400">
+                                                Complete history of approved and rejected payments
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {payments.filter(p => p.status !== 'pending').map((payment) => (
                                                 <div
-                                                    key={folder.id}
-                                                    className="flex items-center justify-between"
+                                                    key={payment.id}
+                                                    className={`rounded-lg border bg-gray-800 p-6 ${
+                                                        payment.status === 'approved' ? 'border-green-500' : 'border-red-500'
+                                                    }`}
                                                 >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-4">
                                                     <div>
-                                                        <p className="text-white">{folder.name}</p>
+                                                                    <h3 className="text-lg font-semibold text-white">
+                                                                        {payment.user.name}
+                                                                    </h3>
                                                         <p className="text-sm text-gray-400">
-                                                            {folder.user.name}
+                                                                        {payment.user.email}
                                                         </p>
                                                     </div>
-                                                    <span className="text-sm text-gray-400">
-                                                        {folder.type}
+                                                                <div className="text-center">
+                                                                    <div className="text-2xl font-bold text-white">
+                                                                        ฿{payment.amount.toLocaleString()}
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-400">
+                                                                        {payment.plan_type === 'token_purchase' 
+                                                                            ? 'TOKEN PURCHASE' 
+                                                                            : `${payment.plan_type.toUpperCase()} - ${payment.months} month${payment.months > 1 ? 's' : ''}`
+                                                                        }
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-center">
+                                                                    <div className="text-lg font-semibold text-blue-400">
+                                                                        {payment.tokens_purchased.toLocaleString()} tokens
+                                                                    </div>
+                                                                    <div className="text-sm text-gray-400">
+                                                                        {new Date(payment.created_at).toLocaleDateString()}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {payment.notes && (
+                                                                <div className="mt-3">
+                                                                    <p className="text-sm text-gray-300">
+                                                                        <strong>User Notes:</strong> {payment.notes}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {payment.payment_proof && (
+                                                                <div className="mt-3">
+                                                                    <p className="text-sm text-gray-300">
+                                                                        <strong>Payment Proof:</strong> {payment.payment_proof}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {payment.admin_notes && (
+                                                                <div className="mt-3">
+                                                                    <p className="text-sm text-gray-300">
+                                                                        <strong>Admin Notes:</strong> {payment.admin_notes}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <div className="ml-6 flex flex-col items-end gap-2">
+                                                            <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                                                payment.status === 'approved' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                                                            }`}>
+                                                                {payment.status.toUpperCase()}
                                                     </span>
+                                                            
+                                                            <button
+                                                                onClick={() => {
+                                                                    setSelectedPayment(payment);
+                                                                    setShowPaymentEditModal(true);
+                                                                }}
+                                                                className="rounded bg-blue-600 px-3 py-1 text-sm text-white transition-colors hover:bg-blue-700"
+                                                            >
+                                                                Edit
+                                                            </button>
+                                                            
+                                                            {payment.approver && (
+                                                                <div className="text-xs text-gray-400">
+                                                                    {payment.status === 'approved' ? 'Approved' : 'Rejected'} by {payment.approver.name}
+                                                                    <br />
+                                                                    {payment.approved_at && new Date(payment.approved_at).toLocaleDateString()}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             ))}
+                                            
+                                            {payments.filter(p => p.status !== 'pending').length === 0 && (
+                                                <div className="text-center py-8">
+                                                    <FaChartBar className="mx-auto h-12 w-12 text-gray-400" />
+                                                    <p className="mt-2 text-gray-400">No payment history</p>
+                                                    <p className="text-sm text-gray-500">No payments have been processed yet</p>
                                         </div>
+                                            )}
                                     </div>
                                 </div>
+                                )}
                             </div>
                         )}
 
@@ -695,6 +1014,7 @@ export default function SuperUserDashboard() {
                                 })()}
                             </div>
                         )}
+
                     </div>
                 </div>
             </div>
@@ -731,6 +1051,35 @@ export default function SuperUserDashboard() {
                     }}
                     onUpdate={handleUpdateUser}
                     user={selectedUser}
+                    t={t}
+                />
+            )}
+
+            {/* Payment Review Modal */}
+            {showPaymentModal && selectedPayment && (
+                <PaymentReviewModal
+                    isOpen={showPaymentModal}
+                    onClose={() => {
+                        setShowPaymentModal(false);
+                        setSelectedPayment(null);
+                    }}
+                    payment={selectedPayment}
+                    onApprove={handleApprovePayment}
+                    onReject={handleRejectPayment}
+                    t={t}
+                />
+            )}
+
+            {/* Payment Edit Modal */}
+            {showPaymentEditModal && selectedPayment && (
+                <PaymentEditModal
+                    isOpen={showPaymentEditModal}
+                    onClose={() => {
+                        setShowPaymentEditModal(false);
+                        setSelectedPayment(null);
+                    }}
+                    payment={selectedPayment}
+                    onUpdate={handleUpdatePayment}
                     t={t}
                 />
             )}
@@ -910,6 +1259,7 @@ const CreateFolderModal = ({
     );
 };
 
+
 // Create User Modal Component
 const CreateUserModal = ({
     isOpen,
@@ -1042,6 +1392,7 @@ const CreateUserModal = ({
         </div>
     );
 };
+
 
 // Edit User Modal Component
 const EditUserModal = ({
@@ -1179,3 +1530,5 @@ const EditUserModal = ({
         </div>
     );
 };
+
+

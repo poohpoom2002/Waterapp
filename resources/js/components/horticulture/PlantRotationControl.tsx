@@ -1,6 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaRedo, FaTimes, FaUndo, FaCheck, FaSpinner } from 'react-icons/fa';
 
 interface PlantRotationControlProps {
@@ -23,6 +21,11 @@ const PlantRotationControl: React.FC<PlantRotationControlProps> = ({
     t,
 }) => {
     const [localRotationAngle, setLocalRotationAngle] = useState(currentRotationAngle);
+
+    // อัปเดต localRotationAngle เมื่อ currentRotationAngle prop เปลี่ยน
+    useEffect(() => {
+        setLocalRotationAngle(currentRotationAngle);
+    }, [currentRotationAngle]);
 
     if (!isVisible) return null;
 
