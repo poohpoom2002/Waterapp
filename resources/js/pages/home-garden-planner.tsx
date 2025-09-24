@@ -736,7 +736,7 @@ export default function HomeGardenPlanner() {
 
                 if (!shouldAvoid) {
                     const gpsPos = isCanvas 
-                        ? canvasToGPS(centerPoint, canvasData)
+                        ? canvasToGPS(centerPoint as CanvasCoordinate, canvasData)
                         : centerPoint as Coordinate;
                     
                     newSprinklers.push({

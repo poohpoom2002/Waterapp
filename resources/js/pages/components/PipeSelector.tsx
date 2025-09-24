@@ -1112,10 +1112,11 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                                         return `${currentPlot.production.waterRequirementPerIrrigation.toFixed(1)} L/min`;
                                                     case 'main':
                                                         return '0.0 L/min';
-                                                    case 'emitter':
+                                                    case 'emitter': {
                                                         const waterCalc = currentPlot.production?.waterCalculation;
-                                                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                                                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute ?? 6.0;
                                                         return `${flowRate.toFixed(1)} L/min`;
+                                                    }
                                                     default:
                                                         return `${currentZoneBestPipe.waterFlowRate.toFixed(1)} L/min`;
                                                 }
