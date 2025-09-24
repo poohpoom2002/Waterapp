@@ -1155,7 +1155,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             return gardenStats.summary.totalArea / 1600;
         }
         if (projectMode === 'field-crop' && fieldCropData) {
-            return fieldCropData.area.size / 1600;
+            return fieldCropData.area.sizeInRai; // ใช้ sizeInRai ที่คำนวณแล้ว
         }
         if (projectMode === 'greenhouse' && greenhouseData) {
             return greenhouseData.summary.totalPlotArea; // ใช้ตารางเมตรโดยตรง
@@ -1179,8 +1179,23 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             // Try to get field-crop data from props first, then from localStorage
             const fcData = fieldCropData || getEnhancedFieldCropData();
             if (fcData) {
+                // Try to get water requirement from fieldCropSystemData first
+                let totalWaterNeed = fcData.summary?.totalWaterRequirementPerDay || 0;
+                try {
+                    const fieldCropSystemDataStr = localStorage.getItem('fieldCropSystemData');
+                    if (fieldCropSystemDataStr) {
+                        const fieldCropSystemData = JSON.parse(fieldCropSystemDataStr);
+                        if (fieldCropSystemData?.sprinklerConfig?.totalFlowRatePerMinute) {
+                            // Convert LPM to liters per irrigation (assuming 30 minutes irrigation)
+                            totalWaterNeed = fieldCropSystemData.sprinklerConfig.totalFlowRatePerMinute * 30;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error parsing fieldCropSystemData in CostSummary:', error);
+                }
+                
                 return {
-                    totalWaterNeed: fcData.summary?.totalWaterRequirementPerDay || 0,
+                    totalWaterNeed: totalWaterNeed,
                     totalProduction: fcData.summary?.totalEstimatedYield || 0,
                     totalIncome: fcData.summary?.totalEstimatedIncome || 0,
                     totalSprinklers: fcData.summary?.totalPlantingPoints || 0,

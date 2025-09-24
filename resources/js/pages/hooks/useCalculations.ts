@@ -119,10 +119,47 @@ const calculateSprinklerBasedFlow = (
     let flowPerSprinkler: number;
 
     if (projectMode === 'field-crop') {
-        // Field-crop: waterPerTreeLiters is LPM per head
+        // Field-crop: waterPerTreeLiters is LPM per head (similar to horticulture mode)
         totalSprinklers = input.totalTrees;
         flowPerSprinkler = input.waterPerTreeLiters;
         totalWaterPerMinute = totalSprinklers * flowPerSprinkler;
+        
+        console.log('🔍 calculateSprinklerBasedFlow for field-crop:');
+        console.log('- input.totalTrees:', input.totalTrees);
+        console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
+        console.log('- totalSprinklers:', totalSprinklers);
+        console.log('- flowPerSprinkler:', flowPerSprinkler);
+        console.log('- totalWaterPerMinute:', totalWaterPerMinute);
+        
+        // Additional debug for sprinkler count
+        if (totalSprinklers === 1) {
+            console.warn('⚠️ totalSprinklers is 1, this might be incorrect for field-crop mode');
+            console.log('- input object:', input);
+        }
+        
+        // Debug for all field-crop calculations
+        console.log('🔍 Field-crop sprinkler calculation result:');
+        console.log('- totalSprinklers:', totalSprinklers);
+        console.log('- flowPerSprinkler:', flowPerSprinkler);
+        console.log('- totalWaterPerMinute:', totalWaterPerMinute);
+        
+        // Ensure we have valid values
+        if (totalWaterPerMinute === 0 || isNaN(totalWaterPerMinute)) {
+            console.warn('⚠️ totalWaterPerMinute is 0 or NaN, using fallback calculation');
+            // Try to get from fieldCropSystemData
+            try {
+                const fieldCropSystemDataStr = localStorage.getItem('fieldCropSystemData');
+                if (fieldCropSystemDataStr) {
+                    const fieldCropSystemData = JSON.parse(fieldCropSystemDataStr);
+                    if (fieldCropSystemData?.sprinklerConfig?.totalFlowRatePerMinute) {
+                        totalWaterPerMinute = fieldCropSystemData.sprinklerConfig.totalFlowRatePerMinute;
+                        console.log('✅ Using totalFlowRatePerMinute from fieldCropSystemData:', totalWaterPerMinute);
+                    }
+                }
+            } catch (error) {
+                console.error('Error parsing fieldCropSystemData:', error);
+            }
+        }
     } else if (projectMode === 'greenhouse') {
         // Greenhouse: Convert from per-session to per-minute flow rate
         totalSprinklers = input.totalTrees;
@@ -162,7 +199,7 @@ const calculateFlowRequirements = (
     if (projectMode === 'field-crop' || projectMode === 'greenhouse' || projectMode === 'garden') {
         totalSprinklers = sprinklerFlow.sprinklersUsed || input.totalTrees;
         flowPerSprinklerLPM =
-            sprinklerFlow.sprinklerFlowLPM || sprinklerFlow.totalFlowLPM / totalSprinklers;
+            sprinklerFlow.sprinklerFlowLPM || (totalSprinklers > 0 ? sprinklerFlow.totalFlowLPM / totalSprinklers : 0);
     } else {
         totalSprinklers =
             sprinklerFlow.sprinklersUsed ||
@@ -174,7 +211,7 @@ const calculateFlowRequirements = (
     let maxSprinklersPerBranch: number;
     if (projectMode === 'field-crop') {
         maxSprinklersPerBranch = Math.min(
-            input.sprinklersPerLongestBranch || input.sprinklersPerBranch,
+            input.sprinklersPerLongestBranch || input.sprinklersPerBranch || 1,
             25
         );
     } else if (projectMode === 'greenhouse') {
@@ -199,7 +236,7 @@ const calculateFlowRequirements = (
     let maxBranchesPerSecondary: number;
     if (projectMode === 'field-crop') {
         maxBranchesPerSecondary = Math.min(
-            input.branchesPerLongestSecondary || input.branchesPerSecondary,
+            input.branchesPerLongestSecondary || input.branchesPerSecondary || 1,
             12
         );
     } else if (projectMode === 'greenhouse') {
@@ -975,11 +1012,30 @@ export const useCalculations = (
 
     return useMemo(() => {
         if (loading || error) return null;
-        if (!sprinklerData.length || !pumpData.length || !pipeData.length) return null;
+        
+        if (!sprinklerData.length || !pumpData.length || !pipeData.length) {
+            console.warn('❌ Missing equipment data:', {
+                sprinklers: sprinklerData.length,
+                pumps: pumpData.length,
+                pipes: pipeData.length
+            });
+            return null;
+        }
         if (!input) return null;
 
         const projectMode =
             allZoneData && allZoneData.length > 0 ? allZoneData[0].projectMode : undefined;
+
+        // Debug logging for field-crop mode
+        if (projectMode === 'field-crop') {
+            console.log('🔍 useCalculations debug for field-crop:');
+            console.log('- sprinklerData.length:', sprinklerData.length);
+            console.log('- pumpData.length:', pumpData.length);
+            console.log('- pipeData.length:', pipeData.length);
+            console.log('- input:', input);
+            console.log('- loading:', loading);
+            console.log('- error:', error);
+        }
 
         // For field-crop mode, try to get enhanced data from fieldCropData
         let workingInput = input;
@@ -1227,6 +1283,18 @@ export const useCalculations = (
             branchLoss.total + secondaryLoss.total + mainLoss.total + emitterLoss.total;
         const connectionLoss = totalHeadLoss * 0.03;
         totalHeadLoss += connectionLoss;
+        
+        // Debug logging for field-crop mode
+        if (projectMode === 'field-crop') {
+            console.log('🔍 Head Loss calculation for field-crop:');
+            console.log('- branchLoss.total:', branchLoss.total);
+            console.log('- secondaryLoss.total:', secondaryLoss.total);
+            console.log('- mainLoss.total:', mainLoss.total);
+            console.log('- emitterLoss.total:', emitterLoss.total);
+            console.log('- connectionLoss:', connectionLoss);
+            console.log('- totalHeadLoss:', totalHeadLoss);
+            console.log('- flowData.totalFlowLPM:', flowData.totalFlowLPM);
+        }
 
         const totalMajorLoss =
             branchLoss.major + secondaryLoss.major + mainLoss.major + emitterLoss.major;
@@ -1346,6 +1414,15 @@ export const useCalculations = (
         if (hasValidEmitterPipe && emitterLoss.velocity > 0) {
             const warning = checkVelocity(emitterLoss.velocity, 'ท่อย่อยแยก');
             if (!warning.includes('🟢')) velocityWarnings.push(warning);
+        }
+
+        // Debug logging for field-crop mode results
+        if (projectMode === 'field-crop') {
+            console.log('🔍 useCalculations results for field-crop:');
+            console.log('- flowData.totalSprinklers:', flowData.totalSprinklers);
+            console.log('- flowData.sprinklersPerZone:', flowData.sprinklersPerZone);
+            console.log('- sanitizedInput.totalTrees:', sanitizedInput.totalTrees);
+            console.log('- sanitizedInput.numberOfZones:', sanitizedInput.numberOfZones);
         }
 
         return {

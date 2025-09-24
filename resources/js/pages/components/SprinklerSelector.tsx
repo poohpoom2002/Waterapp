@@ -49,6 +49,26 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
     // Helper function to get field-crop sprinkler requirements
     const getFieldCropSprinklerRequirements = useCallback(() => {
+        // First try to get data from fieldCropSystemData (from summary page)
+        try {
+            const systemDataStr = localStorage.getItem('fieldCropSystemData');
+            if (systemDataStr) {
+                const systemData = JSON.parse(systemDataStr);
+                if (systemData?.sprinklerConfig) {
+                    return {
+                        targetFlowPerSprinkler: systemData.sprinklerConfig.flowRatePerPlant,
+                        targetPressure: systemData.sprinklerConfig.pressureBar,
+                        targetRadius: systemData.sprinklerConfig.radiusMeters,
+                        totalSprinklers: systemData.totalPlants || 0,
+                        irrigationTypes: {},
+                    };
+                }
+            }
+        } catch (error) {
+            console.error('Error loading fieldCropSystemData:', error);
+        }
+
+        // Fallback to calculation from field data
         const fcData = fieldCropData || getEnhancedFieldCropData();
         if (fcData) {
             // Calculate target flow per sprinkler based on field-crop data
@@ -74,6 +94,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             return {
                 targetFlowPerSprinkler,
                 targetPressure,
+                targetRadius: 8.0, // Default radius
                 totalSprinklers: totalPlantingPoints,
                 irrigationTypes: irrigationByType,
             };
@@ -350,7 +371,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 sprinklerConfig = {
                     flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
                     pressureBar: fieldCropRequirements.targetPressure,
-                    radiusMeters: 8.0, // Default radius for field-crop
+                    radiusMeters: fieldCropRequirements.targetRadius || 8.0,
                 };
             } else {
                 // fallback ค่า default สำหรับ field-crop
@@ -569,12 +590,12 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     } else if (projectMode === 'field-crop') {
                         // ใช้ข้อมูลจาก field-crop data
                         const fieldCropRequirements = getFieldCropSprinklerRequirements();
-                        if (fieldCropRequirements) {
-                            sprinklerConfig = {
-                                flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
-                                pressureBar: fieldCropRequirements.targetPressure,
-                                radiusMeters: 8.0, // Default radius for field-crop
-                            };
+            if (fieldCropRequirements) {
+                sprinklerConfig = {
+                    flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
+                    pressureBar: fieldCropRequirements.targetPressure,
+                    radiusMeters: fieldCropRequirements.targetRadius || 8.0,
+                };
                         } else {
                             // fallback ค่า default สำหรับ field-crop
                             sprinklerConfig = {
