@@ -452,9 +452,91 @@ export default function InitialArea({
         }
     }, [realPlantPoints, hideAllPoints]);
 
+    // Effect to track map zoom changes
+    useEffect(() => {
+        if (!map) return;
+
+        const handleZoomChanged = () => {
+            const currentZoom = map.getZoom();
+            if (currentZoom !== undefined) {
+                setMapZoom(currentZoom);
+            }
+        };
+
+        // Listen for zoom changes
+        const zoomListener = map.addListener('zoom_changed', handleZoomChanged);
+        
+        // Set initial zoom
+        handleZoomChanged();
+
+        return () => {
+            google.maps.event.removeListener(zoomListener);
+        };
+    }, [map]);
 
     // ===== PLANT POINT FUNCTIONS =====
     
+    // Helper function to calculate point size based on point count
+    const calculatePointSize = useCallback((pointCount: number): number => {
+        if (pointCount >= 5000) {
+            return 8 * 0.4; // 60% reduction (40% of original size)
+        } else if (pointCount >= 2000) {
+            return 8 * 0.6; // 40% reduction (60% of original size)
+        } else if (pointCount >= 800) {
+            return 8 * 0.8; // 20% reduction (80% of original size)
+        } else {
+            return 8; // Original size
+        }
+    }, []);
+
+    // Helper function to filter points based on zoom level and total point count
+    const filterPointsByZoom = useCallback((points: PlantPoint[], zoom: number, totalPointCount: number): PlantPoint[] => {
+        // If we have fewer than 800 points, show all points regardless of zoom
+        if (totalPointCount < 800) {
+            return points;
+        }
+
+        // Calculate maximum reduction factor based on total point count
+        let maxReductionFactor = 1; // No reduction by default
+        
+        if (totalPointCount >= 5000) {
+            maxReductionFactor = 4; // Up to 4x reduction (show 1/4 of points)
+        } else if (totalPointCount >= 2000) {
+            maxReductionFactor = 3; // Up to 3x reduction (show 1/3 of points)
+        } else if (totalPointCount >= 800) {
+            maxReductionFactor = 2; // Up to 2x reduction (show 1/2 of points)
+        }
+
+        // Calculate zoom-based reduction (5 levels: zoom 20, 19, 18, 17, 16)
+        let reductionFactor = 1;
+        
+        if (zoom >= 20) {
+            // Zoom 20+: show all points
+            reductionFactor = 1;
+        } else if (zoom >= 19) {
+            // Zoom 19: 25% of max reduction
+            reductionFactor = 1 + (maxReductionFactor - 1) * 0.25;
+        } else if (zoom >= 18) {
+            // Zoom 18: 50% of max reduction
+            reductionFactor = 1 + (maxReductionFactor - 1) * 0.5;
+        } else if (zoom >= 17) {
+            // Zoom 17: 75% of max reduction
+            reductionFactor = 1 + (maxReductionFactor - 1) * 0.75;
+        } else {
+            // Zoom < 17: maximum reduction
+            reductionFactor = maxReductionFactor;
+        }
+
+        // If no reduction needed, return all points
+        if (reductionFactor <= 1) {
+            return points;
+        }
+
+        // Sample points based on reduction factor
+        const step = Math.ceil(reductionFactor);
+        return points.filter((_, index) => index % step === 0);
+    }, []);
+
     // Enhanced function to clear all existing plant markers immediately
     const clearAllPlantMarkers = useCallback(() => {
         plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
@@ -477,16 +559,22 @@ export default function InitialArea({
             point.lng >= -180 && point.lng <= 180
         );
         
+        // Filter points based on zoom level and total point count
+        const filteredPoints = filterPointsByZoom(validPoints, mapZoom, validPoints.length);
+        
+        // Calculate dynamic point size based on total point count (not filtered count)
+        const pointSize = calculatePointSize(validPoints.length);
+        const anchorPoint = pointSize / 2;
         
         const batchSize = 100;
-        for (let i = 0; i < validPoints.length; i += batchSize) {
+        for (let i = 0; i < filteredPoints.length; i += batchSize) {
             // Check if this generation is still current
             if (currentGenerationIdRef.current !== generationId) {
                 markers.forEach(m => m.setMap(null));
                 return [] as google.maps.Marker[];
             }
             
-            const batch = validPoints.slice(i, i + batchSize);
+            const batch = filteredPoints.slice(i, i + batchSize);
             for (const point of batch) {
                 // Double check before creating each marker
                 if (currentGenerationIdRef.current !== generationId) {
@@ -495,18 +583,18 @@ export default function InitialArea({
                 }
                 
                 try {
-                    // Create marker directly
+                    // Create marker directly with dynamic size
                     const marker = new google.maps.Marker({
                         position: { lat: point.lat, lng: point.lng },
                         map: map,
                         icon: {
                             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                                <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-                                    <circle cx="4" cy="4" r="3.5" fill="#22C55E" stroke="#16A34A" stroke-width="1"/>
+                                <svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.875}" fill="#22C55E" stroke="#16A34A" stroke-width="1"/>
                                 </svg>
                             `),
-                            scaledSize: new google.maps.Size(8, 8),
-                            anchor: new google.maps.Point(4, 4)
+                            scaledSize: new google.maps.Size(pointSize, pointSize),
+                            anchor: new google.maps.Point(anchorPoint, anchorPoint)
                         },
                         title: `Plant ${point.id}`,
                         optimized: true,
@@ -524,7 +612,7 @@ export default function InitialArea({
         }
         
         return markers;
-    }, [map]);
+    }, [map, calculatePointSize, filterPointsByZoom, mapZoom]);
 
     // Geometry helpers
     const computeCentroid = useCallback((points: Coordinate[]): Coordinate => {
@@ -1058,12 +1146,13 @@ export default function InitialArea({
                 fillColor: obstacleColors.fill,
                 strokeColor: obstacleColors.stroke,
                 fillOpacity: 0.4,
-                strokeOpacity: 1,
                 strokeWeight: 2,
+                strokeOpacity: 1,
                 editable: false,
                 draggable: false,
                 clickable: true,
-                map: map
+                map: map,
+                zIndex: 1600
             });
 
             newObstacleOverlays.push(polygon);
@@ -1097,18 +1186,25 @@ export default function InitialArea({
         // Increment generation ID for this recreation
         const generationId = ++currentGenerationIdRef.current;
 
+        // Filter points based on zoom level and total point count
+        const filteredPoints = filterPointsByZoom(plantPoints, mapZoom, plantPoints.length);
+
+        // Calculate dynamic point size based on total point count (not filtered count)
+        const pointSize = calculatePointSize(plantPoints.length);
+        const anchorPoint = pointSize / 2;
+
         const plantIcon = {
             url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                <svg width="8" height="8" viewBox="0 0 8 8" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="4" cy="4" r="3" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
+                <svg width="${pointSize}" height="${pointSize}" viewBox="0 0 ${pointSize} ${pointSize}" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="${anchorPoint}" cy="${anchorPoint}" r="${anchorPoint * 0.75}" fill="#22c55e" stroke="#16a34a" stroke-width="1"/>
                 </svg>
             `),
-            scaledSize: new google.maps.Size(8, 8),
-            anchor: new google.maps.Point(4, 4)
+            scaledSize: new google.maps.Size(pointSize, pointSize),
+            anchor: new google.maps.Point(anchorPoint, anchorPoint)
         };
 
         const newMarkers: google.maps.Marker[] = [];
-        plantPoints.forEach((point) => {
+        filteredPoints.forEach((point) => {
             // Check if still current generation
             if (currentGenerationIdRef.current !== generationId) {
                 // Clean up any markers created so far
@@ -1134,7 +1230,7 @@ export default function InitialArea({
             // Clean up if generation was cancelled
             newMarkers.forEach(m => m.setMap(null));
         }
-    }, [map, plantPoints, clearAllPlantMarkers, hideAllPoints]);
+    }, [map, plantPoints, clearAllPlantMarkers, hideAllPoints, calculatePointSize, filterPointsByZoom, mapZoom]);
     
     // [FIX] Enhanced plant generation logic with proper race condition handling and error recovery
     const runPlantGeneration = useCallback(async (angle: number) => {
@@ -2238,6 +2334,17 @@ export default function InitialArea({
 
     const handleStepClick = (step: StepData) => {
         if (step.id === activeStep) return;
+        
+        // Check if all 4 steps are completed
+        const allStepsCompleted = completed.length >= 4 && completed.includes(1) && completed.includes(2) && completed.includes(3) && completed.includes(4);
+        
+        // If all steps are completed, allow free navigation
+        if (allStepsCompleted) {
+            navigateToStep(step);
+            return;
+        }
+        
+        // Original logic for incomplete steps
         if (completed.includes(step.id)) { navigateToStep(step); return; }
         if (step.id > activeStep && completed.includes(step.id - 1)) { navigateToStep(step); return; }
         if (step.id === 1) navigateToStep(step);
@@ -2936,8 +3043,32 @@ export default function InitialArea({
                                         {t('Zoom Level')}: {mapZoom}
                                     </div>
                                     {plantPoints.length > 0 && (
+                                        <div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
+                                            {t('Points')}: {plantPoints.length.toLocaleString()} / {realPlantCount.toLocaleString()}
+                                            {realPlantCount > plantPoints.length && (
+                                                <span className="text-yellow-300 ml-1">
+                                                    ({Math.round((1 - plantPoints.length / realPlantCount) * 100)}% {t('reduced')})
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+                                    {plantPoints.length > 0 && realPlantCount >= 800 && (
+                                        <div className="px-2 py-1 rounded bg-blue-900 bg-opacity-70 border border-blue-500 text-xs text-white mb-1">
+                                            {mapZoom >= 20 && <span className="text-green-300">{t('All points visible')}</span>}
+                                            {mapZoom >= 19 && mapZoom < 20 && <span className="text-yellow-300">{t('25% reduction')}</span>}
+                                            {mapZoom >= 18 && mapZoom < 19 && <span className="text-orange-300">{t('50% reduction')}</span>}
+                                            {mapZoom >= 17 && mapZoom < 18 && <span className="text-red-300">{t('75% reduction')}</span>}
+                                            {mapZoom < 17 && <span className="text-red-500">{t('Maximum reduction')}</span>}
+                                        </div>
+                                    )}
+                                    {plantPoints.length > 0 && (
                                         <div className="px-2 py-1 rounded bg-green-900 bg-opacity-70 border border-green-500 text-xs text-white">
-                                            <div>{plantPoints.length} {t('points')}</div>
+                                            <div>{plantPoints.length} {t('points')} {t('visible')}</div>
+                                            {realPlantCount > plantPoints.length && (
+                                                <div className="text-yellow-200 text-xs">
+                                                    {t('Performance optimized')}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

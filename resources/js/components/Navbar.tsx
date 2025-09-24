@@ -5,6 +5,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import UserAvatar from './UserAvatar';
 import FloatingAiChat from './FloatingAiChat';
+import TokenBuyModal from './TokenBuyModal';
 import axios from 'axios';
 
 const Navbar: React.FC = () => {
@@ -18,6 +19,7 @@ const Navbar: React.FC = () => {
     const [tokenStatus, setTokenStatus] = useState<any>(null);
     const [loadingTokens, setLoadingTokens] = useState(false);
     const [showTokenPricingModal, setShowTokenPricingModal] = useState(false);
+    const [showTokenBuyModal, setShowTokenBuyModal] = useState(false);
 
     // Set token status from user data for non-admin users
     useEffect(() => {
@@ -30,10 +32,10 @@ const Navbar: React.FC = () => {
         const userTokenStatus = {
             current_tokens: auth.user.tokens || 0,
             total_used: auth.user.total_tokens_used || 0,
-            last_refresh: auth.user.last_token_refresh || null,
-            refresh_count: auth.user.token_refresh_count || 0,
             is_super_user: auth.user.is_super_user || false,
-            can_refresh: auth.user.can_refresh_tokens || false,
+            tier: auth.user.tier || 'free',
+            daily_tokens: auth.user.tier === 'pro' ? 100 : auth.user.tier === 'advanced' ? 200 : 50,
+            monthly_allowance: auth.user.tier === 'pro' ? 500 : auth.user.tier === 'advanced' ? 1000 : 100,
         };
 
         setTokenStatus(userTokenStatus);
@@ -57,36 +59,125 @@ const Navbar: React.FC = () => {
         };
     }, [auth?.user]);
 
-    // Function to refresh tokens
-    const handleRefreshTokens = async () => {
-        if (!auth?.user || auth.user.is_super_user) {
-            return;
-        }
 
-        setLoadingTokens(true);
+    // Function to refresh CSRF token
+    const refreshCsrfToken = async () => {
         try {
-            const response = await axios.post('/api/tokens/refresh');
-            if (response.data.success) {
-                setTokenStatus(response.data.token_status);
-                alert('Tokens refreshed successfully!');
+            console.log('Refreshing CSRF token...');
+            const response = await axios.get('/csrf-token');
+            if (response.data.token) {
+                axios.defaults.headers.common['X-CSRF-TOKEN'] = response.data.token;
+                const metaTag = document.querySelector('meta[name="csrf-token"]');
+                if (metaTag) {
+                    metaTag.setAttribute('content', response.data.token);
+                }
+                console.log('CSRF token refreshed successfully');
+                return response.data.token;
+            }
+        } catch (error) {
+            console.error('Failed to refresh CSRF token:', error);
+        }
+        return null;
+    };
 
-                window.dispatchEvent(
-                    new CustomEvent('tokensUpdated', {
-                        detail: {
-                            consumed: 0,
-                            remaining: response.data.token_status.current_tokens,
-                            operation: 'refresh',
-                        },
-                    })
-                );
+    // Test authentication function
+    const testAuth = async () => {
+        try {
+            console.log('Testing authentication...');
+            const response = await axios.get('/api/test-auth');
+            console.log('Auth test response:', response.data);
+            return response.data;
+        } catch (error: any) {
+            console.error('Auth test failed:', error);
+            return null;
+        }
+    };
+
+    // Function to handle token purchase
+    const handleTokenPurchase = async (purchaseData: {
+        tokens: number;
+        amount: number;
+        payment_proof: File | null;
+        notes: string;
+    }) => {
+        try {
+            console.log('Submitting token purchase request:', purchaseData);
+            console.log('CSRF Token before refresh:', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'));
+            
+            // Refresh CSRF token first
+            await refreshCsrfToken();
+            
+            console.log('CSRF Token after refresh:', document.querySelector('meta[name="csrf-token"]')?.getAttribute('content'));
+            console.log('Axios defaults:', axios.defaults.headers.common);
+            
+            // Test authentication first
+            const authTest = await testAuth();
+            if (!authTest || !authTest.success) {
+                alert('Authentication failed. Please refresh the page and try again.');
+                return;
+            }
+            
+            // Create FormData for file upload
+            const formData = new FormData();
+            formData.append('tokens', purchaseData.tokens.toString());
+            formData.append('amount', purchaseData.amount.toString());
+            formData.append('notes', purchaseData.notes);
+            if (purchaseData.payment_proof) {
+                formData.append('payment_proof', purchaseData.payment_proof);
+            }
+            
+            const response = await axios.post('/api/payments/buy-tokens', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                }
+            });
+            console.log('Token purchase response:', response.data);
+            
+            if (response.data.success) {
+                alert('Token purchase request submitted successfully! You will receive tokens once approved by admin.');
+                setShowTokenBuyModal(false);
             } else {
-                alert(response.data.message || 'Failed to refresh tokens');
+                alert(response.data.message || 'Error submitting token purchase request. Please try again.');
             }
         } catch (error: any) {
-            console.error('Error refreshing tokens:', error);
-            alert(error.response?.data?.message || 'Failed to refresh tokens');
-        } finally {
-            setLoadingTokens(false);
+            console.error('Error submitting token purchase:', error);
+            console.error('Error response:', error.response?.data);
+            console.error('Error status:', error.response?.status);
+            
+            // If it's a CSRF token mismatch, try refreshing and retrying once
+            if (error.response?.status === 419 || error.response?.data?.message?.includes('CSRF')) {
+                console.log('CSRF token mismatch detected, refreshing token and retrying...');
+                try {
+                    await refreshCsrfToken();
+                    
+                    // Recreate FormData for retry
+                    const retryFormData = new FormData();
+                    retryFormData.append('tokens', purchaseData.tokens.toString());
+                    retryFormData.append('amount', purchaseData.amount.toString());
+                    retryFormData.append('notes', purchaseData.notes);
+                    if (purchaseData.payment_proof) {
+                        retryFormData.append('payment_proof', purchaseData.payment_proof);
+                    }
+                    
+                    const retryResponse = await axios.post('/api/payments/buy-tokens', retryFormData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        }
+                    });
+                    console.log('Retry token purchase response:', retryResponse.data);
+                    
+                    if (retryResponse.data.success) {
+                        alert('Token purchase request submitted successfully! You will receive tokens once approved by admin.');
+                        setShowTokenBuyModal(false);
+                        return;
+                    }
+                } catch (retryError: any) {
+                    console.error('Retry also failed:', retryError);
+                }
+            }
+            
+            const errorMessage = error.response?.data?.message || 'Error submitting token purchase request. Please try again.';
+            alert(errorMessage);
         }
     };
 
@@ -184,16 +275,6 @@ const Navbar: React.FC = () => {
                                                 <span className="text-lg">🪙</span>
                                                 <span>{tokenStatus.current_tokens}</span>
                                             </button>
-                                            {tokenStatus.can_refresh && (
-                                                <button
-                                                    onClick={handleRefreshTokens}
-                                                    className="flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-green-700"
-                                                    title="Refresh tokens (once every 24 hours)"
-                                                >
-                                                    <span>🔄</span>
-                                                    Refresh
-                                                </button>
-                                            )}
                                         </div>
                                     ) : (
                                         <div className="flex items-center gap-1 rounded-lg bg-gray-600 px-3 py-1 text-sm text-white">
@@ -260,7 +341,13 @@ const Navbar: React.FC = () => {
                                         <div className="text-2xl font-bold text-white">฿50</div>
                                         <div className="text-sm text-gray-400">฿5 per token</div>
                                     </div>
-                                    <button className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700">
+                                    <button 
+                                        onClick={() => {
+                                            setShowTokenPricingModal(false);
+                                            setShowTokenBuyModal(true);
+                                        }}
+                                        className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                                    >
                                         Buy Now
                                     </button>
                                 </div>
@@ -281,7 +368,13 @@ const Navbar: React.FC = () => {
                                         <div className="text-sm text-gray-400">฿4 per token</div>
                                         <div className="text-xs text-green-400">Save ฿50</div>
                                     </div>
-                                    <button className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700">
+                                    <button 
+                                        onClick={() => {
+                                            setShowTokenPricingModal(false);
+                                            setShowTokenBuyModal(true);
+                                        }}
+                                        className="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+                                    >
                                         Buy Now
                                     </button>
                                 </div>
@@ -299,7 +392,13 @@ const Navbar: React.FC = () => {
                                         <div className="text-sm text-gray-400">฿3.5 per token</div>
                                         <div className="text-xs text-purple-400">Save ฿150</div>
                                     </div>
-                                    <button className="w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700">
+                                    <button 
+                                        onClick={() => {
+                                            setShowTokenPricingModal(false);
+                                            setShowTokenBuyModal(true);
+                                        }}
+                                        className="w-full rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700"
+                                    >
                                         Buy Now
                                     </button>
                                 </div>
@@ -318,7 +417,13 @@ const Navbar: React.FC = () => {
                                         Best Value - Save ฿1,000
                                     </div>
                                 </div>
-                                <button className="w-full rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-yellow-700">
+                                <button 
+                                    onClick={() => {
+                                        setShowTokenPricingModal(false);
+                                        setShowTokenBuyModal(true);
+                                    }}
+                                    className="w-full rounded-lg bg-yellow-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-yellow-700"
+                                >
                                     Buy Now
                                 </button>
                             </div>
@@ -335,13 +440,6 @@ const Navbar: React.FC = () => {
                                     <div>
                                         <strong>Starting Tokens:</strong> New users get 100 tokens
                                         to begin
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-3">
-                                    <span className="text-blue-400">🔄</span>
-                                    <div>
-                                        <strong>Daily Refresh:</strong> Get 50 free tokens every 24
-                                        hours
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
@@ -383,18 +481,19 @@ const Navbar: React.FC = () => {
                                             Total tokens used
                                         </div>
                                     </div>
-                                    <div>
-                                        <div className="text-2xl font-bold text-green-400">
-                                            {tokenStatus.refresh_count || 0}
-                                        </div>
-                                        <div className="text-sm text-gray-400">Times refreshed</div>
-                                    </div>
                                 </div>
                             </div>
                         )}
                     </div>
                 </div>
             )}
+
+            {/* Token Buy Modal */}
+            <TokenBuyModal
+                isOpen={showTokenBuyModal}
+                onClose={() => setShowTokenBuyModal(false)}
+                onSubmit={handleTokenPurchase}
+            />
         </>
     );
 };
