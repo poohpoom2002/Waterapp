@@ -3,7 +3,6 @@ import { LoaderCircle, Droplets, Leaf, Shield, Mail, Lock, Eye, EyeOff } from 'l
 import { FormEventHandler, useState } from 'react';
 
 import InputError from '@/components/input-error';
-import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -20,7 +19,7 @@ interface LoginProps {
     canResetPassword: boolean;
 }
 
-export default function Login({ status, canResetPassword }: LoginProps) {
+export default function Login({ status }: LoginProps) {
     const [showPassword, setShowPassword] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm<Required<LoginForm>>({
@@ -185,7 +184,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     <Lock className="h-4 w-4 text-gray-500" />
                                     <span>รหัสผ่าน</span>
                                 </Label>
-                                {canResetPassword && (
+                                {/* {canResetPassword && (
                                     <TextLink
                                         href={route('password.request')}
                                         className="text-sm font-medium text-green-600 transition-colors hover:text-green-700"
@@ -193,7 +192,7 @@ export default function Login({ status, canResetPassword }: LoginProps) {
                                     >
                                         ลืมรหัสผ่าน?
                                     </TextLink>
-                                )}
+                                )} */}
                             </div>
                             <div className="relative">
                                 <Input

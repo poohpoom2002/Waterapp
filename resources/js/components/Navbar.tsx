@@ -243,12 +243,12 @@ const Navbar: React.FC = () => {
                                     onMinimize={() => setIsAiChatMinimized(!isAiChatMinimized)}
                                     isMinimized={isAiChatMinimized}
                                 />
-                                <button
+                                {/* <button
                                     onClick={() => setShowFloatingAiChat(true)}
                                     className="rounded-lg bg-gradient-to-r from-green-500 to-blue-500 px-4 py-2 text-sm font-medium text-white transition-all hover:from-green-600 hover:to-blue-600"
                                 >
                                     🤖 {t('AI ช่วยเหลือ')}
-                                </button>
+                                </button> */}
                                 <button
                                     onClick={() => (window.location.href = '/equipment-crud')}
                                     className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"

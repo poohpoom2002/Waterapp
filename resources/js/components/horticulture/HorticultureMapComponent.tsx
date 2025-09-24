@@ -192,7 +192,7 @@ const MapComponent: React.FC<{
 
             {React.Children.map(children, (child) => {
                 if (React.isValidElement(child)) {
-                    return React.cloneElement(child, { map });
+                    return React.cloneElement(child, { map } as any);
                 }
             })}
         </>
