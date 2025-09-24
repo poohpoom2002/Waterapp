@@ -119,7 +119,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             case 'field-crop':
                 return t('จุดปลูก');
             case 'greenhouse':
-                return t('หัวฉีด');
             default:
                 return t('ต้นไม้');
         }
@@ -132,7 +131,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             case 'field-crop':
                 return t('หัวฉีด');
             case 'greenhouse':
-                return t('หัวฉีด');
             default:
                 return t('หัวฉีด');
         }
@@ -617,9 +615,25 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 const zoneInput = zoneInputs[plot.plotId];
 
                 if (zoneSprinkler) {
-                    // ใช้จำนวนหัวฉีดแทนจำนวนพืช
-                    const sprinklerQuantity =
-                        plot.equipmentCount.sprinklers || plot.production.totalPlants || 100;
+                    // คำนวณจำนวนหัวฉีดจากข้อมูล greenhouse
+                    let sprinklerQuantity = plot.equipmentCount?.sprinklers || 0;
+                    
+                    if (sprinklerQuantity === 0) {
+                        // fallback: คำนวณจากจำนวนต้นไม้และพื้นที่
+                        const totalPlants = plot.production?.totalPlants || 0;
+                        const effectiveArea = plot.effectivePlantingArea || plot.area || 0;
+                        
+                        if (totalPlants > 0) {
+                            // ประมาณ 1 หัวฉีดต่อ 10-20 ต้น (ขึ้นกับชนิดพืช)
+                            sprinklerQuantity = Math.ceil(totalPlants / 15);
+                        } else if (effectiveArea > 0) {
+                            // ประมาณ 1 หัวฉีดต่อ 4-6 ตารางเมตร
+                            sprinklerQuantity = Math.ceil(effectiveArea / 5);
+                        } else {
+                            sprinklerQuantity = 10; // ค่า default ขั้นต่ำ
+                        }
+                    }
+                    
                     const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
                     totalSprinklerCost += sprinklerCost;
 
@@ -633,14 +647,26 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                         };
                     }
                     sprinklerSummary[key].quantity += sprinklerQuantity;
-                    sprinklerSummary[key].zones.push(plot.plotName);
+                    sprinklerSummary[key].zones.push(plot.plotName || `โซน ${plot.plotId}`);
                     sprinklerSummary[key].totalCost += sprinklerCost;
                 }
 
                 if (zoneInput) {
-                    // ใช้จำนวนหัวฉีดแทนจำนวนพืช
-                    const sprinklerCount =
-                        plot.equipmentCount.sprinklers || plot.production.totalPlants || 100;
+                    // ใช้จำนวนหัวฉีดที่คำนวณได้
+                    let sprinklerCount = plot.equipmentCount?.sprinklers || 0;
+                    if (sprinklerCount === 0) {
+                        const totalPlants = plot.production?.totalPlants || 0;
+                        const effectiveArea = plot.effectivePlantingArea || plot.area || 0;
+                        
+                        if (totalPlants > 0) {
+                            sprinklerCount = Math.ceil(totalPlants / 15);
+                        } else if (effectiveArea > 0) {
+                            sprinklerCount = Math.ceil(effectiveArea / 5);
+                        } else {
+                            sprinklerCount = 10;
+                        }
+                    }
+                    
                     processExtraPipe(plot.plotId, zoneInput, sprinklerCount);
 
                     const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
@@ -656,24 +682,12 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.branch[key].totalLength += zoneInput.totalBranchPipeM;
-                        pipeSummary.branch[key].zones.push(plot.plotName);
+                        pipeSummary.branch[key].zones.push(plot.plotName || `โซน ${plot.plotId}`);
                     }
 
-                    const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
-                    if (secondaryPipe && zoneInput.totalSecondaryPipeM > 0) {
-                        const key = `${secondaryPipe.id}`;
-                        if (!pipeSummary.secondary[key]) {
-                            pipeSummary.secondary[key] = {
-                                pipe: secondaryPipe,
-                                totalLength: 0,
-                                quantity: 0,
-                                zones: [],
-                                totalCost: 0,
-                            };
-                        }
-                        pipeSummary.secondary[key].totalLength += zoneInput.totalSecondaryPipeM;
-                        pipeSummary.secondary[key].zones.push(plot.plotName);
-                    }
+                    // Greenhouse ไม่มีท่อเมนรอง - ข้าม secondary pipe
+                    // const secondaryPipe = zonePipes.secondary || results.autoSelectedSecondaryPipe;
+                    // (ไม่ต้องคำนวณท่อเมนรองสำหรับ greenhouse)
 
                     const mainPipe = zonePipes.main || results.autoSelectedMainPipe;
                     if (mainPipe && zoneInput.totalMainPipeM > 0) {
@@ -688,7 +702,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.main[key].totalLength += zoneInput.totalMainPipeM;
-                        pipeSummary.main[key].zones.push(plot.plotName);
+                        pipeSummary.main[key].zones.push(plot.plotName || `โซน ${plot.plotId}`);
                     }
 
                     const emitterPipe = zonePipes.emitter || results.autoSelectedEmitterPipe;
@@ -708,7 +722,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                             };
                         }
                         pipeSummary.emitter[key].totalLength += zoneInput.totalEmitterPipeM;
-                        pipeSummary.emitter[key].zones.push(plot.plotName);
+                        pipeSummary.emitter[key].zones.push(plot.plotName || `โซน ${plot.plotId}`);
                     }
                 }
             });
@@ -1207,112 +1221,6 @@ const CostSummary: React.FC<CostSummaryProps> = ({
             <h2 className="mb-4 text-2xl font-bold text-yellow-400">
                 💰 {t('สรุปอุปกรณ์ทั้งหมด')} {getProjectIcon()}
             </h2>
-
-            {projectSummary && (
-                <div className="mb-6 rounded-lg bg-blue-900 p-4">
-                    <h3 className="mb-3 text-lg font-bold text-blue-300">
-                        📊 {t('สรุปโครงการทั้งหมด')}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                        <div>
-                            <p className="text-blue-200">{t('พื้นที่รวม:')}</p>
-                            <p className="font-bold text-white">
-                                {projectMode === 'greenhouse'
-                                    ? formatArea(totalArea)
-                                    : formatArea(totalArea * 1600)}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-blue-200">{t('ความต้องการน้ำ:')}</p>
-                            <p className="font-bold text-white">
-                                {(projectSummary.totalWaterNeed || 0).toLocaleString()}{' '}
-                                {projectSummary.waterUnit}
-                            </p>
-                        </div>
-                        {projectMode === 'greenhouse' && projectSummary.totalSprinklers > 0 && (
-                            <div>
-                                <p className="text-blue-200">{t('จำนวนหัวฉีดรวม:')}</p>
-                                <p className="font-bold text-white">
-                                    {(projectSummary.totalSprinklers || 0).toLocaleString()}{' '}
-                                    {t('หัว')}
-                                </p>
-                            </div>
-                        )}
-                        {projectMode === 'field-crop' && projectSummary.totalIrrigationPoints > 0 && (
-                            <div>
-                                <p className="text-blue-200">{t('จุดให้น้ำรวม:')}</p>
-                                <p className="font-bold text-white">
-                                    {(projectSummary.totalIrrigationPoints || 0).toLocaleString()}{' '}
-                                    {t('จุด')}
-                                </p>
-                            </div>
-                        )}
-                        {(projectSummary.totalProduction || 0) > 0 && (
-                            <div>
-                                <p className="text-blue-200">{t('ผลผลิตประมาณ:')}</p>
-                                <p className="font-bold text-green-300">
-                                    {(projectSummary.totalProduction || 0).toLocaleString()}{' '}
-                                    {projectSummary.productionUnit}
-                                </p>
-                            </div>
-                        )}
-                        {(projectSummary.totalIncome || 0) > 0 && (
-                            <div>
-                                <p className="text-blue-200">{t('รายได้ประมาณ:')}</p>
-                                <p className="font-bold text-green-300">
-                                    {Number(
-                                        (projectSummary.totalIncome || 0).toFixed(2)
-                                    ).toLocaleString('th-TH')}{' '}
-                                    {t('บาท')}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Field-crop specific irrigation information */}
-                    {projectMode === 'field-crop' && projectSummary.irrigationByType && (
-                        <div className="mt-3 border-t border-blue-700 pt-3">
-                            <h4 className="mb-2 text-sm font-semibold text-blue-200">
-                                🌱 {t('ประเภทระบบให้น้ำ')}
-                            </h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                {projectSummary.irrigationByType.sprinkler > 0 && (
-                                    <div>
-                                        <p className="text-blue-200">{t('สปริงเกลอร์:')}</p>
-                                        <p className="font-bold text-white">
-                                            {projectSummary.irrigationByType.sprinkler.toLocaleString()} {t('จุด')}
-                                        </p>
-                                    </div>
-                                )}
-                                {projectSummary.irrigationByType.dripTape > 0 && (
-                                    <div>
-                                        <p className="text-blue-200">{t('เทปหยด:')}</p>
-                                        <p className="font-bold text-white">
-                                            {projectSummary.irrigationByType.dripTape.toLocaleString()} {t('จุด')}
-                                        </p>
-                                    </div>
-                                )}
-                                {projectSummary.irrigationByType.pivot > 0 && (
-                                    <div>
-                                        <p className="text-blue-200">{t('ปิโวต์:')}</p>
-                                        <p className="font-bold text-white">
-                                            {projectSummary.irrigationByType.pivot.toLocaleString()} {t('จุด')}
-                                        </p>
-                                    </div>
-                                )}
-                                {projectSummary.irrigationByType.waterJetTape > 0 && (
-                                    <div>
-                                        <p className="text-blue-200">{t('เทปน้ำพุ่ง:')}</p>
-                                        <p className="font-bold text-white">
-                                            {projectSummary.irrigationByType.waterJetTape.toLocaleString()} {t('จุด')}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
 
             {uniqueSprinklers > 0 && (
                 <div className="mb-4 rounded bg-green-900 p-3">

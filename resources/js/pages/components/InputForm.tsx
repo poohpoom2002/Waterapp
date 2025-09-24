@@ -790,11 +790,11 @@ const InputForm: React.FC<InputFormProps> = ({
         switch (projectMode) {
             case 'field-crop':
                 return t('น้ำต่อหัว (ลิตร/นาที)');
-            case 'greenhouse':
-                return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
             case 'garden':
                 return t('ต้องการน้ำ (ลิตร/นาที)');
             case 'horticulture':
+                return t('ต้องการน้ำ (ลิตร/นาที)');
+            case 'greenhouse':
                 return t('ต้องการน้ำ (ลิตร/นาที)');
             default:
                 return t('น้ำต่อ') + getItemName() + t(' (ลิตร/ครั้ง)');
@@ -803,11 +803,11 @@ const InputForm: React.FC<InputFormProps> = ({
 
     const getQuantityLabel = () => {
         switch (projectMode) {
-            case 'greenhouse':
-                return t('จำนวนหัวฉีด');
             case 'garden':
                 return t('จำนวนหัวฉีด');
             case 'field-crop':
+                return t('จำนวนหัวฉีด');
+            case 'greenhouse':
                 return t('จำนวนหัวฉีด');
             default:
                 return t('จำนวนต้นไม้');
@@ -816,7 +816,7 @@ const InputForm: React.FC<InputFormProps> = ({
 
     const shouldShowSprinklersPerTree = () => {
         return (
-            projectMode !== 'field-crop' && projectMode !== 'greenhouse' && projectMode !== 'garden'
+            projectMode !== 'field-crop' && projectMode !== 'garden'
         );
     };
 
@@ -1298,8 +1298,8 @@ const InputForm: React.FC<InputFormProps> = ({
                     <h3 className="text-lg font-semibold text-blue-400">🔧 {t('ข้อมูลท่อ')}</h3>
 
                     <div className="rounded-lg bg-gray-700 p-3">
-                        <h4 className="mb-2 text-sm font-medium text-purple-300">
-                            🔹 {t('ท่อย่อย (Branch Pipe)')}
+                        <h4 className="mb-2 text-sm font-medium text-yellow-300">
+                        🟡 {t('ท่อย่อย (Branch Pipe)')}
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -1353,11 +1353,13 @@ const InputForm: React.FC<InputFormProps> = ({
                         </div>
                     </div>
 
-                    <div className="rounded-lg bg-gray-700 p-3">
-                        {input.longestSecondaryPipeM > 0 ? (
+                    {/* ซ่อนท่อเมนรองสำหรับ greenhouse mode */}
+                    {projectMode !== 'greenhouse' && (
+                        <div className="rounded-lg bg-gray-700 p-3">
+                            {input.longestSecondaryPipeM > 0 ? (
                             <>
-                                <h4 className="mb-2 text-sm font-medium text-orange-300">
-                                    🔸 {t('ท่อเมนรอง (Secondary)')}
+                                <h4 className="mb-2 text-sm font-medium text-purple-300">
+                                🟣 {t('ท่อเมนรอง (Sub Main)')}
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
@@ -1419,8 +1421,7 @@ const InputForm: React.FC<InputFormProps> = ({
                                     <p className="text-sm">{t('ไม่ใช้ท่อเมนรอง')}</p>
                                 </div>
                                 {(projectMode === 'horticulture' ||
-                                    projectMode === 'field-crop' ||
-                                    projectMode === 'greenhouse') && (
+                                    projectMode === 'field-crop') && (
                                     <button
                                         onClick={() => updateInput('longestSecondaryPipeM', 50)}
                                         className="text-sm text-blue-400 hover:text-blue-300"
@@ -1430,13 +1431,14 @@ const InputForm: React.FC<InputFormProps> = ({
                                 )}
                             </div>
                         )}
-                    </div>
+                        </div>
+                    )}
 
                     <div className="rounded-lg bg-gray-700 p-3">
                         {input.longestMainPipeM > 0 ? (
                             <>
-                                <h4 className="mb-2 text-sm font-medium text-cyan-300">
-                                    🔷 {t('ท่อเมนหลัก')} (Main)
+                                <h4 className="mb-2 text-sm font-medium text-red-300">
+                                    🔴 {t('ท่อเมนหลัก')} (Main)
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
@@ -1511,11 +1513,12 @@ const InputForm: React.FC<InputFormProps> = ({
                         )}
                     </div>
 
-                    {input.longestEmitterPipeM && input.longestEmitterPipeM > 0 ? (
+                    {/* ซ่อนท่อย่อยแยกสำหรับ greenhouse mode */}
+                    {input.longestEmitterPipeM && input.longestEmitterPipeM > 0 && projectMode !== 'greenhouse' ? (
                         <>
                             <div className="rounded-lg bg-gray-700 p-3">
                                 <h4 className="mb-2 text-sm font-medium text-green-300">
-                                    🌿 {t('ท่อย่อยแยก (Emitter Pipe)')}
+                                🟢 {t('ท่อย่อยแยก (Emitter Pipe)')}
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>

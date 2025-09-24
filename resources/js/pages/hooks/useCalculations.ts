@@ -215,10 +215,16 @@ const calculateFlowRequirements = (
     }
 
     const secondaryFlowLPM =
-        input.longestSecondaryPipeM > 0 ? branchFlowLPM * maxBranchesPerSecondary : 0;
+        input.longestSecondaryPipeM > 0 && projectMode !== 'greenhouse' 
+            ? branchFlowLPM * maxBranchesPerSecondary 
+            : 0;
 
     const mainFlowLPM =
-        input.longestMainPipeM > 0 ? Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2) : 0;
+        input.longestMainPipeM > 0 
+            ? projectMode === 'greenhouse' 
+                ? sprinklerFlow.totalFlowLPM // Greenhouse: main pipe carries total flow directly
+                : Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2)
+            : 0;
 
     // Calculate emitter flow based on plant density and connection method
     const emitterFlowLPM =
@@ -702,11 +708,11 @@ const getFieldCropCalculationData = (): {
             waterPerTreeLiters: fieldCropData.summary.totalWaterRequirementPerDay / fieldCropData.summary.totalPlantingPoints / 60, // Convert to LPM per plant
             numberOfZones: fieldCropData.zones.count,
             sprinklersPerTree: 1, // Default for field-crop
-            longestBranchPipeM: fieldCropData.pipes.stats.lateral.longest,
+            longestBranchPipeM: fieldCropData.pipes.stats.lateral.longestLength,
             totalBranchPipeM: fieldCropData.pipes.stats.lateral.totalLength,
-            longestSecondaryPipeM: fieldCropData.pipes.stats.submain.longest,
+            longestSecondaryPipeM: fieldCropData.pipes.stats.submain.longestLength,
             totalSecondaryPipeM: fieldCropData.pipes.stats.submain.totalLength,
-            longestMainPipeM: fieldCropData.pipes.stats.main.longest,
+            longestMainPipeM: fieldCropData.pipes.stats.main.longestLength,
             totalMainPipeM: fieldCropData.pipes.stats.main.totalLength,
             irrigationTimeMinutes: 30, // Default irrigation time
             staticHeadM: 5, // Default static head
@@ -1021,7 +1027,7 @@ export const useCalculations = (
         // Enhanced sprinkler analysis for field-crop mode
         const analyzedSprinklers = sprinklerData
             .map((sprinkler) => {
-                let enhancedSprinkler = { ...sprinkler };
+                const enhancedSprinkler = { ...sprinkler };
                 
                 // For field-crop mode, enhance sprinkler data with field-crop specific calculations
                 if (projectMode === 'field-crop' && fieldCropData) {
@@ -1253,7 +1259,7 @@ export const useCalculations = (
         // Enhanced pump analysis for field-crop mode
         const analyzedPumps = pumpData
             .map((pump) => {
-                let enhancedPump = evaluatePumpOverall(pump, requiredPumpFlow, pumpHeadRequired);
+                const enhancedPump = evaluatePumpOverall(pump, requiredPumpFlow, pumpHeadRequired);
                 
                 // For field-crop mode, enhance pump data with field-crop specific calculations
                 if (projectMode === 'field-crop' && fieldCropData) {
