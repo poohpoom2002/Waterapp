@@ -13,6 +13,7 @@ import {
 interface PipeSystemSummaryProps {
     horticultureSystemData?: any;
     gardenSystemData?: any; // เพิ่มสำหรับ garden mode
+    greenhouseData?: any; // เพิ่มสำหรับ greenhouse mode
     activeZoneId?: string;
     selectedPipes?: {
         branch?: any;
@@ -27,6 +28,7 @@ interface PipeSystemSummaryProps {
 const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
     horticultureSystemData,
     gardenSystemData,
+    greenhouseData,
     activeZoneId,
     selectedPipes,
     sprinklerPressure,
@@ -34,49 +36,22 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
 }) => {
     const { t } = useLanguage();
 
-    // Only show for horticulture, garden, greenhouse and field-crop modes
-    if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'greenhouse' && projectMode !== 'field-crop') {
+    // Only show for supported modes
+    if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'field-crop' && projectMode !== 'greenhouse') {
         return null;
     }
 
     // Don't show if no data
     const systemData = projectMode === 'garden' ? gardenSystemData : 
-                      projectMode === 'field-crop' ? null : 
-                      projectMode === 'greenhouse' ? null : horticultureSystemData; // field-crop and greenhouse don't use systemData
-    if (!sprinklerPressure || (!systemData && projectMode !== 'field-crop' && projectMode !== 'greenhouse') || !activeZoneId) {
+                      projectMode === 'greenhouse' ? greenhouseData : 
+                      horticultureSystemData;
+    if (!sprinklerPressure || !systemData || !activeZoneId) {
         return null;
     }
 
     const calculationData = useMemo(() => {
-        let zone: any;
-        
-        // For field-crop and greenhouse modes, we don't need zone data, just use selected pipes directly
-        if (projectMode === 'field-crop') {
-            // Create mock zone data for field-crop mode
-            zone = {
-                bestPipes: {
-                    branch: { length: 50, count: 1, waterFlowRate: 6.0, details: { type: 'branch' } },
-                    subMain: { length: 100, count: 1, waterFlowRate: 60.0, details: { type: 'subMain' } },
-                    main: { length: 200, count: 1, waterFlowRate: 120.0, details: { type: 'main' } },
-                }
-            };
-        } else if (projectMode === 'greenhouse') {
-            // Create mock zone data for greenhouse mode
-            zone = {
-                bestPipes: {
-                    branch: { length: 30, count: 1, waterFlowRate: 6.0, details: { type: 'branch' } },
-                    subMain: { length: 50, count: 1, waterFlowRate: 30.0, details: { type: 'subMain' } },
-                    main: { length: 0, count: 1, waterFlowRate: 0, details: { type: 'main' } }, // greenhouse usually doesn't have main pipe
-                }
-            };
-        } else {
-            // For other modes, use systemData
-            zone = systemData?.zones?.find((z: any) => z.id === activeZoneId);
-        }
-        
-        if (!zone?.bestPipes) {
-            return null;
-        }
+        const zone = systemData.zones?.find((z: any) => z.id === activeZoneId);
+        if (!zone?.bestPipes) return null;
 
         // คำนวณ head loss สำหรับแต่ละประเภทท่อ
         const branchCalc =
@@ -170,7 +145,6 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         const branchSubMainCombined = (branchCalc?.headLoss || 0) + (subMainCalc?.headLoss || 0);
         const head20Percent = sprinklerPressure.head20PercentM;
 
-
         return {
             branchCalc,
             subMainCalc,
@@ -185,6 +159,21 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         return null;
     }
 
+    // Handle greenhouse mode rendering - simplified version
+    if (projectMode === 'greenhouse') {
+        return (
+            <div className="mt-6 rounded bg-green-900 p-4">
+                <h4 className="mb-3 text-lg font-bold text-green-300">
+                    🔧 ข้อมูลท่อ - โหมดเรือนกระจก
+                </h4>
+                <div className="text-sm text-green-200">
+                    <p>การแสดงผลสำหรับโหมดเรือนกระจกจะได้รับการพัฒนาต่อไป</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Original horticulture/garden mode rendering
     const { branchCalc, subMainCalc, mainCalc, emitterCalc, branchSubMainCombined, head20Percent } =
         calculationData;
 
@@ -201,21 +190,21 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                     <div className="flex items-center space-x-2">
                         <span className="text-lg text-blue-300">แรงดัน</span>
                         <span className="text-lg font-bold text-white">
-                            {parseFloat(sprinklerPressure.pressureBar.toFixed(2)).toString()}
+                            {parseFloat((sprinklerPressure?.pressureBar || 0).toFixed(2)).toString()}
                         </span>
                         <span className="text-lg text-blue-300">บาร์</span>
                     </div>
                     <div className="flex items-center space-x-2">
                         <span className="text-lg text-blue-300">แปลงเป็น Head</span>
                         <span className="text-lg font-bold text-white">
-                            {parseFloat(sprinklerPressure.headM.toFixed(2)).toString()}
+                            {parseFloat((sprinklerPressure?.headM || 0).toFixed(2)).toString()}
                         </span>
                         <span className="text-lg text-blue-300">ม.</span>
                     </div>
                     <div className="flex items-center space-x-2">
                         <span className="text-lg text-blue-300">20% Head</span>
                         <span className="text-lg font-bold text-yellow-300">
-                            {parseFloat(head20Percent.toFixed(2)).toString()}
+                            {parseFloat((head20Percent || 0).toFixed(2)).toString()}
                         </span>
                         <span className="text-lg text-blue-300">ม.</span>
                     </div>
@@ -274,17 +263,17 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
                                                 ขีดจำกัด 20% Head หัวฉีด:
                                             </span>
                                             <span className="font-bold text-yellow-300">
-                                                {head20Percent.toFixed(3)} ม.
+                                                {(head20Percent || 0).toFixed(3)} ม.
                                             </span>
                                         </div>
 
                                         {/* Warning Messages */}
-                                        {mainCalc && mainCalc.headLoss > head20Percent && (
+                                        {mainCalc && mainCalc.headLoss > (head20Percent || 0) && (
                                             <div className="rounded border border-red-700 bg-red-900 p-2">
                                                 <span className="text-xs text-red-300">
                                                     ⚠️ <strong>คำเตือน:</strong> ท่อเมนหลักมี Head
                                                     Loss เกินขีดจำกัด{' '}
-                                                    {(mainCalc.headLoss - head20Percent).toFixed(3)}{' '}
+                                                    {(mainCalc.headLoss - (head20Percent || 0)).toFixed(3)}{' '}
                                                     ม.
                                                 </span>
                                             </div>

@@ -35,6 +35,7 @@ interface InputFormProps {
     connectionStats?: ConnectionPointStats[];
     onConnectionEquipmentsChange?: (equipments: ConnectionPointEquipment[]) => void;
     greenhouseData?: any; // เพิ่มสำหรับ greenhouse projectMode
+    fieldCropSystemData?: any; // เพิ่มสำหรับ field-crop projectMode
 }
 
 interface BranchPipeStats {
@@ -96,6 +97,7 @@ const InputForm: React.FC<InputFormProps> = ({
     connectionStats = [],
     onConnectionEquipmentsChange,
     greenhouseData,
+    fieldCropSystemData,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
@@ -122,8 +124,94 @@ const InputForm: React.FC<InputFormProps> = ({
 
     const { t } = useLanguage();
 
+    // ใช้ useRef เพื่อเก็บ reference ของ fieldCropSystemData
+    const fieldCropSystemDataRef = useRef(fieldCropSystemData);
+    fieldCropSystemDataRef.current = fieldCropSystemData;
+
+    // Debug logging for field-crop mode
+    useEffect(() => {
+        if (projectMode === 'field-crop') {
+            console.log('🔍 InputForm field-crop debug:');
+            console.log('- input.totalTrees:', input.totalTrees);
+            console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
+            console.log('- activeZone:', activeZone);
+            console.log('- fieldCropSystemData:', fieldCropSystemData);
+        }
+    }, [projectMode, input.totalTrees, input.waterPerTreeLiters, activeZone, fieldCropSystemData]);
+
     // ฟังก์ชันสำหรับจัดการข้อมูล connection points
     const initializeConnectionPointEquipments = useCallback(() => {
+        console.log('🔍 initializeConnectionPointEquipments called for projectMode:', projectMode);
+        // สำหรับ field-crop mode ให้ใช้ fieldCropSystemData
+        if (projectMode === 'field-crop' && fieldCropSystemDataRef.current) {
+            console.log('🔍 Field-crop mode: fieldCropSystemData found');
+            const equipments: ConnectionPointEquipment[] = [];
+            
+            // โหลดการเลือกอุปกรณ์ที่เก็บไว้
+            const savedSelections = localStorage.getItem('connectionPointEquipmentSelections');
+            const selections = savedSelections ? JSON.parse(savedSelections) : {};
+
+            // หาโซนที่ active
+            const activeZoneData = fieldCropSystemDataRef.current.zones?.find((z: any) => z.id === activeZone?.id);
+            console.log('🔍 Active zone data:', activeZoneData);
+            console.log('🔍 Active zone connection points:', activeZoneData?.connectionPoints);
+            if (activeZoneData && activeZoneData.connectionPoints) {
+                // สร้างอุปกรณ์สำหรับแต่ละประเภทจุดเชื่อมต่อ
+                const connectionTypes = [
+                    { key: 'junction', name: 'จุดเชื่อมต่อ', color: '#FFD700' },
+                    { key: 'crossing', name: 'จุดข้ามท่อ', color: '#4CAF50' },
+                    { key: 'l_shape', name: 'จุดเชื่อมต่อรูปตัว L', color: '#F44336' },
+                    { key: 't_shape', name: 'จุดเชื่อมต่อรูปตัว T', color: '#2196F3' },
+                    { key: 'cross_shape', name: 'จุดเชื่อมต่อรูปตัว +', color: '#9C27B0' },
+                ];
+
+                connectionTypes.forEach((type) => {
+                    const pointsOfType = activeZoneData.connectionPoints.filter((cp: any) => cp.type === type.key);
+                    if (pointsOfType.length > 0) {
+                        const equipmentId = `${activeZoneData.id}-${type.key}`;
+                        const savedSelection = selections[equipmentId];
+
+                        const equipmentData = {
+                            zoneId: activeZoneData.id,
+                            zoneName: activeZoneData.name,
+                            connectionType: type.key as any,
+                            connectionTypeName: type.name,
+                            color: type.color,
+                            count: pointsOfType.length,
+                            category: savedSelection?.category || null,
+                            equipment: savedSelection?.equipment || null,
+                        };
+                        equipments.push(equipmentData);
+                    }
+                });
+            }
+
+            console.log('🔍 Field-crop equipments created:', equipments);
+            setConnectionPointEquipments(equipments);
+
+            // Load equipment options for any category that already has selected equipment
+            const categoriesToLoad = new Set<string>();
+            equipments.forEach((eq) => {
+                if (eq.category && eq.equipment) {
+                    categoriesToLoad.add(eq.category);
+                }
+            });
+
+            console.log('🔍 Categories to load for field-crop:', Array.from(categoriesToLoad));
+
+            // Load equipment for each category that has selected equipment
+            categoriesToLoad.forEach((category) => {
+                fetchConnectionEquipments(category);
+            });
+
+            return;
+        } else if (projectMode === 'field-crop') {
+            console.log('❌ Field-crop mode but no fieldCropSystemData or no active zone');
+            console.log('- fieldCropSystemDataRef.current:', fieldCropSystemDataRef.current);
+            console.log('- activeZone:', activeZone);
+        }
+
+        // สำหรับ horticulture mode (เดิม)
         if (!connectionStats || connectionStats.length === 0) {
             return;
         }
@@ -188,28 +276,33 @@ const InputForm: React.FC<InputFormProps> = ({
         categoriesToLoad.forEach((category) => {
             fetchConnectionEquipments(category);
         });
-    }, [connectionStats, activeZone]);
+    }, [connectionStats, activeZone, projectMode]);
 
     // ฟังก์ชันโหลดหมวดหมู่อุปกรณ์ connection points
     const fetchConnectionCategories = useCallback(async () => {
         setLoadingConnectionCategories(true);
         try {
+            console.log('🔍 Fetching connection categories for projectMode:', projectMode);
             const response = await fetch('/api/equipment-categories');
             if (response.ok) {
                 const categories = await response.json();
+                console.log('🔍 All categories received:', categories);
                 // กรองเฉพาะหมวดหมู่ที่ต้องการ
                 const filteredCategories = categories.filter(
                     (cat: any) =>
                         cat.name === 'agricultural_fittings' || cat.name === 'pvc_fittings'
                 );
+                console.log('🔍 Filtered categories for connection points:', filteredCategories);
                 setEquipmentCategories(filteredCategories);
+            } else {
+                console.error('❌ Failed to fetch categories, response status:', response.status);
             }
         } catch (error) {
-            console.error('Error fetching connection categories:', error);
+            console.error('❌ Error fetching connection categories:', error);
         } finally {
             setLoadingConnectionCategories(false);
         }
-    }, []);
+    }, [projectMode]);
 
     // ฟังก์ชันโหลดอุปกรณ์ในหมวดหมู่
     const fetchConnectionEquipments = async (categoryName: string) => {
@@ -361,14 +454,17 @@ const InputForm: React.FC<InputFormProps> = ({
     // Initialize connection point equipments when connectionStats or activeZone changes
     useEffect(() => {
         initializeConnectionPointEquipments();
-    }, [connectionStats, activeZone, initializeConnectionPointEquipments]);
+    }, [connectionStats, activeZone, projectMode, initializeConnectionPointEquipments]);
 
     // Load connection equipment categories (แยกออกจาก connection equipments)
     useEffect(() => {
-        if (connectionPointEquipments.length > 0) {
+        // สำหรับ field-crop mode ให้โหลดหมวดหมู่ทันที
+        if (projectMode === 'field-crop') {
+            fetchConnectionCategories();
+        } else if (connectionPointEquipments.length > 0) {
             fetchConnectionCategories();
         }
-    }, [connectionPointEquipments.length, fetchConnectionCategories]); // เพิ่ม fetchConnectionCategories ใน dependencies
+    }, [connectionPointEquipments.length, fetchConnectionCategories, projectMode]); // เพิ่ม projectMode ใน dependencies
 
     // ใช้ useRef เพื่อเก็บ reference ของ callback function
     const onConnectionEquipmentsChangeRef = useRef(onConnectionEquipmentsChange);
@@ -1026,7 +1122,7 @@ const InputForm: React.FC<InputFormProps> = ({
                             </label>
                             <input
                                 type="number"
-                                defaultValue={input.totalTrees}
+                                value={input.totalTrees}
                                 onChange={(e) => {
                                     const value = parseInt(e.target.value);
                                     if (!isNaN(value)) {
@@ -1594,7 +1690,22 @@ const InputForm: React.FC<InputFormProps> = ({
 
                         {/* แสดงจุดเชื่อมต่อของโซนที่เลือก */}
                         <div className="grid grid-cols-2 gap-3">
-                            {connectionPointEquipments.map((equipment, index) => {
+                            {connectionPointEquipments.length === 0 ? (
+                                <div className="col-span-2 rounded bg-gray-600 p-3 text-center text-gray-400">
+                                    {projectMode === 'field-crop' ? (
+                                        <div>
+                                            <p>ไม่พบจุดเชื่อมต่อในโซนนี้</p>
+                                            <p className="text-xs mt-1">
+                                                Debug: fieldCropSystemData = {fieldCropSystemData ? 'มี' : 'ไม่มี'}, 
+                                                activeZone = {activeZone ? activeZone.id : 'ไม่มี'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        'ไม่พบจุดเชื่อมต่อในโซนนี้'
+                                    )}
+                                </div>
+                            ) : (
+                                connectionPointEquipments.map((equipment, index) => {
                                 const equipmentId = `${equipment.zoneId}-${equipment.connectionType}`;
                                 return (
                                     <div key={equipmentId} className="rounded bg-gray-600 p-3">
@@ -1781,7 +1892,8 @@ const InputForm: React.FC<InputFormProps> = ({
                                         )}
                                     </div>
                                 );
-                            })}
+                            })
+                            )}
                         </div>
                     </div>
                 ) : (
