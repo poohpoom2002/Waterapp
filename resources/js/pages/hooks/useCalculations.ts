@@ -142,6 +142,9 @@ const calculateSprinklerBasedFlow = (
         console.log('- totalSprinklers:', totalSprinklers);
         console.log('- flowPerSprinkler:', flowPerSprinkler);
         console.log('- totalWaterPerMinute:', totalWaterPerMinute);
+        console.log('- input.totalTrees:', input.totalTrees);
+        console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
+        console.log('- projectMode:', projectMode);
         
         // Ensure we have valid values
         if (totalWaterPerMinute === 0 || isNaN(totalWaterPerMinute)) {
@@ -252,10 +255,16 @@ const calculateFlowRequirements = (
     }
 
     const secondaryFlowLPM =
-        input.longestSecondaryPipeM > 0 ? branchFlowLPM * maxBranchesPerSecondary : 0;
+        input.longestSecondaryPipeM > 0 && projectMode !== 'greenhouse' 
+            ? branchFlowLPM * maxBranchesPerSecondary 
+            : 0;
 
     const mainFlowLPM =
-        input.longestMainPipeM > 0 ? Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2) : 0;
+        input.longestMainPipeM > 0 
+            ? projectMode === 'greenhouse' 
+                ? sprinklerFlow.totalFlowLPM // Greenhouse: main pipe carries total flow directly
+                : Math.min(sprinklerFlow.totalFlowLPM, secondaryFlowLPM * 2)
+            : 0;
 
     // Calculate emitter flow based on plant density and connection method
     const emitterFlowLPM =

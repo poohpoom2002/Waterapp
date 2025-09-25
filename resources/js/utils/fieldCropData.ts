@@ -150,13 +150,6 @@ export interface FieldCropData {
         totalEstimatedIncome: number;
         irrigationEfficiency: number;
     };
-    // Add sprinkler configuration similar to horticulture
-    sprinklerConfig?: {
-        flowRatePerPlant: number;
-        pressureBar: number;
-        radiusMeters: number;
-        totalFlowRatePerMinute: number;
-    };
 }
 
 export const calculateEnhancedPipeLength = (coordinates: CoordinateInput[]): number => {
@@ -559,13 +552,6 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
         zoneSummaries[zone.id] = createZoneSummary(zone, crop, zone.area, irrigationCounts);
     });
 
-    // Calculate sprinkler configuration from irrigation settings
-    const irrigationSettings = summaryData.irrigationSettings || {};
-    const sprinklerSettings = irrigationSettings.sprinkler_system || irrigationSettings.sprinkler || {};
-    const defaultFlowRate = sprinklerSettings.flow || 30; // Default 30 L/min
-    const defaultPressure = sprinklerSettings.pressure || 2.5; // Default 2.5 bar
-    const defaultRadius = sprinklerSettings.coverageRadius || 8; // Default 8 meters
-
     return {
         area: {
             size: totalArea,
@@ -634,12 +620,6 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
             }, 0),
             irrigationEfficiency:
                 totalPlantingPoints > 0 ? totalWaterRequirementPerDay / totalPlantingPoints : 0,
-        },
-        sprinklerConfig: {
-            flowRatePerPlant: defaultFlowRate,
-            pressureBar: defaultPressure,
-            radiusMeters: defaultRadius,
-            totalFlowRatePerMinute: totalPlantingPoints * defaultFlowRate,
         },
     };
 };
@@ -923,19 +903,6 @@ export interface FieldCropSystemData {
             subMain: any;
             branch: any;
         };
-        connectionPoints?: Array<{
-            id: string;
-            position: {
-                lat: number;
-                lng: number;
-            };
-            connectedLaterals: string[];
-            submainId: string;
-            type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
-            color?: string;
-            size?: number;
-            title?: string;
-        }>;
     }>;
     totalPlants: number;
     isMultipleZones: boolean;

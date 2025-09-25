@@ -53,9 +53,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
     const requiredFlow = results.flows.main;
     const requiredHead = results.pumpHeadRequired;
 
-    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture และ garden mode
+    // คำนวณความต้องการตามเงื่อนไขใหม่สำหรับ horticulture, garden และ greenhouse mode
     const getHorticultureRequirements = () => {
-        if (projectMode !== 'horticulture' && projectMode !== 'garden') {
+        if (projectMode !== 'horticulture' && projectMode !== 'garden' && projectMode !== 'greenhouse') {
             return {
                 requiredFlowLPM: requiredFlow,
                 minRequiredHead: requiredHead,
@@ -135,6 +135,112 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                 };
             } catch (error) {
                 console.error('Error parsing garden data:', error);
+                return {
+                    requiredFlowLPM: requiredFlow,
+                    minRequiredHead: requiredHead,
+                    qHeadSpray: 0,
+                };
+            }
+        }
+
+        // สำหรับ greenhouse mode ใช้ข้อมูลจาก greenhouse data
+        if (projectMode === 'greenhouse') {
+            try {
+                // ดึงข้อมูลจาก localStorage
+                const greenhouseSystemDataStr = localStorage.getItem('greenhouseSystemData');
+                if (!greenhouseSystemDataStr) {
+                    return {
+                        requiredFlowLPM: requiredFlow,
+                        minRequiredHead: requiredHead,
+                        qHeadSpray: 0,
+                    };
+                }
+
+                const greenhouseSystemData = JSON.parse(greenhouseSystemDataStr);
+                const plotPipeData = greenhouseSystemData.plotPipeData || [];
+
+                // ดึงข้อมูลรูปแบบการเปิดโซนจาก product page
+                const productDataStr = localStorage.getItem('product_data');
+                let zoneOperationMode = 'sequential'; // default: เปิดทีละโซน
+                
+                if (productDataStr) {
+                    try {
+                        const productData = JSON.parse(productDataStr);
+                        zoneOperationMode = productData.zoneOperationMode || 'sequential';
+                    } catch (e) {
+                        console.error('Error parsing product data:', e);
+                    }
+                }
+
+                let totalWaterRequirement = 0;
+
+                if (zoneOperationMode === 'simultaneous') {
+                    // เปิดพร้อมกันทุกโซน: รวมความต้องการน้ำทุกแปลง
+                    totalWaterRequirement = plotPipeData.reduce(
+                        (total: number, plot: any) => total + (plot.totalFlowRate || 0),
+                        0
+                    );
+                } else {
+                    // เปิดทีละโซน: ใช้แปลงที่ต้องการน้ำมากที่สุด
+                    totalWaterRequirement = Math.max(
+                        ...plotPipeData.map((plot: any) => plot.totalFlowRate || 0)
+                    );
+                }
+
+                // คำนวณ Pump Head ให้ตรงกับ CalculationSummary.tsx
+                // ใช้ค่าคงที่ที่ไม่เปลี่ยนตามโซน
+                const getGreenhousePumpHead = () => {
+                    // ดึงข้อมูลหัวฉีดจาก greenhouse planning data
+                    let sprinklerHeadLoss = 25; // ค่าเริ่มต้น (2.5 bar = 25 เมตร)
+                    try {
+                        const greenhousePlanningDataStr = localStorage.getItem('greenhousePlanningData');
+                        if (greenhousePlanningDataStr) {
+                            const planningData = JSON.parse(greenhousePlanningDataStr);
+                            const sprinklerPressureBar = planningData.sprinklerPressure || 2.5;
+                            sprinklerHeadLoss = sprinklerPressureBar * 10; // ใช้ x10 เหมือน CalculationSummary.tsx
+                        }
+                    } catch (e) {
+                        console.error('Error loading sprinkler pressure:', e);
+                    }
+                    
+                    // ใช้ค่าคงที่สำหรับ Pump Head - ไม่เปลี่ยนตามโซน
+                    // ค่านี้ควรเป็นค่าสูงสุดที่เคยคำนวณได้จากทุกโซน
+                    let maxPipeHeadLoss = 0;
+                    
+                    // ดึงค่าสูงสุดที่เก็บไว้ หรือใช้ค่าปัจจุบัน
+                    const maxHeadLossStr = localStorage.getItem('greenhouse_max_head_loss');
+                    if (maxHeadLossStr) {
+                        try {
+                            const maxHeadLossData = JSON.parse(maxHeadLossStr);
+                            maxPipeHeadLoss = maxHeadLossData.totalHeadLoss || 0;
+                        } catch (e) {
+                            console.error('Error loading max head loss:', e);
+                        }
+                    }
+                    
+                    // ถ้าไม่มีค่าสูงสุดที่เก็บไว้ ให้ใช้ค่าปัจจุบัน
+                    if (maxPipeHeadLoss === 0) {
+                        const pipeCalculationsStr = localStorage.getItem('greenhouse_pipe_calculations');
+                        if (pipeCalculationsStr) {
+                            const pipeCalculations = JSON.parse(pipeCalculationsStr);
+                            const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                            const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                            maxPipeHeadLoss = branchHeadLoss + mainHeadLoss;
+                        }
+                    }
+                    
+                    return maxPipeHeadLoss + sprinklerHeadLoss;
+                };
+
+                const maxPumpHead = getGreenhousePumpHead();
+
+                return {
+                    requiredFlowLPM: totalWaterRequirement || requiredFlow,
+                    minRequiredHead: maxPumpHead || requiredHead,
+                    qHeadSpray: 6.0, // ค่าเริ่มต้นสำหรับ greenhouse
+                };
+            } catch (error) {
+                console.error('Error parsing greenhouse data:', error);
                 return {
                     requiredFlowLPM: requiredFlow,
                     minRequiredHead: requiredHead,
@@ -682,8 +788,17 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
 
         // ใช้ค่าเดียวกันกับที่แสดงใน UI
         const requiredFlowLPM =
-            projectMode === 'garden' ? gardenReq.requiredFlowLPM : horticultureReq.requiredFlowLPM;
-        const requiredHeadM = projectMode === 'garden' ? gardenReq.pumpHeadM : actualPumpHead;
+            projectMode === 'garden' 
+                ? gardenReq.requiredFlowLPM 
+                : projectMode === 'greenhouse'
+                  ? horticultureReq.requiredFlowLPM
+                  : horticultureReq.requiredFlowLPM;
+        const requiredHeadM = 
+            projectMode === 'garden' 
+                ? gardenReq.pumpHeadM 
+                : projectMode === 'greenhouse'
+                  ? horticultureReq.minRequiredHead
+                  : actualPumpHead;
 
         const isFlowAdequate = maxFlow >= requiredFlowLPM;
         const isHeadAdequate = maxHead >= requiredHeadM;
@@ -892,7 +1007,9 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                             {Number(
                                 (projectMode === 'garden'
                                     ? gardenReq.requiredFlowLPM
-                                    : horticultureReq.requiredFlowLPM
+                                    : projectMode === 'greenhouse'
+                                      ? horticultureReq.requiredFlowLPM
+                                      : horticultureReq.requiredFlowLPM
                                 ).toFixed(2)
                             ).toLocaleString()}{' '}
                             {t('LPM')}
@@ -900,19 +1017,29 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                         {projectMode === 'garden' && (
                             <span className="ml-2 text-xs text-green-400">(จาก garden input)</span>
                         )}
+                        {projectMode === 'greenhouse' && (
+                            <span className="ml-2 text-xs text-green-400">(จาก greenhouse zones)</span>
+                        )}
                     </span>
                     <span>
                         {t('Pump Head:')}{' '}
                         <span className="font-bold text-orange-300">
                             {(() => {
                                 const displayValue =
-                                    projectMode === 'garden' ? gardenReq.pumpHeadM : actualPumpHead;
+                                    projectMode === 'garden' 
+                                        ? gardenReq.pumpHeadM 
+                                        : projectMode === 'greenhouse'
+                                          ? horticultureReq.minRequiredHead
+                                          : actualPumpHead;
                                 return Number(displayValue.toFixed(2)).toLocaleString();
                             })()}{' '}
                             {t('เมตร')}
                         </span>
                         {projectMode === 'garden' && (
                             <span className="ml-2 text-xs text-green-400">(จาก Head Loss รวม)</span>
+                        )}
+                        {projectMode === 'greenhouse' && (
+                            <span className="ml-2 text-xs text-green-400">(ท่อเมนหลัก + ท่อย่อย + หัวฉีด)</span>
                         )}
                     </span>
                 </div>
@@ -991,12 +1118,16 @@ const PumpSelector: React.FC<PumpSelectorProps> = ({
                                     calculationDetails: `Flow: ${(pump.maxFlow || 0).toLocaleString()}/${(() => {
                                         if (projectMode === 'garden')
                                             return gardenReq.requiredFlowLPM.toFixed(0);
+                                        if (projectMode === 'greenhouse')
+                                            return horticultureReq.requiredFlowLPM.toFixed(0);
                                         if (projectMode === 'horticulture')
                                             return horticultureReq.requiredFlowLPM.toFixed(0);
                                         return requiredFlow.toFixed(0);
                                     })()} LPM | Head: ${(pump.maxHead || 0).toFixed(1)}/${(() => {
                                         if (projectMode === 'garden')
                                             return gardenReq.pumpHeadM.toFixed(1);
+                                        if (projectMode === 'greenhouse')
+                                            return horticultureReq.minRequiredHead.toFixed(1);
                                         if (projectMode === 'horticulture')
                                             return horticultureReq.minRequiredHead.toFixed(1);
                                         return actualPumpHead.toFixed(1);

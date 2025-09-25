@@ -103,9 +103,11 @@ import {
 // Function to clean up localStorage when quota is exceeded
 const cleanupLocalStorage = () => {
     try {
-
+        console.log('🧹 Starting localStorage cleanup...');
+        
         // Get all keys
         const keys = Object.keys(localStorage);
+        console.log(`📊 Found ${keys.length} localStorage items`);
 
         // Remove old project data (keep only the most recent)
         const projectKeys = keys.filter(
@@ -115,9 +117,12 @@ const cleanupLocalStorage = () => {
                 key.startsWith('projectMapImage')
         );
 
-        if (projectKeys.length > 3) {
-            // Keep only the 3 most recent items
-            const keysToRemove = projectKeys.slice(0, projectKeys.length - 3);
+        console.log(`🗂️ Found ${projectKeys.length} project-related keys`);
+
+        if (projectKeys.length > 2) {
+            // Keep only the 2 most recent items
+            const keysToRemove = projectKeys.slice(0, projectKeys.length - 2);
+            console.log(`🗑️ Removing ${keysToRemove.length} old project keys`);
             keysToRemove.forEach((key) => {
                 localStorage.removeItem(key);
             });
@@ -125,12 +130,32 @@ const cleanupLocalStorage = () => {
 
         // Remove old mock fields
         const mockKeys = keys.filter((key) => key.startsWith('mock-'));
-        mockKeys.forEach((key) => {
-            localStorage.removeItem(key);
-        });
+        if (mockKeys.length > 0) {
+            console.log(`🗑️ Removing ${mockKeys.length} mock keys`);
+            mockKeys.forEach((key) => {
+                localStorage.removeItem(key);
+            });
+        }
 
+        // Remove other large data that might be taking up space
+        const otherKeys = keys.filter((key) => 
+            key.startsWith('fieldCropData') ||
+            key.startsWith('fieldMapData') ||
+            key.startsWith('autoZoneConfig') ||
+            key.startsWith('plantRotation')
+        );
+        
+        if (otherKeys.length > 0) {
+            console.log(`🗑️ Removing ${otherKeys.length} other large data keys`);
+            otherKeys.forEach((key) => {
+                localStorage.removeItem(key);
+            });
+        }
+
+        console.log('✅ localStorage cleanup completed');
         return true;
-    } catch {
+    } catch (error) {
+        console.error('❌ localStorage cleanup failed:', error);
         return false;
     }
 };
@@ -154,11 +179,124 @@ if (typeof window !== 'undefined') {
         console.log('✅ All localStorage cleared!');
         alert('All localStorage cleared!');
     };
+
+    // Add a function to check localStorage usage
+    (window as unknown as { checkStorageUsage: () => void }).checkStorageUsage = () => {
+        let totalSize = 0;
+        const items: { key: string; size: number }[] = [];
+        
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                const value = localStorage.getItem(key) || '';
+                const size = new Blob([value]).size;
+                totalSize += size;
+                items.push({ key, size });
+            }
+        }
+        
+        console.log(`📊 Total localStorage usage: ${(totalSize / 1024).toFixed(2)}KB`);
+        console.log('📋 Items by size:');
+        items.sort((a, b) => b.size - a.size).forEach(item => {
+            console.log(`  ${item.key}: ${(item.size / 1024).toFixed(2)}KB`);
+        });
+        
+        alert(`localStorage usage: ${(totalSize / 1024).toFixed(2)}KB\nCheck console for details.`);
+    };
 }
 
 // Function to safely save to localStorage with cleanup
+// Function to compress data by reducing precision and removing unnecessary fields
+const compressProjectData = (data: any): any => {
+    try {
+        const compressed = {
+            ...data,
+            // Reduce coordinate precision to 6 decimal places
+            mainArea: Array.isArray(data.mainArea) ? data.mainArea.map((coord: any) => ({
+                lat: Math.round(coord.lat * 1000000) / 1000000,
+                lng: Math.round(coord.lng * 1000000) / 1000000
+            })) : data.mainArea,
+            
+            // Compress plants data
+            plants: Array.isArray(data.plants) ? data.plants.map((plant: any) => ({
+                id: plant.id,
+                position: {
+                    lat: Math.round(plant.position.lat * 1000000) / 1000000,
+                    lng: Math.round(plant.position.lng * 1000000) / 1000000
+                },
+                plantData: plant.plantData
+            })) : data.plants,
+            
+            // Compress zones data
+            zones: Array.isArray(data.zones) ? data.zones.map((zone: any) => ({
+                ...zone,
+                coordinates: Array.isArray(zone.coordinates) ? zone.coordinates.map((coord: any) => ({
+                    lat: Math.round(coord.lat * 1000000) / 1000000,
+                    lng: Math.round(coord.lng * 1000000) / 1000000
+                })) : zone.coordinates
+            })) : data.zones,
+            
+            // Compress irrigation zones
+            irrigationZones: Array.isArray(data.irrigationZones) ? data.irrigationZones.map((zone: any) => ({
+                ...zone,
+                coordinates: Array.isArray(zone.coordinates) ? zone.coordinates.map((coord: any) => ({
+                    lat: Math.round(coord.lat * 1000000) / 1000000,
+                    lng: Math.round(coord.lng * 1000000) / 1000000
+                })) : zone.coordinates
+            })) : data.irrigationZones,
+            
+            // Compress pipes data
+            mainPipes: Array.isArray(data.mainPipes) ? data.mainPipes.map((pipe: any) => ({
+                ...pipe,
+                coordinates: Array.isArray(pipe.coordinates) ? pipe.coordinates.map((coord: any) => ({
+                    lat: Math.round(coord.lat * 1000000) / 1000000,
+                    lng: Math.round(coord.lng * 1000000) / 1000000
+                })) : pipe.coordinates
+            })) : data.mainPipes,
+            
+            subMainPipes: Array.isArray(data.subMainPipes) ? data.subMainPipes.map((pipe: any) => ({
+                ...pipe,
+                coordinates: Array.isArray(pipe.coordinates) ? pipe.coordinates.map((coord: any) => ({
+                    lat: Math.round(coord.lat * 1000000) / 1000000,
+                    lng: Math.round(coord.lng * 1000000) / 1000000
+                })) : pipe.coordinates
+            })) : data.subMainPipes,
+            
+            // Remove debug and temporary fields
+            debugInfo: undefined,
+            tempData: undefined,
+            _temp: undefined
+        };
+        
+        return compressed;
+    } catch (error) {
+        console.warn('Failed to compress data, using original:', error);
+        return data;
+    }
+};
+
 const safeLocalStorageSet = (key: string, value: string): boolean => {
     try {
+        // Check data size first
+        const dataSizeKB = new Blob([value]).size / 1024;
+        console.log(`📊 Data size: ${dataSizeKB.toFixed(2)}KB for key: ${key}`);
+        
+        if (dataSizeKB > 2000) { // If larger than 2MB, try compression
+            console.warn(`⚠️ Large data detected (${dataSizeKB.toFixed(2)}KB), attempting compression...`);
+            try {
+                const parsedData = JSON.parse(value);
+                const compressedData = compressProjectData(parsedData);
+                const compressedValue = JSON.stringify(compressedData);
+                const compressedSizeKB = new Blob([compressedValue]).size / 1024;
+                console.log(`📦 Compressed size: ${compressedSizeKB.toFixed(2)}KB (${((1 - compressedSizeKB/dataSizeKB) * 100).toFixed(1)}% reduction)`);
+                
+                localStorage.setItem(key, compressedValue);
+                return true;
+            } catch (compressError) {
+                console.warn('Compression failed, trying original data:', compressError);
+            }
+        }
+        
         localStorage.setItem(key, value);
         return true;
     } catch (error) {
@@ -166,11 +304,16 @@ const safeLocalStorageSet = (key: string, value: string): boolean => {
             console.warn('⚠️ localStorage quota exceeded, attempting cleanup...');
             if (cleanupLocalStorage()) {
                 try {
-                    localStorage.setItem(key, value);
-                    console.log('✅ Successfully saved after cleanup');
+                    // Try compression after cleanup
+                    const parsedData = JSON.parse(value);
+                    const compressedData = compressProjectData(parsedData);
+                    const compressedValue = JSON.stringify(compressedData);
+                    
+                    localStorage.setItem(key, compressedValue);
+                    console.log('✅ Successfully saved compressed data after cleanup');
                     return true;
                 } catch (retryError) {
-                    console.error('❌ Still failed after cleanup:', retryError);
+                    console.error('❌ Still failed after cleanup and compression:', retryError);
                     return false;
                 }
             }
@@ -8946,8 +9089,12 @@ export default function EnhancedHorticulturePlannerPage() {
         };
 
         // Save to localStorage for backup (same format as new fields)
-        if (!safeLocalStorageSet('horticultureIrrigationData', JSON.stringify(projectData))) {
+        const saveSuccess = safeLocalStorageSet('horticultureIrrigationData', JSON.stringify(projectData));
+        if (!saveSuccess) {
             console.error('❌ Failed to save to horticultureIrrigationData');
+            // Show user-friendly error message
+            alert('ไม่สามารถบันทึกข้อมูลได้เนื่องจากพื้นที่เก็บข้อมูลเต็ม กรุณาลองใหม่อีกครั้ง');
+            return;
         }
 
         // Also save to field-specific localStorage for product page compatibility
@@ -9264,8 +9411,12 @@ export default function EnhancedHorticulturePlannerPage() {
             updatedAt: new Date().toISOString(),
         };
 
-        if (!safeLocalStorageSet('horticultureIrrigationData', JSON.stringify(projectData))) {
+        const saveSuccess = safeLocalStorageSet('horticultureIrrigationData', JSON.stringify(projectData));
+        if (!saveSuccess) {
             console.error('❌ Failed to save to horticultureIrrigationData');
+            // Show user-friendly error message
+            alert('ไม่สามารถบันทึกข้อมูลได้เนื่องจากพื้นที่เก็บข้อมูลเต็ม กรุณาลองใหม่อีกครั้ง');
+            return;
         }
 
         // Always go to results page first, regardless of whether it's a new project or finished draft
@@ -9275,6 +9426,7 @@ export default function EnhancedHorticulturePlannerPage() {
             totalArea: totalArea.toString(),
         });
 
+        console.log('✅ Project saved successfully, navigating to results page...');
         router.visit(`/horticulture/results?${params.toString()}`);
     }, [
         history.present.pump,

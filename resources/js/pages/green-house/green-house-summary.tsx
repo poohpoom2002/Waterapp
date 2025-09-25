@@ -324,6 +324,14 @@ export default function GreenhouseSummary() {
             // Save greenhouse data using the new format
             saveGreenhouseData(greenhouseData);
 
+            // เก็บ plotPipeData ที่มี totalFlowRate สำหรับแต่ละแปลง
+            localStorage.setItem('greenhouseSystemData', JSON.stringify({
+                plotPipeData: plotPipeData,
+                pipeFlowData: pipeFlowData,
+                plotWaterCalculations: plotWaterCalculations,
+                updatedAt: new Date().toISOString()
+            }));
+
             // Set project type for the product page
             localStorage.setItem('projectType', 'greenhouse');
 
@@ -656,6 +664,7 @@ export default function GreenhouseSummary() {
         return sortedPlots.map((plot, sortedIndex) => {
             const plotPipeData = {
                 plotName: plot.name || `${t('แปลงปลูกที่')} ${sortedIndex + 1}`,
+                plotId: `plot-${sortedIndex + 1}`, // เพิ่ม unique ID
                 cropType:
                     plot.cropType ||
                     (summaryData.selectedCrops && summaryData.selectedCrops[plot.originalIndex]) ||
