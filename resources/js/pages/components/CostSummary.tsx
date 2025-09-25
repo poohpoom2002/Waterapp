@@ -509,12 +509,25 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 const zoneInput = zoneInputs[zone.id];
 
                 if (zoneSprinkler) {
-                    const sprinklerQuantity =
-                        projectMode === 'field-crop'
-                            ? zoneInput?.totalTrees ||
-                              zone.sprinklerCount ||
-                              Math.ceil((zone.totalPlantingPoints || 100) / 10)
-                            : zone.totalPlantingPoints || zone.sprinklerCount || 100;
+                    // For field-crop mode, prioritize sprinkler count from zone summaries (most accurate)
+                    let sprinklerQuantity = 0;
+                    
+                    if (projectMode === 'field-crop' && fieldCropData?.zoneSummaries && fieldCropData.zoneSummaries[zone.id]) {
+                        const zoneSummary = fieldCropData.zoneSummaries[zone.id];
+                        // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
+                        if (zoneSummary.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
+                            sprinklerQuantity = zoneSummary.totalIrrigationPoints;
+                        } else if (zoneSummary.sprinklerCount && zoneSummary.sprinklerCount > 0) {
+                            sprinklerQuantity = zoneSummary.sprinklerCount;
+                        }
+                    }
+                    
+                    // Fallback to zoneInput or zone data if no summary data
+                    if (sprinklerQuantity === 0) {
+                        sprinklerQuantity = zoneInput?.totalTrees ||
+                                          zone.sprinklerCount ||
+                                          Math.ceil((zone.totalPlantingPoints || 100) / 10);
+                    }
                     const sprinklerCost = zoneSprinkler.price * sprinklerQuantity;
                     totalSprinklerCost += sprinklerCost;
 
@@ -533,12 +546,25 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                 }
 
                 if (zoneInput) {
-                    const sprinklerCount =
-                        projectMode === 'field-crop'
-                            ? zoneInput?.totalTrees ||
-                              zone.sprinklerCount ||
-                              Math.ceil((zone.totalPlantingPoints || 100) / 10)
-                            : zone.totalPlantingPoints || 100;
+                    // For field-crop mode, prioritize sprinkler count from zone summaries (most accurate)
+                    let sprinklerCount = 0;
+                    
+                    if (projectMode === 'field-crop' && fieldCropData?.zoneSummaries && fieldCropData.zoneSummaries[zone.id]) {
+                        const zoneSummary = fieldCropData.zoneSummaries[zone.id];
+                        // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
+                        if (zoneSummary.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
+                            sprinklerCount = zoneSummary.totalIrrigationPoints;
+                        } else if (zoneSummary.sprinklerCount && zoneSummary.sprinklerCount > 0) {
+                            sprinklerCount = zoneSummary.sprinklerCount;
+                        }
+                    }
+                    
+                    // Fallback to zoneInput or zone data if no summary data
+                    if (sprinklerCount === 0) {
+                        sprinklerCount = zoneInput?.totalTrees ||
+                                       zone.sprinklerCount ||
+                                       Math.ceil((zone.totalPlantingPoints || 100) / 10);
+                    }
                     processExtraPipe(zone.id, zoneInput, sprinklerCount);
 
                     const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
@@ -1180,12 +1206,31 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                     console.error('Error parsing fieldCropSystemData in CostSummary:', error);
                 }
                 
+                // Calculate total sprinklers from zone summaries (most accurate)
+                let totalSprinklers = 0;
+                let totalIrrigationPoints = 0;
+                
+                if (fcData.zoneSummaries) {
+                    const sprinklerCounts = Object.values(fcData.zoneSummaries).map((zoneSummary: any) => {
+                        // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
+                        return zoneSummary.totalIrrigationPoints || zoneSummary.sprinklerCount || 0;
+                    });
+                    totalSprinklers = sprinklerCounts.reduce((sum, count) => sum + count, 0);
+                    totalIrrigationPoints = totalSprinklers; // Same value for field-crop
+                }
+                
+                // Fallback to old data if no zone summaries
+                if (totalSprinklers === 0) {
+                    totalSprinklers = fcData.summary?.totalPlantingPoints || 0;
+                    totalIrrigationPoints = fcData.irrigation?.totalCount || 0;
+                }
+                
                 return {
                     totalWaterNeed: totalWaterNeed,
                     totalProduction: fcData.summary?.totalEstimatedYield || 0,
                     totalIncome: fcData.summary?.totalEstimatedIncome || 0,
-                    totalSprinklers: fcData.summary?.totalPlantingPoints || 0,
-                    totalIrrigationPoints: fcData.irrigation?.totalCount || 0,
+                    totalSprinklers: totalSprinklers,
+                    totalIrrigationPoints: totalIrrigationPoints,
                     irrigationByType: fcData.irrigation?.byType || {},
                     waterUnit: 'ลิตร/ครั้ง',
                     productionUnit: 'กก.',
@@ -1253,7 +1298,7 @@ const CostSummary: React.FC<CostSummaryProps> = ({
                                 </p>
                             </div>
                         )}
-                        {projectMode === 'field-crop' && projectSummary.totalIrrigationPoints > 0 && (
+                        {projectMode === 'field-crop' && (projectSummary.totalIrrigationPoints || 0) > 0 && (
                             <div>
                                 <p className="text-blue-200">{t('จุดให้น้ำรวม:')}</p>
                                 <p className="font-bold text-white">

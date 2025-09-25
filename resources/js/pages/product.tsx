@@ -562,12 +562,12 @@ export default function Product() {
             console.log('✅ Calculated sprinkler count from totalPlantingPoints:', totalSprinklers);
         }
         
-        // Try to get from fieldCropSystemData as well
-        if (fieldCropSystemData?.zones) {
+        // Try to get from fieldCropSystemData as well (but prioritize zoneSummaries)
+        if (fieldCropSystemData?.zones && totalSprinklers === 0) {
             const systemZone = fieldCropSystemData.zones.find((z: any) => z.id === zone.id);
-            if (systemZone?.plantCount && systemZone.plantCount > totalSprinklers) {
+            if (systemZone?.plantCount && systemZone.plantCount > 0) {
                 totalSprinklers = systemZone.plantCount;
-                console.log('✅ Using plantCount from fieldCropSystemData zones (field input):', totalSprinklers);
+                console.log('✅ Using plantCount from fieldCropSystemData zones as fallback (field input):', totalSprinklers);
             }
         }
 
@@ -655,9 +655,10 @@ export default function Product() {
             }
         }
         
-        // Final fallback to zone.plantCount
-        if (totalSprinklers === 0) {
-            totalSprinklers = zone.plantCount || 0;
+        // Final fallback to zone.plantCount (but only if it's not 0)
+        if (totalSprinklers === 0 && zone.plantCount && zone.plantCount > 0) {
+            totalSprinklers = zone.plantCount;
+            console.log('✅ Using zone.plantCount as final fallback:', totalSprinklers);
         }
         
         // If still 0, try to calculate from field data

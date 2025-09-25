@@ -1455,14 +1455,47 @@ function EnhancedHorticultureResultsPageContent() {
                                       const zoneData = projectSummary?.zoneDetails?.find(
                                           (z: { zoneId: string }) => z.zoneId === zone.id
                                       );
-                                      const plantCount = zone.plants ? zone.plants.length : 0;
-                                      const waterNeedPerMinute = calculateTotalFlowRate(
-                                          plantCount,
-                                          enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5
-                                      );
-                                      // น้ำต่อต้น = totalWaterNeed / plantCount (เหมือนใน Zone Details Section)
-                                      const waterPerTree =
-                                          plantCount > 0 ? zone.totalWaterNeed / plantCount : 0;
+                                      // For field-crop mode, use data from zoneSummaries if available
+                                      let plantCount = 0;
+                                      let totalWaterNeed = 0;
+                                      let waterNeedPerMinute = 0;
+                                      let waterPerTree = 0;
+                                      
+                                      // Try to get data from field-crop zoneSummaries first
+                                      try {
+                                          const fieldCropDataStr = localStorage.getItem('enhancedFieldCropData');
+                                          if (fieldCropDataStr) {
+                                              const fieldCropData = JSON.parse(fieldCropDataStr);
+                                              if (fieldCropData?.zoneSummaries && fieldCropData.zoneSummaries[zone.id]) {
+                                                  const zoneSummary = fieldCropData.zoneSummaries[zone.id];
+                                                  plantCount = zoneSummary.totalIrrigationPoints || zoneSummary.sprinklerCount || 0;
+                                                  totalWaterNeed = zoneSummary.totalWaterRequirementPerDay || 0;
+                                                  waterNeedPerMinute = zoneSummary.waterNeedPerMinute || 0;
+                                                  waterPerTree = plantCount > 0 ? totalWaterNeed / plantCount : 0;
+                                                  
+                                                  console.log(`✅ Using field-crop zoneSummaries data for zone ${zone.id}:`, {
+                                                      plantCount,
+                                                      totalWaterNeed,
+                                                      waterNeedPerMinute,
+                                                      waterPerTree
+                                                  });
+                                              }
+                                          }
+                                      } catch (error) {
+                                          console.warn('Error parsing field-crop data:', error);
+                                      }
+                                      
+                                      // Fallback to original calculation if no field-crop data
+                                      if (plantCount === 0) {
+                                          plantCount = zone.plants ? zone.plants.length : 0;
+                                          waterNeedPerMinute = calculateTotalFlowRate(
+                                              plantCount,
+                                              enhancedStats?.sprinklerFlowRate?.flowRatePerPlant || 2.5
+                                          );
+                                          // น้ำต่อต้น = totalWaterNeed / plantCount (เหมือนใน Zone Details Section)
+                                          waterPerTree = plantCount > 0 ? zone.totalWaterNeed / plantCount : 0;
+                                          totalWaterNeed = zone.totalWaterNeed || 0;
+                                      }
 
                                       // หาข้อมูลท่อที่ต้องการน้ำมากที่สุดในแต่ละโซน
                                       const bestMainPipe = findBestMainPipeInZone(
