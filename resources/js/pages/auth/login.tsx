@@ -3,6 +3,7 @@ import { LoaderCircle, Droplets, Leaf, Shield, Mail, Lock, Eye, EyeOff } from 'l
 import { FormEventHandler, useState } from 'react';
 
 import InputError from '@/components/input-error';
+import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -262,8 +263,8 @@ export default function Login({ status }: LoginProps) {
                         </Button>
                     </div>
 
-                    {/* Register Link - Temporarily disabled */}
-                    {/* <div className="mt-6 text-center">
+                    {/* Register Link */}
+                    <div className="mt-6 text-center">
                         <p className="text-sm text-gray-600">
                             ยังไม่มีบัญชี?{' '}
                             <TextLink
@@ -274,7 +275,7 @@ export default function Login({ status }: LoginProps) {
                                 สมัครสมาชิก
                             </TextLink>
                         </p>
-                    </div> */}
+                    </div>
                 </div>
 
                 {/* Footer Info */}
