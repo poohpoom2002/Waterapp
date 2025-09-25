@@ -424,8 +424,7 @@ export default function Product() {
     const createGreenhouseZoneInput = (
         plot: EnhancedPlotStats,
         greenhouseData: GreenhousePlanningData,
-        totalZones: number,
-        plotIndex: number = 0 // เพิ่ม plotIndex parameter
+        totalZones: number
     ): IrrigationInput => {
         const areaInSqm = plot.area;
         // Fix: Convert square meters to rai for consistency
@@ -433,43 +432,19 @@ export default function Product() {
         const crop = getCropByValue(plot.cropType || '');
         const totalSprinklers = plot.equipmentCount.sprinklers || plot.production.totalPlants;
 
-        // คำนวณ totalFlowRate สำหรับแปลงนี้จากข้อมูล greenhouse
-        let plotTotalFlowRate = 6.0; // default
-        
-        // ลองหาข้อมูลจาก localStorage ก่อน
-        try {
-            const storedData = localStorage.getItem('greenhouseSystemData');
-            if (storedData) {
-                const parsedData = JSON.parse(storedData);
-                // หาข้อมูลแปลงนี้จาก plotPipeData โดยใช้ plotIndex
-                const plotPipeData = parsedData.plotPipeData?.[plotIndex];
-                if (plotPipeData?.totalFlowRate && plotPipeData.totalFlowRate > 0) {
-                    plotTotalFlowRate = plotPipeData.totalFlowRate;
-                    console.log(`✅ Found totalFlowRate for ${plot.plotName} (index ${plotIndex}): ${plotTotalFlowRate} L/min`);
-                } else {
-                    console.log(`⚠️ No totalFlowRate found for ${plot.plotName} (index ${plotIndex}), using fallback`);
-                }
-            }
-        } catch (error) {
-            console.log('Could not load greenhouse flow rate data:', error);
-        }
-        
-        // fallback ใช้การคำนวณเดิมถ้าไม่เจอข้อมูล
-        if (plotTotalFlowRate <= 6.0) {
-            const waterPerSprinkler = plot.production.waterRequirementPerIrrigation / Math.max(totalSprinklers, 1);
-            plotTotalFlowRate = waterPerSprinkler;
-        }
+        const waterPerSprinkler =
+            plot.production.waterRequirementPerIrrigation / Math.max(totalSprinklers, 1);
 
-        // Greenhouse pipe mapping: main = เมนหลัก, sub/drip = ท่อย่อย
-        const longestBranch = plot.pipeStats.sub.longest || plot.pipeStats.drip.longest || 30;
-        const totalBranchLength = plot.pipeStats.sub.totalLength || plot.pipeStats.drip.totalLength || 100;
-        const longestMain = plot.pipeStats.main.longest || 100; // ท่อเมนหลัก
-        const totalMainLength = plot.pipeStats.main.totalLength || 200;
+        const longestBranch = plot.pipeStats.drip.longest || plot.pipeStats.sub.longest || 30;
+        const totalBranchLength =
+            plot.pipeStats.drip.totalLength || plot.pipeStats.sub.totalLength || 100;
+        const longestSubmain = plot.pipeStats.main.longest || 0;
+        const totalSubmainLength = plot.pipeStats.main.totalLength || 0;
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3), // Fix: Now consistently in rai
-            totalTrees: totalSprinklers, // จำนวนหัวฉีด
-            waterPerTreeLiters: formatNumber(plotTotalFlowRate, 3), // ต้องการน้ำ (ลิตร/นาที)
+            totalTrees: totalSprinklers,
+            waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
             numberOfZones: totalZones,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
@@ -478,22 +453,19 @@ export default function Product() {
             pipeAgeYears: 0,
 
             sprinklersPerBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
-            branchesPerSecondary: 1, // ไม่ใช้ใน greenhouse แต่ต้องมีค่า
+            branchesPerSecondary: 1,
             simultaneousZones: 1,
 
             sprinklersPerLongestBranch: Math.max(1, Math.ceil(totalSprinklers / 5)),
-            branchesPerLongestSecondary: 1, // ไม่ใช้ใน greenhouse แต่ต้องมีค่า
-            secondariesPerLongestMain: 1, // ไม่ใช้ใน greenhouse แต่ต้องมีค่า
+            branchesPerLongestSecondary: 1,
+            secondariesPerLongestMain: 1,
 
-            // Greenhouse: เฉพาะท่อย่อยและท่อเมนหลัก
-            longestBranchPipeM: formatNumber(longestBranch, 3), // ท่อย่อย
-            totalBranchPipeM: formatNumber(totalBranchLength, 3), // ท่อย่อย
-            longestSecondaryPipeM: 0, // Greenhouse ไม่มีท่อเมนรอง
-            totalSecondaryPipeM: 0, // Greenhouse ไม่มีท่อเมนรอง
-            longestMainPipeM: formatNumber(longestMain, 3), // ท่อเมนหลัก
-            totalMainPipeM: formatNumber(totalMainLength, 3), // ท่อเมนหลัก
-            longestEmitterPipeM: 0, // Greenhouse ไม่มีท่อย่อยแยก
-            totalEmitterPipeM: 0, // Greenhouse ไม่มีท่อย่อยแยก
+            longestBranchPipeM: formatNumber(longestBranch, 3),
+            totalBranchPipeM: formatNumber(totalBranchLength, 3),
+            longestSecondaryPipeM: formatNumber(longestSubmain, 3),
+            totalSecondaryPipeM: formatNumber(totalSubmainLength, 3),
+            longestMainPipeM: 0,
+            totalMainPipeM: 0,
         };
     };
 
@@ -507,39 +479,14 @@ export default function Product() {
             greenhouseData.summary.overallEquipmentCount.sprinklers ||
             greenhouseData.summary.overallProduction.totalPlants;
 
-        // คำนวณ totalFlowRate รวมสำหรับทั้งโรงเรือน
-        let totalFlowRate = 6.0; // default
-        
-        // ลองหาข้อมูลจาก localStorage ก่อน
-        try {
-            const storedData = localStorage.getItem('greenhouseSystemData');
-            if (storedData) {
-                const parsedData = JSON.parse(storedData);
-                // รวม totalFlowRate จากทุกแปลง
-                if (parsedData.plotPipeData && Array.isArray(parsedData.plotPipeData)) {
-                    const sumFlowRate = parsedData.plotPipeData.reduce((sum: number, plot: any) => {
-                        return sum + (plot.totalFlowRate || 0);
-                    }, 0);
-                    if (sumFlowRate > 0) {
-                        totalFlowRate = sumFlowRate;
-                        console.log(`✅ Found total flow rate for all plots: ${totalFlowRate} L/min`);
-                    }
-                }
-            }
-        } catch (error) {
-            console.log('Could not load greenhouse flow rate data:', error);
-        }
-        
-        // fallback ใช้การคำนวณเดิมถ้าไม่เจอข้อมูล
-        if (totalFlowRate <= 6.0) {
-            const waterPerSprinkler = greenhouseData.summary.overallProduction.waterRequirementPerIrrigation / Math.max(totalSprinklers, 1);
-            totalFlowRate = waterPerSprinkler;
-        }
+        const waterPerSprinkler =
+            greenhouseData.summary.overallProduction.waterRequirementPerIrrigation /
+            Math.max(totalSprinklers, 1);
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3), // Fix: Now consistently in rai
-            totalTrees: totalSprinklers, // จำนวนหัวฉีด
-            waterPerTreeLiters: formatNumber(totalFlowRate, 3), // ต้องการน้ำ (ลิตร/นาที)
+            totalTrees: totalSprinklers,
+            waterPerTreeLiters: formatNumber(waterPerSprinkler, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
             irrigationTimeMinutes: 30,
@@ -555,31 +502,28 @@ export default function Product() {
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
-            // Greenhouse: เฉพาะท่อย่อยและท่อเมนหลัก
             longestBranchPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.sub.longest ||
-                    greenhouseData.summary.overallPipeStats.drip.longest ||
+                greenhouseData.summary.overallPipeStats.drip.longest ||
+                    greenhouseData.summary.overallPipeStats.sub.longest ||
                     30,
                 3
-            ), // ท่อย่อย
+            ),
             totalBranchPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.sub.totalLength ||
-                    greenhouseData.summary.overallPipeStats.drip.totalLength ||
+                greenhouseData.summary.overallPipeStats.drip.totalLength ||
+                    greenhouseData.summary.overallPipeStats.sub.totalLength ||
                     100,
                 3
-            ), // ท่อย่อย
-            longestSecondaryPipeM: 0, // Greenhouse ไม่มีท่อเมนรอง
-            totalSecondaryPipeM: 0, // Greenhouse ไม่มีท่อเมนรอง
-            longestMainPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.main.longest || 100,
+            ),
+            longestSecondaryPipeM: formatNumber(
+                greenhouseData.summary.overallPipeStats.main.longest || 0,
                 3
-            ), // ท่อเมนหลัก
-            totalMainPipeM: formatNumber(
-                greenhouseData.summary.overallPipeStats.main.totalLength || 200,
+            ),
+            totalSecondaryPipeM: formatNumber(
+                greenhouseData.summary.overallPipeStats.main.totalLength || 0,
                 3
-            ), // ท่อเมนหลัก
-            longestEmitterPipeM: 0, // Greenhouse ไม่มีท่อย่อยแยก
-            totalEmitterPipeM: 0, // Greenhouse ไม่มีท่อย่อยแยก
+            ),
+            longestMainPipeM: 0,
+            totalMainPipeM: 0,
         };
     };
 
@@ -592,57 +536,12 @@ export default function Product() {
         const assignedCropValue = fieldData.crops.zoneAssignments[zone.id];
         const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
 
-        // For field-crop mode, use sprinkler count from zone summaries (most accurate)
-        let totalSprinklers = 0;
-        
-        if (fieldData.zoneSummaries && fieldData.zoneSummaries[zone.id]) {
-            const zoneSummary = fieldData.zoneSummaries[zone.id];
-            // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
-            if (zoneSummary.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
-                totalSprinklers = zoneSummary.totalIrrigationPoints;
-                console.log('✅ Using totalIrrigationPoints from zoneSummaries (field-crop):', totalSprinklers);
-            } else if (zoneSummary.sprinklerCount && zoneSummary.sprinklerCount > 0) {
-                totalSprinklers = zoneSummary.sprinklerCount;
-                console.log('✅ Using sprinklerCount from zoneSummaries as fallback (field-crop):', totalSprinklers);
-            }
-        }
-        
-        // Fallback to zone data if no summary data
-        if (totalSprinklers === 0) {
-            totalSprinklers = zone.sprinklerCount || 0;
-        }
-        
-        // If no sprinklerCount, calculate from totalPlantingPoints
-        if (totalSprinklers === 0 && zone.totalPlantingPoints) {
-            totalSprinklers = Math.max(1, Math.ceil(zone.totalPlantingPoints / 10));
-            console.log('✅ Calculated sprinkler count from totalPlantingPoints:', totalSprinklers);
-        }
-        
-        // Try to get from fieldCropSystemData as well
-        if (fieldCropSystemData?.zones) {
-            const systemZone = fieldCropSystemData.zones.find((z: any) => z.id === zone.id);
-            if (systemZone?.plantCount && systemZone.plantCount > totalSprinklers) {
-                totalSprinklers = systemZone.plantCount;
-                console.log('✅ Using plantCount from fieldCropSystemData zones (field input):', totalSprinklers);
-            }
-        }
+        const totalSprinklers =
+            zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10));
 
-        // Use sprinkler flow rate from fieldCropSystemData if available
-        let waterPerSprinklerLPM = 2.0; // Default fallback
-        if (fieldCropSystemData?.sprinklerConfig?.flowRatePerPlant) {
-            waterPerSprinklerLPM = fieldCropSystemData.sprinklerConfig.flowRatePerPlant;
-            console.log('✅ Using flowRatePerPlant from fieldCropSystemData:', waterPerSprinklerLPM);
-        } else if (crop && crop.waterRequirement) {
-            waterPerSprinklerLPM = crop.waterRequirement;
-            console.log('⚠️ Using crop waterRequirement as fallback:', waterPerSprinklerLPM);
-        } else if (zone.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
-            const avgIrrigationTimeHours = 0.5;
-            waterPerSprinklerLPM =
-                zone.totalWaterRequirementPerDay / totalSprinklers / (avgIrrigationTimeHours * 60);
-            console.log('⚠️ Using calculated flow rate as fallback:', waterPerSprinklerLPM);
-        } else {
-            console.log('❌ Using default flow rate:', waterPerSprinklerLPM);
-        }
+        // ใช้ค่าเริ่มต้นสำหรับอัตราการไหล (ลิตร/นาที) ต่อหัวฉีด
+        // ไม่ต้องคำนวณจากข้อมูลพืชหรือปริมาณน้ำต่อวัน
+        const waterPerSprinklerLPM = 2.5; // ลิตร/นาที ต่อหัวฉีด (ค่าเริ่มต้น)
 
         const zonePipeStats = zone.pipeStats;
         const longestBranch = zonePipeStats.lateral.longestLength || 30;
@@ -654,7 +553,7 @@ export default function Product() {
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers,
+            totalTrees: totalSprinklers, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
             waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
             numberOfZones: totalZones,
             sprinklersPerTree: 1,
@@ -684,68 +583,23 @@ export default function Product() {
         zone: any,
         totalZones: number
     ): IrrigationInput => {
+        console.log('🔍 createFieldCropZoneInputFromSystemData - zone data:', zone);
         const areaInRai = zone.area / 1600;
-        // For field-crop mode, prioritize sprinkler count from zone summaries
-        let totalSprinklers = 0;
+        const totalSprinklers = zone.plantCount || 0;
+        const waterPerSprinklerLPM = zone.waterPerTree || 2.0;
         
-        // Try to get sprinkler count from zone summaries first (most accurate)
-        const fcData = getEnhancedFieldCropData();
-        if (fcData?.zoneSummaries && fcData.zoneSummaries[zone.id]) {
-            const zoneSummary = fcData.zoneSummaries[zone.id];
-            // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
-            if (zoneSummary.totalIrrigationPoints && zoneSummary.totalIrrigationPoints > 0) {
-                totalSprinklers = zoneSummary.totalIrrigationPoints;
-                console.log('✅ Using totalIrrigationPoints from zoneSummaries (system data):', totalSprinklers);
-            } else if (zoneSummary.sprinklerCount && zoneSummary.sprinklerCount > 0) {
-                totalSprinklers = zoneSummary.sprinklerCount;
-                console.log('✅ Using sprinklerCount from zoneSummaries (system data) as fallback:', totalSprinklers);
-            }
-        }
-        
-        // Fallback to fieldCropSystemData zones
-        if (totalSprinklers === 0 && fieldCropSystemData?.zones) {
-            const systemZone = fieldCropSystemData.zones.find((z: any) => z.id === zone.id);
-            if (systemZone?.plantCount) {
-                totalSprinklers = systemZone.plantCount;
-                console.log('✅ Using plantCount from fieldCropSystemData zones as fallback:', totalSprinklers);
-            }
-        }
-        
-        // Final fallback to zone.plantCount
-        if (totalSprinklers === 0) {
-            totalSprinklers = zone.plantCount || 0;
-        }
-        
-        // If still 0, try to calculate from field data
-        if (totalSprinklers === 0) {
-            // Try to get from fieldCropData
-            const fcData = getEnhancedFieldCropData();
-            if (fcData?.zones?.info) {
-                const fieldZone = fcData.zones.info.find((z: any) => z.id === zone.id);
-                if (fieldZone?.totalPlantingPoints) {
-                    totalSprinklers = fieldZone.totalPlantingPoints;
-                    console.log('✅ Using totalPlantingPoints from fieldCropData:', totalSprinklers);
-                }
-            }
-        }
-        
-        // Use sprinkler flow rate from fieldCropSystemData if available
-        let waterPerSprinklerLPM = 2.0; // Default fallback
-        if (fieldCropSystemData?.sprinklerConfig?.flowRatePerPlant) {
-            waterPerSprinklerLPM = fieldCropSystemData.sprinklerConfig.flowRatePerPlant;
-            console.log('✅ Using flowRatePerPlant from fieldCropSystemData (system data):', waterPerSprinklerLPM);
-        } else if (zone.waterNeedPerMinute && totalSprinklers > 0) {
-            // Use waterNeedPerMinute from fieldCropSystemData zones
-            waterPerSprinklerLPM = zone.waterNeedPerMinute / totalSprinklers;
-            console.log('✅ Using waterNeedPerMinute from fieldCropSystemData zones:', waterPerSprinklerLPM);
-        } else {
-            waterPerSprinklerLPM = zone.waterPerTree || 2.0;
-            console.log('⚠️ Using zone.waterPerTree as fallback:', waterPerSprinklerLPM);
-        }
+        console.log('🔍 Field-crop zone input calculation:', {
+            zoneId: zone.id,
+            zoneName: zone.name,
+            areaInRai,
+            totalSprinklers,
+            waterPerSprinklerLPM,
+            totalZones
+        });
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers,
+            totalTrees: totalSprinklers, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
             waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
             numberOfZones: totalZones,
             sprinklersPerTree: 1,
@@ -774,60 +628,18 @@ export default function Product() {
     const createSingleFieldCropInput = (fieldData: FieldCropData): IrrigationInput => {
         const areaInRai = fieldData.area.size / 1600;
 
-        // For field-crop mode, prioritize sprinkler count from zone summaries
-        let totalSprinklers = 0;
-        
-        // Try to get sprinkler count from zone summaries first (most accurate)
-        if (fieldData.zoneSummaries) {
-            const totalSprinklersFromZones = Object.values(fieldData.zoneSummaries).reduce((sum: number, zoneSummary: any) => {
-                // Use totalIrrigationPoints (which is zoneIrrigationCounts.total from summary page)
-                return sum + (zoneSummary.totalIrrigationPoints || zoneSummary.sprinklerCount || 0);
-            }, 0);
-            if (totalSprinklersFromZones > 0) {
-                totalSprinklers = totalSprinklersFromZones;
-                console.log('✅ Using total totalIrrigationPoints from zoneSummaries (single input):', totalSprinklers);
-            }
-        }
-        
-        // Fallback to field data
-        if (totalSprinklers === 0) {
-            totalSprinklers = fieldData.irrigation.totalCount || 0;
-        }
-        
-        if (totalSprinklers === 0) {
-            totalSprinklers = fieldData.summary.totalPlantingPoints || 0;
-        }
-        
-        if (totalSprinklers === 0) {
-            totalSprinklers = Math.max(1, Math.ceil(fieldData.summary.totalPlantingPoints / 10));
-        }
-        
-        // Try to get from fieldCropSystemData as well
-        if (fieldCropSystemData?.totalPlants && fieldCropSystemData.totalPlants > totalSprinklers) {
-            totalSprinklers = fieldCropSystemData.totalPlants;
-            console.log('✅ Using totalPlants from fieldCropSystemData (single input):', totalSprinklers);
-        }
+        const totalSprinklers =
+            fieldData.irrigation.totalCount ||
+            fieldData.summary.totalPlantingPoints ||
+            Math.max(1, Math.ceil(fieldData.summary.totalPlantingPoints / 10));
 
-        // Use sprinkler flow rate from fieldCropSystemData if available
-        let waterPerSprinklerLPM = 2.0; // Default fallback
-        if (fieldCropSystemData?.sprinklerConfig?.flowRatePerPlant) {
-            waterPerSprinklerLPM = fieldCropSystemData.sprinklerConfig.flowRatePerPlant;
-            console.log('✅ Using flowRatePerPlant from fieldCropSystemData (single input):', waterPerSprinklerLPM);
-        } else if (fieldData.summary.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
-            // Fallback to calculation from water requirement
-            const avgIrrigationTimeHours = 0.5;
-            waterPerSprinklerLPM =
-                fieldData.summary.totalWaterRequirementPerDay /
-                totalSprinklers /
-                (avgIrrigationTimeHours * 60);
-            console.log('⚠️ Using calculated flow rate as fallback (single input):', waterPerSprinklerLPM);
-        } else {
-            console.log('❌ Using default flow rate (single input):', waterPerSprinklerLPM);
-        }
+        // ใช้ค่าเริ่มต้นสำหรับอัตราการไหล (ลิตร/นาที) ต่อหัวฉีด
+        // ไม่ต้องคำนวณจากข้อมูลพืชหรือปริมาณน้ำต่อวัน
+        const waterPerSprinklerLPM = 2.5; // ลิตร/นาที ต่อหัวฉีด (ค่าเริ่มต้น)
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers,
+            totalTrees: totalSprinklers, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
             waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
@@ -1155,18 +967,6 @@ export default function Product() {
 
     const handleZoneOperationModeChange = (mode: 'sequential' | 'simultaneous' | 'custom') => {
         setZoneOperationMode(mode);
-        
-        // บันทึก zoneOperationMode ใน localStorage สำหรับ greenhouse mode
-        if (projectMode === 'greenhouse') {
-            try {
-                const existingData = localStorage.getItem('product_data') || '{}';
-                const productData = JSON.parse(existingData);
-                productData.zoneOperationMode = mode;
-                localStorage.setItem('product_data', JSON.stringify(productData));
-            } catch (error) {
-                console.error('Error saving zoneOperationMode to localStorage:', error);
-            }
-        }
 
         let allZoneIds: string[] = [];
 
@@ -1233,6 +1033,12 @@ export default function Product() {
         let mode = urlParams.get('mode') as ProjectMode;
         const storedType = localStorage.getItem('projectType');
 
+        console.log('🔍 Product page mode detection:', {
+            urlMode: mode,
+            storedType: storedType,
+            currentUrl: window.location.href
+        });
+
         if (!mode && storedType === 'greenhouse') {
             mode = 'greenhouse';
         } else if (!mode && storedType === 'field-crop') {
@@ -1242,6 +1048,8 @@ export default function Product() {
         } else if (!mode && storedType === 'horticulture') {
             mode = 'horticulture';
         }
+
+        console.log('🔍 Final detected mode:', mode);
 
         if (mode === 'greenhouse') {
             setProjectMode('greenhouse');
@@ -1284,12 +1092,11 @@ export default function Product() {
                 } = {};
 
                 if (currentData.summary.plotStats.length > 1) {
-                    currentData.summary.plotStats.forEach((plot, plotIndex) => {
+                    currentData.summary.plotStats.forEach((plot) => {
                         initialZoneInputs[plot.plotId] = createGreenhouseZoneInput(
                             plot,
-                            currentData,
-                            currentData.summary.plotStats.length,
-                            plotIndex // ส่ง plotIndex
+                            currentData!,
+                            currentData!.summary.plotStats.length
                         );
                         initialSelectedPipes[plot.plotId] = {
                             branch: undefined,
@@ -1301,36 +1108,20 @@ export default function Product() {
                     setZoneInputs(initialZoneInputs);
                     setSelectedPipes(initialSelectedPipes);
                     setActiveZoneId(currentData.summary.plotStats[0].plotId);
-                    
-                    // โหลด zoneOperationMode จาก localStorage
-                    let savedMode: 'sequential' | 'simultaneous' | 'custom' = 'sequential';
-                    try {
-                        const productDataStr = localStorage.getItem('product_data');
-                        if (productDataStr) {
-                            const productData = JSON.parse(productDataStr);
-                            const mode = productData.zoneOperationMode;
-                            if (mode === 'sequential' || mode === 'simultaneous' || mode === 'custom') {
-                                savedMode = mode;
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error loading zoneOperationMode from localStorage:', error);
-                    }
-                    
-                    handleZoneOperationModeChange(savedMode);
+                    handleZoneOperationModeChange('sequential');
                 } else if (currentData.summary.plotStats.length === 1) {
                     const plot = currentData.summary.plotStats[0];
-                    const singleInput = createGreenhouseZoneInput(plot, currentData, 1, 0); // ส่ง plotIndex = 0
+                    const singleInput = createGreenhouseZoneInput(plot, currentData, 1);
                     setZoneInputs({ [plot.plotId]: singleInput });
                     setSelectedPipes({
-                        [plot.plotId]: { branch: undefined, secondary: undefined, main: undefined, emitter: undefined },
+                        [plot.plotId]: { branch: undefined, secondary: undefined, main: undefined },
                     });
                     setActiveZoneId(plot.plotId);
                 } else {
                     const singleInput = createSingleGreenhouseInput(currentData);
                     setZoneInputs({ 'main-area': singleInput });
                     setSelectedPipes({
-                        'main-area': { branch: undefined, secondary: undefined, main: undefined, emitter: undefined },
+                        'main-area': { branch: undefined, secondary: undefined, main: undefined },
                     });
                     setActiveZoneId('main-area');
                 }
@@ -1344,25 +1135,49 @@ export default function Product() {
             localStorage.removeItem('horticulture_defaultSprinkler');
             localStorage.removeItem('garden_defaultSprinkler');
 
-            // Load field crop system data first (from field-crop-summary)
-            const systemData = getFieldCropSystemData();
-            if (systemData) {
-                setFieldCropSystemData(systemData);
-                console.log('✅ Loaded fieldCropSystemData:', systemData);
-                
-                // Set connection stats for field crop
-                if (systemData.connectionStats && systemData.connectionStats.length > 0) {
-                    console.log('✅ Found connectionStats:', systemData.connectionStats);
-                    setConnectionStats(systemData.connectionStats);
-                } else {
-                    console.log('❌ No connectionStats in fieldCropSystemData');
+            // Load field crop system data from localStorage (similar to horticulture and greenhouse)
+            let systemData: FieldCropSystemData | null = null;
+            const systemDataStr = localStorage.getItem('fieldCropSystemData');
+            if (systemDataStr) {
+                try {
+                    systemData = JSON.parse(systemDataStr);
+                    setFieldCropSystemData(systemData);
+                    console.log('✅ Loaded fieldCropSystemData from localStorage:', systemData);
+                    console.log('🔍 System data zones:', systemData?.zones);
+                    systemData?.zones.forEach((zone: any, index: number) => {
+                        console.log(`🔍 Zone ${index}:`, {
+                            id: zone.id,
+                            name: zone.name,
+                            plantCount: zone.plantCount,
+                            waterPerTree: zone.waterPerTree,
+                            area: zone.area
+                        });
+                    });
+                } catch (error) {
+                    console.error('❌ Error parsing fieldCropSystemData from localStorage:', error);
+                }
+            } else {
+                console.warn('⚠️ No fieldCropSystemData found in localStorage');
+            }
+
+            // Load field crop data from localStorage
+            let fieldData: FieldCropData | null = null;
+            const fieldDataStr = localStorage.getItem('fieldCropData');
+            if (fieldDataStr) {
+                try {
+                    fieldData = JSON.parse(fieldDataStr);
+                    console.log('✅ Loaded fieldCropData from localStorage:', fieldData);
+                } catch (error) {
+                    console.error('❌ Error parsing fieldCropData from localStorage:', error);
                 }
             }
 
-            let fieldData = getEnhancedFieldCropData();
-
+            // Fallback to utility functions if localStorage data is not available
             if (!fieldData) {
-                fieldData = migrateToEnhancedFieldCropData();
+                fieldData = getEnhancedFieldCropData();
+                if (!fieldData) {
+                    fieldData = migrateToEnhancedFieldCropData();
+                }
             }
 
             if (fieldData) {
@@ -1370,7 +1185,7 @@ export default function Product() {
 
                 const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
                 const initialSelectedPipes: {
-                    [zoneId: string]: { branch?: any; secondary?: any; main?: any; emitter?: any };
+                    [zoneId: string]: { branch?: any; secondary?: any; main?: any };
                 } = {};
 
                 // Use system data zones if available, otherwise use field data zones
@@ -1400,11 +1215,9 @@ export default function Product() {
                             branch: undefined,
                             secondary: undefined,
                             main: undefined,
-                            emitter: undefined,
                         };
                     });
 
-                    console.log('🔍 Setting zoneInputs for field-crop (multiple zones):', initialZoneInputs);
                     setZoneInputs(initialZoneInputs);
                     setSelectedPipes(initialSelectedPipes);
                     setActiveZoneId(zonesInfo[0].id);
@@ -1420,18 +1233,16 @@ export default function Product() {
                         singleInput = createFieldCropZoneInputFromSystemData(zone, 1);
                     }
                     
-                    console.log('🔍 Setting zoneInputs for field-crop (single zone):', { [zone.id]: singleInput });
                     setZoneInputs({ [zone.id]: singleInput });
                     setSelectedPipes({
-                        [zone.id]: { branch: undefined, secondary: undefined, main: undefined, emitter: undefined },
+                        [zone.id]: { branch: undefined, secondary: undefined, main: undefined },
                     });
                     setActiveZoneId(zone.id);
                 } else {
                     const singleInput = createSingleFieldCropInput(fieldData);
-                    console.log('🔍 Setting zoneInputs for field-crop (main-area):', { 'main-area': singleInput });
                     setZoneInputs({ 'main-area': singleInput });
                     setSelectedPipes({
-                        'main-area': { branch: undefined, secondary: undefined, main: undefined, emitter: undefined },
+                        'main-area': { branch: undefined, secondary: undefined, main: undefined },
                     });
                     setActiveZoneId('main-area');
                 }
@@ -1833,51 +1644,6 @@ export default function Product() {
         zoneOperationGroups
     );
 
-    // Debug logging for field-crop mode
-    useEffect(() => {
-        if (projectMode === 'field-crop') {
-            console.log('🔍 Product page debug for field-crop:');
-            console.log('- currentInput:', currentInput);
-            console.log('- results:', results);
-            console.log('- results?.analyzedSprinklers?.length:', results?.analyzedSprinklers?.length);
-            console.log('- connectionStats.length:', connectionStats.length);
-            console.log('- fieldCropSystemData:', fieldCropSystemData);
-            
-            // Debug sprinkler counts per zone
-            if (fieldCropData?.zoneSummaries) {
-                console.log('🔍 Sprinkler counts per zone (field-crop mode):');
-                Object.entries(fieldCropData.zoneSummaries).forEach(([zoneId, zoneSummary]: [string, any]) => {
-                    console.log(`- Zone ${zoneId}: ${zoneSummary.totalIrrigationPoints || zoneSummary.sprinklerCount} sprinklers`);
-                    console.log(`  - totalIrrigationPoints: ${zoneSummary.totalIrrigationPoints}`);
-                    console.log(`  - sprinklerCount: ${zoneSummary.sprinklerCount}`);
-                    console.log(`  - dripTapeCount: ${zoneSummary.dripTapeCount}`);
-                    console.log(`  - pivotCount: ${zoneSummary.pivotCount}`);
-                    console.log(`  - waterJetTapeCount: ${zoneSummary.waterJetTapeCount}`);
-                });
-            }
-            
-            // Debug connection points for field-crop mode
-            if (fieldCropSystemData?.zones) {
-                console.log('🔍 Connection points per zone (field-crop mode):');
-                fieldCropSystemData.zones.forEach((zone: any) => {
-                    console.log(`- Zone ${zone.id} (${zone.name}):`);
-                    console.log(`  - connectionPoints: ${zone.connectionPoints?.length || 0} points`);
-                    if (zone.connectionPoints && zone.connectionPoints.length > 0) {
-                        zone.connectionPoints.forEach((cp: any, index: number) => {
-                            console.log(`    ${index + 1}. Type: ${cp.type}, Position: (${cp.position?.lat}, ${cp.position?.lng})`);
-                        });
-                    }
-                });
-            }
-            
-            // Debug currentInput for field-crop
-            console.log('🔍 currentInput for field-crop:');
-            console.log('- currentInput.totalTrees:', currentInput?.totalTrees);
-            console.log('- currentInput.waterPerTreeLiters:', currentInput?.waterPerTreeLiters);
-            console.log('- currentInput object:', currentInput);
-        }
-    }, [projectMode, currentInput, results, connectionStats, fieldCropSystemData]);
-
     const hasValidMainPipeData = results?.hasValidMainPipe ?? false;
     const hasValidSubmainPipeData = results?.hasValidSecondaryPipe ?? false;
 
@@ -1902,14 +1668,6 @@ export default function Product() {
 
     const handleInputChange = (input: IrrigationInput) => {
         if (activeZoneId) {
-            if (projectMode === 'field-crop') {
-                console.log('🔍 handleInputChange for field-crop:', {
-                    activeZoneId,
-                    input,
-                    totalTrees: input.totalTrees,
-                    waterPerTreeLiters: input.waterPerTreeLiters
-                });
-            }
             setZoneInputs((prev) => ({
                 ...prev,
                 [activeZoneId]: input,
@@ -1972,7 +1730,7 @@ export default function Product() {
                     id: z.id,
                     name: z.name,
                     area: z.area,
-                    plantCount: z.plantCount,
+                    plantCount: z.plantCount, // ในโหมดพืชไร่ plantCount หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
                     totalWaterNeed: z.totalWaterNeed,
                     plantData: null, // Could be enhanced later with crop data
                 }));
@@ -1986,7 +1744,7 @@ export default function Product() {
                         name: z.name,
                         area: z.area,
                         plantCount:
-                            z.sprinklerCount || Math.max(1, Math.ceil(z.totalPlantingPoints / 10)),
+                            z.sprinklerCount || Math.max(1, Math.ceil(z.totalPlantingPoints / 10)), // ในโหมดพืชไร่ plantCount หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
                         totalWaterNeed: z.totalWaterRequirementPerDay,
                         plantData: crop
                             ? {
@@ -2072,7 +1830,7 @@ export default function Product() {
                         id: zone.id,
                         name: zone.name,
                         area: zone.area,
-                        plantCount: zone.plantCount,
+                        plantCount: zone.plantCount, // ในโหมดพืชไร่ plantCount หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
                         totalWaterNeed: zone.totalWaterNeed,
                         plantData: null, // Could be enhanced later with crop data
                     } as any;
@@ -2087,7 +1845,7 @@ export default function Product() {
                         id: zone.id,
                         name: zone.name,
                         area: zone.area,
-                        plantCount: zone.totalPlantingPoints,
+                        plantCount: zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10)), // ในโหมดพืชไร่ plantCount หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
                         totalWaterNeed: zone.totalWaterRequirementPerDay,
                         plantData: crop
                             ? {
@@ -2684,7 +2442,6 @@ export default function Product() {
                             connectionStats={connectionStats}
                             onConnectionEquipmentsChange={handleConnectionEquipmentsChange}
                             greenhouseData={greenhouseData}
-                            fieldCropSystemData={fieldCropSystemData}
                         />
 
                         <SprinklerSelector
@@ -2696,7 +2453,6 @@ export default function Product() {
                             projectMode={projectMode}
                             gardenStats={gardenStats}
                             greenhouseData={greenhouseData}
-                            fieldCropData={fieldCropData}
                         />
 
                         {currentSprinkler && (
@@ -2732,7 +2488,14 @@ export default function Product() {
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
                                         />
-                                    ) : null}
+                                    ) : (
+                                        <div className="flex items-center justify-center rounded-lg bg-gray-800 p-8">
+                                            <div className="text-center text-gray-500">
+                                                <div className="mb-2 text-4xl">➖</div>
+                                                <p>ไม่ใช้ท่อรอง</p>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {shouldShowMainPipe && (
                                         <PipeSelector
@@ -2751,8 +2514,7 @@ export default function Product() {
                                     )}
 
                                     {currentInput.longestEmitterPipeM &&
-                                    currentInput.longestEmitterPipeM > 0 &&
-                                    projectMode !== 'greenhouse' ? (
+                                    currentInput.longestEmitterPipeM > 0 ? (
                                         <PipeSelector
                                             pipeType="emitter"
                                             results={results}
@@ -2768,6 +2530,13 @@ export default function Product() {
                                             selectedSprinkler={currentSprinkler}
                                             projectMode={projectMode}
                                         />
+                                    ) : projectMode === 'horticulture' ? (
+                                        <div className="flex items-center justify-center rounded-lg bg-gray-800 p-8">
+                                            <div className="text-center text-gray-500">
+                                                <div className="mb-2 text-4xl">➖</div>
+                                                <p>ไม่ใช้ท่อย่อยแยก</p>
+                                            </div>
+                                        </div>
                                     ) : null}
                                 </div>
 
@@ -2775,8 +2544,7 @@ export default function Product() {
                                 <PipeSystemSummary
                                     horticultureSystemData={horticultureSystemData}
                                     gardenSystemData={gardenSystemData}
-                                    greenhouseSystemData={greenhouseData}
-                                    fieldCropData={fieldCropData}
+                                    greenhouseData={greenhouseData}
                                     activeZoneId={activeZoneId}
                                     selectedPipes={{
                                         branch: effectiveEquipment.branchPipe,

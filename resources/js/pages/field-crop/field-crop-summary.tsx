@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, usePage, router } from '@inertiajs/react';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import * as turf from '@turf/turf';
@@ -16,7 +16,6 @@ import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
 import { 
-    saveFieldCropSystemData, 
     FieldCropSystemData,
     getEnhancedFieldCropData,
     calculateEnhancedFieldStats
@@ -27,58 +26,6 @@ const DEBUG_ZONE_PIPE_STATS = false as const;
 const DEBUG_SUMMARY_LOGS = true as const; // เปิดใช้งานเพื่อดูการคำนวณ lateral flow
 const dbg = (...args: unknown[]) => {
     if (DEBUG_SUMMARY_LOGS) console.log(...args);
-};
-
-// Helper functions for connection points
-const getConnectionPointColor = (type: string): string => {
-    switch (type) {
-        case 'junction':
-            return '#FFD700'; // สีเหลือง
-        case 'crossing':
-            return '#4CAF50'; // สีเขียว
-        case 'l_shape':
-            return '#F44336'; // สีแดง
-        case 't_shape':
-            return '#2196F3'; // สีน้ำเงิน
-        case 'cross_shape':
-            return '#9C27B0'; // สีม่วง
-        default:
-            return '#FFD700'; // default yellow
-    }
-};
-
-const getConnectionPointSize = (type: string): number => {
-    switch (type) {
-        case 'junction':
-            return 8;
-        case 'crossing':
-            return 7;
-        case 'l_shape':
-            return 8;
-        case 't_shape':
-            return 8;
-        case 'cross_shape':
-            return 9;
-        default:
-            return 8;
-    }
-};
-
-const getConnectionPointTitle = (type: string, connectedCount: number): string => {
-    switch (type) {
-        case 'junction':
-            return `จุดเชื่อมต่อ (${connectedCount} ท่อ)`;
-        case 'crossing':
-            return `จุดข้ามท่อเมนย่อย (${connectedCount} ท่อ)`;
-        case 'l_shape':
-            return 'จุดเชื่อมต่อรูปตัว L (ปลายท่อเมน)';
-        case 't_shape':
-            return 'จุดเชื่อมต่อรูปตัว T (ผ่านปลายท่อเมน)';
-        case 'cross_shape':
-            return 'จุดเชื่อมต่อรูปตัว + (สี่แยกท่อเมน)';
-        default:
-            return 'จุดเชื่อมต่อท่อย่อย';
-    }
 };
 
 // Proper TypeScript interfaces
@@ -5107,199 +5054,227 @@ export default function FieldCropSummary() {
     const areaInRai = fieldAreaSize / 1600;
 
     // Handle export to product page
-    const handleExportToProduct = useCallback(async () => {
+    const handleExportToProduct = async () => {
+        if (!mapContainerRef.current) {
+            alert(t('ไม่พบแผนที่'));
+            return;
+        }
+        setIsCapturingImage(true);
         try {
             // Capture map image first
-            if (mapContainerRef.current) {
-                setIsCapturingImage(true);
-                setCaptureStatus('กำลังบันทึกภาพแผนที่...');
-                
-                const imageDataUrl = await captureMapImage(mapContainerRef.current, 'field-crop');
-                if (imageDataUrl) {
-                    setMapImageCaptured(true);
-                    setCaptureStatus('บันทึกภาพแผนที่สำเร็จ');
-                } else {
-                    setCaptureStatus('ไม่สามารถบันทึกภาพแผนที่ได้');
-                }
-                setIsCapturingImage(false);
-            }
+            setCaptureStatus('กำลังบันทึกภาพแผนที่...');
+            
+            await new Promise((resolve) => setTimeout(resolve, 2000));
 
-            // Get enhanced field crop data
-            let fieldData = getEnhancedFieldCropData();
-            if (!fieldData) {
-                // Try to create from summary data
-                fieldData = calculateEnhancedFieldStats(summaryData);
-            }
+            const html2canvas = await import('html2canvas');
+            const html2canvasLib = html2canvas.default || html2canvas;
 
-            if (fieldData) {
-                // Create connection points data from pipes
-                const allConnectionPoints: Array<{
-                    id: string;
-                    position: { lat: number; lng: number };
-                    connectedLaterals: string[];
-                    submainId: string;
-                    type: 'single' | 'junction' | 'crossing' | 'l_shape' | 't_shape' | 'cross_shape';
-                    zoneId?: string;
-                    color?: string;
-                    size?: number;
-                    title?: string;
-                }> = [];
-
-                // Get pipes from fieldData and convert coordinates
-                const pipes = fieldData.pipes?.details || [];
-                if (pipes.length > 0) {
-                    // Convert pipes to proper format
-                    const convertedPipes = pipes.map((p: { id: string; type: string; coordinates: unknown[]; length: number; zoneId?: string }) => ({
-                        ...p,
-                        coordinates: p.coordinates.map((coord: unknown) => {
-                            if (Array.isArray(coord)) {
-                                return { lat: coord[0], lng: coord[1] };
-                            }
-                            return coord;
-                        })
-                    }));
-
-                    // Create lateral connection points
-                    const lateralPipes = convertedPipes.filter((p: { type: string }) => p.type === 'lateral');
-                    const submainPipes = convertedPipes.filter((p: { type: string }) => p.type === 'submain');
-
-                    if (lateralPipes.length > 0 && submainPipes.length > 0) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const lateralConnectionPoints = createLateralConnectionPoints(
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            lateralPipes as any,
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            submainPipes as any
+            const canvas = await html2canvasLib(mapContainerRef.current, {
+                useCORS: true,
+                allowTaint: true,
+                scale: 2,
+                logging: false,
+                backgroundColor: '#1F2937',
+                width: mapContainerRef.current.offsetWidth,
+                height: mapContainerRef.current.offsetHeight,
+                onclone: (clonedDoc) => {
+                    try {
+                        const controls = clonedDoc.querySelectorAll(
+                            '.leaflet-control-container, .gm-control-active'
                         );
-                        allConnectionPoints.push(...lateralConnectionPoints.map(cp => ({
-                            id: cp.id,
-                            position: { lat: cp.position.lat, lng: cp.position.lng },
-                            connectedLaterals: cp.connectedLaterals,
-                            submainId: cp.submainId,
-                            type: cp.type,
-                            color: getConnectionPointColor(cp.type),
-                            size: getConnectionPointSize(cp.type),
-                            title: getConnectionPointTitle(cp.type, cp.connectedLaterals.length)
-                        })));
-                    }
+                        controls.forEach((el) => el.remove());
 
-                    // Create submain to main connection points
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const submainToMainConnectionPoints = createSubmainToMainConnectionPoints(convertedPipes as any);
-                    allConnectionPoints.push(...submainToMainConnectionPoints.map(cp => ({
-                        id: cp.id,
-                        position: { lat: cp.position.lat, lng: cp.position.lng },
-                        connectedLaterals: cp.connectedLaterals,
-                        submainId: cp.submainId,
-                        type: cp.type,
-                        color: getConnectionPointColor(cp.type),
-                        size: getConnectionPointSize(cp.type),
-                        title: getConnectionPointTitle(cp.type, cp.connectedLaterals.length)
-                    })));
-                }
+                        const elements = clonedDoc.querySelectorAll('*');
+                        elements.forEach((el: Element) => {
+                            const htmlEl = el as HTMLElement;
+                            const computedStyle = window.getComputedStyle(htmlEl);
 
-                // Get sprinkler configuration from irrigation settings
-                const irrigationSettings = fieldData.irrigation?.settings || {};
-                const sprinklerSettings = irrigationSettings.sprinkler_system || irrigationSettings.sprinkler || {};
-                const defaultFlowRate = (sprinklerSettings && typeof sprinklerSettings === 'object' && 'flow' in sprinklerSettings) 
-                    ? (sprinklerSettings as { flow: number }).flow 
-                    : 30; // Default 30 L/min
-                const defaultPressure = (sprinklerSettings && typeof sprinklerSettings === 'object' && 'pressure' in sprinklerSettings) 
-                    ? (sprinklerSettings as { pressure: number }).pressure 
-                    : 2.5; // Default 2.5 bar
-                const defaultRadius = (sprinklerSettings && typeof sprinklerSettings === 'object' && 'coverageRadius' in sprinklerSettings) 
-                    ? (sprinklerSettings as { coverageRadius: number }).coverageRadius 
-                    : 8; // Default 8 meters
-
-                console.log('🔍 Field-crop summary sprinkler config:');
-                console.log('- irrigationSettings:', irrigationSettings);
-                console.log('- sprinklerSettings:', sprinklerSettings);
-                console.log('- defaultFlowRate:', defaultFlowRate);
-                console.log('- defaultPressure:', defaultPressure);
-                console.log('- defaultRadius:', defaultRadius);
-
-                // Create field crop system data similar to horticulture
-                const fieldCropSystemData: FieldCropSystemData = {
-                    sprinklerConfig: {
-                        flowRatePerPlant: defaultFlowRate,
-                        pressureBar: defaultPressure,
-                        radiusMeters: defaultRadius,
-                        totalFlowRatePerMinute: totalPlantingPoints * defaultFlowRate,
-                    },
-                    connectionStats: allConnectionPoints,
-                    zones: fieldData.zones.info.map((zone) => {
-                        // Get connection points for this zone
-                        const zoneConnectionPoints = allConnectionPoints.filter(() => {
-                            // Check if connection point is within zone coordinates
-                            if (zone.coordinates && zone.coordinates.length > 0) {
-                                // Simple point-in-polygon check (can be enhanced later)
-                                return true; // For now, include all connection points
+                            const color = computedStyle.color;
+                            if (color && (color.includes('oklch') || color.includes('hsl'))) {
+                                htmlEl.style.color = '#FFFFFF';
                             }
-                            return false;
+
+                            const backgroundColor = computedStyle.backgroundColor;
+                            if (
+                                backgroundColor &&
+                                (backgroundColor.includes('oklch') ||
+                                    backgroundColor.includes('hsl'))
+                            ) {
+                                if (
+                                    backgroundColor.includes('transparent') ||
+                                    backgroundColor.includes('rgba(0,0,0,0)')
+                                ) {
+                                    htmlEl.style.backgroundColor = 'transparent';
+                                } else {
+                                    htmlEl.style.backgroundColor = '#1F2937';
+                                }
+                            }
+
+                            const borderColor = computedStyle.borderColor;
+                            if (
+                                borderColor &&
+                                (borderColor.includes('oklch') || borderColor.includes('hsl'))
+                            ) {
+                                htmlEl.style.borderColor = '#374151';
+                            }
+
+                            const outlineColor = computedStyle.outlineColor;
+                            if (
+                                outlineColor &&
+                                (outlineColor.includes('oklch') || outlineColor.includes('hsl'))
+                            ) {
+                                htmlEl.style.outlineColor = '#374151';
+                            }
                         });
 
-                        return {
-                            id: zone.id,
-                            name: zone.name,
-                            plantCount: zone.totalPlantingPoints,
-                            totalWaterNeed: zone.totalWaterRequirementPerDay,
-                            waterPerTree: zone.totalWaterRequirementPerDay / Math.max(zone.totalPlantingPoints, 1),
-                            waterNeedPerMinute: zone.totalPlantingPoints * defaultFlowRate,
-                            area: zone.area,
-                            color: '#22C55E', // Default green color
-                            pipes: {
-                                mainPipes: {
-                                    count: zone.pipeStats?.main?.count || 0,
-                                    totalLength: zone.pipeStats?.main?.totalLength || 0,
-                                    longest: zone.pipeStats?.main?.longestLength || 0,
-                                },
-                                subMainPipes: {
-                                    count: zone.pipeStats?.submain?.count || 0,
-                                    totalLength: zone.pipeStats?.submain?.totalLength || 0,
-                                    longest: zone.pipeStats?.submain?.longestLength || 0,
-                                },
-                                branchPipes: {
-                                    count: zone.pipeStats?.lateral?.count || 0,
-                                    totalLength: zone.pipeStats?.lateral?.totalLength || 0,
-                                    longest: zone.pipeStats?.lateral?.longestLength || 0,
-                                },
-                                emitterPipes: {
-                                    count: 0,
-                                    totalLength: 0,
-                                    longest: 0,
-                                },
-                            },
-                            bestPipes: {
-                                main: null,
-                                subMain: null,
-                                branch: null,
-                            },
-                            connectionPoints: zoneConnectionPoints,
-                        };
-                    }),
-                    totalPlants: totalPlantingPoints,
-                    isMultipleZones: fieldData.zones.info.length > 1,
-                };
+                        const problematicElements = clonedDoc.querySelectorAll(
+                            '[style*="oklch"], [style*="hsl"]'
+                        );
+                        problematicElements.forEach((el) => {
+                            const htmlEl = el as HTMLElement;
+                            htmlEl.style.removeProperty('color');
+                            htmlEl.style.removeProperty('background-color');
+                            htmlEl.style.removeProperty('border-color');
+                            htmlEl.style.removeProperty('outline-color');
+                        });
+                    } catch {
+                        // Ignore cleanup errors
+                    }
+                },
+            });
 
-                // Save system data
-                saveFieldCropSystemData(fieldCropSystemData);
-                
-                // Set project type
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+            if (dataUrl && dataUrl !== 'data:,' && dataUrl.length > 100) {
+                localStorage.setItem('projectMapImage', dataUrl);
                 localStorage.setItem('projectType', 'field-crop');
-                
-                console.log('✅ Field crop system data saved:', fieldCropSystemData);
-                
-                // Navigate to product page
-                window.location.href = '/product?mode=field-crop';
+
+                setMapImageCaptured(true);
+                setCaptureStatus('บันทึกภาพแผนที่สำเร็จ');
+
+                // Get enhanced field crop data
+                let fieldData = getEnhancedFieldCropData();
+                if (!fieldData) {
+                    // Try to create from summary data
+                    fieldData = calculateEnhancedFieldStats(summaryData);
+                }
+
+                if (fieldData) {
+                    // คำนวณจำนวนสปริงเกลอร์รวมทั้งหมด
+                    const totalSprinklerCount = zoneIrrigationCounts.reduce((total, count) => total + count.sprinkler, 0);
+                    
+                    // ใช้ค่าอัตราการไหลจาก irrigationSettingsData
+                    const sprinklerSettings = irrigationSettingsData?.sprinkler_system;
+                    const flowRatePerSprinkler = sprinklerSettings?.flow || 2.5; // ลิตร/นาที ต่อหัวฉีด
+                    const pressureBar = sprinklerSettings?.pressure || 2.0; // บาร์
+                    const radiusMeters = sprinklerSettings?.coverageRadius || 6.0; // เมตร
+
+                    // Create field crop system data similar to horticulture
+                    const fieldCropSystemData: FieldCropSystemData = {
+                        sprinklerConfig: {
+                            flowRatePerPlant: flowRatePerSprinkler, // อัตราการไหลต่อหัวฉีด
+                            pressureBar: pressureBar, // แรงดัน
+                            radiusMeters: radiusMeters, // รัศมี
+                            totalFlowRatePerMinute: totalSprinklerCount * flowRatePerSprinkler, // อัตราการไหลรวม
+                        },
+                        connectionStats: [], // Can be enhanced later
+                        zones: fieldData.zones.info.map((zone, index) => {
+                            const assignedCropValue = fieldData.crops.zoneAssignments[zone.id];
+                            const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
+                            
+                            // ใช้จำนวนสปริงเกลอร์จาก zoneIrrigationCounts แทน totalPlantingPoints
+                            const zoneIrrigationCount = zoneIrrigationCounts[index] || { sprinkler: 0, dripTape: 0, pivot: 0, waterJetTape: 0, total: 0 };
+                            // ใช้แค่จำนวนสปริงเกลอร์ ไม่รวม drip tape, pivot, water jet tape
+                            const actualSprinklerCount = zoneIrrigationCount.sprinkler;
+                            
+                            // คำนวณน้ำต่อต้น (หัวฉีด) = อัตราการไหลต่อหัวฉีด
+                            const waterPerTree = flowRatePerSprinkler; // ลิตร/นาที ต่อหัวฉีด
+                            
+                            console.log('🔍 Creating zone data for fieldCropSystemData:', {
+                                zoneId: zone.id,
+                                zoneName: zone.name,
+                                actualSprinklerCount,
+                                waterPerTree,
+                                waterNeedPerMinute: actualSprinklerCount * waterPerTree,
+                                zoneArea: zone.area,
+                                zoneIrrigationCount,
+                                totalWaterRequirementPerDay: zone.totalWaterRequirementPerDay,
+                                cropWaterRequirement: crop?.waterRequirement
+                            });
+
+                            return {
+                                id: zone.id,
+                                name: zone.name,
+                                plantCount: actualSprinklerCount, // ใช้จำนวนสปริงเกลอร์จริง
+                                totalWaterNeed: actualSprinklerCount * waterPerTree * 30, // คำนวณจากอัตราการไหล * เวลา (30 นาที)
+                                waterPerTree: waterPerTree, // ลิตร/นาที ต่อหัวฉีด
+                                waterNeedPerMinute: actualSprinklerCount * waterPerTree, // ลิตร/นาที รวมทั้งโซน
+                                area: zone.area,
+                                color: '#22C55E', // Default green color
+                                pipes: {
+                                    mainPipes: {
+                                        count: zone.pipeStats?.main?.count || 0,
+                                        totalLength: zone.pipeStats?.main?.totalLength || 0,
+                                        longest: zone.pipeStats?.main?.longestLength || 0,
+                                    },
+                                    subMainPipes: {
+                                        count: zone.pipeStats?.submain?.count || 0,
+                                        totalLength: zone.pipeStats?.submain?.totalLength || 0,
+                                        longest: zone.pipeStats?.submain?.longestLength || 0,
+                                    },
+                                    branchPipes: {
+                                        count: zone.pipeStats?.lateral?.count || 0,
+                                        totalLength: zone.pipeStats?.lateral?.totalLength || 0,
+                                        longest: zone.pipeStats?.lateral?.longestLength || 0,
+                                    },
+                                    emitterPipes: {
+                                        count: 0,
+                                        totalLength: 0,
+                                        longest: 0,
+                                    },
+                                },
+                                bestPipes: {
+                                    main: null,
+                                    subMain: null,
+                                    branch: null,
+                                },
+                            };
+                        }),
+                        totalPlants: totalSprinklerCount, // ใช้จำนวนสปริงเกลอร์รวมทั้งหมด
+                        isMultipleZones: fieldData.zones.info.length > 1,
+                    };
+
+                    // Save system data to localStorage (similar to horticulture and greenhouse)
+                    localStorage.setItem('fieldCropSystemData', JSON.stringify(fieldCropSystemData));
+                    localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
+                    localStorage.setItem('projectType', 'field-crop');
+                    
+                    console.log('✅ Field crop system data saved to localStorage:', fieldCropSystemData);
+                    console.log('🔍 Saved zones data:', fieldCropSystemData.zones.map(zone => ({
+                        id: zone.id,
+                        name: zone.name,
+                        plantCount: zone.plantCount,
+                        waterPerTree: zone.waterPerTree
+                    })));
+                    
+                    // Navigate to product page using router (similar to greenhouse)
+                    router.visit('/product?mode=field-crop');
+                } else {
+                    console.error('❌ No field crop data available');
+                    alert('ไม่พบข้อมูลโครงการ กรุณากลับไปสร้างโครงการใหม่');
+                }
             } else {
-                console.error('❌ No field crop data available');
-                alert('ไม่พบข้อมูลโครงการ กรุณากลับไปสร้างโครงการใหม่');
+                throw new Error('ไม่สามารถสร้างภาพแผนที่ได้');
             }
         } catch (error) {
-            console.error('❌ Error exporting to product page:', error);
-            alert('เกิดข้อผิดพลาดในการส่งออกข้อมูล กรุณาลองใหม่อีกครั้ง');
+            console.error('❌ Error creating map image:', error);
+            alert(
+                '❌ เกิดข้อผิดพลาดในการสร้างภาพแผนผัง\n\nกรุณาใช้วิธี Screenshot แทน:\n\n1. กด F11 เพื่อ Fullscreen\n2. กด Print Screen หรือใช้ Snipping Tool\n3. หรือใช้ Extension "Full Page Screen Capture"'
+            );
+        } finally {
+            setIsCapturingImage(false);
         }
-    }, [summaryData, totalPlantingPoints]);
+    };
 
     if (!summaryData) {
         return (
