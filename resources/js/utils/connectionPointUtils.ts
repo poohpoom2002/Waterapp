@@ -1,3 +1,6 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-require-imports */
 // ฟังก์ชันสำหรับจัดการจุดเชื่อมต่อระหว่างท่อ (ปรับปรุงให้แม่นยำขึ้น)
 import { Coordinate } from './horticultureUtils';
 
@@ -70,7 +73,7 @@ export const createMainToSubMainConnectionPoints = (
         snapThreshold
     );
 
-    connections.forEach((connection, index) => {
+    connections.forEach((connection) => {
         connectionPoints.push({
             id: `main-submain-${connection.mainPipeId}-${connection.subMainPipeId}`,
             type: 'main-to-submain',

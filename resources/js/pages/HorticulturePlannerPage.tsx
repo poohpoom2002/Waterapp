@@ -9516,6 +9516,23 @@ export default function EnhancedHorticulturePlannerPage() {
     };
 
     const handleCompletePlantAreas = () => {
+        // ตรวจสอบว่ามีพื้นที่ที่ยังไม่ได้เลือกพืชหรือไม่
+        const incompleteAreas = history.present.plantAreas.filter(area => !area.isCompleted);
+        
+        if (incompleteAreas.length > 0) {
+            // แสดงข้อความแจ้งเตือนและเปิด modal สำหรับพื้นที่แรกที่ยังไม่เสร็จ
+            if (typeof window !== 'undefined' && (window as any).showNotification) {
+                (window as any).showNotification(
+                    `กรุณาเลือกพืชสำหรับพื้นที่ที่ยังไม่เสร็จ (${incompleteAreas.length} พื้นที่)`,
+                    'warning'
+                );
+            }
+            setCurrentPlantArea(incompleteAreas[0]);
+            setShowPlantAreaSelectionModal(true);
+            return;
+        }
+
+        // ถ้าทุกพื้นที่เสร็จแล้ว ให้ดำเนินการต่อ
         pushToHistory({
             plantSelectionMode: {
                 ...history.present.plantSelectionMode,
@@ -9528,72 +9545,130 @@ export default function EnhancedHorticulturePlannerPage() {
     };
 
     const handleGeneratePlants = () => {
-        const settings = history.present.plantGenerationSettings;
-        pushToHistory({
-            plantGenerationSettings: { ...settings, isGenerating: true },
-        });
+        try {
+            const settings = history.present.plantGenerationSettings;
+            pushToHistory({
+                plantGenerationSettings: { ...settings, isGenerating: true },
+            });
 
-        let allPlants: PlantLocation[] = [];
+            let allPlants: PlantLocation[] = [];
 
-        if (
-            history.present.plantSelectionMode.type === 'multiple' &&
-            history.present.plantAreas.length > 0
-        ) {
-            // คำนวณ shared baseline สำหรับการจัดแถวแรกให้อยู่ในระดับเดียวกัน
-            // ใช้ข้อมูลพืชจากพื้นที่แรกเป็น reference สำหรับการคำนวณ
-            const referenceArea = history.present.plantAreas[0];
-            const sharedBaseline = calculateSharedBaseline(
-                history.present.plantAreas,
-                referenceArea.plantData
-            );
+            if (
+                history.present.plantSelectionMode.type === 'multiple' &&
+                history.present.plantAreas.length > 0
+            ) {
+                // ตรวจสอบว่าทุกพื้นที่มีการเลือกพืชแล้ว
+                const incompleteAreas = history.present.plantAreas.filter(area => !area.isCompleted);
+                if (incompleteAreas.length > 0) {
+                    pushToHistory({
+                        plantGenerationSettings: { ...settings, isGenerating: false },
+                    });
+                    
+                    if (typeof window !== 'undefined' && (window as any).showNotification) {
+                        (window as any).showNotification(
+                            `กรุณาเลือกพืชสำหรับพื้นที่ที่ยังไม่เสร็จ (${incompleteAreas.length} พื้นที่)`,
+                            'error'
+                        );
+                    }
+                    return;
+                }
 
-            history.present.plantAreas.forEach((area, areaIndex) => {
-                const plants = generatePlantsInAreaWithSmartBoundary(
-                    area.coordinates,
-                    area.plantData,
-                    settings.layoutPattern,
-                    history.present.exclusionAreas,
-                    history.present.plantAreas.filter((a) => a.id !== area.id),
-                    settings.rotationAngle,
-                    sharedBaseline
+                // คำนวณ shared baseline สำหรับการจัดแถวแรกให้อยู่ในระดับเดียวกัน
+                // ใช้ข้อมูลพืชจากพื้นที่แรกเป็น reference สำหรับการคำนวณ
+                const completedAreas = history.present.plantAreas.filter(area => area.isCompleted);
+                if (completedAreas.length === 0) {
+                    throw new Error('ไม่พบพื้นที่ปลูกที่เสร็จสมบูรณ์');
+                }
+
+                const referenceArea = completedAreas[0];
+                const sharedBaseline = calculateSharedBaseline(
+                    completedAreas,
+                    referenceArea.plantData
                 );
 
-                const plantsWithAreaInfo = plants.map((plant) => ({
-                    ...plant,
-                    zoneId: area.id,
-                    plantAreaId: area.id,
-                    plantAreaColor: area.color,
-                }));
+                completedAreas.forEach((area, areaIndex) => {
+                    try {
+                        const plants = generatePlantsInAreaWithSmartBoundary(
+                            area.coordinates,
+                            area.plantData,
+                            settings.layoutPattern,
+                            history.present.exclusionAreas,
+                            completedAreas.filter((a) => a.id !== area.id),
+                            settings.rotationAngle,
+                            sharedBaseline
+                        );
 
-                allPlants = [...allPlants, ...plantsWithAreaInfo];
+                        const plantsWithAreaInfo = plants.map((plant) => ({
+                            ...plant,
+                            zoneId: area.id,
+                            plantAreaId: area.id,
+                            plantAreaColor: area.color,
+                        }));
+
+                        allPlants = [...allPlants, ...plantsWithAreaInfo];
+                    } catch (error) {
+                        console.error(`Error generating plants for area ${area.name}:`, error);
+                        if (typeof window !== 'undefined' && (window as any).showNotification) {
+                            (window as any).showNotification(
+                                `เกิดข้อผิดพลาดในการสร้างพืชสำหรับ ${area.name}`,
+                                'error'
+                            );
+                        }
+                    }
+                });
+            } else {
+                // โหมดพืชชนิดเดียว
+                if (!history.present.selectedPlantType) {
+                    throw new Error('กรุณาเลือกชนิดพืชก่อนสร้างต้นไม้');
+                }
+
+                allPlants = generatePlantsInArea(
+                    history.present.mainArea,
+                    history.present.selectedPlantType,
+                    settings.layoutPattern,
+                    history.present.exclusionAreas,
+                    settings.rotationAngle
+                );
+            }
+
+            allPlants = removePlantsInExclusionZones(allPlants, history.present.exclusionAreas);
+
+            if (allPlants.length === 0) {
+                throw new Error('ไม่สามารถสร้างต้นไม้ได้ กรุณาตรวจสอบพื้นที่และการตั้งค่า');
+            }
+
+            pushToHistory({
+                plants: allPlants,
+                plantGenerationSettings: { ...settings, isGenerating: false },
             });
-        } else {
-            allPlants = generatePlantsInArea(
-                history.present.mainArea,
-                history.present.selectedPlantType,
-                settings.layoutPattern,
-                history.present.exclusionAreas,
-                settings.rotationAngle
-            );
-        }
 
-        allPlants = removePlantsInExclusionZones(allPlants, history.present.exclusionAreas);
+            setShowPlantGenerationModal(false);
 
-        pushToHistory({
-            plants: allPlants,
-            plantGenerationSettings: { ...settings, isGenerating: false },
-        });
+            // แสดง popup กรอกข้อมูลหัวฉีดน้ำหลังจากสร้างต้นไม้เสร็จ
+            setShowSprinklerConfigModal(true);
 
-        setShowPlantGenerationModal(false);
+            if (typeof window !== 'undefined' && (window as any).showNotification) {
+                (window as any).showNotification(
+                    `สร้างต้นไม้สำเร็จ: ${allPlants.length} ต้น กรุณากรอกข้อมูลหัวฉีดน้ำ`,
+                    'success'
+                );
+            }
+        } catch (error) {
+            console.error('Error in handleGeneratePlants:', error);
+            
+            pushToHistory({
+                plantGenerationSettings: { 
+                    ...history.present.plantGenerationSettings, 
+                    isGenerating: false 
+                },
+            });
 
-        // แสดง popup กรอกข้อมูลหัวฉีดน้ำหลังจากสร้างต้นไม้เสร็จ
-        setShowSprinklerConfigModal(true);
-
-        if (typeof window !== 'undefined' && (window as any).showNotification) {
-            (window as any).showNotification(
-                `สร้างต้นไม้สำเร็จ: ${allPlants.length} ต้น กรุณากรอกข้อมูลหัวฉีดน้ำ`,
-                'success'
-            );
+            if (typeof window !== 'undefined' && (window as any).showNotification) {
+                (window as any).showNotification(
+                    error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการสร้างต้นไม้',
+                    'error'
+                );
+            }
         }
     };
 
@@ -12911,14 +12986,9 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                     onClick={
                                                                         handleCompletePlantAreas
                                                                     }
-                                                                    disabled={history.present.plantAreas.some(
-                                                                        (area) => !area.isCompleted
-                                                                    )}
+                                                                    disabled={history.present.plantAreas.length === 0}
                                                                     className={`w-full rounded-lg border px-4 py-2 text-sm font-medium ${
-                                                                        history.present.plantAreas.some(
-                                                                            (area) =>
-                                                                                !area.isCompleted
-                                                                        )
+                                                                        history.present.plantAreas.length === 0
                                                                             ? 'cursor-not-allowed border-gray-300 bg-gray-100 text-gray-500'
                                                                             : 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100'
                                                                     }`}
@@ -13006,10 +13076,41 @@ export default function EnhancedHorticulturePlannerPage() {
                                                                                                       )}
                                                                                             </span>
                                                                                             {!area.isCompleted && (
-                                                                                                <span className="text-xs text-yellow-400">
-                                                                                                    ⚠️
-                                                                                                </span>
+                                                                                                <button
+                                                                                                    onClick={() => {
+                                                                                                        setCurrentPlantArea(area);
+                                                                                                        setShowPlantAreaSelectionModal(true);
+                                                                                                    }}
+                                                                                                    className="rounded bg-yellow-600 px-1 py-0.5 text-xs text-white hover:bg-yellow-700"
+                                                                                                    title={t('เลือกพืช')}
+                                                                                                >
+                                                                                                    ✏️
+                                                                                                </button>
                                                                                             )}
+                                                                                            {area.isCompleted && (
+                                                                                                <button
+                                                                                                    onClick={() => {
+                                                                                                        setCurrentPlantArea(area);
+                                                                                                        setShowPlantAreaSelectionModal(true);
+                                                                                                    }}
+                                                                                                    className="rounded bg-blue-600 px-1 py-0.5 text-xs text-white hover:bg-blue-700"
+                                                                                                    title={t('เปลี่ยนพืช')}
+                                                                                                >
+                                                                                                    🔄
+                                                                                                </button>
+                                                                                            )}
+                                                                                            <button
+                                                                                                onClick={() => {
+                                                                                                    const updatedPlantAreas = history.present.plantAreas.filter(a => a.id !== area.id);
+                                                                                                    pushToHistory({
+                                                                                                        plantAreas: updatedPlantAreas,
+                                                                                                    });
+                                                                                                }}
+                                                                                                className="rounded bg-red-600 px-1 py-0.5 text-xs text-white hover:bg-red-700"
+                                                                                                title={t('ลบพื้นที่')}
+                                                                                            >
+                                                                                                🗑️
+                                                                                            </button>
                                                                                             <button
                                                                                                 onClick={() =>
                                                                                                     handleTogglePlantAreaVisibility(
@@ -17864,3 +17965,4 @@ const extractCoordinatesFromLayer = (layer: any): Coordinate[] => {
         return [];
     }
 };
+
