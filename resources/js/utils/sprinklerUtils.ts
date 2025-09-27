@@ -6,7 +6,7 @@ export interface SprinklerConfig {
     radiusMeters: number; // รัศมีหัวฉีด (เมตร)
     createdAt: string; // วันที่สร้าง
     updatedAt: string; // วันที่อัปเดต
-}
+} 
 
 export interface SprinklerFormData {
     flowRatePerMinute: string;
@@ -217,7 +217,7 @@ export const generateSprinklerSummary = (config: SprinklerConfig, plantCount: nu
 export const DEFAULT_SPRINKLER_CONFIG: Omit<SprinklerConfig, 'createdAt' | 'updatedAt'> = {
     flowRatePerMinute: 2.5, // 2.5 ลิตร/นาที ต่อต้น (ปกติสำหรับพืชสวน)
     pressureBar: 2.0, // 2 บาร์ (ปกติสำหรับระบบหัวฉีดแบบ micro)
-    radiusMeters: 1.5, // รัศมี 1.5 เมตร (เหมาะสำหรับพืชสวน)
+    radiusMeters: 4, // รัศมี 4 เมตร (เหมาะสำหรับพืชสวน)
 };
 
 export default {
