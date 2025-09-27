@@ -364,7 +364,7 @@ export const isPointInPolygonEnhanced = (point: [number, number], polygon: any[]
     return inside;
 };
 
-export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => {
+export const calculateEnhancedFieldStats = (summaryData: any, calculatedZoneSummaries?: Record<string, any>, zonePipeStatsMap?: Map<string, any>): FieldCropData => {
     const zones = Array.isArray(summaryData.zones) ? summaryData.zones : [];
     const pipes = Array.isArray(summaryData.pipes) ? summaryData.pipes : [];
     const irrigationPoints = Array.isArray(summaryData.irrigationPoints)
@@ -378,13 +378,69 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
     const lateralPipeStats = calculateEnhancedPipeStats(pipes, 'lateral');
     const enhancedZones = zones.map((zone: any) => {
         const zoneArea = calculateZoneAreaEnhanced(zone.coordinates);
-        const zonePipeStats = calculateEnhancedZonePipeStats(pipes, zone.id.toString(), zones);
         const assignedCropValue = summaryData.zoneAssignments?.[zone.id];
         const crop = assignedCropValue ? getCropByValueEnhanced(assignedCropValue) : null;
+        
+        // Use calculated zone summaries if available (more accurate)
+        const calculatedZoneSummary = calculatedZoneSummaries?.[zone.id.toString()];
+        
+        // Use calculated pipe statistics if available (more accurate)
+        let zonePipeStats;
+        if (zonePipeStatsMap && zonePipeStatsMap.has(zone.id.toString())) {
+            const summaryPipeStats = zonePipeStatsMap.get(zone.id.toString());
+            // Convert from field crop summary format to enhanced format
+            zonePipeStats = {
+                main: {
+                    count: summaryPipeStats.main.count,
+                    longest: summaryPipeStats.main.longestLength,
+                    totalLength: summaryPipeStats.main.totalLength,
+                    averageLength: summaryPipeStats.main.count > 0 ? summaryPipeStats.main.totalLength / summaryPipeStats.main.count : 0,
+                    details: []
+                },
+                submain: {
+                    count: summaryPipeStats.submain.count,
+                    longest: summaryPipeStats.submain.longestLength,
+                    totalLength: summaryPipeStats.submain.totalLength,
+                    averageLength: summaryPipeStats.submain.count > 0 ? summaryPipeStats.submain.totalLength / summaryPipeStats.submain.count : 0,
+                    details: []
+                },
+                lateral: {
+                    count: summaryPipeStats.lateral.count,
+                    longest: summaryPipeStats.lateral.longestLength,
+                    totalLength: summaryPipeStats.lateral.totalLength,
+                    averageLength: summaryPipeStats.lateral.count > 0 ? summaryPipeStats.lateral.totalLength / summaryPipeStats.lateral.count : 0,
+                    details: []
+                },
+                combined: {
+                    longestPath: summaryPipeStats.main.longestLength + summaryPipeStats.submain.longestLength + summaryPipeStats.lateral.longestLength,
+                    totalLength: summaryPipeStats.main.totalLength + summaryPipeStats.submain.totalLength + summaryPipeStats.lateral.totalLength,
+                    totalCount: summaryPipeStats.main.count + summaryPipeStats.submain.count + summaryPipeStats.lateral.count
+                }
+            };
+            
+            console.log(`🔍 Using calculated pipe stats for zone ${zone.id}:`, zonePipeStats);
+        } else {
+            // Fallback to enhanced calculation if no calculated pipe stats available
+            zonePipeStats = calculateEnhancedZonePipeStats(pipes, zone.id.toString(), zones);
+        }
+        
         let totalPlantingPoints = 0;
         let sprinklerCount = 0;
         let waterRequirementPerDay = 0;
-        if (crop && zoneArea > 0) {
+        
+        if (calculatedZoneSummary) {
+            // Use the already calculated values from the summary page
+            totalPlantingPoints = calculatedZoneSummary.totalPlantingPoints || 0;
+            sprinklerCount = calculatedZoneSummary.sprinklerCount || 0;
+            waterRequirementPerDay = calculatedZoneSummary.waterRequirementPerDay || 0;
+            
+            console.log(`🔍 Using calculated zone summary for zone ${zone.id}:`, {
+                sprinklerCount,
+                totalPlantingPoints,
+                waterRequirementPerDay
+            });
+        } else if (crop && zoneArea > 0) {
+            // Fallback to original calculation if no calculated summary available
             const rowSpacing = summaryData.rowSpacing?.[assignedCropValue] || crop.rowSpacing / 100;
             const plantSpacing =
                 summaryData.plantSpacing?.[assignedCropValue] || crop.plantSpacing / 100;
@@ -466,7 +522,7 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
     );
     const totalArea = summaryData.fieldAreaSize || 0;
 
-    return {
+    const result = {
         area: {
             size: totalArea,
             sizeInRai: totalArea / 1600,
@@ -535,6 +591,9 @@ export const calculateEnhancedFieldStats = (summaryData: any): FieldCropData => 
                 totalPlantingPoints > 0 ? totalWaterRequirementPerDay / totalPlantingPoints : 0,
         },
     };
+
+    console.log('🔍 Enhanced field crop data irrigation settings:', result.irrigation.settings);
+    return result;
 };
 
 export const calculateZoneAreaEnhanced = (coordinates: any[]): number => {

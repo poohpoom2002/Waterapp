@@ -15,6 +15,11 @@ import { getCropByValue, getTranslatedCropByValue } from './choose-crop';
 import Navbar from '../../components/Navbar';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { createGoogleMapsApiUrl } from '@/utils/googleMapsConfig';
+import { 
+    calculateEnhancedFieldStats, 
+    saveEnhancedFieldCropData,
+    FieldCropData 
+} from '../../utils/fieldCropData';
 
 // Reduce verbose logs in production/dev by toggling these flags
 const DEBUG_ZONE_PIPE_STATS = false as const;
@@ -4786,6 +4791,23 @@ export default function FieldCropSummary() {
 
             setCalculatedZoneSummaries(newZoneSummaries);
             dbg('✅ Zone calculations completed with cropData (per irrigation):', newZoneSummaries);
+            
+            // Save enhanced field crop data for product page
+            if (summaryData) {
+                try {
+                    // Pass the calculated zone summaries and pipe statistics to get accurate data
+                    const enhancedData = calculateEnhancedFieldStats(summaryData, newZoneSummaries, zonePipeStatsMap);
+                    console.log('🔍 Saving enhanced field crop data:', enhancedData);
+                    saveEnhancedFieldCropData(enhancedData);
+                    dbg('✅ Enhanced field crop data saved for product page');
+                    
+                    // Verify the data was saved
+                    const savedData = localStorage.getItem('enhancedFieldCropData');
+                    console.log('🔍 Verified saved data exists:', !!savedData);
+                } catch (error) {
+                    console.error('❌ Error saving enhanced field crop data:', error);
+                }
+            }
         }
     }, [
         summaryData,

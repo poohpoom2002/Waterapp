@@ -61,6 +61,7 @@ import {
     migrateToEnhancedFieldCropData,
     FieldCropData,
     calculateEnhancedFieldStats,
+    saveEnhancedFieldCropData,
 } from '../utils/fieldCropData';
 
 import {
@@ -482,17 +483,41 @@ export default function Product() {
         const assignedCropValue = fieldData.crops.zoneAssignments[zone.id];
         const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
 
-        const totalSprinklers =
-            zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10));
+        // Use the actual sprinkler count from the field crop data
+        const totalSprinklers = zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10));
 
-        let waterPerSprinklerLPM = 2.0;
-        if (crop && crop.waterRequirement) {
-            waterPerSprinklerLPM = crop.waterRequirement;
-        } else if (zone.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
-            const avgIrrigationTimeHours = 0.5;
-            waterPerSprinklerLPM =
-                zone.totalWaterRequirementPerDay / totalSprinklers / (avgIrrigationTimeHours * 60);
+        // Calculate water per sprinkler based on irrigation settings (flow rate per sprinkler)
+        let waterPerSprinklerLPM = 2.0; // Default fallback
+        
+        // Try to get the actual flow rate per sprinkler from irrigation settings
+        if (fieldData.irrigation?.settings) {
+            const irrigationSettings = fieldData.irrigation.settings;
+            // Look for sprinkler flow rate in irrigation settings
+            if (irrigationSettings.sprinkler_system?.flow) {
+                waterPerSprinklerLPM = irrigationSettings.sprinkler_system.flow;
+            } else if (irrigationSettings.sprinkler?.flow) {
+                waterPerSprinklerLPM = irrigationSettings.sprinkler.flow;
+            }
         }
+        
+        // Fallback: if no irrigation settings, try to calculate from total flow and sprinkler count
+        if (waterPerSprinklerLPM === 2.0 && zone.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
+            // This is a fallback calculation - should not be the primary method
+            const avgIrrigationTimeHours = 0.5;
+            waterPerSprinklerLPM = zone.totalWaterRequirementPerDay / totalSprinklers / (avgIrrigationTimeHours * 60);
+        } else if (waterPerSprinklerLPM === 2.0 && crop && crop.waterRequirement) {
+            // Final fallback to crop water requirement
+            waterPerSprinklerLPM = crop.waterRequirement;
+        }
+
+        console.log(`🔍 Field crop zone input for zone ${zone.id}:`, {
+            totalSprinklers,
+            totalWaterRequirementPerDay: zone.totalWaterRequirementPerDay,
+            waterPerSprinklerLPM,
+            areaInRai,
+            irrigationSettings: fieldData.irrigation?.settings,
+            hasIrrigationSettings: !!fieldData.irrigation?.settings
+        });
 
         const zonePipeStats = zone.pipeStats;
         const longestBranch = zonePipeStats.lateral.longest || 30;
@@ -1017,10 +1042,34 @@ export default function Product() {
             localStorage.removeItem('horticulture_defaultSprinkler');
             localStorage.removeItem('garden_defaultSprinkler');
 
+            console.log('🔍 Loading field crop data...');
             let fieldData = getEnhancedFieldCropData();
+            console.log('🔍 Enhanced field crop data:', fieldData);
 
             if (!fieldData) {
+                console.log('🔍 No enhanced data found, trying migration...');
                 fieldData = migrateToEnhancedFieldCropData();
+                console.log('🔍 Migrated field crop data:', fieldData);
+            }
+
+            // Additional fallback: try to load from fieldMapData directly
+            if (!fieldData) {
+                console.log('🔍 Trying to load from fieldMapData...');
+                try {
+                    const fieldMapDataStr = localStorage.getItem('fieldMapData');
+                    if (fieldMapDataStr) {
+                        const fieldMapData = JSON.parse(fieldMapDataStr);
+                        console.log('🔍 Found fieldMapData:', fieldMapData);
+                        // Convert to enhanced format
+                        fieldData = calculateEnhancedFieldStats(fieldMapData);
+                        if (fieldData) {
+                            saveEnhancedFieldCropData(fieldData);
+                            console.log('🔍 Converted and saved fieldMapData to enhanced format');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error loading from fieldMapData:', error);
+                }
             }
 
             if (fieldData) {
