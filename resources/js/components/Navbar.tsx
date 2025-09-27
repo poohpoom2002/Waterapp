@@ -249,12 +249,15 @@ const Navbar: React.FC = () => {
                                 >
                                     🤖 {t('AI ช่วยเหลือ')}
                                 </button> */}
-                                <button
+                                {auth?.user?.is_super_user && (
+                                    <button
                                     onClick={() => (window.location.href = '/equipment-crud')}
                                     className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
                                 >
                                     ⚙️ {t('จัดการอุปกรณ์')}
                                 </button>
+                                )}
+                                
                             </div>
 
                             {/* Token Display for Non-Admin Users */}

@@ -13,6 +13,7 @@ import LateralPipeInfoPanel from '../components/horticulture/LateralPipeInfoPane
 import LateralPipeModeSelector from '../components/horticulture/LateralPipeModeSelector';
 import ContinuousLateralPipePanel from '../components/horticulture/ContinuousLateralPipePanel';
 import DeletePipePanel from '../components/horticulture/DeletePipePanel';
+import AutoLateralPipeModal from '../components/horticulture/AutoLateralPipeModal';
 import { loadSprinklerConfig } from '../utils/sprinklerUtils';
 // import { calculateZoneStats } from '../utils/irrigationZoneUtils';
 import {
@@ -54,6 +55,11 @@ import {
     findLateralToSubMainIntersections,
     findMidConnections,
 } from '../utils/lateralPipeUtils';
+import {
+    generateAutoLateralPipes,
+    validateAutoLateralPipes,
+    AutoLateralPipeResult,
+} from '../utils/autoLateralPipeUtils';
 
 import { router } from '@inertiajs/react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -5457,6 +5463,9 @@ export default function EnhancedHorticulturePlannerPage() {
     const [selectedLateralPipe, setSelectedLateralPipe] = useState<LateralPipe | null>(null);
     const [showLateralPipeInfoModal, setShowLateralPipeInfoModal] = useState(false);
     const [showSprinklerRadius, setShowSprinklerRadius] = useState(false);
+
+    // Auto Lateral Pipe Modal
+    const [showAutoLateralPipeModal, setShowAutoLateralPipeModal] = useState(false);
 
     // Head Loss Calculation Modal
     const [showHeadLossModal, setShowHeadLossModal] = useState(false);
@@ -11278,6 +11287,158 @@ export default function EnhancedHorticulturePlannerPage() {
         });
     };
 
+    // ฟังก์ชันเริ่มต้นระบบลากท่อย่อยอัตโนมัติ
+    const handleStartAutoLateralPipeDrawing = () => {
+        if (history.present.subMainPipes.length === 0) {
+            alert(t('กรุณาวางท่อเมนรองก่อนใช้ระบบลากอัตโนมัติ'));
+            return;
+        }
+        
+        if (history.present.irrigationZones.length === 0) {
+            alert(t('กรุณาสร้างโซนก่อนใช้ระบบลากอัตโนมัติ'));
+            return;
+        }
+
+        setShowAutoLateralPipeModal(true);
+    };
+
+    // ฟังก์ชันจัดการเลือกโหมดลากอัตโนมัติ
+    const handleAutoLateralPipeModeSelect = (mode: 'through_submain' | 'from_submain', selectedZoneId?: string) => {
+        setShowAutoLateralPipeModal(false);
+        
+        // เตรียมข้อมูลสำหรับ algorithm
+        const subMainPipes = history.present.subMainPipes.map(pipe => ({
+            id: pipe.id,
+            coordinates: pipe.coordinates,
+            zoneId: pipe.zoneId,
+        }));
+
+        // กรองโซนตามที่เลือก
+        let zones = history.present.irrigationZones.map(zone => ({
+            id: zone.id,
+            name: zone.name,
+            coordinates: zone.coordinates,
+            plants: zone.plants,
+        }));
+
+        // ถ้าเลือกโซนเฉพาะ ให้กรองเฉพาะโซนนั้น
+        if (selectedZoneId) {
+            zones = zones.filter(zone => zone.id === selectedZoneId);
+            console.log(`🎯 Filtering to selected zone: ${selectedZoneId}`);
+        }
+
+        console.log('🎯 Auto Lateral Pipe Data:');
+        console.log('📋 Mode:', mode);
+        console.log('🔧 SubMain pipes:', subMainPipes);
+        console.log('🌍 Zones:', zones);
+        console.log('🌱 Total plants across all zones:', zones.reduce((sum, zone) => sum + zone.plants.length, 0));
+
+        // ตรวจสอบข้อมูลพื้นฐาน
+        if (subMainPipes.length === 0) {
+            alert(t('ไม่พบท่อ Sub Main ในระบบ'));
+            return;
+        }
+
+        if (zones.length === 0) {
+            alert(t('ไม่พบโซนในระบบ'));
+            return;
+        }
+
+        const totalPlants = zones.reduce((sum, zone) => sum + zone.plants.length, 0);
+        if (totalPlants === 0) {
+            alert(t('ไม่พบต้นไม้ในโซน กรุณาสร้างต้นไม้ก่อน'));
+            return;
+        }
+
+        console.log('✅ Basic validation passed');
+
+        try {
+            // สร้างท่อย่อยอัตโนมัติ
+            const autoLateralPipes = generateAutoLateralPipes(mode, subMainPipes, zones, {
+                snapThreshold: 50, // เพิ่มจาก 20 เป็น 50 เมตร
+                minPipeLength: 1,  // ลดจาก 5 เป็น 1 เมตร
+                maxPipeLength: 500, // เพิ่มจาก 200 เป็น 500 เมตร
+            });
+
+            // ตรวจสอบความถูกต้อง
+            const { valid, invalid } = validateAutoLateralPipes(autoLateralPipes, zones);
+
+            if (invalid.length > 0) {
+                console.warn('Invalid lateral pipes:', invalid);
+            }
+
+            if (valid.length === 0) {
+                alert(t('ไม่สามารถสร้างท่อย่อยอัตโนมัติได้ กรุณาตรวจสอบการจัดเรียงต้นไม้และท่อเมนรอง'));
+                return;
+            }
+
+            // แปลงเป็นรูปแบบที่ระบบใช้
+            const newLateralPipes = valid.map(pipe => {
+                // สร้าง segmentStats สำหรับ intersectionData
+                const segmentStats = pipe.intersectionData ? {
+                    segment1: {
+                        length: pipe.length / 2,
+                        plants: pipe.plants.slice(0, Math.floor(pipe.plants.length / 2)),
+                        waterNeed: pipe.plants.slice(0, Math.floor(pipe.plants.length / 2))
+                            .reduce((sum, plant) => sum + plant.plantData.waterNeed, 0),
+                    },
+                    segment2: {
+                        length: pipe.length / 2,
+                        plants: pipe.plants.slice(Math.floor(pipe.plants.length / 2)),
+                        waterNeed: pipe.plants.slice(Math.floor(pipe.plants.length / 2))
+                            .reduce((sum, plant) => sum + plant.plantData.waterNeed, 0),
+                    },
+                    total: {
+                        length: pipe.length,
+                        plants: pipe.plants,
+                        waterNeed: pipe.totalFlowRate,
+                    },
+                } : undefined;
+
+                return {
+                    id: pipe.id,
+                    subMainPipeId: pipe.intersectionData?.subMainPipeId || '',
+                    coordinates: pipe.coordinates,
+                    length: pipe.length,
+                    diameter: 16, // ค่าเริ่มต้น
+                    plants: pipe.plants,
+                    placementMode: pipe.placementMode,
+                    emitterLines: [], // จะสร้างทีหลัง
+                    totalWaterNeed: pipe.totalFlowRate,
+                    plantCount: pipe.plants.length,
+                    connectionPoint: pipe.connectionPoint,
+                    zoneId: pipe.zoneId,
+                    intersectionData: pipe.intersectionData ? {
+                        point: pipe.intersectionData.point,
+                        subMainPipeId: pipe.intersectionData.subMainPipeId,
+                        segmentIndex: pipe.intersectionData.segmentIndex,
+                        segmentStats: segmentStats!,
+                    } : undefined,
+                } as LateralPipe;
+            });
+
+            // เพิ่มท่อย่อยใหม่เข้าไปในระบบ
+            dispatchHistory({
+                type: 'PUSH_STATE',
+                state: {
+                    ...history.present,
+                    lateralPipes: [...history.present.lateralPipes, ...newLateralPipes],
+                },
+            });
+
+            alert(t(`สร้างท่อย่อยอัตโนมัติสำเร็จ ${valid.length} เส้น`));
+
+        } catch (error) {
+            console.error('Error generating auto lateral pipes:', error);
+            alert(t('เกิดข้อผิดพลาดในการสร้างท่อย่อยอัตโนมัติ'));
+        }
+    };
+
+    // ฟังก์ชันยกเลิกโหมดลากอัตโนมัติ
+    const handleCancelAutoLateralPipe = () => {
+        setShowAutoLateralPipeModal(false);
+    };
+
     const handleStartLateralPipeDrawing = () => {
         if (history.present.subMainPipes.length === 0 && history.present.plants.length === 0) {
             alert(t('กรุณาวางท่อเมนรองหรือต้นไม้ก่อนวางท่อย่อย'));
@@ -14219,19 +14380,37 @@ export default function EnhancedHorticulturePlannerPage() {
                                                         <>🔧 {t('วางท่อเมนรอง')}</>
                                                     )}
                                                 </button>
-                                                <button
-                                                    onClick={handleStartLateralPipeDrawing}
-                                                    disabled={
-                                                        history.present.subMainPipes.length === 0
-                                                    }
-                                                    className={`w-full rounded-lg border-2 px-4 py-3 font-medium transition-colors ${
-                                                        history.present.subMainPipes.length === 0
-                                                            ? 'cursor-not-allowed border-yellow-300 bg-yellow-300 text-yellow-700'
-                                                            : 'border-yellow-300 bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
-                                                    }`}
-                                                >
-                                                    🔧 {t('วางท่อย่อย')}
-                                                </button>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button
+                                                        onClick={handleStartLateralPipeDrawing}
+                                                        disabled={
+                                                            history.present.subMainPipes.length === 0
+                                                        }
+                                                        className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-colors ${
+                                                            history.present.subMainPipes.length === 0
+                                                                ? 'cursor-not-allowed border-yellow-300 bg-yellow-300 text-yellow-700'
+                                                                : 'border-yellow-300 bg-yellow-50 text-yellow-700 hover:bg-yellow-100'
+                                                        }`}
+                                                    >
+                                                        🔧 {t('วางท่อย่อย')}
+                                                    </button>
+                                                    <button
+                                                        onClick={handleStartAutoLateralPipeDrawing}
+                                                        disabled={
+                                                            history.present.subMainPipes.length === 0 ||
+                                                            history.present.irrigationZones.length === 0
+                                                        }
+                                                        className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-colors ${
+                                                            history.present.subMainPipes.length === 0 ||
+                                                            history.present.irrigationZones.length === 0
+                                                                ? 'cursor-not-allowed border-orange-300 bg-orange-300 text-orange-700'
+                                                                : 'border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                                        }`}
+                                                        title={t('ลากท่อย่อยอัตโนมัติตามแนวต้นไม้') || 'ลากท่อย่อยอัตโนมัติตามแนวต้นไม้'}
+                                                    >
+                                                        🤖 {t('ลากอัตโนมัติ')}
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             {/* ปุ่มลบท่อ */}
@@ -14800,6 +14979,14 @@ export default function EnhancedHorticulturePlannerPage() {
                             onCancel={handleCancelLateralPipeDrawing}
                             t={t}
                         />
+
+                <AutoLateralPipeModal
+                    isVisible={showAutoLateralPipeModal && !hasLargeModalOpen()}
+                    onModeSelect={handleAutoLateralPipeModeSelect}
+                    onCancel={handleCancelAutoLateralPipe}
+                    zones={history.present.irrigationZones}
+                    t={t}
+                />
 
                         <LateralPipeInfoPanel
                             isVisible={
