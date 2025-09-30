@@ -214,13 +214,21 @@ export default function IrrigationGenerate({
 	const [parsedRotationAngle, setParsedRotationAngle] = useState<number>(0);
 	const [parsedRowSpacing, setParsedRowSpacing] = useState<Record<string, number>>({});
 	const [parsedPlantSpacing, setParsedPlantSpacing] = useState<Record<string, number>>({});
+
+	// Adjust rotation angle by delta (supports 0.5° increments)
+	const adjustRotationAngle = useCallback((delta: number) => {
+		setParsedRotationAngle(prev => {
+			const next = prev + delta;
+			const clamped = Math.max(-180, Math.min(180, next));
+			// round to nearest 0.5
+			return Math.round(clamped * 2) / 2;
+		});
+	}, []);
 	const [parsedSelectedCrops, setParsedSelectedCrops] = useState<string[]>([]);
 	const [parsedMapCenter, setParsedMapCenter] = useState<{ lat: number; lng: number }>({ lat: 13.7563, lng: 100.5018 });
 	const [parsedMapZoom, setParsedMapZoom] = useState<number>(18);
 	const hasInitializedRef = useRef<boolean>(false);
 
-	// Plant points state
-	const [hideAllPoints, setHideAllPoints] = useState<boolean>(false); // Hide all points toggle
 
 	// Parse data on component mount
 	useEffect(() => {
@@ -253,6 +261,18 @@ export default function IrrigationGenerate({
 						setParsedPlantPoints(fieldData.plantPoints);
 					}
 					
+					// Load realPlantCount from localStorage on fresh load
+					if (typeof fieldData.realPlantCount === 'number' && fieldData.realPlantCount > 0) {
+						console.log('Fresh load - Loading realPlantCount from localStorage:', fieldData.realPlantCount);
+						setRealPlantCount(fieldData.realPlantCount);
+					} else if (fieldData.plantPoints) {
+						// Fallback to plantPoints.__realCount
+						const plantPointsWithRealCount = fieldData.plantPoints as typeof fieldData.plantPoints & { __realCount?: number };
+						const realCount = plantPointsWithRealCount.__realCount || fieldData.plantPoints.length;
+						console.log('Fresh load - Using fallback realPlantCount:', realCount);
+						setRealPlantCount(realCount);
+					}
+					
 					if (fieldData.areaRai) {
 						dbg('Loading areaRai from localStorage:', fieldData.areaRai);
 						setParsedAreaRai(fieldData.areaRai);
@@ -263,10 +283,9 @@ export default function IrrigationGenerate({
 						setParsedPerimeterMeters(fieldData.perimeterMeters);
 					}
 					
-					if (fieldData.rotationAngle) {
-						dbg('Loading rotationAngle from localStorage:', fieldData.rotationAngle);
-						setParsedRotationAngle(fieldData.rotationAngle);
-					}
+						// Initialize rotation angle to 0 on fresh load
+						dbg('Initializing rotationAngle to 0 on fresh load');
+						setParsedRotationAngle(0);
 					
 					if (fieldData.rowSpacing) {
 						dbg('Loading rowSpacing from localStorage:', fieldData.rowSpacing);
@@ -294,10 +313,6 @@ export default function IrrigationGenerate({
 						setParsedMapZoom(fieldData.mapZoom);
 					}
 					
-					if (typeof fieldData.hideAllPoints === 'boolean') {
-						console.log('Irrigation - Loading hideAllPoints from localStorage (fresh load):', fieldData.hideAllPoints);
-						setHideAllPoints(fieldData.hideAllPoints);
-					}
 					
 					// Then sanitize irrigation data
 					const sanitized: FieldData = {
@@ -311,7 +326,6 @@ export default function IrrigationGenerate({
 							water_jet_tape: { emitterSpacing: 20, placement: 'along_rows', side: 'left', flow: 1.5, pressure: 1.5 }
 						},
 						irrigationPositions: { sprinklers: [], pivots: [], dripTapes: [], waterJets: [] },
-						hideAllPoints: fieldData.hideAllPoints // Preserve hideAllPoints state
 					};
 					safeSetItem('fieldCropData', sanitized);
 				}
@@ -360,10 +374,21 @@ export default function IrrigationGenerate({
 					if (fieldData.plantPoints) {
 						dbg('Setting parsedPlantPoints:', fieldData.plantPoints.length, 'points');
 						setParsedPlantPoints(fieldData.plantPoints);
-						
+					}
+					
+					// Load realPlantCount from separate property first, then fallback to plantPoints.__realCount
+					if (typeof fieldData.realPlantCount === 'number' && fieldData.realPlantCount > 0) {
+						console.log('Irrigation - Loading realPlantCount from separate property:', fieldData.realPlantCount);
+						setRealPlantCount(fieldData.realPlantCount);
+					} else if (fieldData.plantPoints) {
 						// Extract real count if available (from initial-area.tsx with real count)
 						const plantPointsWithRealCount = fieldData.plantPoints as typeof fieldData.plantPoints & { __realCount?: number };
 						const realCount = plantPointsWithRealCount.__realCount || fieldData.plantPoints.length;
+						console.log('Irrigation - Loading plant points:', {
+							plantPointsLength: fieldData.plantPoints.length,
+							realCount: realCount,
+							hasRealCount: !!plantPointsWithRealCount.__realCount
+						});
 						setRealPlantCount(realCount);
 						dbg('Real plant count:', realCount);
 					}
@@ -404,10 +429,6 @@ export default function IrrigationGenerate({
 						setParsedMapZoom(fieldData.mapZoom);
 					}
 					
-					if (typeof fieldData.hideAllPoints === 'boolean') {
-						console.log('Irrigation - Loading hideAllPoints from localStorage (with URL params):', fieldData.hideAllPoints);
-						setHideAllPoints(fieldData.hideAllPoints);
-					}
 					
 					// Load irrigation data if exists
 					if (fieldData.selectedIrrigationType) {
@@ -497,6 +518,14 @@ export default function IrrigationGenerate({
 		waterJets: []
 	});
 
+	// Sprinkler Management States
+	const [sprinklerMode, setSprinklerMode] = useState<'none' | 'add' | 'move' | 'delete'>('none');
+	const [selectedSprinklers, setSelectedSprinklers] = useState<number[]>([]);
+	const [isSelecting, setIsSelecting] = useState(false);
+	const [selectionStart, setSelectionStart] = useState<{ lat: number; lng: number } | null>(null);
+	const [selectionEnd, setSelectionEnd] = useState<{ lat: number; lng: number } | null>(null);
+	const selectionRectangleRef = useRef<google.maps.Rectangle | null>(null);
+
 	// Require at least one generated irrigation type before proceeding
 	const hasGeneratedIrrigation = (
 		irrigationPositions.sprinklers.length > 0 ||
@@ -572,7 +601,6 @@ export default function IrrigationGenerate({
 			irrigationPositions,
 			mapCenter: parsedMapCenter || finalMapCenter,
 			mapZoom: parsedMapZoom || finalMapZoom,
-			hideAllPoints, // Save hideAllPoints state
 		};
 		try { safeSetItem('fieldCropData', allData); } catch { /* ignore storage errors */ }
 		
@@ -636,7 +664,6 @@ export default function IrrigationGenerate({
 				irrigationPositions,
 				mapCenter: calculatedMapCenter,
 				mapZoom: finalMapZoom,
-				hideAllPoints: false, // Default value for new data
 			};
 			fieldData = {
 				...fieldData,
@@ -656,7 +683,6 @@ export default function IrrigationGenerate({
 				irrigationCounts,
 				totalWaterRequirement,
 				irrigationPositions,
-				hideAllPoints, // Save hideAllPoints state
 			};
 			safeSetItem('fieldCropData', fieldData);
 		} catch {
@@ -758,7 +784,6 @@ export default function IrrigationGenerate({
 				irrigationPositions,
 				mapCenter: calculatedMapCenter,
 				mapZoom: finalMapZoom,
-				hideAllPoints: false, // Default value for new data
 			};
 			
 			// เพิ่มข้อมูล irrigation ใหม่
@@ -781,7 +806,6 @@ export default function IrrigationGenerate({
 				irrigationCounts,
 				totalWaterRequirement,
 				irrigationPositions,
-				hideAllPoints, // Save hideAllPoints state
 			};
 			
 			safeSetItem('fieldCropData', fieldData);
@@ -876,6 +900,27 @@ export default function IrrigationGenerate({
 		});
 	}, []);
 
+	// Real-time regenerate irrigation overlays when angle changes
+	useEffect(() => {
+		if (!isMapLoaded) return;
+		let raf: number | null = null;
+		const doRegen = () => {
+			// Only regenerate the currently selected type, if any data exists
+			if (irrigationPositions.sprinklers.length > 0) {
+				generateSprinklerSystem();
+			}
+			if (irrigationPositions.pivots.length > 0) {
+				generatePivotSystem();
+			}
+		};
+		// debounce via rAF to avoid flooding
+		raf = requestAnimationFrame(doRegen);
+		return () => {
+			if (raf) cancelAnimationFrame(raf);
+		};
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [parsedRotationAngle]);
+
 
 
 	// Fit map to main area when main area changes
@@ -925,6 +970,232 @@ export default function IrrigationGenerate({
 			},
 		}));
 	};
+
+	// ===== SPRINKLER MANAGEMENT FUNCTIONS =====
+	
+	// Add sprinkler at position
+	const addSprinkler = useCallback((position: { lat: number; lng: number }) => {
+		const newSprinkler = { lat: position.lat, lng: position.lng };
+		setIrrigationPositions(prev => ({
+			...prev,
+			sprinklers: [...prev.sprinklers, newSprinkler]
+		}));
+		setIrrigationCounts(prev => ({ ...prev, sprinkler_system: prev.sprinkler_system + 1 }));
+		console.log('Added sprinkler:', newSprinkler);
+	}, []);
+
+	// Update sprinkler position
+	const updateSprinklerPosition = useCallback((index: number, newPosition: { lat: number; lng: number }) => {
+		setIrrigationPositions(prev => ({
+			...prev,
+			sprinklers: prev.sprinklers.map((sprinkler, i) => 
+				i === index ? { lat: newPosition.lat, lng: newPosition.lng } : sprinkler
+			)
+		}));
+		console.log('Updated sprinkler position:', index, newPosition);
+	}, []);
+
+	// Delete sprinkler
+	const deleteSprinkler = useCallback((index: number) => {
+		setIrrigationPositions(prev => ({
+			...prev,
+			sprinklers: prev.sprinklers.filter((_, i) => i !== index)
+		}));
+		setIrrigationCounts(prev => ({ ...prev, sprinkler_system: Math.max(0, prev.sprinkler_system - 1) }));
+		console.log('Deleted sprinkler:', index);
+	}, []);
+
+	// Handle sprinkler mode change
+	const handleSprinklerModeChange = useCallback((mode: 'none' | 'add' | 'move' | 'delete') => {
+		setSprinklerMode(mode);
+		
+		// Clear selection when changing modes
+		if (mode !== 'delete') {
+			setSelectedSprinklers([]);
+			setIsSelecting(false);
+			setSelectionStart(null);
+			setSelectionEnd(null);
+			if (selectionRectangleRef.current) {
+				selectionRectangleRef.current.setMap(null);
+				selectionRectangleRef.current = null;
+			}
+		}
+		
+		// Control map dragging and cursor based on mode
+		if (mapRef.current) {
+			const mapDiv = mapRef.current.getDiv();
+			
+			switch (mode) {
+				case 'add':
+					mapRef.current.setOptions({ 
+						draggable: false,
+						scrollwheel: true,
+						disableDoubleClickZoom: true,
+						draggableCursor: 'crosshair',
+						draggingCursor: 'crosshair'
+					});
+					mapDiv.style.cursor = 'crosshair';
+					break;
+				case 'move':
+					mapRef.current.setOptions({ 
+						draggable: false,
+						scrollwheel: true,
+						disableDoubleClickZoom: true,
+						draggableCursor: 'move',
+						draggingCursor: 'move'
+					});
+					mapDiv.style.cursor = 'move';
+					break;
+				case 'delete':
+					mapRef.current.setOptions({ 
+						draggable: false,
+						scrollwheel: true,
+						disableDoubleClickZoom: true,
+						draggableCursor: 'pointer',
+						draggingCursor: 'pointer'
+					});
+					mapDiv.style.cursor = 'pointer';
+					break;
+				default:
+					mapRef.current.setOptions({ 
+						draggable: true,
+						scrollwheel: true,
+						disableDoubleClickZoom: false,
+						draggableCursor: undefined,
+						draggingCursor: undefined
+					});
+					mapDiv.style.cursor = '';
+					mapDiv.style.userSelect = '';
+					break;
+			}
+		}
+		
+		console.log('Sprinkler mode changed to:', mode);
+	}, []);
+
+	// Handle map click for adding sprinklers
+	const handleMapClickForSprinkler = useCallback((event: google.maps.MapMouseEvent) => {
+		if (sprinklerMode === 'add' && event.latLng) {
+			addSprinkler({
+				lat: event.latLng.lat(),
+				lng: event.latLng.lng()
+			});
+		}
+	}, [sprinklerMode, addSprinkler]);
+
+	// Handle selection rectangle drawing
+	const handleSelectionStart = useCallback((event: google.maps.MapMouseEvent) => {
+		if (sprinklerMode === 'delete' && event.latLng) {
+			// Prevent default map behavior
+			if (event.stop) {
+				event.stop();
+			}
+			
+			console.log('Selection started at:', event.latLng.lat(), event.latLng.lng());
+			
+			setIsSelecting(true);
+			setSelectionStart({
+				lat: event.latLng.lat(),
+				lng: event.latLng.lng()
+			});
+			setSelectionEnd(null);
+			
+			// Clear previous selection rectangle
+			if (selectionRectangleRef.current) {
+				selectionRectangleRef.current.setMap(null);
+				selectionRectangleRef.current = null;
+			}
+		}
+	}, [sprinklerMode]);
+
+	const handleSelectionMove = useCallback((event: google.maps.MapMouseEvent) => {
+		if (sprinklerMode === 'delete' && isSelecting && selectionStart && event.latLng) {
+			const currentEnd = {
+				lat: event.latLng.lat(),
+				lng: event.latLng.lng()
+			};
+			setSelectionEnd(currentEnd);
+
+			// Update selection rectangle
+			if (selectionRectangleRef.current) {
+				selectionRectangleRef.current.setMap(null);
+			}
+
+			const bounds = new google.maps.LatLngBounds();
+			bounds.extend(new google.maps.LatLng(selectionStart.lat, selectionStart.lng));
+			bounds.extend(new google.maps.LatLng(currentEnd.lat, currentEnd.lng));
+
+			selectionRectangleRef.current = new google.maps.Rectangle({
+				bounds: bounds,
+				fillColor: '#3b82f6',
+				fillOpacity: 0.2,
+				strokeColor: '#1d4ed8',
+				strokeOpacity: 0.8,
+				strokeWeight: 2,
+				map: mapRef.current,
+				clickable: false,
+				zIndex: 3000
+			});
+		}
+	}, [sprinklerMode, isSelecting, selectionStart]);
+
+	const handleSelectionEnd = useCallback(() => {
+		if (sprinklerMode === 'delete' && isSelecting && selectionStart && selectionEnd) {
+			// Find sprinklers within selection rectangle
+			const selectedIndices: number[] = [];
+			const minLat = Math.min(selectionStart.lat, selectionEnd.lat);
+			const maxLat = Math.max(selectionStart.lat, selectionEnd.lat);
+			const minLng = Math.min(selectionStart.lng, selectionEnd.lng);
+			const maxLng = Math.max(selectionStart.lng, selectionEnd.lng);
+
+			irrigationPositions.sprinklers.forEach((sprinkler, index) => {
+				if (sprinkler.lat >= minLat && sprinkler.lat <= maxLat &&
+					sprinkler.lng >= minLng && sprinkler.lng <= maxLng) {
+					selectedIndices.push(index);
+				}
+			});
+
+			setSelectedSprinklers(selectedIndices);
+			console.log('Selected sprinklers:', selectedIndices);
+		}
+
+		setIsSelecting(false);
+		setSelectionStart(null);
+		setSelectionEnd(null);
+		
+		// Keep selection rectangle visible for a moment
+		setTimeout(() => {
+			if (selectionRectangleRef.current) {
+				selectionRectangleRef.current.setMap(null);
+				selectionRectangleRef.current = null;
+			}
+		}, 1000);
+	}, [sprinklerMode, isSelecting, selectionStart, selectionEnd, irrigationPositions.sprinklers]);
+
+	// Delete selected sprinklers
+	const deleteSelectedSprinklers = useCallback(() => {
+		if (selectedSprinklers.length > 0) {
+			// Sort indices in descending order to avoid index shifting issues
+			const sortedIndices = [...selectedSprinklers].sort((a, b) => b - a);
+			
+			setIrrigationPositions(prev => {
+				const newSprinklers = [...prev.sprinklers];
+				sortedIndices.forEach(index => {
+					newSprinklers.splice(index, 1);
+				});
+				return { ...prev, sprinklers: newSprinklers };
+			});
+			
+			setIrrigationCounts(prev => ({ 
+				...prev, 
+				sprinkler_system: Math.max(0, prev.sprinkler_system - selectedSprinklers.length) 
+			}));
+			
+			setSelectedSprinklers([]);
+			console.log('Deleted selected sprinklers:', selectedSprinklers);
+		}
+	}, [selectedSprinklers]);
+
 
 	// Helper function to check if point is inside polygon
 	const isPointInPolygon = useCallback((point: { lat: number; lng: number }, polygon: { lat: number; lng: number }[]): boolean => {
@@ -1770,6 +2041,34 @@ export default function IrrigationGenerate({
 									<span>50%</span>
 								</div>
 							</div>
+
+								{/* Irrigation rotation angle for sprinklers */}
+								<div>
+									<label className="block text-xs text-gray-400 mb-2">
+										{t('Angle')}: {parsedRotationAngle.toFixed(1)}°
+									</label>
+									<input
+										type="range"
+										min={-180}
+										max={180}
+										step={0.5}
+										value={parsedRotationAngle}
+										onChange={(e) => setParsedRotationAngle(parseFloat(e.target.value))}
+										className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+										style={{
+											background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${((parsedRotationAngle + 180) / 360) * 100}%, #6b7280 ${((parsedRotationAngle + 180) / 360) * 100}%, #6b7280 100%)`
+										}}
+									/>
+									<div className="flex justify-between text-xs text-gray-400 mt-1">
+										<span>-180°</span>
+										<span>0°</span>
+										<span>180°</span>
+									</div>
+									<div className="flex items-center justify-between mt-2">
+										<button onClick={() => adjustRotationAngle(-0.5)} className="px-2 py-1 bg-gray-700 text-white rounded border border-white text-xs">-0.5°</button>
+										<button onClick={() => adjustRotationAngle(0.5)} className="px-2 py-1 bg-gray-700 text-white rounded border border-white text-xs">+0.5°</button>
+									</div>
+								</div>
 							
 							<div className="grid grid-cols-2 gap-3">
 								<div>
@@ -1869,6 +2168,30 @@ export default function IrrigationGenerate({
 									<span>50%</span>
 								</div>
 							</div>
+
+								{/* Irrigation rotation angle for pivots */}
+								<div>
+									<label className="block text-xs text-gray-400 mb-2">
+										{t('Angle')}: {parsedRotationAngle.toFixed(1)}°
+									</label>
+									<input
+										type="range"
+										min={-180}
+										max={180}
+										step={0.5}
+										value={parsedRotationAngle}
+										onChange={(e) => setParsedRotationAngle(parseFloat(e.target.value))}
+										className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer slider"
+										style={{
+											background: `linear-gradient(to right, #f97316 0%, #f97316 ${((parsedRotationAngle + 180) / 360) * 100}%, #6b7280 ${((parsedRotationAngle + 180) / 360) * 100}%, #6b7280 100%)`
+										}}
+									/>
+									<div className="flex justify-between text-xs text-gray-400 mt-1">
+										<span>-180°</span>
+										<span>0°</span>
+										<span>180°</span>
+									</div>
+								</div>
 							
 							<div className="grid grid-cols-2 gap-3">
 								<div>
@@ -2337,12 +2660,6 @@ export default function IrrigationGenerate({
 		plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
 		plantPointMarkersRef.current = [];
 		
-		// Don't show points if hideAllPoints is true
-		console.log('Irrigation - Rendering plant points - hideAllPoints:', hideAllPoints, 'finalPlantPoints.length:', finalPlantPoints.length);
-		if (hideAllPoints) {
-			console.log('Irrigation - Hiding all plant points due to hideAllPoints = true');
-			return;
-		}
 
 		// Filter points based on zoom level and total point count
 		const filteredPoints = filterPointsByZoom(finalPlantPoints, parsedMapZoom, realPlantCount);
@@ -2375,7 +2692,7 @@ export default function IrrigationGenerate({
 		});
 		
 		dbg(`Created ${filteredPoints.length} plant point markers (filtered from ${finalPlantPoints.length} total)`);
-	}, [finalPlantPoints, isMapLoaded, hideAllPoints, parsedPlantPoints.length, filterPointsByZoom, parsedMapZoom, realPlantCount, calculatePointSize]);
+	}, [finalPlantPoints, isMapLoaded, parsedPlantPoints.length, filterPointsByZoom, parsedMapZoom, realPlantCount, calculatePointSize]);
 
 	// Render irrigation overlays when data is loaded from localStorage
 	const renderIrrigationOverlays = useCallback(async () => {
@@ -2400,6 +2717,11 @@ export default function IrrigationGenerate({
 				batch.forEach((pos, batchIndex) => {
 					const index = i + batchIndex;
 					
+					// Check if this sprinkler is selected
+					const isSelected = selectedSprinklers.includes(index);
+					const fillColor = isSelected ? '#f59e0b' : '#3b82f6';
+					const strokeColor = isSelected ? '#d97706' : '#1d4ed8';
+					
 					// Create marker
 					const marker = new google.maps.Marker({
 						position: pos,
@@ -2407,18 +2729,46 @@ export default function IrrigationGenerate({
 						icon: {
 							url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
 								<svg width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-									<circle cx="6" cy="6" r="5" fill="#3b82f6" stroke="#1d4ed8" stroke-width="1"/>
+									<circle cx="6" cy="6" r="5" fill="${fillColor}" stroke="${strokeColor}" stroke-width="${isSelected ? '2' : '1'}"/>
 									<circle cx="6" cy="6" r="2" fill="#ffffff"/>
 								</svg>
 							`),
 							scaledSize: new google.maps.Size(12, 12),
 							anchor: new google.maps.Point(6, 6)
 						},
-						title: `Sprinkler ${index + 1}`,
+						title: `Sprinkler ${index + 1}${isSelected ? ' (Selected)' : ''}`,
 						optimized: true,
-						clickable: false,
-						zIndex: 2000
+						clickable: sprinklerMode === 'delete',
+						draggable: sprinklerMode === 'move',
+						zIndex: isSelected ? 2100 : 2000
 					});
+
+					// Add click listener for deletion
+					if (sprinklerMode === 'delete') {
+						marker.addListener('click', (e: google.maps.MapMouseEvent) => {
+							e.stop(); // Prevent map click
+							deleteSprinkler(index);
+						});
+					}
+
+					// Add drag listener for moving
+					if (sprinklerMode === 'move') {
+						marker.addListener('dragend', (event: google.maps.MapMouseEvent) => {
+							if (event.latLng) {
+								updateSprinklerPosition(index, {
+									lat: event.latLng.lat(),
+									lng: event.latLng.lng()
+								});
+							}
+						});
+					}
+
+					// Prevent marker clicks from interfering with rectangle delete selection
+					if (sprinklerMode === 'delete') {
+						marker.addListener('mousedown', (e: google.maps.MapMouseEvent) => {
+							e.stop();
+						});
+					}
 					irrigationMarkersRef.current.push(marker);
 
 					// Create coverage circle
@@ -2546,7 +2896,11 @@ export default function IrrigationGenerate({
 		irrigationPositions.dripTapes,
 		irrigationPositions.pivots,
 		irrigationPositions.sprinklers,
-		irrigationPositions.waterJets
+		irrigationPositions.waterJets,
+		sprinklerMode,
+		deleteSprinkler,
+		updateSprinklerPosition,
+		selectedSprinklers
 	]);
 
 	// Additional effect to ensure irrigation overlays are recreated when data is loaded from localStorage
@@ -2572,6 +2926,112 @@ export default function IrrigationGenerate({
 		irrigationPositions.waterJets,
 		renderIrrigationOverlays
 	]);
+
+	// Map event listeners for sprinkler management
+	useEffect(() => {
+		if (!mapRef.current) return;
+
+		const listeners: google.maps.MapsEventListener[] = [];
+		const mapDiv = mapRef.current.getDiv();
+
+		// Click listener for adding sprinklers
+		const clickListener = mapRef.current.addListener('click', (event: google.maps.MapMouseEvent) => {
+			if (sprinklerMode === 'add' && event.latLng) {
+				handleMapClickForSprinkler(event);
+			}
+		});
+		listeners.push(clickListener);
+
+		// Mouse down listener for rectangle selection start in delete mode
+		const mouseDownListener = mapRef.current.addListener('mousedown', (event: google.maps.MapMouseEvent) => {
+			if (sprinklerMode === 'delete' && event.latLng) {
+				console.log('Mouse down detected for selection');
+				handleSelectionStart(event);
+			}
+		});
+		listeners.push(mouseDownListener);
+
+		// Mouse move listener for selection drawing in delete mode
+		const mouseMoveListener = mapRef.current.addListener('mousemove', (event: google.maps.MapMouseEvent) => {
+			if (sprinklerMode === 'delete' && isSelecting && event.latLng) {
+				handleSelectionMove(event);
+			}
+		});
+		listeners.push(mouseMoveListener);
+
+		// Mouse up listener for selection end in delete mode
+		const mouseUpListener = mapRef.current.addListener('mouseup', () => {
+			if (sprinklerMode === 'delete' && isSelecting) {
+				console.log('Mouse up detected, ending selection');
+				handleSelectionEnd();
+			}
+		});
+		listeners.push(mouseUpListener);
+
+		// Additional DOM event listeners for better selection control
+		const domListeners: (() => void)[] = [];
+
+		if (sprinklerMode === 'delete') {
+			// Prevent context menu during selection
+			const preventContextMenu = (e: MouseEvent) => {
+				if (isSelecting) {
+					e.preventDefault();
+				}
+			};
+			mapDiv.addEventListener('contextmenu', preventContextMenu);
+			domListeners.push(() => mapDiv.removeEventListener('contextmenu', preventContextMenu));
+
+			// Prevent text selection during drag
+			const preventSelectStart = (e: Event) => {
+				if (isSelecting) {
+					e.preventDefault();
+				}
+			};
+			mapDiv.addEventListener('selectstart', preventSelectStart);
+			domListeners.push(() => mapDiv.removeEventListener('selectstart', preventSelectStart));
+
+			// Prevent drag start
+			const preventDragStart = (e: DragEvent) => {
+				if (isSelecting) {
+					e.preventDefault();
+				}
+			};
+			mapDiv.addEventListener('dragstart', preventDragStart);
+			domListeners.push(() => mapDiv.removeEventListener('dragstart', preventDragStart));
+
+			// Additional mouse event handling for better selection
+			const handleMouseDown = (e: MouseEvent) => {
+				if (sprinklerMode === 'delete') {
+					console.log('DOM mouse down event');
+					e.preventDefault();
+				}
+			};
+			mapDiv.addEventListener('mousedown', handleMouseDown);
+			domListeners.push(() => mapDiv.removeEventListener('mousedown', handleMouseDown));
+
+			const handleMouseMove = (e: MouseEvent) => {
+				if (sprinklerMode === 'delete' && isSelecting) {
+					e.preventDefault();
+				}
+			};
+			mapDiv.addEventListener('mousemove', handleMouseMove);
+			domListeners.push(() => mapDiv.removeEventListener('mousemove', handleMouseMove));
+
+			const handleMouseUp = (e: MouseEvent) => {
+				if (sprinklerMode === 'delete' && isSelecting) {
+					console.log('DOM mouse up event');
+					e.preventDefault();
+				}
+			};
+			mapDiv.addEventListener('mouseup', handleMouseUp);
+			domListeners.push(() => mapDiv.removeEventListener('mouseup', handleMouseUp));
+		}
+
+		return () => {
+			listeners.forEach(listener => google.maps.event.removeListener(listener));
+			domListeners.forEach(cleanup => cleanup());
+		};
+	}, [sprinklerMode, handleMapClickForSprinkler, handleSelectionStart, handleSelectionMove, handleSelectionEnd, isSelecting]);
 
 	return (
 		<>
@@ -2913,59 +3373,89 @@ export default function IrrigationGenerate({
 										<span>Lat: {calculatedMapCenter.lat.toFixed(4)}</span>
 										<span>Lng: {calculatedMapCenter.lng.toFixed(4)}</span>
 									</div>
+					{/* Removed mode overlay to avoid container growth */}
 								</div>
 								
-								{/* Hide/Show Points Button */}
-								{realPlantCount > 0 && (
-									<div className="absolute top-2.5 right-60 z-10">
-										<button 
-											onClick={() => {
-												const newHideState = !hideAllPoints;
-												console.log('Irrigation - Toggling hideAllPoints from', hideAllPoints, 'to', newHideState);
-												setHideAllPoints(newHideState);
-												
-												// Save the new state to localStorage immediately
-												try {
-													const existingData = localStorage.getItem('fieldCropData');
-													if (existingData) {
-														const fieldData = JSON.parse(existingData) as FieldData;
-														const updatedData = {
-															...fieldData,
-															hideAllPoints: newHideState
-														};
-														console.log('Irrigation - Saving hideAllPoints to localStorage:', newHideState);
-														safeSetItem('fieldCropData', updatedData);
-													}
-												} catch (error) {
-													console.error('Error saving hideAllPoints state:', error);
-												}
-											}}
-											className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
-												hideAllPoints 
-													? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
-													: 'bg-green-600 text-white border-green-500 hover:bg-green-500'
+								{/* Sprinkler Management Controls */}
+								<div className="absolute top-2.5 left-4 z-10 bg-black bg-opacity-80 rounded-lg border border-white p-3">
+									<div className="text-white text-xs mb-2 font-semibold">🚿 {t('Sprinkler Management')}</div>
+									<div className="flex flex-col gap-2">
+										<button
+											onClick={() => handleSprinklerModeChange(sprinklerMode === 'add' ? 'none' : 'add')}
+											className={`px-3 py-1 rounded text-xs font-medium transition-colors border border-white ${
+												sprinklerMode === 'add'
+													? 'bg-green-600 text-white'
+													: 'bg-gray-700 text-gray-300 hover:bg-gray-600'
 											}`}
-											title={hideAllPoints ? t('Show All Points') : t('Hide All Points')}
 										>
-											{hideAllPoints ? (
-												<div className="flex items-center gap-1">
-													<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-													</svg>
-													{t('Show')}
-												</div>
-											) : (
-												<div className="flex items-center gap-1">
-													<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-													</svg>
-													{t('Hide')}
-												</div>
-											)}
+											➕ {sprinklerMode === 'add' ? t('Cancel Add') : t('Add Sprinkler')}
 										</button>
+										
+						{/* Removed Select Multiple button; rectangle selection is available in Delete mode */}
+										
+										<button
+											onClick={() => handleSprinklerModeChange(sprinklerMode === 'move' ? 'none' : 'move')}
+											className={`px-3 py-1 rounded text-xs font-medium transition-colors border border-white ${
+												sprinklerMode === 'move'
+													? 'bg-blue-600 text-white'
+													: 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+											}`}
+											disabled={irrigationPositions.sprinklers.length === 0}
+										>
+											🔄 {sprinklerMode === 'move' ? t('Cancel Move') : t('Move Sprinkler')}
+										</button>
+										
+										<button
+											onClick={() => handleSprinklerModeChange(sprinklerMode === 'delete' ? 'none' : 'delete')}
+											className={`px-3 py-1 rounded text-xs font-medium transition-colors border border-white ${
+												sprinklerMode === 'delete'
+													? 'bg-red-600 text-white'
+													: 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+											}`}
+											disabled={irrigationPositions.sprinklers.length === 0}
+										>
+											🗑️ {sprinklerMode === 'delete' ? t('Cancel Delete') : t('Delete Sprinkler')}
+										</button>
+										
+										{/* Selection Actions */}
+										{selectedSprinklers.length > 0 && (
+											<div className="border-t border-gray-600 pt-2 mt-2">
+												<div className="text-xs text-orange-300 mb-2">
+													{t('Selected')}: {selectedSprinklers.length} {t('sprinklers')}
+												</div>
+												<div className="flex gap-1">
+													<button
+														onClick={deleteSelectedSprinklers}
+														className="flex-1 px-2 py-1 rounded text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors border border-white"
+													>
+														🗑️ {t('Delete Selected')}
+													</button>
+													<button
+														onClick={() => setSelectedSprinklers([])}
+														className="px-2 py-1 rounded text-xs font-medium bg-gray-600 text-white hover:bg-gray-700 transition-colors border border-white"
+													>
+														✖️
+													</button>
+												</div>
+											</div>
+										)}
+										
+										{irrigationPositions.sprinklers.length > 0 && (
+											<div className="text-xs text-blue-300 mt-1">
+												{t('Total Sprinklers')}: {irrigationPositions.sprinklers.length}
+											</div>
+										)}
+										
+						{sprinklerMode !== 'none' && (
+							<div className="text-xs text-yellow-300 bg-yellow-900 bg-opacity-30 p-2 rounded mt-1">
+								{sprinklerMode === 'add' && `💡 ${t('Click on map to add sprinkler')}`}
+								{sprinklerMode === 'move' && `💡 ${t('Drag sprinkler to move')}`}
+								{sprinklerMode === 'delete' && `💡 ${t('Click to delete or drag to box-select and delete')}`}
+							</div>
+						)}
 									</div>
-								)}
+								</div>
+								
 								<div className="absolute bottom-4 right-20 z-10 pointer-events-none">
 									<div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
 										{t('Zoom Level')}: {parsedMapZoom}
