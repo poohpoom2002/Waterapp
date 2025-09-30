@@ -40,6 +40,8 @@ interface Zone {
     color: string;
     coordinates: Coordinate[];
     cropType?: string;
+    plantCount?: number;
+    waterRequirement?: number;
 }
 
 interface Pipe {
@@ -135,6 +137,7 @@ interface FieldCropSummaryProps {
     irrigationSettings?: Record<string, unknown>;
     rowSpacing?: Record<string, number>;
     plantSpacing?: Record<string, number>;
+    realPlantCount?: number;
     mapCenter?: [number, number];
     mapZoom?: number;
     mapType?: string;
@@ -3217,11 +3220,7 @@ const buildZoneConnectivityLongestFlows = (
     
     // Debug logging for flow settings
     if (perSprinkler === 0) {
-        console.log(`🔍 Flow settings debug:`, {
-            flowSettings,
-            perSprinkler,
-            sprinklerSystemFlow: flowSettings?.sprinkler_system?.flow
-        });
+        // No flow settings available
     }
     
     // ฟังก์ชันสำหรับหาสปริงเกลอร์ที่เชื่อมต่อกับท่อย่อยแบบโหมดระหว่างแถว
@@ -3465,7 +3464,6 @@ const buildZoneConnectivityLongestFlows = (
                             latLongestUnits = leftRowSprinklers.length + rightRowSprinklers.length;
 
                             // Debug logging สำหรับโหมดระหว่างแถว
-                            console.log(`🌾 Zone ${zone.id}: Between rows mode - ${latLongestUnits} units, ${(latLongestUnits * perSprinkler).toFixed(2)} L/min`);
                         } else {
                             // ถ้าไม่สามารถหาสปริงเกลอร์ทั้งสองแถวได้ ใช้วิธีเดิม
                             latLongestUnits = connectedSprinklers.length;
@@ -3674,7 +3672,7 @@ const buildZoneConnectivityLongestFlows = (
 
         // Debug logging for troubleshooting
         if (totalMainFlow === 0 && subIds.length > 0) {
-            console.log(`🔍 Main ${m.id} flow calculation debug:`, { mainId: m.id, subCount, totalMainFlow });
+            // No main flow calculated
         }
 
         if (totalMainFlow > bestMainFlow) {
@@ -3702,11 +3700,6 @@ const buildZoneConnectivityLongestFlows = (
     }
 
     // Debug logging for final results
-    console.log(`🔍 Zone ${zone.id} final flow calculation:`, {
-        main: { flowLMin: bestMainFlow },
-        submain: { flowLMin: subLongestStats.flow },
-        lateral: { flowLMin: latLongestFlow }
-    });
 
     return {
         main: {
@@ -3843,6 +3836,13 @@ export default function FieldCropSummary() {
     const [calculatedZoneSummaries, setCalculatedZoneSummaries] = useState<
         Record<string, ZoneSummary>
     >({});
+    const [zoneIrrigationCounts, setZoneIrrigationCounts] = useState<Array<{
+        sprinkler: number;
+        dripTape: number;
+        pivot: number;
+        waterJetTape: number;
+        total: number;
+    }>>([]);
 
     // Enhanced state for Google Maps and image capture
     const [mapImageCaptured, setMapImageCaptured] = useState<boolean>(false);
@@ -3936,6 +3936,14 @@ export default function FieldCropSummary() {
                         typeof inertiaProps.mapCenter === 'string'
                             ? JSON.parse(inertiaProps.mapCenter)
                             : inertiaProps.mapCenter,
+                    zoneAssignments:
+                        typeof inertiaProps.zoneAssignments === 'string'
+                            ? JSON.parse(inertiaProps.zoneAssignments)
+                            : inertiaProps.zoneAssignments,
+                    irrigationAssignments:
+                        typeof inertiaProps.irrigationAssignments === 'string'
+                            ? JSON.parse(inertiaProps.irrigationAssignments)
+                            : inertiaProps.irrigationAssignments,
                 } as FieldCropSummaryProps;
                 const derivedIrrigationPoints =
                     Array.isArray(normalized.irrigationPoints) &&
@@ -4230,7 +4238,7 @@ export default function FieldCropSummary() {
 
             return () => clearTimeout(timer);
         }
-    }, [summaryData, mapImageCaptured, isCapturingImage, handleCaptureMapImage]);
+    }, [summaryData, mapImageCaptured, isCapturingImage, handleCaptureMapImage, zoneIrrigationCounts]);
 
     // Enhanced manual capture function with user feedback
     const handleManualCapture = async () => {
@@ -4402,11 +4410,6 @@ export default function FieldCropSummary() {
 
     // Debug logging for irrigation settings
     useEffect(() => {
-        console.log('🔍 Irrigation Settings Debug:', {
-            sprinklerFlow: irrigationSettingsData?.sprinkler_system?.flow,
-            actualPipes: actualPipes.length,
-            actualIrrigationPoints: actualIrrigationPoints.length
-        });
     }, [irrigationSettingsData, actualPipes, actualIrrigationPoints]);
 
     // Build global pipe network connectivity & flow summary
@@ -4454,14 +4457,67 @@ export default function FieldCropSummary() {
             dbg('🎯 Available zones:', zones);
 
             const newZoneSummaries: Record<string, ZoneSummary> = {};
-            const zAssign: Record<string, string> =
-                zoneAssignments && typeof zoneAssignments === 'object'
-                    ? (zoneAssignments as Record<string, string>)
-                    : {};
-            const iAssign: Record<string, string> =
-                irrigationAssignments && typeof irrigationAssignments === 'object'
-                    ? (irrigationAssignments as Record<string, string>)
-                    : {};
+            const newZoneIrrigationCounts: Array<{
+                sprinkler: number;
+                dripTape: number;
+                pivot: number;
+                waterJetTape: number;
+                total: number;
+            }> = [];
+            
+            // Load zoneAssignments and irrigationAssignments from localStorage if not in props
+            let zAssign: Record<string, string> = {};
+            let iAssign: Record<string, string> = {};
+            
+            if (zoneAssignments && typeof zoneAssignments === 'object') {
+                zAssign = zoneAssignments as Record<string, string>;
+            } else {
+                // Try to load from localStorage
+                try {
+                    const fieldDataStr = localStorage.getItem('fieldCropData');
+                    if (fieldDataStr) {
+                        const parsed = JSON.parse(fieldDataStr);
+                        if (parsed?.crops?.zoneAssignments) {
+                            zAssign = parsed.crops.zoneAssignments;
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to load zoneAssignments from localStorage:', error);
+                }
+                
+                // If still empty, create from zones with cropType
+                if (Object.keys(zAssign).length === 0) {
+                    zones.forEach((zone) => {
+                        if (zone.cropType) {
+                            zAssign[zone.id.toString()] = zone.cropType;
+                        }
+                    });
+                }
+            }
+            
+            if (irrigationAssignments && typeof irrigationAssignments === 'object') {
+                iAssign = irrigationAssignments as Record<string, string>;
+            } else {
+                // Try to load from localStorage
+                try {
+                    const fieldDataStr = localStorage.getItem('fieldCropData');
+                    if (fieldDataStr) {
+                        const parsed = JSON.parse(fieldDataStr);
+                        if (parsed?.irrigation?.zoneAssignments) {
+                            iAssign = parsed.irrigation.zoneAssignments;
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Failed to load irrigationAssignments from localStorage:', error);
+                }
+                
+                // If still empty, create default irrigation assignments
+                if (Object.keys(iAssign).length === 0) {
+                    zones.forEach((zone) => {
+                        iAssign[zone.id.toString()] = 'sprinkler'; // Default to sprinkler
+                    });
+                }
+            }
 
             // ดึงจุดปลูกจริง (plant points) จาก props หรือตกลง localStorage ถ้าไม่มีใน props
             let actualPlantPoints: Array<{ lat: number; lng: number }> = [];
@@ -4487,6 +4543,31 @@ export default function FieldCropSummary() {
                 // ignore
             }
 
+            // Consolidated console.log for all zone data
+            console.log('🌾 [FIELD-CROP-SUMMARY] ===== ALL ZONE DATA =====');
+            console.log('🌾 [FIELD-CROP-SUMMARY] Summary Data:', summaryData);
+            console.log('🌾 [FIELD-CROP-SUMMARY] Zones Array:', zones);
+            console.log('🌾 [FIELD-CROP-SUMMARY] Zone Assignments (from props):', zoneAssignments);
+            console.log('🌾 [FIELD-CROP-SUMMARY] Zone Assignments (loaded):', zAssign);
+            console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (from props):', irrigationAssignments);
+            console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Assignments (loaded):', iAssign);
+            console.log('🌾 [FIELD-CROP-SUMMARY] Pipes Data:', pipes);
+            console.log('🌾 [FIELD-CROP-SUMMARY] Irrigation Points:', irrigationPoints);
+            console.log('🌾 [FIELD-CROP-SUMMARY] Plant Points:', actualPlantPoints);
+            
+            // Detailed zone information
+            const allZonesData = zones.map((zone: Zone) => ({
+                id: zone.id,
+                name: zone.name,
+                color: zone.color,
+                coordinates: zone.coordinates,
+                cropType: zone.cropType,
+                assignedCrop: zAssign[zone.id.toString()],
+                irrigationType: iAssign[zone.id.toString()]
+            }));
+            console.log('🌾 [FIELD-CROP-SUMMARY] All Zones Detailed Data:', allZonesData);
+            console.log('🌾 [FIELD-CROP-SUMMARY] ===== END ZONE DATA =====');
+            
             zones.forEach((zone: Zone) => {
                 const zoneId = zone.id.toString();
                 let assignedCropValue = zone.cropType || zAssign[zoneId];
@@ -4513,70 +4594,77 @@ export default function FieldCropSummary() {
                             ? plantSpacing[assignedCropValue]
                             : crop.plantSpacing;
 
-                        // คำนวณจำนวนจุดปลูกจากท่อย่อยที่มีอยู่จริง (ถ้ามี)
-                        // ถ้าไม่มีท่อย่อย ให้คำนวณจากพื้นที่โซน
+                        // Use plant count from zone object first (calculated in zone-obstacle.tsx)
                         let totalPlantingPoints = 0;
-                        // นับจำนวนจุดปลูกจริงภายในโซน (ถ้ามีข้อมูล)
                         let actualPlantsInZone = 0;
-                        try {
-                            if (
-                                Array.isArray(zone.coordinates) &&
-                                zone.coordinates.length >= 3 &&
-                                actualPlantPoints.length > 0
-                            ) {
-                                const zoneCoords = zone.coordinates.map((c) => [c.lng, c.lat]);
-                                // ปิด polygon หากยังไม่ปิด
-                                if (zoneCoords.length >= 3) {
-                                    const first = zoneCoords[0];
-                                    const last = zoneCoords[zoneCoords.length - 1];
-                                    if (first[0] !== last[0] || first[1] !== last[1])
-                                        zoneCoords.push(first);
+                        
+                        // Check if zone has plantCount property (from zone-obstacle.tsx calculation)
+                        if (typeof zone.plantCount === 'number' && zone.plantCount > 0) {
+                            totalPlantingPoints = zone.plantCount;
+                            actualPlantsInZone = zone.plantCount;
+                            console.log(`Using zone plantCount for zone ${zoneId}:`, totalPlantingPoints);
+                        } else {
+                            // Fallback to calculation methods
+                            try {
+                                if (
+                                    Array.isArray(zone.coordinates) &&
+                                    zone.coordinates.length >= 3 &&
+                                    actualPlantPoints.length > 0
+                                ) {
+                                    const zoneCoords = zone.coordinates.map((c) => [c.lng, c.lat]);
+                                    // ปิด polygon หากยังไม่ปิด
+                                    if (zoneCoords.length >= 3) {
+                                        const first = zoneCoords[0];
+                                        const last = zoneCoords[zoneCoords.length - 1];
+                                        if (first[0] !== last[0] || first[1] !== last[1])
+                                            zoneCoords.push(first);
+                                    }
+                                    const zonePolygon = turf.polygon([
+                                        zoneCoords as [number, number][],
+                                    ]);
+                                    actualPlantsInZone = actualPlantPoints.reduce((acc, pt) => {
+                                        const p = turf.point([pt.lng, pt.lat]);
+                                        return acc + (booleanPointInPolygon(p, zonePolygon) ? 1 : 0);
+                                    }, 0);
                                 }
-                                const zonePolygon = turf.polygon([
-                                    zoneCoords as [number, number][],
-                                ]);
-                                actualPlantsInZone = actualPlantPoints.reduce((acc, pt) => {
-                                    const p = turf.point([pt.lng, pt.lat]);
-                                    return acc + (booleanPointInPolygon(p, zonePolygon) ? 1 : 0);
-                                }, 0);
+                            } catch {
+                                // Error counting actual plant points in zone
+                                console.warn('Error counting actual plant points in zone');
                             }
-                        } catch {
-                            // Error counting actual plant points in zone
-                            console.warn('Error counting actual plant points in zone');
-                        }
-                        try {
-                            const fromArea = calculatePlantingPoints(
-                                zoneArea,
-                                crop,
-                                effectiveRowSpacing,
-                                effectivePlantSpacing
-                            );
-                            let fromPipes = 0;
-                            if (pipes && pipes.length > 0) {
-                                try {
-                                    fromPipes = calculatePlantingPointsFromPipes(
-                                        pipes,
-                                        zoneId,
-                                        crop,
-                                        effectiveRowSpacing,
-                                        effectivePlantSpacing
-                                    );
-                                } catch {
-                                    // Pipe-based planting calc failed for zone
-                                    console.warn('Pipe-based planting calc failed for zone');
+                            try {
+                                const fromArea = calculatePlantingPoints(
+                                    zoneArea,
+                                    crop,
+                                    effectiveRowSpacing,
+                                    effectivePlantSpacing
+                                );
+                                let fromPipes = 0;
+                                if (pipes && pipes.length > 0) {
+                                    try {
+                                        fromPipes = calculatePlantingPointsFromPipes(
+                                            pipes,
+                                            zoneId,
+                                            crop,
+                                            effectiveRowSpacing,
+                                            effectivePlantSpacing
+                                        );
+                                    } catch {
+                                        // Pipe-based planting calc failed for zone
+                                        console.warn('Pipe-based planting calc failed for zone');
+                                    }
                                 }
+                                totalPlantingPoints = fromPipes > 0 ? fromPipes : fromArea;
+                            } catch {
+                                // Error calculating planting points for zone
+                                console.warn('Error calculating planting points for zone');
+                                // Fallback to area-based calculation
+                                totalPlantingPoints = calculatePlantingPoints(
+                                    zoneArea,
+                                    crop,
+                                    effectiveRowSpacing,
+                                    effectivePlantSpacing
+                                );
                             }
-                            totalPlantingPoints = fromPipes > 0 ? fromPipes : fromArea;
-                        } catch {
-                            // Error calculating planting points for zone
-                            console.warn('Error calculating planting points for zone');
-                            // Fallback to area-based calculation
-                            totalPlantingPoints = calculatePlantingPoints(
-                                zoneArea,
-                                crop,
-                                effectiveRowSpacing,
-                                effectivePlantSpacing
-                            );
                         }
                         // ใช้จำนวนจริงหากมี (มากกว่า 0)
                         if (actualPlantsInZone > 0) totalPlantingPoints = actualPlantsInZone;
@@ -4600,6 +4688,9 @@ export default function FieldCropSummary() {
                             zone,
                             actualIrrigationPoints
                         );
+                        
+                        // เก็บ zoneIrrigationCounts ไว้ใน array
+                        newZoneIrrigationCounts.push(zoneIrrigationCounts);
 
                         newZoneSummaries[zoneId] = {
                             zoneId: zoneId,
@@ -4790,6 +4881,7 @@ export default function FieldCropSummary() {
             });
 
             setCalculatedZoneSummaries(newZoneSummaries);
+            setZoneIrrigationCounts(newZoneIrrigationCounts);
             dbg('✅ Zone calculations completed with cropData (per irrigation):', newZoneSummaries);
         }
     }, [
@@ -4800,6 +4892,7 @@ export default function FieldCropSummary() {
         plantSpacing,
         irrigationAssignments,
         pipes,
+        irrigationPoints,
         actualIrrigationPoints,
         t,
     ]);
@@ -4927,17 +5020,17 @@ export default function FieldCropSummary() {
     });
 
     // คำนวณจำนวน irrigation points รวมจากทุกโซน
-    const zoneIrrigationCounts = actualZones.map((zone) =>
+    const calculatedZoneIrrigationCounts = actualZones.map((zone) =>
         calculateZoneIrrigationCounts(zone, uniqueIrrigationPoints)
     );
 
-    const sprinklerPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.sprinkler, 0);
-    const pivotPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + (counts.pivot || 0), 0);
-    const waterJetPoints = zoneIrrigationCounts.reduce(
+    const sprinklerPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + counts.sprinkler, 0);
+    const pivotPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + (counts.pivot || 0), 0);
+    const waterJetPoints = calculatedZoneIrrigationCounts.reduce(
         (sum, counts) => sum + (counts.waterJetTape || 0),
         0
     );
-    const dripPoints = zoneIrrigationCounts.reduce((sum, counts) => sum + counts.dripTape, 0);
+    const dripPoints = calculatedZoneIrrigationCounts.reduce((sum, counts) => sum + counts.dripTape, 0);
 
     // Debug: ตรวจสอบการคำนวณจำนวน irrigation points รวม
     dbg('🔍 Total irrigation points calculation:', {
@@ -5159,7 +5252,7 @@ export default function FieldCropSummary() {
                     fieldData = calculateEnhancedFieldStats(summaryData);
                 }
 
-                if (fieldData) {
+                if (fieldData && zoneIrrigationCounts.length > 0) {
                     // คำนวณจำนวนสปริงเกลอร์รวมทั้งหมด
                     const totalSprinklerCount = zoneIrrigationCounts.reduce((total, count) => total + count.sprinkler, 0);
                     
@@ -5179,34 +5272,22 @@ export default function FieldCropSummary() {
                         },
                         connectionStats: [], // Can be enhanced later
                         zones: fieldData.zones.info.map((zone, index) => {
-                            const assignedCropValue = fieldData.crops.zoneAssignments[zone.id];
-                            const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
-                            
-                            // ใช้จำนวนสปริงเกลอร์จาก zoneIrrigationCounts แทน totalPlantingPoints
+                            // ใช้จำนวนสปริงเกลอร์จาก zoneIrrigationCounts state แทน totalPlantingPoints
                             const zoneIrrigationCount = zoneIrrigationCounts[index] || { sprinkler: 0, dripTape: 0, pivot: 0, waterJetTape: 0, total: 0 };
                             // ใช้แค่จำนวนสปริงเกลอร์ ไม่รวม drip tape, pivot, water jet tape
                             const actualSprinklerCount = zoneIrrigationCount.sprinkler;
                             
                             // คำนวณน้ำต่อต้น (หัวฉีด) = อัตราการไหลต่อหัวฉีด
                             const waterPerTree = flowRatePerSprinkler; // ลิตร/นาที ต่อหัวฉีด
-                            
-                            console.log('🔍 Creating zone data for fieldCropSystemData:', {
-                                zoneId: zone.id,
-                                zoneName: zone.name,
-                                actualSprinklerCount,
-                                waterPerTree,
-                                waterNeedPerMinute: actualSprinklerCount * waterPerTree,
-                                zoneArea: zone.area,
-                                zoneIrrigationCount,
-                                totalWaterRequirementPerDay: zone.totalWaterRequirementPerDay,
-                                cropWaterRequirement: crop?.waterRequirement
-                            });
 
+                            // คำนวณปริมาณน้ำต่อครั้ง (ลิตร/ครั้ง) จากข้อมูลที่คำนวณไว้แล้ว
+                            const waterPerIrrigation = actualSprinklerCount * waterPerTree * 30; // ลิตร/ครั้ง
+                            
                             return {
                                 id: zone.id,
                                 name: zone.name,
                                 plantCount: actualSprinklerCount, // ใช้จำนวนสปริงเกลอร์จริง
-                                totalWaterNeed: actualSprinklerCount * waterPerTree * 30, // คำนวณจากอัตราการไหล * เวลา (30 นาที)
+                                totalWaterNeed: waterPerIrrigation, // ปริมาณน้ำต่อครั้ง (ลิตร/ครั้ง)
                                 waterPerTree: waterPerTree, // ลิตร/นาที ต่อหัวฉีด
                                 waterNeedPerMinute: actualSprinklerCount * waterPerTree, // ลิตร/นาที รวมทั้งโซน
                                 area: zone.area,
@@ -5246,16 +5327,13 @@ export default function FieldCropSummary() {
 
                     // Save system data to localStorage (similar to horticulture and greenhouse)
                     localStorage.setItem('fieldCropSystemData', JSON.stringify(fieldCropSystemData));
+                    
+                    // Debug: แสดงข้อมูลที่สร้าง fieldCropSystemData
+                    console.log('🌾 [FIELD-CROP-SUMMARY] Created fieldCropSystemData:', fieldCropSystemData);
+                    console.log('🌾 [FIELD-CROP-SUMMARY] Zone Irrigation Counts:', zoneIrrigationCounts);
+                    console.log('🌾 [FIELD-CROP-SUMMARY] Total Sprinkler Count:', totalSprinklerCount);
                     localStorage.setItem('fieldCropData', JSON.stringify(fieldData));
                     localStorage.setItem('projectType', 'field-crop');
-                    
-                    console.log('✅ Field crop system data saved to localStorage:', fieldCropSystemData);
-                    console.log('🔍 Saved zones data:', fieldCropSystemData.zones.map(zone => ({
-                        id: zone.id,
-                        name: zone.name,
-                        plantCount: zone.plantCount,
-                        waterPerTree: zone.waterPerTree
-                    })));
                     
                     // Navigate to product page using router (similar to greenhouse)
                     router.visit('/product?mode=field-crop');
@@ -6310,39 +6388,7 @@ export default function FieldCropSummary() {
                                         )}
                                     </h2>
                                     <div className="space-y-3 print:space-y-2">
-                                        {(() => {
-                                            // คำนวณและแสดงผลรวมการไหลของทุกโซนทีเดียว
-                                            const allZoneFlows = actualZones.map((zone) => {
-                                                try {
-                                                    const zFlows =
-                                                        buildZoneConnectivityLongestFlows(
-                                                            zone,
-                                                            actualPipes,
-                                                            actualIrrigationPoints,
-                                                            irrigationSettingsData || {}
-                                                        );
-                                                    return {
-                                                        zoneId: zone.id,
-                                                        zoneName: zone.name,
-                                                        mainFlow: zFlows.main.flowLMin,
-                                                        submainFlow: zFlows.submain.flowLMin,
-                                                        lateralFlow: zFlows.lateral.flowLMin,
-                                                    };
-                                                } catch {
-                                                    return {
-                                                        zoneId: zone.id,
-                                                        zoneName: zone.name,
-                                                        mainFlow: 0,
-                                                        submainFlow: 0,
-                                                        lateralFlow: 0,
-                                                    };
-                                                }
-                                            });
-                                            
-                                            console.log('🔍 All Zone Flow Calculations:', allZoneFlows);
-                                            
-                                            return null;
-                                        })()}
+                                        {null}
                                         {actualZones.map((zone) => {
                                             const summary = calculatedZoneSummaries[zone.id];
                                             const assignedCrop = zoneAssignments[zone.id]

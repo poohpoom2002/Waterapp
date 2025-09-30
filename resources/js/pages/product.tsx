@@ -583,19 +583,9 @@ export default function Product() {
         zone: any,
         totalZones: number
     ): IrrigationInput => {
-        console.log('🔍 createFieldCropZoneInputFromSystemData - zone data:', zone);
         const areaInRai = zone.area / 1600;
         const totalSprinklers = zone.plantCount || 0;
         const waterPerSprinklerLPM = zone.waterPerTree || 2.0;
-        
-        console.log('🔍 Field-crop zone input calculation:', {
-            zoneId: zone.id,
-            zoneName: zone.name,
-            areaInRai,
-            totalSprinklers,
-            waterPerSprinklerLPM,
-            totalZones
-        });
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
@@ -1033,12 +1023,6 @@ export default function Product() {
         let mode = urlParams.get('mode') as ProjectMode;
         const storedType = localStorage.getItem('projectType');
 
-        console.log('🔍 Product page mode detection:', {
-            urlMode: mode,
-            storedType: storedType,
-            currentUrl: window.location.href
-        });
-
         if (!mode && storedType === 'greenhouse') {
             mode = 'greenhouse';
         } else if (!mode && storedType === 'field-crop') {
@@ -1048,8 +1032,6 @@ export default function Product() {
         } else if (!mode && storedType === 'horticulture') {
             mode = 'horticulture';
         }
-
-        console.log('🔍 Final detected mode:', mode);
 
         if (mode === 'greenhouse') {
             setProjectMode('greenhouse');
@@ -1142,17 +1124,6 @@ export default function Product() {
                 try {
                     systemData = JSON.parse(systemDataStr);
                     setFieldCropSystemData(systemData);
-                    console.log('✅ Loaded fieldCropSystemData from localStorage:', systemData);
-                    console.log('🔍 System data zones:', systemData?.zones);
-                    systemData?.zones.forEach((zone: any, index: number) => {
-                        console.log(`🔍 Zone ${index}:`, {
-                            id: zone.id,
-                            name: zone.name,
-                            plantCount: zone.plantCount,
-                            waterPerTree: zone.waterPerTree,
-                            area: zone.area
-                        });
-                    });
                 } catch (error) {
                     console.error('❌ Error parsing fieldCropSystemData from localStorage:', error);
                 }
@@ -1166,7 +1137,6 @@ export default function Product() {
             if (fieldDataStr) {
                 try {
                     fieldData = JSON.parse(fieldDataStr);
-                    console.log('✅ Loaded fieldCropData from localStorage:', fieldData);
                 } catch (error) {
                     console.error('❌ Error parsing fieldCropData from localStorage:', error);
                 }
@@ -1316,15 +1286,8 @@ export default function Product() {
                     setHorticultureSystemData(horticultureSystemData);
 
                     // ตั้งค่า connection stats
-                    console.log('🔍 Debug horticultureSystemData:', horticultureSystemData);
                     if (horticultureSystemData.connectionStats) {
-                        console.log(
-                            '✅ Found connectionStats:',
-                            horticultureSystemData.connectionStats
-                        );
                         setConnectionStats(horticultureSystemData.connectionStats);
-                    } else {
-                        console.log('❌ No connectionStats in horticultureSystemData');
                     }
                 } catch (error) {
                     console.warn('Failed to parse horticulture system data:', error);
@@ -1713,8 +1676,30 @@ export default function Product() {
     };
 
     const getZonesData = () => {
+        // Consolidated console.log for all zone data
+        console.log('📦 [PRODUCT] ===== ALL ZONE DATA =====');
+        console.log('📦 [PRODUCT] Project Mode:', projectMode);
+        console.log('📦 [PRODUCT] Garden Data:', gardenData);
+        console.log('📦 [PRODUCT] Garden Stats:', gardenStats);
+        console.log('📦 [PRODUCT] Field Crop Data:', fieldCropData);
+        console.log('📦 [PRODUCT] Field Crop System Data:', fieldCropSystemData);
+        if (fieldCropData?.crops?.zoneAssignments) {
+            console.log('📦 [PRODUCT] Field Crop Zone Assignments:', fieldCropData.crops.zoneAssignments);
+        }
+        if (fieldCropSystemData?.zones) {
+            console.log('📦 [PRODUCT] Field Crop System Zones:', fieldCropSystemData.zones);
+        }
+        console.log('📦 [PRODUCT] Greenhouse Data:', greenhouseData);
+        console.log('📦 [PRODUCT] Project Data:', projectData);
+        console.log('📦 [PRODUCT] Zone Inputs:', zoneInputs);
+        console.log('📦 [PRODUCT] Zone Sprinklers:', zoneSprinklers);
+        console.log('📦 [PRODUCT] Selected Pipes:', selectedPipes);
+        console.log('📦 [PRODUCT] Active Zone ID:', activeZoneId);
+        console.log('📦 [PRODUCT] Zone Operation Mode:', zoneOperationMode);
+        console.log('📦 [PRODUCT] Zone Operation Groups:', zoneOperationGroups);
+        
         if (projectMode === 'garden' && gardenStats) {
-            return gardenStats.zones.map((z) => ({
+            const zones = gardenStats.zones.map((z) => ({
                 id: z.zoneId,
                 name: z.zoneName,
                 area: z.area,
@@ -1722,11 +1707,14 @@ export default function Product() {
                 totalWaterNeed: z.sprinklerCount * 50,
                 plantData: null,
             }));
+            console.log('🏡 [PRODUCT] Garden Zones Data:', zones);
+            console.log('📦 [PRODUCT] ===== END ZONE DATA =====');
+            return zones;
         }
         if (projectMode === 'field-crop') {
             // Use fieldCropSystemData if available, otherwise fallback to fieldCropData
             if (fieldCropSystemData && fieldCropSystemData.zones) {
-                return fieldCropSystemData.zones.map((z: any) => ({
+                const zones = fieldCropSystemData.zones.map((z: any) => ({
                     id: z.id,
                     name: z.name,
                     area: z.area,
@@ -1734,8 +1722,11 @@ export default function Product() {
                     totalWaterNeed: z.totalWaterNeed,
                     plantData: null, // Could be enhanced later with crop data
                 }));
+                console.log('🌾 [PRODUCT] Field Crop System Zones Data:', zones);
+                console.log('📦 [PRODUCT] ===== END ZONE DATA =====');
+                return zones;
             } else if (fieldCropData) {
-                return fieldCropData.zones.info.map((z) => {
+                const zones = fieldCropData.zones.info.map((z) => {
                     const assignedCropValue = fieldCropData.crops.zoneAssignments[z.id];
                     const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
 
@@ -1755,10 +1746,13 @@ export default function Product() {
                             : null,
                     };
                 });
+                console.log('🌾 [PRODUCT] Field Crop Data Zones:', zones);
+                console.log('📦 [PRODUCT] ===== END ZONE DATA =====');
+                return zones;
             }
         }
         if (projectMode === 'greenhouse' && greenhouseData) {
-            return greenhouseData.summary.plotStats.map((p) => {
+            const zones = greenhouseData.summary.plotStats.map((p) => {
                 const crop = getCropByValue(p.cropType || '');
 
                 return {
@@ -1786,8 +1780,14 @@ export default function Product() {
                     estimatedIncome: p.production.estimatedIncome,
                 };
             });
+            console.log('🏠 [PRODUCT] Greenhouse Zones Data:', zones);
+            console.log('📦 [PRODUCT] ===== END ZONE DATA =====');
+            return zones;
         }
-        return projectData?.zones || [];
+        const zones = projectData?.zones || [];
+        console.log('🌱 [PRODUCT] Horticulture Zones Data:', zones);
+        console.log('📦 [PRODUCT] ===== END ZONE DATA =====');
+        return zones;
     };
 
     const getZoneNameForSummary = (zoneId: string): string => {

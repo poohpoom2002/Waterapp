@@ -235,7 +235,7 @@ export interface FieldData {
   irrigationPositions: IrrigationPositions;
   mapCenter: { lat: number; lng: number };
   mapZoom: number;
-  hideAllPoints?: boolean;
+  realPlantCount?: number; // Add realPlantCount as optional property
 }
 
 interface DrawingState {
@@ -1738,7 +1738,7 @@ const useMapManager = () => {
   }, [filterPointsByZoom, calculatePointSize]);
 
   // ปรับปรุง drawPumps ให้มีประสิทธิภาพ
-  const drawPumps = useCallback((pumps: Pump[], onRemovePump?: (pumpId: string) => void) => {
+  const drawPumps = useCallback((pumps: Pump[], t: (key: string) => string) => {
     if (!mapRef.current) return;
 
     const currentPumpMap = overlaysRef.current.pumps;
@@ -1765,45 +1765,9 @@ const useMapManager = () => {
             position: { lat: pump.lat, lng: pump.lng },
             map: mapRef.current,
             icon: pumpIcon,
-            title: `${pump.name} (${pump.capacity} L/h)`,
-            clickable: true,
+            title: `${pump.name} (${pump.capacity} L/h) - ${t('Use Pump Management to remove')}`,
+            clickable: false,
             zIndex: 3000
-        });
-
-        marker.addListener('click', () => {
-            const infoWindow = new google.maps.InfoWindow({
-              content: `
-                <div style="padding: 10px; font-family: Arial, sans-serif; min-width: 200px;">
-                  <h3 style="margin: 0 0 10px 0; color: #333; font-size: 16px;">${pump.name}</h3>
-                  <p style="margin: 5px 0; color: #666; font-size: 14px;">
-                    <strong>Capacity:</strong> ${pump.capacity} L/h
-                  </p>
-                  <p style="margin: 5px 0; color: #666; font-size: 14px;">
-                    <strong>Location:</strong> ${pump.lat.toFixed(6)}, ${pump.lng.toFixed(6)}
-                  </p>
-                  <div style="margin-top: 15px; text-align: center;">
-                    <button 
-                      onclick="window.deletePump('${pump.id}')" 
-                      style="
-                        background-color: #dc2626; color: white; border: none; padding: 8px 16px; border-radius: 4px; 
-                        cursor: pointer; font-size: 14px;"
-                      onmouseover="this.style.backgroundColor='#b91c1c'"
-                      onmouseout="this.style.backgroundColor='#dc2626'"
-                    >
-                      🗑️ Delete Pump
-                    </button>
-                  </div>
-                </div>
-              `,
-              maxWidth: 250
-            });
-
-            (window as { deletePump?: (pumpId: string) => void }).deletePump = (pumpId: string) => {
-              if (onRemovePump) onRemovePump(pumpId);
-              infoWindow.close();
-            };
-
-            infoWindow.open(mapRef.current, marker);
         });
         currentPumpMap.set(pump.id, marker);
       }
@@ -2407,7 +2371,7 @@ const useMapManager = () => {
   }, []);
 
   // updateMapVisuals เรียกใช้ฟังก์ชันที่ปรับปรุงแล้ว
-  const updateMapVisuals = useCallback((fieldData: FieldData, hideAllPoints: boolean = false, currentZoom: number = 18) => {
+  const updateMapVisuals = useCallback((fieldData: FieldData, currentZoom: number = 18) => {
     if (!mapRef.current) return;
     
     if (fieldData.mainArea.length > 0) {
@@ -2420,7 +2384,7 @@ const useMapManager = () => {
         drawObstacles(fieldData.obstacles);
     }
     if (fieldData.plantPoints.length > 0) {
-        drawPlantPoints(fieldData.plantPoints, hideAllPoints, currentZoom);
+        drawPlantPoints(fieldData.plantPoints, false, currentZoom);
     }
     if (fieldData.irrigationPositions) {
         drawIrrigation(fieldData.irrigationPositions, fieldData.irrigationSettings);
@@ -2598,7 +2562,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
   const isApplyingPumpHistoryRef = useRef(false);
   const [isPlacingPump, setIsPlacingPump] = useState(false);
   const isPlacingPumpRef = useRef(false);
-  const [hideAllPoints, setHideAllPoints] = useState<boolean>(false); // Hide all points toggle
   const [mapZoom, setMapZoom] = useState<number>(18); // Track map zoom level
 
 
@@ -2700,9 +2663,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           if(storageData.mapCenter && storageData.mapZoom) {
             setMapStatus({ center: storageData.mapCenter, zoom: storageData.mapZoom });
           }
-          if (typeof storageData.hideAllPoints === 'boolean') {
-            setHideAllPoints(storageData.hideAllPoints);
-          }
           return;
         }
       }
@@ -2732,9 +2692,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
           }
         } catch {
           // ignore pump restore errors
-        }
-        if (typeof storageData.hideAllPoints === 'boolean') {
-          setHideAllPoints(storageData.hideAllPoints);
         }
       }
     };
@@ -2785,7 +2742,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       }
       
       mapVisualsDebounceTimer.current = setTimeout(() => {
-        mapManager.updateMapVisuals(fieldData, hideAllPoints, mapZoom);
+        mapManager.updateMapVisuals(fieldData, mapZoom);
       }, 100); // 100ms debounce สำหรับ map visuals
     }
     
@@ -2794,16 +2751,16 @@ export default function PipeGenerate(props: PipeGenerateProps) {
         clearTimeout(mapVisualsDebounceTimer.current);
       }
     };
-  }, [fieldData, createFieldDataHash, mapManager, hideAllPoints, mapZoom]); // Removed mapManager from dependencies
+  }, [fieldData, createFieldDataHash, mapManager, mapZoom]); // Removed mapManager from dependencies
 
   // useEffect แยกสำหรับการโหลดข้อมูลทันทีเมื่อเข้าสู่หน้า
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (fieldData.mainArea.length > 0 && mapManager.mapRef.current) {
       // อัปเดต map visuals ทันทีเมื่อมีข้อมูลและ map พร้อม
-      mapManager.updateMapVisuals(fieldData, hideAllPoints, mapZoom);
+      mapManager.updateMapVisuals(fieldData, mapZoom);
     }
-  }, [fieldData, mapManager, hideAllPoints, mapZoom]); // Removed mapManager from dependencies
+  }, [fieldData, mapManager, mapZoom]); // Removed mapManager from dependencies
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -5038,7 +4995,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
     }
 
     // Initial draw
-    mapManager.updateMapVisuals(fieldData, hideAllPoints);
+    mapManager.updateMapVisuals(fieldData);
 
     // Ensure pipes are drawn on first map load with currently loaded state
     try {
@@ -5047,7 +5004,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       console.warn('drawPipes on initial map load failed:', err);
     }
 
-  }, [fieldData, mapManager, handleMapClick, pipeManager, hideAllPoints]);
+  }, [fieldData, mapManager, handleMapClick, pipeManager]);
   // ======================== MODIFIED SECTION END ========================
 
   const steps = [
@@ -5135,6 +5092,7 @@ export default function PipeGenerate(props: PipeGenerateProps) {
       irrigationSettings: JSON.stringify(fieldData.irrigationSettings || {}),
       rowSpacing: JSON.stringify(fieldData.rowSpacing || {}),
       plantSpacing: JSON.stringify(fieldData.plantSpacing || {}),
+      realPlantCount: fieldData.realPlantCount || 0,
       mapCenter: JSON.stringify(fieldData.mapCenter ? [fieldData.mapCenter.lat, fieldData.mapCenter.lng] : null),
       mapZoom: fieldData.mapZoom,
       mapType: undefined,
@@ -5219,8 +5177,8 @@ export default function PipeGenerate(props: PipeGenerateProps) {
   const canRedo = pipeManager.pipeHistoryIndex < pipeManager.pipeHistoryLength - 1 || pumpHistoryIndex < pumpHistory.length - 1;
 
   useEffect(() => {
-    mapManager.drawPumps(pumps, removePump);
-  }, [pumps, removePump, mapManager]); // Removed mapManager from dependencies
+    mapManager.drawPumps(pumps, t);
+  }, [pumps, mapManager, t]); // Removed mapManager from dependencies
 
   // Persist pumps to localStorage so summary page can read them
   useEffect(() => {
@@ -5715,6 +5673,9 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                       <div className="text-xs text-gray-300 mb-2">
                         {t('Placed Pumps')}: {pumps.length}
                       </div>
+                      <div className="text-xs text-blue-300 bg-blue-900 bg-opacity-30 p-2 rounded">
+                        💡 {t('Pumps on map are not clickable. Use this section to manage pumps.')}
+                      </div>
                       
                       {pumps.length > 0 && (
                         <div className="space-y-2 max-h-32 overflow-y-auto">
@@ -5935,55 +5896,6 @@ export default function PipeGenerate(props: PipeGenerateProps) {
                   </div>
                 </div>
                 
-                {/* Hide/Show Points Button */}
-                {fieldData.plantPoints.length > 0 && (
-                  <div className="absolute top-1.5 right-44 z-10">
-                    <button 
-                      onClick={() => {
-                        const newHideState = !hideAllPoints;
-                        setHideAllPoints(newHideState);
-                        
-                        // Save the new state to localStorage immediately
-                        try {
-                          const existingData = localStorage.getItem('fieldCropData');
-                          if (existingData) {
-                            const storageData = JSON.parse(existingData) as FieldData;
-                            const updatedData = {
-                              ...storageData,
-                              hideAllPoints: newHideState
-                            };
-                            localStorage.setItem('fieldCropData', JSON.stringify(updatedData));
-                          }
-                        } catch (error) {
-                          console.error('Error saving hideAllPoints state:', error);
-                        }
-                      }}
-                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
-                        hideAllPoints 
-                          ? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
-                          : 'bg-green-600 text-white border-green-500 hover:bg-green-500'
-                      }`}
-                      title={hideAllPoints ? t('Show All Points') : t('Hide All Points')}
-                    >
-                      {hideAllPoints ? (
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          {t('Show')}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                          </svg>
-                          {t('Hide')}
-                        </div>
-                      )}
-                    </button>
-                  </div>
-                )}
                 
                 {pipeManager.isDrawing && (
                   <div className="absolute top-11 left-1 z-10 bg-blue-600 bg-opacity-90 rounded-lg border border-blue-400 p-3 text-xs">
