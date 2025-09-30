@@ -1956,7 +1956,7 @@ const PipeSelector: React.FC<PipeSelectorProps> = ({
                                             <div className="flex flex-col">
                                                 <span className="text-gray-400">ยาว/ม้วน:</span>
                                                 <span className="font-medium text-white">
-                                                    {selectedPipe.lengthM}ม.
+                                                    {selectedPipe.lengthM} ม.
                                                 </span>
                                             </div>
                                             <div className="flex flex-col">
