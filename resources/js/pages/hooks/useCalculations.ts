@@ -142,6 +142,9 @@ const calculateSprinklerBasedFlow = (
         console.log('- totalSprinklers:', totalSprinklers);
         console.log('- flowPerSprinkler:', flowPerSprinkler);
         console.log('- totalWaterPerMinute:', totalWaterPerMinute);
+        console.log('- input.totalTrees:', input.totalTrees);
+        console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
+        console.log('- projectMode:', projectMode);
         
         // Ensure we have valid values
         if (totalWaterPerMinute === 0 || isNaN(totalWaterPerMinute)) {
