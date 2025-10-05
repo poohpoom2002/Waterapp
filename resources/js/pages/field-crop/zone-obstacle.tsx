@@ -384,38 +384,6 @@ const useMapRefs = (): MapRefs => {
 	};
 };
 
-const useWaterCalculations = (fieldData: FieldData) => {
-	const getPlantMultiplier = useCallback((cropType?: string): number => {
-		if (!cropType) return 1.0;
-		switch (cropType.toLowerCase()) {
-			case 'rice':
-			case 'ข้าว':
-				return 1.5;
-			case 'corn':
-			case 'ข้าวโพด':
-				return 1.2;
-			case 'vegetables':
-			case 'ผัก':
-				return 1.1;
-			default:
-				return 1.0;
-		}
-	}, []);
-
-	const totalWaterMultiplier = useMemo(() => {
-		if (fieldData.plantPoints.length === 0) return 0;
-		return fieldData.plantPoints.reduce((sum, p) => sum + getPlantMultiplier(p.cropType), 0);
-	}, [fieldData.plantPoints, getPlantMultiplier]);
-
-	const calculateWaterPerPoint = useCallback((point: PlantPoint): number => {
-		if (fieldData.plantPoints.length === 0 || fieldData.totalWaterRequirement === 0) return 0;
-		const multiplier = getPlantMultiplier(point.cropType);
-		const denom = totalWaterMultiplier > 0 ? totalWaterMultiplier : fieldData.plantPoints.length;
-		return (fieldData.totalWaterRequirement * multiplier) / denom;
-	}, [fieldData.plantPoints.length, fieldData.totalWaterRequirement, totalWaterMultiplier, getPlantMultiplier]);
-
-	return { getPlantMultiplier, calculateWaterPerPoint, totalWaterMultiplier };
-};
 
 // ==================== MAIN COMPONENT ====================
 export default function ZoneObstacle(props: ZoneObstacleProps) {
@@ -434,6 +402,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					mainArea: localStorageData.mainArea || [],
 					obstacles: localStorageData.obstacles || [],
 					plantPoints: localStorageData.plantPoints || [],
+					realPlantCount: localStorageData.realPlantCount || 0,
 					zones: localStorageData.zones || [],
 					selectedCrops: localStorageData.selectedCrops || [],
 					selectedIrrigationType: localStorageData.selectedIrrigationType || '',
@@ -448,7 +417,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 					plantSpacing: localStorageData.plantSpacing || {},
 					mapCenter: localStorageData.mapCenter || MAP_CONFIG.DEFAULT_CENTER,
 					mapZoom: localStorageData.mapZoom || MAP_CONFIG.DEFAULT_ZOOM,
-					hideAllPoints: localStorageData.hideAllPoints || false
 				};
 			}
 
@@ -458,6 +426,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				mainArea: [],
 				obstacles: [],
 				plantPoints: [],
+				realPlantCount: 0,
 				zones: [],
 				selectedCrops: [],
 				selectedIrrigationType: '',
@@ -472,7 +441,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				plantSpacing: {},
 				mapCenter: MAP_CONFIG.DEFAULT_CENTER,
 				mapZoom: MAP_CONFIG.DEFAULT_ZOOM,
-				hideAllPoints: false
 			};
 		}
 
@@ -481,6 +449,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			mainArea: parseJsonSafely(props.mainArea, localStorageData.mainArea || []),
 			obstacles: parseJsonSafely(props.obstacles, localStorageData.obstacles || []),
 			plantPoints: parseJsonSafely(props.plantPoints, localStorageData.plantPoints || []),
+			realPlantCount: localStorageData.realPlantCount || 0,
 			zones: localStorageData.zones || [],
 			selectedCrops: props.crops ? props.crops.split(',').filter(c => c.trim()) : localStorageData.selectedCrops || [],
 			selectedIrrigationType: props.selectedIrrigationType || localStorageData.selectedIrrigationType || '',
@@ -495,7 +464,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			plantSpacing: parseJsonSafely(props.plantSpacing, localStorageData.plantSpacing || {}),
 			mapCenter: localStorageData.mapCenter || MAP_CONFIG.DEFAULT_CENTER,
 			mapZoom: localStorageData.mapZoom || MAP_CONFIG.DEFAULT_ZOOM,
-			hideAllPoints: localStorageData.hideAllPoints || false
 		};
 	}, [props]);
 
@@ -509,7 +477,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 
 	// Plant points state
 	const [mapZoom, setMapZoom] = useState<number>(18);
-	const [hideAllPoints, setHideAllPoints] = useState<boolean>(initialFieldData.hideAllPoints || false); // Hide all points toggle
 
 	// Helper function to calculate point size based on point count
 	const calculatePointSize = useCallback((pointCount: number): number => {
@@ -628,7 +595,6 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 	// ==================== COMPUTED VALUES ====================
 	const currentStep = props.currentStep || 3;
 	const completedSteps = props.completedSteps || '';
-	const { calculateWaterPerPoint } = useWaterCalculations(fieldData);
 
 	const defaultWaterPerZone = useMemo(() => {
 		if (fieldData.totalWaterRequirement === 0) return 0;
@@ -640,9 +606,10 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 	}, [fieldData.zones]);
 
 	const recalculatedTotalWater = useMemo(() => {
-		if (fieldData.plantPoints.length === 0) return 0;
+		const totalPlants = fieldData.realPlantCount || fieldData.plantPoints.length;
+		if (totalPlants === 0) return 0;
 		return fieldData.totalWaterRequirement;
-	}, [fieldData.plantPoints.length, fieldData.totalWaterRequirement]);
+	}, [fieldData.plantPoints.length, fieldData.realPlantCount, fieldData.totalWaterRequirement]);
 
 
 	// Centralized map state using MapState interface
@@ -691,35 +658,45 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 	}, [fieldData.irrigationPositions, fieldData.irrigationSettings]);
 
 	const calculateZoneWaterInfo = useCallback((coordinates: Coordinate[]) => {
-		const plantsInZone = fieldData.plantPoints.filter(point => isPointInOrOnPolygon(point, coordinates));
-		const waterRequirement = plantsInZone.reduce((sum, point) => sum + calculateWaterPerPoint(point), 0);
+		// Use realPlantCount for accurate zone calculations
+		const totalPlants = fieldData.realPlantCount || fieldData.plantPoints.length;
+		const totalWaterReq = fieldData.totalWaterRequirement || 0;
+		
+		if (totalPlants === 0 || totalWaterReq === 0) {
+			return {
+				waterRequirement: 0,
+				plantCount: 0,
+				waterStatus: 'normal' as const,
+				waterMessage: ''
+			};
+		}
+		
+		// Calculate zone area as percentage of total main area
+		const mainAreaSize = google.maps.geometry?.spherical ? 
+			google.maps.geometry.spherical.computeArea(fieldData.mainArea.map(p => new google.maps.LatLng(p.lat, p.lng))) : 
+			0;
+		const zoneAreaSize = google.maps.geometry?.spherical ? 
+			google.maps.geometry.spherical.computeArea(coordinates.map(p => new google.maps.LatLng(p.lat, p.lng))) : 
+			0;
+		
+		const areaRatio = mainAreaSize > 0 ? zoneAreaSize / mainAreaSize : 0;
+		
+		// Estimate plants and water requirement based on area ratio
+		const estimatedPlantsInZone = Math.round(totalPlants * areaRatio);
+		const estimatedWaterRequirement = totalWaterReq * areaRatio;
+		
 		return {
-			waterRequirement,
-			plantCount: plantsInZone.length,
+			waterRequirement: estimatedWaterRequirement,
+			plantCount: estimatedPlantsInZone,
 			waterStatus: 'normal' as const,
 			waterMessage: ''
 		};
-	}, [fieldData.plantPoints, calculateWaterPerPoint]);
+	}, [fieldData.plantPoints, fieldData.realPlantCount, fieldData.totalWaterRequirement, fieldData.mainArea]);
 
 	const createCombinedPoints = useCallback((): CombinedPoint[] => {
 		const combinedPoints: CombinedPoint[] = [];
 
-		// Plants weighted by normalized daily water per plant (ลิตร/ครั้ง)
-		const plantWeights = fieldData.plantPoints.map(p => calculateWaterPerPoint(p));
-		const totalPlantWeight = plantWeights.reduce((s, w) => s + w, 0);
-
-		fieldData.plantPoints.forEach((point, idx) => {
-			combinedPoints.push({
-				id: `plant-${point.id}`,
-				lat: point.lat,
-				lng: point.lng,
-				type: 'plant',
-				cropType: point.cropType,
-				weight: plantWeights[idx] || 0
-			});
-		});
-
-		// All irrigation equipment weighted by flow, scaled to match total plant weight
+		// Only use irrigation equipment for zone generation
 		const flowPerSprinkler = (fieldData.irrigationSettings?.sprinkler_system?.flow as number) || ALGORITHM_CONFIG.DEFAULT_FLOW_RATES.sprinkler;
 		const flowPerPivot = (fieldData.irrigationSettings?.pivot?.flow as number) || ALGORITHM_CONFIG.DEFAULT_FLOW_RATES.pivot;
 		const flowPerDripTape = 0.24; // Fixed flow for drip tape
@@ -731,67 +708,63 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			(fieldData.irrigationPositions.dripTapes.length * flowPerDripTape) +
 			(fieldData.irrigationPositions.waterJets.length * flowPerWaterJet);
 
-		// Use balanced scaling with minimum weight to ensure all irrigation points are considered equally
-		const irrigationScale = totalIrrigationFlow > 0 ? (totalPlantWeight / Math.max(totalIrrigationFlow, 1)) : 1;
+		// Use normalized weights based on flow rates
+		const baseWeight = totalIrrigationFlow > 0 ? 1.0 : 1.0;
 		
-		// Define minimum weights for each irrigation type to ensure balanced zone generation
-		const MIN_WEIGHTS = {
-			sprinkler: 0.5,
-			pivot: 0.8,
-			dripTape: 0.3,
-			waterJet: 0.4
+		// Define weights for each irrigation type based on their flow rates
+		const IRRIGATION_WEIGHTS = {
+			sprinkler: baseWeight * (flowPerSprinkler / 10), // Normalize to base weight
+			pivot: baseWeight * (flowPerPivot / 50), // Normalize to base weight
+			dripTape: baseWeight * (flowPerDripTape / 0.24), // Normalize to base weight
+			waterJet: baseWeight * (flowPerWaterJet / 1.5) // Normalize to base weight
 		};
 
-		// Add sprinklers with balanced weight
+		// Add sprinklers
 		fieldData.irrigationPositions.sprinklers.forEach((sprinkler, index) => {
-			const sprinklerWeight = Math.max(flowPerSprinkler * irrigationScale, MIN_WEIGHTS.sprinkler);
 			combinedPoints.push({
 				id: `sprinkler-${index}`,
 				lat: sprinkler.lat,
 				lng: sprinkler.lng,
 				type: 'sprinkler',
-				weight: sprinklerWeight
+				weight: IRRIGATION_WEIGHTS.sprinkler
 			});
 		});
 
-		// Add pivots with balanced weight
+		// Add pivots
 		fieldData.irrigationPositions.pivots.forEach((pivot, index) => {
-			const pivotWeight = Math.max(flowPerPivot * irrigationScale, MIN_WEIGHTS.pivot);
 			combinedPoints.push({
 				id: `pivot-${index}`,
 				lat: pivot.lat,
 				lng: pivot.lng,
 				type: 'sprinkler', // Use same type for zone generation
-				weight: pivotWeight
+				weight: IRRIGATION_WEIGHTS.pivot
 			});
 		});
 
-		// Add drip tapes with balanced weight for better zone coverage
+		// Add drip tapes
 		fieldData.irrigationPositions.dripTapes.forEach((dripTape, index) => {
-			const dripTapeWeight = Math.max(flowPerDripTape * irrigationScale, MIN_WEIGHTS.dripTape);
 			combinedPoints.push({
 				id: `dripTape-${index}`,
 				lat: dripTape.lat,
 				lng: dripTape.lng,
 				type: 'sprinkler', // Use same type for zone generation
-				weight: dripTapeWeight
+				weight: IRRIGATION_WEIGHTS.dripTape
 			});
 		});
 
-		// Add water jets with balanced weight for better zone coverage
+		// Add water jets
 		fieldData.irrigationPositions.waterJets.forEach((waterJet, index) => {
-			const waterJetWeight = Math.max(flowPerWaterJet * irrigationScale, MIN_WEIGHTS.waterJet);
 			combinedPoints.push({
 				id: `waterJet-${index}`,
 				lat: waterJet.lat,
 				lng: waterJet.lng,
 				type: 'sprinkler', // Use same type for zone generation
-				weight: waterJetWeight
+				weight: IRRIGATION_WEIGHTS.waterJet
 			});
 		});
 
 		return combinedPoints;
-	}, [fieldData.plantPoints, fieldData.irrigationPositions, fieldData.irrigationSettings, calculateWaterPerPoint]);
+	}, [fieldData.irrigationPositions, fieldData.irrigationSettings]);
 
 	const checkPolygonOverlap = useCallback((coords1: Coordinate[], coords2: Coordinate[]): boolean => {
 		try {
@@ -1159,11 +1132,20 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		return createCombinedPoints();
 	}, [createCombinedPoints]);
 
+	// ==================== SAVE STATE ====================
+	const saveState = useCallback(() => {
+		try {
+			localStorage.setItem('fieldCropData', JSON.stringify(fieldDataRef.current));
+		} catch (e) {
+			console.error('Error saving state to localStorage:', e);
+		}
+	}, []); // Remove fieldData from dependencies to prevent infinite loops
+
 	// ==================== ZONE GENERATION FUNCTIONS ====================
 	const generateSmartAutoZones = useCallback(async () => {
 		const combinedPoints = memoizedCombinedPoints;
 		if (combinedPoints.length === 0) {
-			alert(t('No plant points or sprinklers available for zone generation'));
+			alert(t('No irrigation equipment available for zone generation'));
 			return;
 		}
 
@@ -1195,13 +1177,35 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 			const stats = calculateZoneStats(newZones, targetWaterPerZone);
 			setZoneStats(stats);
 
+			// Console log zone information
+			console.log('=== ZONE GENERATION COMPLETED ===');
+			console.log(`Generated ${newZones.length} zones using ${zoneGenerationMethod} method`);
+			console.log('Zone Details:');
+			newZones.forEach((zone, index) => {
+				console.log(`Zone ${index + 1} (${zone.name}):`, {
+					id: zone.id,
+					color: zone.color,
+					coordinates: zone.coordinates.length + ' points',
+					cropType: zone.cropType,
+					plantCount: zone.plantCount || 0,
+					waterRequirement: (zone.waterRequirement || 0).toFixed(2) + ' ลิตร/ครั้ง',
+					waterStatus: zone.waterStatus,
+					waterMessage: zone.waterMessage
+				});
+			});
+			console.log('Zone Statistics:', stats);
+			console.log('=================================');
+
+			// Save state after successful zone generation
+			saveState();
+
 		} catch (error) {
 			console.error('Error generating smart zones:', error);
 			alert(t('Error generating zones. Please try again.'));
 		} finally {
 			setIsGeneratingZones(false);
 		}
-	}, [fieldData.totalWaterRequirement, desiredZoneCount, performKMeansClustering, createConvexHullZones, createVoronoiZones, calculateZoneStats, memoizedCombinedPoints, zoneGenerationMethod, t]); // Use memoizedCombinedPoints instead of createCombinedPoints
+	}, [fieldData.totalWaterRequirement, desiredZoneCount, performKMeansClustering, createConvexHullZones, createVoronoiZones, calculateZoneStats, memoizedCombinedPoints, zoneGenerationMethod, saveState, t]); // Use memoizedCombinedPoints instead of createCombinedPoints
 
 	const generateAutoZones = useCallback(() => {
 		if (fieldData.mainArea.length < 3) return;
@@ -1261,16 +1265,29 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		const targetWaterPerZone = fieldData.totalWaterRequirement / 4;
 		const stats = calculateZoneStats(autoZones, targetWaterPerZone);
 		setZoneStats(stats);
-	}, [fieldData.mainArea, fieldData.selectedCrops, fieldData.totalWaterRequirement, calculateZoneWaterInfo, calculateZoneStats]); // Keep all dependencies as they are needed for auto zone generation
 
-	// ==================== SAVE STATE ====================
-	const saveState = useCallback(() => {
-		try {
-			localStorage.setItem('fieldCropData', JSON.stringify(fieldDataRef.current));
-		} catch (e) {
-			console.error('Error saving state to localStorage:', e);
-		}
-	}, []); // Remove fieldData from dependencies to prevent infinite loops
+		// Console log auto zone information
+		console.log('=== AUTO ZONE GENERATION COMPLETED ===');
+		console.log(`Generated ${autoZones.length} auto zones (4 quadrants)`);
+		console.log('Auto Zone Details:');
+		autoZones.forEach((zone, index) => {
+			console.log(`Auto Zone ${index + 1} (${zone.name}):`, {
+				id: zone.id,
+				color: zone.color,
+				coordinates: zone.coordinates.length + ' points',
+				cropType: zone.cropType,
+				plantCount: zone.plantCount || 0,
+				waterRequirement: (zone.waterRequirement || 0).toFixed(2) + ' ลิตร/ครั้ง',
+				waterStatus: zone.waterStatus,
+				waterMessage: zone.waterMessage
+			});
+		});
+		console.log('Auto Zone Statistics:', stats);
+		console.log('=======================================');
+
+		// Save state after successful auto zone generation
+		saveState();
+	}, [fieldData.mainArea, fieldData.selectedCrops, fieldData.totalWaterRequirement, calculateZoneWaterInfo, calculateZoneStats, saveState]); // Keep all dependencies as they are needed for auto zone generation
 
 	// ==================== MAP FUNCTIONS ====================
 	const clearMapObjects = useCallback(() => {
@@ -1504,7 +1521,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		const shouldUpdate = forceUpdate ||
 			!mainPolygonRef.current ||
 			obstaclePolygonsRef.current.length !== fieldData.obstacles.length ||
-			plantPointMarkersRef.current.length !== (hideAllPoints ? 0 : fieldData.plantPoints.length);
+			plantPointMarkersRef.current.length !== fieldData.plantPoints.length;
 
 		if (shouldUpdate) {
 			clearMapObjects();
@@ -1616,7 +1633,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				});
 			}
 		});
-	}, [fieldData.mainArea, fieldData.obstacles, fieldData.zones, fieldData.plantPoints, zoneEditingState.currentEdit, clearMapObjects, createIrrigationMarkers, updateZoneFromPolygon, hideAllPoints]); // Remove mapZoom and other unnecessary dependencies to prevent flickering
+	}, [fieldData.mainArea, fieldData.obstacles, fieldData.zones, fieldData.plantPoints, zoneEditingState.currentEdit, clearMapObjects, createIrrigationMarkers, updateZoneFromPolygon]); // Remove mapZoom and other unnecessary dependencies to prevent flickering
 
 
 	// Update map visuals when plant points change
@@ -1624,11 +1641,11 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 		if (mapRef.current) {
 			updateMapVisuals(mapRef.current, true);
 		}
-	}, [fieldData.plantPoints, hideAllPoints, updateMapVisuals]);
+	}, [fieldData.plantPoints, updateMapVisuals]);
 
 	// Update plant points only when zoom changes (to prevent irrigation marker flickering)
 	useEffect(() => {
-		if (mapRef.current && !hideAllPoints && fieldData.plantPoints.length > 0) {
+		if (mapRef.current && fieldData.plantPoints.length > 0) {
 			// Clear existing plant point markers
 			plantPointMarkersRef.current.forEach(marker => marker.setMap(null));
 			plantPointMarkersRef.current = [];
@@ -1664,7 +1681,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 				plantPointMarkersRef.current.push(marker);
 			});
 		}
-	}, [mapZoom, hideAllPoints, fieldData.plantPoints, filterPointsByZoom, calculatePointSize]);
+	}, [mapZoom, fieldData.plantPoints, filterPointsByZoom, calculatePointSize]);
 
 
 	const handleMapLoad = useCallback((loadedMap: google.maps.Map) => {
@@ -2230,14 +2247,14 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 												/>
 											</div>
 
-											{fieldData.totalWaterRequirement > 0 && (fieldData.plantPoints.length > 0 || fieldData.irrigationPositions.sprinklers.length > 0 || fieldData.irrigationPositions.pivots.length > 0 || fieldData.irrigationPositions.dripTapes.length > 0 || fieldData.irrigationPositions.waterJets.length > 0) && (
+											{fieldData.totalWaterRequirement > 0 && (fieldData.irrigationPositions.sprinklers.length > 0 || fieldData.irrigationPositions.pivots.length > 0 || fieldData.irrigationPositions.dripTapes.length > 0 || fieldData.irrigationPositions.waterJets.length > 0) && (
 												<div className="bg-gray-700 rounded p-2 text-xs">
 													<div className="text-gray-300 mb-1">{t('Calculation Preview')}:</div>
 													<div className="text-blue-300">
 														{t('Water per zone')}: {(fieldData.totalWaterRequirement / desiredZoneCount).toFixed(1)} ลิตร/ครั้ง
 													</div>
 													<div className="text-green-300">
-														{t('Plants per zone')}: ~{Math.ceil(fieldData.plantPoints.length / desiredZoneCount)} {t('points')}
+														{t('Plants per zone')}: ~{Math.ceil((fieldData.realPlantCount || fieldData.plantPoints.length) / desiredZoneCount)} {t('points')}
 													</div>
 													{fieldData.irrigationPositions.sprinklers.length > 0 && (
 														<div className="text-orange-300">
@@ -2261,10 +2278,13 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 													)}
 													<div className="border-t border-gray-600 pt-2 mt-2">
 														<div className="text-yellow-300 text-xs">
-															💡 {t('Zone Generation Weights')}:
+															💡 {t('Zone Generation Based On')}:
 														</div>
 														<div className="text-xs text-gray-400 mt-1">
-															🚿 {t('Sprinklers')}: 1.0x | 🔄 {t('Pivots')}: 1.2x | 💧 {t('Drip Tapes')}: 2.0x | 🌊 {t('Water Jets')}: 1.8x
+															🚿 {t('Sprinklers')} | 🔄 {t('Pivots')} | 💧 {t('Drip Tapes')} | 🌊 {t('Water Jets')}
+														</div>
+														<div className="text-xs text-blue-300 mt-1">
+															{t('Zones are generated based on irrigation equipment positions only')}
 														</div>
 													</div>
 												</div>
@@ -2272,7 +2292,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 
 											<button
 												onClick={generateSmartAutoZones}
-												disabled={isGeneratingZones || (fieldData.plantPoints.length === 0 && fieldData.irrigationPositions.sprinklers.length === 0 && fieldData.irrigationPositions.pivots.length === 0 && fieldData.irrigationPositions.dripTapes.length === 0 && fieldData.irrigationPositions.waterJets.length === 0)}
+												disabled={isGeneratingZones || (fieldData.irrigationPositions.sprinklers.length === 0 && fieldData.irrigationPositions.pivots.length === 0 && fieldData.irrigationPositions.dripTapes.length === 0 && fieldData.irrigationPositions.waterJets.length === 0)}
 												className="w-full bg-blue-600 text-white px-3 py-2 rounded text-xs hover:bg-blue-700 transition-colors border border-white disabled:opacity-50 disabled:cursor-not-allowed"
 											>
 												{isGeneratingZones ? t('Generating Smart Zones...') : t('Generate Smart Zones')}
@@ -2360,7 +2380,7 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 														</div>
 														<div className="space-y-1 text-xs">
 															<div className="text-gray-300">
-																{t('Total Plants')}: {fieldData.zones.reduce((sum, zone) => sum + (zone.plantCount || 0), 0)}
+																{t('Total Plants')}: {fieldData.realPlantCount || fieldData.zones.reduce((sum, zone) => sum + (zone.plantCount || 0), 0)}
 															</div>
 															<div className="text-gray-300">
 																{t('Total Water')}: {actualTotalWaterFromZones.toFixed(1)} ลิตร/ครั้ง
@@ -2466,19 +2486,12 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 																		</select>
 																	</div>
 																)}
-																{(() => {
-																	const allPlantsInZone = fieldData.plantPoints.filter(point =>
-																		isPointInOrOnPolygon(point, zone.coordinates)
-																	);
-																	return (
-																		<div className="flex justify-between items-center">
-																			<span className="text-gray-300">🌱 {t('Total Plants')}:</span>
-																			<span className="text-green-400 font-semibold">
-																				{allPlantsInZone.length} {t('points')}
-																			</span>
-																		</div>
-																	);
-																})()}
+																<div className="flex justify-between items-center">
+																	<span className="text-gray-300">🌱 {t('Total Plants')}:</span>
+																	<span className="text-green-400 font-semibold">
+																		{zone.plantCount || 0} {t('points')}
+																	</span>
+																</div>
 																<div className="flex justify-between items-center">
 																	<span className="text-gray-300">💧 {t('Water Need')}:</span>
 																	<span className={`font-semibold ${zone.waterStatus === 'warning' ? 'text-yellow-400' : 'text-blue-400'
@@ -2666,66 +2679,16 @@ export default function ZoneObstacle(props: ZoneObstacleProps) {
 									</div>
 								</div>
 								
-								{/* Hide/Show Points Button */}
-								{fieldData.plantPoints.length > 0 && (
-									<div className="absolute top-2.5 right-60 z-10">
-										<button 
-											onClick={() => {
-												const newHideAllPoints = !hideAllPoints;
-												setHideAllPoints(newHideAllPoints);
-												setFieldData(prev => ({ ...prev, hideAllPoints: newHideAllPoints }));
-												
-												// Save the new state to localStorage immediately
-												try {
-													const existingData = localStorage.getItem('fieldCropData');
-													if (existingData) {
-														const fieldData = JSON.parse(existingData) as FieldData;
-														const updatedData = {
-															...fieldData,
-															hideAllPoints: newHideAllPoints
-														};
-														localStorage.setItem('fieldCropData', JSON.stringify(updatedData));
-													}
-												} catch (error) {
-													console.error('Error saving hideAllPoints state:', error);
-												}
-											}}
-											className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 shadow-lg border ${
-												hideAllPoints 
-													? 'bg-red-600 text-white border-red-500 hover:bg-red-500' 
-													: 'bg-green-600 text-white border-green-500 hover:bg-green-500'
-											}`}
-											title={hideAllPoints ? t('Show All Points') : t('Hide All Points')}
-										>
-											{hideAllPoints ? (
-												<div className="flex items-center gap-1">
-													<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-													</svg>
-													{t('Show')}
-												</div>
-											) : (
-												<div className="flex items-center gap-1">
-													<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-														<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-													</svg>
-													{t('Hide')}
-												</div>
-											)}
-										</button>
-									</div>
-								)}
 								<div className="absolute bottom-4 right-20 z-10 pointer-events-none">
 									<div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
 										{t('Zoom Level')}: {mapZoom}
 									</div>
-									{fieldData.plantPoints.length > 0 && (
+									{((fieldData.realPlantCount || 0) > 0 || fieldData.plantPoints.length > 0) && (
 										<div className="px-2 py-1 rounded bg-black bg-opacity-70 border border-white text-xs text-white mb-1">
-											{t('Points')}: {fieldData.plantPoints.length.toLocaleString()} / {fieldData.plantPoints.length.toLocaleString()}
-											{fieldData.plantPoints.length > fieldData.plantPoints.length && (
+											{t('Points')}: {fieldData.plantPoints.length.toLocaleString()} / {(fieldData.realPlantCount || fieldData.plantPoints.length).toLocaleString()}
+											{(fieldData.realPlantCount || 0) > fieldData.plantPoints.length && (
 												<span className="text-yellow-300 ml-1">
-													({Math.round((1 - fieldData.plantPoints.length / fieldData.plantPoints.length) * 100)}% {t('reduced')})
+													({Math.round((1 - fieldData.plantPoints.length / (fieldData.realPlantCount || 1)) * 100)}% {t('reduced')})
 												</span>
 											)}
 										</div>

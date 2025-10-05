@@ -167,21 +167,22 @@ const getPlantCategories = (t: (key: string) => string): PlantCategory[] => [
             t('environmental_monitoring'),
         ],
     },
-    {
-        id: 'field-crop',
-        name: t('field_crop'),
-        description: t('field_crop_desc'),
-        icon: '🌾',
-        color: 'from-yellow-600 to-yellow-800',
-        route: '/choose-crop',
-        features: [
-            t('large_scale_planning'),
-            t('efficient_irrigation'),
-            t('crop_rotation'),
-            t('weather_integration'),
-            t('yield_optimization'),
-        ],
-    },
+    // TODO: Temporarily hidden Field Crop - uncomment when ready to use
+    // {
+    //     id: 'field-crop',
+    //     name: t('field_crop'),
+    //     description: t('field_crop_desc'),
+    //     icon: '🌾',
+    //     color: 'from-yellow-600 to-yellow-800',
+    //     route: '/choose-crop',
+    //     features: [
+    //         t('large_scale_planning'),
+    //         t('efficient_irrigation'),
+    //         t('crop_rotation'),
+    //         t('weather_integration'),
+    //         t('yield_optimization'),
+    //     ],
+    // },
 ];
 
 // Components

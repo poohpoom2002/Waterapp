@@ -251,7 +251,7 @@ const SprinklerConfigModal: React.FC<SprinklerConfigModalProps> = ({
                                     className={`w-full rounded-lg border px-4 py-3 pr-12 text-black focus:border-blue-500 focus:ring-2 focus:ring-blue-500 ${
                                         errors.radiusMeters ? 'border-red-300' : 'border-white'
                                     }`}
-                                    placeholder="1.5"
+                                    placeholder="3"
                                     autoComplete="off"
                                 />
                                 <div className="absolute inset-y-0 right-0 flex items-center pr-3">

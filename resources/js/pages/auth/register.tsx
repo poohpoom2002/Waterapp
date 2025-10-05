@@ -10,31 +10,44 @@ import {
     EyeOff,
     User,
     UserPlus,
+    Phone,
+    FileText,
 } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 import InputError from '@/components/input-error';
 import TextLink from '@/components/text-link';
+import TermsModal from '@/components/modals/TermsModal';
+import PrivacyModal from '@/components/modals/PrivacyModal';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 type RegisterForm = {
     name: string;
     email: string;
+    phone: string;
+    additional_details: string;
     password: string;
     password_confirmation: string;
+    accept_terms: boolean;
 };
 
 export default function Register() {
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
+    const [showTermsModal, setShowTermsModal] = useState(false);
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm<Required<RegisterForm>>({
         name: '',
         email: '',
+        phone: '',
+        additional_details: '',
         password: '',
         password_confirmation: '',
+        accept_terms: false,
     });
 
     const submit: FormEventHandler = (e) => {
@@ -192,6 +205,58 @@ export default function Register() {
                             <InputError message={errors.email} />
                         </div>
 
+                        {/* Phone Field */}
+                        <div className="space-y-2">
+                            <Label
+                                htmlFor="phone"
+                                className="flex items-center space-x-2 text-sm font-medium text-gray-700"
+                            >
+                                <Phone className="h-4 w-4 text-gray-500" />
+                                <span>เบอร์โทรศัพท์</span>
+                            </Label>
+                            <div className="relative">
+                                <Input
+                                    id="phone"
+                                    type="tel"
+                                    required
+                                    tabIndex={3}
+                                    autoComplete="tel"
+                                    value={data.phone}
+                                    onChange={(e) => setData('phone', e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && submit(e)}
+                                    disabled={processing}
+                                    placeholder="08x-xxx-xxxx"
+                                    className="w-full rounded-xl border-gray-200 bg-gray-50 py-3 pl-4 pr-4 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500"
+                                />
+                            </div>
+                            <InputError message={errors.phone} />
+                        </div>
+
+                        {/* Additional Details Field */}
+                        <div className="space-y-2">
+                            <Label
+                                htmlFor="additional_details"
+                                className="flex items-center space-x-2 text-sm font-medium text-gray-700"
+                            >
+                                <FileText className="h-4 w-4 text-gray-500" />
+                                <span>รายละเอียดเพิ่มเติม</span>
+                                <span className="text-xs text-gray-500">(ไม่บังคับ)</span>
+                            </Label>
+                            <div className="relative">
+                                <textarea
+                                    id="additional_details"
+                                    tabIndex={4}
+                                    value={data.additional_details}
+                                    onChange={(e) => setData('additional_details', e.target.value)}
+                                    disabled={processing}
+                                    placeholder="กรอกรายละเอียดเพิ่มเติมเกี่ยวกับคุณ..."
+                                    rows={3}
+                                    className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 px-4 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-green-500 resize-none"
+                                />
+                            </div>
+                            <InputError message={errors.additional_details} />
+                        </div>
+
                         {/* Password Field */}
                         <div className="space-y-2">
                             <Label
@@ -206,7 +271,7 @@ export default function Register() {
                                     id="password"
                                     type={showPassword ? 'text' : 'password'}
                                     required
-                                    tabIndex={3}
+                                    tabIndex={5}
                                     autoComplete="new-password"
                                     value={data.password}
                                     onChange={(e) => setData('password', e.target.value)}
@@ -245,7 +310,7 @@ export default function Register() {
                                     id="password_confirmation"
                                     type={showPasswordConfirmation ? 'text' : 'password'}
                                     required
-                                    tabIndex={4}
+                                    tabIndex={6}
                                     autoComplete="new-password"
                                     value={data.password_confirmation}
                                     onChange={(e) =>
@@ -296,13 +361,60 @@ export default function Register() {
                             </div>
                         </div>
 
+                        {/* PDPA Terms and Conditions */}
+                        <div className="space-y-3 rounded-lg border border-gray-200 bg-blue-50/50 p-4">
+                            <div className="flex items-start space-x-3">
+                                <Checkbox
+                                    id="accept_terms"
+                                    name="accept_terms"
+                                    checked={data.accept_terms}
+                                    onClick={() => setData('accept_terms', !data.accept_terms)}
+                                    tabIndex={7}
+                                    className="mt-0.5 data-[state=checked]:border-green-600 data-[state=checked]:bg-green-600"
+                                />
+                                <div className="flex-1">
+                                    <Label
+                                        htmlFor="accept_terms"
+                                        className="cursor-pointer text-sm leading-relaxed text-gray-700"
+                                    >
+                                        ฉันยอมรับ{' '}
+                                        <TextLink
+                                            href="#"
+                                            className="font-medium text-blue-600 underline hover:text-blue-700"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setShowTermsModal(true);
+                                            }}
+                                        >
+                                            เงื่อนไขการใช้บริการ
+                                        </TextLink>{' '}
+                                        และ{' '}
+                                        <TextLink
+                                            href="#"
+                                            className="font-medium text-blue-600 underline hover:text-blue-700"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                setShowPrivacyModal(true);
+                                            }}
+                                        >
+                                            นโยบายความเป็นส่วนตัว (PDPA)
+                                        </TextLink>
+                                    </Label>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        รวมถึงการเก็บรวบรวม ใช้ และเปิดเผยข้อมูลส่วนบุคคลตามกฎหมาย PDPA
+                                    </p>
+                                </div>
+                            </div>
+                            <InputError message={errors.accept_terms} />
+                        </div>
+
                         {/* Submit Button */}
                         <Button
                             type="submit"
                             onClick={submit}
-                            className="w-full transform rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-3 font-medium text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:from-green-700 hover:to-emerald-700 hover:shadow-xl focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-                            tabIndex={5}
-                            disabled={processing}
+                            className="w-full transform rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-3 font-medium text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:from-green-700 hover:to-emerald-700 hover:shadow-xl focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                            tabIndex={8}
+                            disabled={processing || !data.accept_terms}
                         >
                             {processing ? (
                                 <div className="flex items-center justify-center space-x-2">
@@ -324,7 +436,7 @@ export default function Register() {
                             มีบัญชีอยู่แล้ว?{' '}
                             <TextLink
                                 href={route('login')}
-                                tabIndex={6}
+                                tabIndex={9}
                                 className="font-medium text-green-600 transition-colors hover:text-green-700"
                             >
                                 เข้าสู่ระบบ
@@ -354,6 +466,16 @@ export default function Register() {
                     </p>
                 </div>
             </div>
+
+            {/* Modals */}
+            <TermsModal 
+                isOpen={showTermsModal} 
+                onClose={() => setShowTermsModal(false)} 
+            />
+            <PrivacyModal 
+                isOpen={showPrivacyModal} 
+                onClose={() => setShowPrivacyModal(false)} 
+            />
         </div>
     );
 }
