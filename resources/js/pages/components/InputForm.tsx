@@ -35,6 +35,7 @@ interface InputFormProps {
     connectionStats?: ConnectionPointStats[];
     onConnectionEquipmentsChange?: (equipments: ConnectionPointEquipment[]) => void;
     greenhouseData?: any; // เพิ่มสำหรับ greenhouse projectMode
+    fieldCropSystemData?: any; // เพิ่มสำหรับ field-crop projectMode
 }
 
 interface BranchPipeStats {
@@ -96,6 +97,7 @@ const InputForm: React.FC<InputFormProps> = ({
     connectionStats = [],
     onConnectionEquipmentsChange,
     greenhouseData,
+    fieldCropSystemData,
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [validationMessages, setValidationMessages] = useState<string[]>([]);
@@ -789,7 +791,7 @@ const InputForm: React.FC<InputFormProps> = ({
     const getWaterPerItemLabel = () => {
         switch (projectMode) {
             case 'field-crop':
-                return t('น้ำต่อหัว (ลิตร/นาที)');
+                return t('น้ำต่อหัวฉีด (ลิตร/นาที)');
             case 'greenhouse':
                 return t('น้ำต่อหัวฉีด (ลิตร/ครั้ง)');
             case 'garden':
@@ -974,7 +976,7 @@ const InputForm: React.FC<InputFormProps> = ({
                     <div className="grid grid-cols-3 gap-3 rounded-lg bg-gray-700 p-2">
                         <div>
                             <label className="mb-2 block text-sm font-medium">
-                                {t('ขนาดพื้นที่')} ({getAreaUnit()})
+                                {projectMode === 'field-crop' ? t('ขนาดพื้นที่โซน') : t('ขนาดพื้นที่')} ({getAreaUnit()})
                             </label>
                             <input
                                 type="number"

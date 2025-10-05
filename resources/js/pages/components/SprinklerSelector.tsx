@@ -49,6 +49,26 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
 
     // Helper function to get field-crop sprinkler requirements
     const getFieldCropSprinklerRequirements = useCallback(() => {
+        // First try to get data from fieldCropSystemData (from summary page)
+        try {
+            const systemDataStr = localStorage.getItem('fieldCropSystemData');
+            if (systemDataStr) {
+                const systemData = JSON.parse(systemDataStr);
+                if (systemData?.sprinklerConfig) {
+                    return {
+                        targetFlowPerSprinkler: systemData.sprinklerConfig.flowRatePerPlant,
+                        targetPressure: systemData.sprinklerConfig.pressureBar,
+                        targetRadius: systemData.sprinklerConfig.radiusMeters,
+                        totalSprinklers: systemData.totalPlants || 0,
+                        irrigationTypes: {},
+                    };
+                }
+            }
+        } catch (error) {
+            console.error('Error loading fieldCropSystemData:', error);
+        }
+
+        // Fallback to calculation from field data
         const fcData = fieldCropData || getEnhancedFieldCropData();
         if (fcData) {
             // Calculate target flow per sprinkler based on field-crop data
@@ -74,6 +94,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
             return {
                 targetFlowPerSprinkler,
                 targetPressure,
+                targetRadius: 8.0, // Default radius
                 totalSprinklers: totalPlantingPoints,
                 irrigationTypes: irrigationByType,
             };
@@ -195,32 +216,44 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                     };
                 }
             } else if (projectMode === 'greenhouse') {
-                // ใช้ข้อมูลจาก greenhouse plot หรือค่า default
-                if (greenhouseData && activeZone) {
-                    const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                    if (currentPlot && currentPlot.production?.waterCalculation) {
-                        const waterCalc = currentPlot.production.waterCalculation;
-                        // ตรวจสอบ null safety สำหรับ waterPerPlant
-                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                // ใช้ข้อมูลจาก greenhouse summary data (การตั้งค่าอุปกรณ์)
+                try {
+                    const storedData = localStorage.getItem('greenhousePlanningData');
+                    if (storedData) {
+                        const summaryData = JSON.parse(storedData);
+                        
+                        // ดึงข้อมูลจาก Equipment Settings ใน green-house-summary.tsx
+                        const flowRate = summaryData?.sprinklerFlowRate || 10.0; // L/min per sprinkler
+                        const pressureBar = summaryData?.sprinklerPressure || 2.0; // Bar for sprinklers
+                        const radiusMeters = summaryData?.sprinklerRadius || 1.5; // Radius in meters
+                        
                         sprinklerConfig = {
                             flowRatePerMinute: flowRate,
-                            pressureBar: 2.5, // ค่า default สำหรับ greenhouse
-                            radiusMeters: 4.0, // ค่า default สำหรับ greenhouse (เล็กกว่าสวนบ้าน)
+                            pressureBar: pressureBar,
+                            radiusMeters: radiusMeters,
                         };
+                        
+                        console.log(`🚿 Greenhouse sprinkler config from summary:`, {
+                            flowRate,
+                            pressureBar,
+                            radiusMeters,
+                            irrigationMethod: summaryData?.irrigationMethod
+                        });
                     } else {
                         // fallback ค่า default สำหรับ greenhouse
                         sprinklerConfig = {
-                            flowRatePerMinute: 6.0,
-                            pressureBar: 2.5,
-                            radiusMeters: 4.0,
+                            flowRatePerMinute: 10.0,
+                            pressureBar: 2.0,
+                            radiusMeters: 1.5,
                         };
                     }
-                } else {
+                } catch (error) {
+                    console.log('Could not load greenhouse sprinkler config:', error);
                     // fallback ค่า default สำหรับ greenhouse
                     sprinklerConfig = {
-                        flowRatePerMinute: 6.0,
-                        pressureBar: 2.5,
-                        radiusMeters: 4.0,
+                        flowRatePerMinute: 10.0,
+                        pressureBar: 2.0,
+                        radiusMeters: 1.5,
                     };
                 }
             }
@@ -338,7 +371,7 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 sprinklerConfig = {
                     flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
                     pressureBar: fieldCropRequirements.targetPressure,
-                    radiusMeters: 8.0, // Default radius for field-crop
+                    radiusMeters: fieldCropRequirements.targetRadius || 8.0,
                 };
             } else {
                 // fallback ค่า default สำหรับ field-crop
@@ -349,32 +382,44 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                 };
             }
         } else if (projectMode === 'greenhouse') {
-            // ใช้ข้อมูลจาก greenhouse plot หรือค่า default
-            if (greenhouseData && activeZone) {
-                const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                if (currentPlot && currentPlot.production?.waterCalculation) {
-                    const waterCalc = currentPlot.production.waterCalculation;
-                    // ตรวจสอบ null safety สำหรับ waterPerPlant
-                    const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+            // ใช้ข้อมูลจาก greenhouse summary data (การตั้งค่าอุปกรณ์)
+            try {
+                const storedData = localStorage.getItem('greenhousePlanningData');
+                if (storedData) {
+                    const summaryData = JSON.parse(storedData);
+                    
+                    // ดึงข้อมูลจาก Equipment Settings ใน green-house-summary.tsx
+                    const flowRate = summaryData?.sprinklerFlowRate || 10.0; // L/min per sprinkler
+                    const pressureBar = summaryData?.sprinklerPressure || 2.0; // Bar for sprinklers
+                    const radiusMeters = summaryData?.sprinklerRadius || 1.5; // Radius in meters
+                    
                     sprinklerConfig = {
                         flowRatePerMinute: flowRate,
-                        pressureBar: 2.5, // ค่า default สำหรับ greenhouse
-                        radiusMeters: 4.0, // ค่า default สำหรับ greenhouse (เล็กกว่าสวนบ้าน)
+                        pressureBar: pressureBar,
+                        radiusMeters: radiusMeters,
                     };
+                    
+                    console.log(`🚿 Greenhouse sprinkler filter config:`, {
+                        flowRate,
+                        pressureBar,
+                        radiusMeters,
+                        irrigationMethod: summaryData?.irrigationMethod
+                    });
                 } else {
                     // fallback ค่า default สำหรับ greenhouse
                     sprinklerConfig = {
-                        flowRatePerMinute: 6.0,
-                        pressureBar: 2.5,
-                        radiusMeters: 4.0,
+                        flowRatePerMinute: 10.0,
+                        pressureBar: 2.0,
+                        radiusMeters: 1.5,
                     };
                 }
-            } else {
+            } catch (error) {
+                console.log('Could not load greenhouse sprinkler filter config:', error);
                 // fallback ค่า default สำหรับ greenhouse
                 sprinklerConfig = {
-                    flowRatePerMinute: 6.0,
-                    pressureBar: 2.5,
-                    radiusMeters: 4.0,
+                    flowRatePerMinute: 10.0,
+                    pressureBar: 2.0,
+                    radiusMeters: 1.5,
                 };
             }
         }
@@ -502,43 +547,55 @@ const SprinklerSelector: React.FC<SprinklerSelectorProps> = ({
                             };
                         }
                     } else if (projectMode === 'greenhouse') {
-                        // ใช้ข้อมูลจาก greenhouse plot หรือค่า default
-                        if (greenhouseData && activeZone) {
-                            const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                            if (currentPlot && currentPlot.production?.waterCalculation) {
-                                const waterCalc = currentPlot.production.waterCalculation;
-                                // ตรวจสอบ null safety สำหรับ waterPerPlant
-                                const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
+                        // ใช้ข้อมูลจาก greenhouse summary data (การตั้งค่าอุปกรณ์)
+                        try {
+                            const storedData = localStorage.getItem('greenhousePlanningData');
+                            if (storedData) {
+                                const summaryData = JSON.parse(storedData);
+                                
+                                // ดึงข้อมูลจาก Equipment Settings ใน green-house-summary.tsx
+                                const flowRate = summaryData?.sprinklerFlowRate || 10.0; // L/min per sprinkler
+                                const pressureBar = summaryData?.sprinklerPressure || 2.0; // Bar for sprinklers
+                                const radiusMeters = summaryData?.sprinklerRadius || 1.5; // Radius in meters
+                                
                                 sprinklerConfig = {
                                     flowRatePerMinute: flowRate,
-                                    pressureBar: 2.5, // ค่า default สำหรับ greenhouse
-                                    radiusMeters: 4.0, // ค่า default สำหรับ greenhouse (เล็กกว่าสวนบ้าน)
+                                    pressureBar: pressureBar,
+                                    radiusMeters: radiusMeters,
                                 };
+                                
+                                console.log(`🚿 Greenhouse sprinkler display config:`, {
+                                    flowRate,
+                                    pressureBar,
+                                    radiusMeters,
+                                    irrigationMethod: summaryData?.irrigationMethod
+                                });
                             } else {
                                 // fallback ค่า default สำหรับ greenhouse
                                 sprinklerConfig = {
-                                    flowRatePerMinute: 6.0,
-                                    pressureBar: 2.5,
-                                    radiusMeters: 4.0,
+                                    flowRatePerMinute: 10.0,
+                                    pressureBar: 2.0,
+                                    radiusMeters: 1.5,
                                 };
                             }
-                        } else {
+                        } catch (error) {
+                            console.log('Could not load greenhouse sprinkler display config:', error);
                             // fallback ค่า default สำหรับ greenhouse
                             sprinklerConfig = {
-                                flowRatePerMinute: 6.0,
-                                pressureBar: 2.5,
-                                radiusMeters: 4.0,
+                                flowRatePerMinute: 10.0,
+                                pressureBar: 2.0,
+                                radiusMeters: 1.5,
                             };
                         }
                     } else if (projectMode === 'field-crop') {
                         // ใช้ข้อมูลจาก field-crop data
                         const fieldCropRequirements = getFieldCropSprinklerRequirements();
-                        if (fieldCropRequirements) {
-                            sprinklerConfig = {
-                                flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
-                                pressureBar: fieldCropRequirements.targetPressure,
-                                radiusMeters: 8.0, // Default radius for field-crop
-                            };
+            if (fieldCropRequirements) {
+                sprinklerConfig = {
+                    flowRatePerMinute: fieldCropRequirements.targetFlowPerSprinkler,
+                    pressureBar: fieldCropRequirements.targetPressure,
+                    radiusMeters: fieldCropRequirements.targetRadius || 8.0,
+                };
                         } else {
                             // fallback ค่า default สำหรับ field-crop
                             sprinklerConfig = {

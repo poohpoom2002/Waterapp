@@ -368,8 +368,102 @@ const QuotationDocument: React.FC<QuotationDocumentProps> = ({
 
         const isMultiZone =
             projectData?.useZones && projectData.zones && projectData.zones.length > 1;
+        
+        const isGreenhouseMode = projectMode === 'greenhouse' && greenhouseData;
+        const isGreenhouseMultiPlot = isGreenhouseMode && greenhouseData.summary?.plotStats?.length > 1;
 
-        if (isMultiZone) {
+        if (isGreenhouseMultiPlot) {
+            // Handle greenhouse multi-plot mode
+            const totalPlantsInAllPlots = greenhouseData.summary.plotStats.reduce(
+                (sum: number, plot: any) => sum + (plot.production?.totalPlants || 0),
+                0
+            );
+
+            const equipmentMap = new Map();
+
+            greenhouseData.summary.plotStats.forEach((plot: any) => {
+                const zoneSprinkler = zoneSprinklers[plot.plotId];
+                const zonePipes = selectedPipes[plot.plotId] || {};
+
+                if (zoneSprinkler) {
+                    // คำนวณจำนวนหัวฉีดสำหรับแปลงนี้
+                    let sprinklerQuantity = plot.equipmentCount?.sprinklers || 0;
+                    if (sprinklerQuantity === 0) {
+                        const totalPlants = plot.production?.totalPlants || 0;
+                        const effectiveArea = plot.effectivePlantingArea || plot.area || 0;
+                        
+                        if (totalPlants > 0) {
+                            sprinklerQuantity = Math.ceil(totalPlants / 15);
+                        } else if (effectiveArea > 0) {
+                            sprinklerQuantity = Math.ceil(effectiveArea / 5);
+                        } else {
+                            sprinklerQuantity = 10;
+                        }
+                    }
+
+                    const sprinklerKey = `sprinkler_${zoneSprinkler.id}`;
+                    if (equipmentMap.has(sprinklerKey)) {
+                        const existing = equipmentMap.get(sprinklerKey);
+                        existing.quantity += sprinklerQuantity;
+                        existing.zones.push(plot.plotName || `โซน ${plot.plotId}`);
+                    } else {
+                        equipmentMap.set(sprinklerKey, {
+                            id: sprinklerKey,
+                            seq: seq++,
+                            image: zoneSprinkler.image_url || zoneSprinkler.image || '',
+                            date: '',
+                            description: `${zoneSprinkler.productCode || zoneSprinkler.product_code || ''} - ${zoneSprinkler.name || 'สปริงเกอร์'} (${zoneSprinkler.brand || ''})`,
+                            quantity: sprinklerQuantity,
+                            unitPrice: zoneSprinkler.price || 0,
+                            discount: 0.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: zoneSprinkler,
+                            zones: [plot.plotName || `โซน ${plot.plotId}`],
+                        });
+                    }
+                }
+
+                // Handle pipes for greenhouse
+                const branchPipe = zonePipes.branch || results.autoSelectedBranchPipe;
+                if (branchPipe) {
+                    const pipeKey = `branch_${branchPipe.id}`;
+                    const plotRatio = (plot.production?.totalPlants || 0) / Math.max(totalPlantsInAllPlots, 1);
+                    const rolls = Math.max(1, Math.ceil((results.branchPipeRolls || 1) * plotRatio));
+
+                    if (equipmentMap.has(pipeKey)) {
+                        const existing = equipmentMap.get(pipeKey);
+                        existing.quantity += rolls;
+                        existing.zones.push(plot.plotName || `โซน ${plot.plotId}`);
+                    } else {
+                        equipmentMap.set(pipeKey, {
+                            id: pipeKey,
+                            seq: seq++,
+                            image: branchPipe.image_url || branchPipe.image || '',
+                            date: '',
+                            description: `${branchPipe.productCode || branchPipe.product_code || ''} - ท่อย่อย ${branchPipe.pipeType || ''} ${branchPipe.sizeMM || ''}mm ยาว ${branchPipe.lengthM || ''} ม./ม้วน`,
+                            quantity: rolls,
+                            unitPrice: branchPipe.price || 0,
+                            discount: 0.0,
+                            taxes: 'Output\nVAT\n7%',
+                            originalData: branchPipe,
+                            zones: [plot.plotName || `โซน ${plot.plotId}`],
+                        });
+                    }
+                }
+
+                // Greenhouse ไม่มีท่อเมนรอง - ข้าม secondary pipe
+                // (ไม่ต้องคำนวณท่อเมนรองสำหรับ greenhouse)
+            });
+
+            // Add equipment to initial items
+            for (const [key, item] of equipmentMap.entries()) {
+                if (item.zones && item.zones.length > 1) {
+                    item.description += ` (ใช้ใน ${item.zones.length} แปลง)`;
+                }
+                delete item.zones;
+                initialItems.push(item);
+            }
+        } else if (isMultiZone) {
             const totalTreesInAllZones = projectData.zones.reduce(
                 (sum, zone) => sum + zone.plantCount,
                 0

@@ -1,7 +1,7 @@
 // resources\js\pages\components\CalculationSummary.tsx
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CalculationResults, IrrigationInput } from '../types/interfaces';
 import { Zone } from '../../utils/horticultureUtils';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -58,52 +58,105 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
     const actualMainPipe = results.autoSelectedMainPipe;
     const actualEmitterPipe = results.autoSelectedEmitterPipe;
 
+    // Debug logging for field-crop mode
+    useEffect(() => {
+        if (projectMode === 'field-crop') {
+            console.log('🔍 CalculationSummary field-crop debug:');
+            console.log('- results.totalWaterRequiredLPM:', results.totalWaterRequiredLPM);
+            console.log('- results.totalSprinklers:', results.totalSprinklers);
+            console.log('- input.waterPerTreeLiters:', input.waterPerTreeLiters);
+            console.log('- input.totalTrees:', input.totalTrees);
+            console.log('- input object:', input);
+        }
+    }, [projectMode, results.totalWaterRequiredLPM, results.totalSprinklers, input.waterPerTreeLiters, input.totalTrees, input]);
+
     // ฟังก์ชันสำหรับดึงค่า Head Loss จากท่อแต่ละชนิด
     const getActualPipeHeadLoss = useCallback(() => {
         // ลองดึงข้อมูลจาก localStorage ก่อน (สำหรับทุก mode)
         try {
-            // ลองดึงข้อมูลจาก garden_pipe_calculations
-            const gardenPipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
-            if (gardenPipeCalculationsStr) {
-                const pipeCalculations = JSON.parse(gardenPipeCalculationsStr);
+            // ลองดึงข้อมูลจาก greenhouse_pipe_calculations ก่อน
+            if (projectMode === 'greenhouse') {
+                const greenhousePipeCalculationsStr = localStorage.getItem('greenhouse_pipe_calculations');
+                if (greenhousePipeCalculationsStr) {
+                    const pipeCalculations = JSON.parse(greenhousePipeCalculationsStr);
 
-                const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
-                const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
-                const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
-                const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
 
-                const totalHeadLoss =
-                    branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    // สำหรับ greenhouse mode ใช้เฉพาะท่อเมนหลักและท่อย่อย
+                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
 
-                return {
-                    branch: branchHeadLoss,
-                    secondary: secondaryHeadLoss,
-                    main: mainHeadLoss,
-                    emitter: emitterHeadLoss,
-                    total: totalHeadLoss,
-                };
+                    // greenhouse ไม่มีท่อเมนรองและท่อย่อยแยก
+                    const secondaryHeadLoss = 0;
+                    const emitterHeadLoss = 0;
+
+                    // สำหรับ greenhouse mode: เฉพาะท่อเมนหลัก + ท่อย่อย
+                    const totalHeadLoss = branchHeadLoss + mainHeadLoss;
+                    
+
+                    return {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss, // greenhouse ไม่มีท่อเมนรอง
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss, // greenhouse ไม่มีท่อย่อยแยก
+                        total: totalHeadLoss,
+                    };
+                }
             }
 
-            // ลองดึงข้อมูลจาก greenhouse_pipe_calculations
-            const greenhousePipeCalculationsStr = localStorage.getItem('greenhouse_pipe_calculations');
-            if (greenhousePipeCalculationsStr) {
-                const pipeCalculations = JSON.parse(greenhousePipeCalculationsStr);
+            // ลองดึงข้อมูลจาก field_crop_pipe_calculations
+            if (projectMode === 'field-crop') {
+                const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                if (fieldCropPipeCalculationsStr) {
+                    const pipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
 
-                const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
-                const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
-                const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
-                const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
+                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
 
-                const totalHeadLoss =
-                    branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    const totalHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
-                return {
-                    branch: branchHeadLoss,
-                    secondary: secondaryHeadLoss,
-                    main: mainHeadLoss,
-                    emitter: emitterHeadLoss,
-                    total: totalHeadLoss,
-                };
+                    console.log(`🔍 CalculationSummary field-crop Head Loss:`, {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss
+                    });
+
+                    return {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss,
+                    };
+                }
+            }
+
+            // ลองดึงข้อมูลจาก garden_pipe_calculations
+            if (projectMode === 'garden') {
+                const gardenPipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+                if (gardenPipeCalculationsStr) {
+                    const pipeCalculations = JSON.parse(gardenPipeCalculationsStr);
+
+                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
+
+                    const totalHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+                    return {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss,
+                    };
+                }
             }
         } catch (error) {
             console.error('Error loading pipe calculations from localStorage:', error);
@@ -143,7 +196,22 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         const mainHeadLoss = actualMainPipe?.headLoss || 0;
         const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
 
-        const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+        let totalHeadLoss;
+        if (projectMode === 'greenhouse') {
+            // สำหรับ greenhouse mode: ท่อเมนหลัก + ท่อย่อย
+            totalHeadLoss = mainHeadLoss + branchHeadLoss;
+        } else {
+            // สำหรับ mode อื่นๆ: รวมทุกประเภทท่อ
+            totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+        }
+
+        console.log(`🔍 CalculationSummary Head Loss Fallback (${projectMode}):`, {
+            branch: branchHeadLoss,
+            secondary: secondaryHeadLoss,
+            main: mainHeadLoss,
+            emitter: emitterHeadLoss,
+            total: totalHeadLoss
+        });
 
         return {
             branch: branchHeadLoss,
@@ -152,9 +220,15 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             emitter: emitterHeadLoss,
             total: totalHeadLoss,
         };
-    }, [actualBranchPipe, actualSecondaryPipe, actualMainPipe, actualEmitterPipe]);
+    }, [actualBranchPipe, actualSecondaryPipe, actualMainPipe, actualEmitterPipe, projectMode]);
 
     const [actualHeadLoss, setActualHeadLoss] = useState(() => getActualPipeHeadLoss());
+    const actualHeadLossRef = useRef(actualHeadLoss);
+    
+    // อัปเดต ref เมื่อ state เปลี่ยน
+    useEffect(() => {
+        actualHeadLossRef.current = actualHeadLoss;
+    }, [actualHeadLoss]);
 
     // อัปเดตค่า Head Loss เมื่อมีการเปลี่ยนแปลงใน localStorage
     useEffect(() => {
@@ -168,14 +242,28 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         // อัปเดตค่าเมื่อ component mount หรือเมื่อมีการเปลี่ยนแปลง
         const interval = setInterval(() => {
             const newHeadLoss = getActualPipeHeadLoss();
-            setActualHeadLoss(newHeadLoss);
-        }, 1000); // ตรวจสอบทุก 1 วินาที
+            // เปรียบเทียบค่าเพื่อหลีกเลี่ยงการ re-render ที่ไม่จำเป็น
+            const currentHeadLossString = JSON.stringify(actualHeadLossRef.current);
+            const newHeadLossString = JSON.stringify(newHeadLoss);
+            
+            if (currentHeadLossString !== newHeadLossString) {
+                setActualHeadLoss(newHeadLoss);
+            }
+        }, 2000); // ลดความถี่เป็น 2 วินาที
 
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             clearInterval(interval);
         };
-    }, [getActualPipeHeadLoss]);
+    }, [getActualPipeHeadLoss, projectMode]);
+
+    // บังคับอัปเดตข้อมูลเมื่อ projectMode เปลี่ยนเป็น greenhouse
+    useEffect(() => {
+        if (projectMode === 'greenhouse') {
+            const newHeadLoss = getActualPipeHeadLoss();
+            setActualHeadLoss(newHeadLoss);
+        }
+    }, [projectMode, getActualPipeHeadLoss]);
 
     const getEquipmentName = () => {
         switch (projectMode) {
@@ -330,6 +418,12 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     // คำนวณ Pump Head จาก Head Loss ท่อ + Head Loss หัวฉีด
     const calculatePumpHead = () => {
+        // สำหรับ greenhouse mode ใช้เฉพาะท่อเมนหลัก + ท่อย่อย
+        if (projectMode === 'greenhouse') {
+            const greenhouseTotalHeadLoss = (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
+            return greenhouseTotalHeadLoss + sprinklerHeadLoss;
+        }
+        // สำหรับ mode อื่นๆ ใช้ค่าเดิม
         return actualHeadLoss.total + sprinklerHeadLoss;
     };
 
@@ -345,7 +439,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
             case 'field-crop':
                 return t('จุดปลูก');
             case 'greenhouse':
-                return t('หัวฉีด');
             default:
                 return t('ต้นไม้');
         }
@@ -542,13 +635,44 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         }
 
         if (projectMode === 'greenhouse' && greenhouseData) {
+            // คำนวณข้อมูลสรุปจาก greenhouse data
+            const totalPlotArea = greenhouseData.summary?.totalPlotArea || 0;
+            const totalAreaInRai = totalPlotArea / 1600; // แปลงจากตารางเมตรเป็นไร่
+            
+            // รวมข้อมูลจากทุกแปลง
+            const plotStats = greenhouseData.summary?.plotStats || [];
+            const totalPlants = plotStats.reduce((sum: number, plot: any) => 
+                sum + (plot.production?.totalPlants || 0), 0);
+            
+            // คำนวณความต้องการน้ำรวม
+            let totalDailyWaterNeed = 0;
+            if (greenhouseData.summary?.waterManagement?.dailyRequirement?.optimal) {
+                totalDailyWaterNeed = greenhouseData.summary.waterManagement.dailyRequirement.optimal;
+            } else {
+                // fallback: รวมจากแต่ละแปลง
+                totalDailyWaterNeed = plotStats.reduce((sum: number, plot: any) => {
+                    const waterCalc = plot.production?.waterCalculation;
+                    return sum + (waterCalc?.dailyWaterNeed?.optimal || 0);
+                }, 0);
+            }
+            
+            // คำนวณผลผลิตและรายได้รวม
+            const totalEstimatedYield = plotStats.reduce((sum: number, plot: any) => 
+                sum + (plot.production?.estimatedYield || 0), 0);
+            const totalEstimatedIncome = plotStats.reduce((sum: number, plot: any) => 
+                sum + (plot.production?.estimatedIncome || 0), 0);
+            
             return {
-                totalArea: greenhouseData.summary.totalPlotArea,
-                totalZones: greenhouseData.summary.plotStats.length,
-                totalItems: greenhouseData.summary.overallProduction.totalPlants,
-                totalWaterNeed: greenhouseData.summary.overallProduction.waterRequirementPerDay,
-                totalEstimatedYield: greenhouseData.summary.overallProduction.estimatedYield || 0,
-                totalEstimatedIncome: greenhouseData.summary.overallProduction.estimatedIncome || 0,
+                totalArea: totalAreaInRai, // ใช้หน่วยไร่เพื่อให้สอดคล้องกับ mode อื่น
+                totalZones: plotStats.length,
+                totalItems: totalPlants, // จำนวนต้นไม้รวม
+                totalWaterNeed: totalDailyWaterNeed, // ความต้องการน้ำต่อวัน (ลิตร)
+                totalEstimatedYield: totalEstimatedYield, // ผลผลิตรวม (กิโลกรัม)
+                totalEstimatedIncome: totalEstimatedIncome, // รายได้รวม (บาท)
+                // เพิ่มข้อมูลเฉพาะ greenhouse
+                totalGreenhouseArea: greenhouseData.summary?.totalGreenhouseArea || 0,
+                totalEffectivePlantingArea: greenhouseData.summary?.totalEffectivePlantingArea || 0,
+                irrigationMethod: greenhouseData.projectInfo?.irrigationMethod || 'mini-sprinkler',
             };
         }
 
@@ -559,115 +683,6 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
 
     return (
         <div className="space-y-6">
-            {projectSummaryData && (
-                <div className="rounded-lg bg-blue-900 p-4">
-                    <h3 className="mb-3 text-lg font-bold text-blue-300">
-                        📊 {t('สรุปโครงการทั้งหมด')}
-                        {projectMode === 'field-crop'
-                            ? t(' (พืชไร่)')
-                            : projectMode === 'greenhouse'
-                              ? t(' (โรงเรือน)')
-                              : ''}
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-gray-300 md:grid-cols-4">
-                        <div>
-                            <p className="text-blue-200">{t('พื้นที่รวม:')}</p>
-                            <p className="font-bold text-white">
-                                {formatArea(projectSummaryData.totalArea)}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-blue-200">
-                                {projectMode === 'greenhouse' ? t('จำนวนแปลง:') : t('จำนวนโซน:')}
-                            </p>
-                            <p className="font-bold text-white">{projectSummaryData.totalZones}</p>
-                        </div>
-                        <div>
-                            <p className="text-blue-200">
-                                {t('จำนวน')}
-                                {getItemName()}
-                                {t('รวม:')}
-                            </p>
-                            <p className="font-bold text-white">
-                                {(projectSummaryData.totalItems || 0).toLocaleString()}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-blue-200">{t('น้ำรวม:')}</p>
-                            <p className="font-bold text-white">
-                                {(projectSummaryData.totalWaterNeed || 0).toLocaleString()}{' '}
-                                {t('ลิตร')}
-                                {'/ครั้ง'}
-                            </p>
-                        </div>
-                    </div>
-
-                    {((projectSummaryData.totalEstimatedYield || 0) > 0 ||
-                        (projectSummaryData.totalEstimatedIncome || 0) > 0) && (
-                        <div className="mt-3 grid grid-cols-2 gap-4 border-t border-blue-700 pt-3">
-                            {(projectSummaryData.totalEstimatedYield || 0) > 0 && (
-                                <div>
-                                    <p className="text-blue-200">{t('ผลผลิตรวม:')}</p>
-                                    <p className="font-bold text-green-300">
-                                        {(
-                                            projectSummaryData.totalEstimatedYield || 0
-                                        ).toLocaleString()}{' '}
-                                        {t('กก.')}
-                                    </p>
-                                </div>
-                            )}
-                            {(projectSummaryData.totalEstimatedIncome || 0) > 0 && (
-                                <div>
-                                    <p className="text-blue-200">{t('รายได้รวม:')}</p>
-                                    <p className="font-bold text-green-300">
-                                        {(
-                                            projectSummaryData.totalEstimatedIncome || 0
-                                        ).toLocaleString()}{' '}
-                                        {t('บาท')}
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Field-crop specific irrigation information */}
-                    {projectMode === 'field-crop' && projectSummaryData && (
-                        <div className="mt-3 border-t border-blue-700 pt-3">
-                            <h4 className="mb-2 text-sm font-semibold text-blue-200">
-                                🌱 {t('ข้อมูลระบบให้น้ำ')}
-                            </h4>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <p className="text-blue-200">{t('จุดให้น้ำรวม:')}</p>
-                                    <p className="font-bold text-white">
-                                        {(projectSummaryData.totalIrrigationPoints || 0).toLocaleString()}
-                                    </p>
-                                </div>
-                                {projectSummaryData.irrigationByType && (
-                                    <div>
-                                        <p className="text-blue-200">{t('ประเภทระบบ:')}</p>
-                                        <div className="text-xs text-gray-300">
-                                            {projectSummaryData.irrigationByType.sprinkler > 0 && (
-                                                <p>• {t('สปริงเกลอร์')}: {projectSummaryData.irrigationByType.sprinkler}</p>
-                                            )}
-                                            {projectSummaryData.irrigationByType.dripTape > 0 && (
-                                                <p>• {t('เทปหยด')}: {projectSummaryData.irrigationByType.dripTape}</p>
-                                            )}
-                                            {projectSummaryData.irrigationByType.pivot > 0 && (
-                                                <p>• {t('ปิโวต์')}: {projectSummaryData.irrigationByType.pivot}</p>
-                                            )}
-                                            {projectSummaryData.irrigationByType.waterJetTape > 0 && (
-                                                <p>• {t('เทปน้ำพุ่ง')}: {projectSummaryData.irrigationByType.waterJetTape}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
             <div className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 p-4">
                 <h2 className="mb-2 text-lg font-bold text-white">
                     🎯 {t('ข้อมูลสำคัญ')}
@@ -687,10 +702,18 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     return input.waterPerTreeLiters.toFixed(1);
                                 } else if (projectMode === 'greenhouse') {
                                     // สำหรับ greenhouse mode ใช้ข้อมูลจาก greenhouse data
-                                    if (greenhouseData && activeZone) {
-                                        const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                                        if (currentPlot) {
-                                            return currentPlot.production.waterRequirementPerIrrigation.toFixed(1);
+                                
+                                    return (input.waterPerTreeLiters.toLocaleString(undefined, {
+                                        minimumFractionDigits: 0,
+                                        maximumFractionDigits: 2,
+                                    }));
+                                    
+                                } else if (projectMode === 'field-crop') {
+                                    // สำหรับ field-crop mode ใช้ข้อมูลจาก field crop data flow rates
+                                    if (fieldCropData && activeZone) {
+                                        const currentZone = fieldCropData.zones.info.find((z: any) => z.id === activeZone.id);
+                                        if (currentZone?.flowRates?.lateral) {
+                                            return currentZone.flowRates.lateral.toFixed(1);
                                         }
                                     }
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);
@@ -709,14 +732,24 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         <p
                             className={`text-xl font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
                         >
-                            {actualHeadLoss.total.toFixed(1)} m
+                            {(() => {
+                                // สำหรับ greenhouse mode ใช้เฉพาะท่อเมนหลัก + ท่อย่อย
+                                if (projectMode === 'greenhouse') {
+                                    const greenhouseTotalHeadLoss = (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
+                                    return greenhouseTotalHeadLoss.toFixed(1);
+                                }
+                                // สำหรับ mode อื่นๆ ใช้ค่าเดิม
+                                return actualHeadLoss.total.toFixed(1);
+                            })()} m
                         </p>
                         <p className="text-xs text-green-100">
-                            {systemPerformance.headLossStatus === 'good'
-                                ? t('เหมาะสม')
-                                : systemPerformance.headLossStatus === 'warning'
-                                  ? t('ค่อนข้างสูง')
-                                  : t('สูงเกินไป')}
+                            {projectMode === 'greenhouse' 
+                                ? t('ท่อเมนหลัก + ท่อย่อย')
+                                : systemPerformance.headLossStatus === 'good'
+                                  ? t('เหมาะสม')
+                                  : systemPerformance.headLossStatus === 'warning'
+                                    ? t('ค่อนข้างสูง')
+                                    : t('สูงเกินไป')}
                         </p>
                     </div>
                     <div className="text-center">
@@ -778,36 +811,25 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             💧 {t('ความต้องการน้ำทั้งโซน')}
                         </h3>
                         <p className="text-lg font-bold">
-                            {results.totalWaterRequiredLPM.toLocaleString(undefined, {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 2,
-                            })}{' '}
-                            {t('ลิตร/นาที')}
+                            {(() => {
+                                // Always use the correct calculation: sprinkler count × water per sprinkler
+                                const totalWaterRequirement = input.totalTrees * input.waterPerTreeLiters;
+                                return `${totalWaterRequirement.toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 2,
+                                })} ${t('ลิตร/นาที')}`;
+                            })()}
                         </p>
                         <div className="mt-1 space-y-1 text-sm text-gray-300">
                             <p>{t('ความต้องการน้ำทั้งโซน:')}</p>
-                            <p>
-                                {input.waterPerTreeLiters.toLocaleString(undefined, {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 2,
-                                })}{' '}
-                                {t('ลิตร/นาที')} {t('(จาก input)')}
-                            </p>
-                            <p>
-                                {t('หัวฉีดละ')}{' '}
-                                {results.waterPerSprinklerLPM.toLocaleString(undefined, {
-                                    minimumFractionDigits: 0,
-                                    maximumFractionDigits: 2,
-                                })}{' '}
-                                {t('ลิตร/นาที')}
-                            </p>
                             <p className="text-xs text-blue-300">
-                                {t('ค่าจาก input โดยตรง:')}{' '}
-                                {input.waterPerTreeLiters.toLocaleString(undefined, {
+                                {t('คำนวณจาก:')} {input.totalTrees} {t('หัวฉีด')} × {input.waterPerTreeLiters.toLocaleString(undefined, {
                                     minimumFractionDigits: 0,
                                     maximumFractionDigits: 2,
-                                })}{' '}
-                                {t('ลิตร/นาที')}
+                                })} {t('ลิตร/นาที/หัว')} = {(input.totalTrees * input.waterPerTreeLiters).toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 2,
+                                })} {t('ลิตร/นาที')}
                             </p>
                         </div>
                     </div>
@@ -819,46 +841,13 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </h3>
                         <p className="text-lg font-bold">
                             {(() => {
-                                if (projectMode === 'garden' && gardenStats && activeZone) {
-                                    const currentZone = gardenStats.zones.find(
-                                        (z: any) => z.zoneId === activeZone.id
-                                    );
-                                    if (currentZone) {
-                                        return `${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                    }
-                                } else if (projectMode === 'greenhouse' && greenhouseData && activeZone) {
-                                    const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                                    if (currentPlot && currentPlot.production?.waterCalculation) {
-                                        const waterCalc = currentPlot.production.waterCalculation;
-                                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
-                                        return `${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                    }
-                                }
-                                return `${results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                // Always use the input value for consistency
+                                return `${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                             })()}
                         </p>
                         <div className="mt-2 space-y-1 text-sm text-gray-300">
                             <p className="text-xs text-blue-300">
-                                {projectMode === 'garden' && gardenStats && activeZone
-                                    ? (() => {
-                                          const currentZone = gardenStats.zones.find(
-                                              (z: any) => z.zoneId === activeZone.id
-                                          );
-                                          return currentZone
-                                              ? `${t('ค่าจาก garden zone:')} ${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`
-                                              : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                      })()
-                                    : projectMode === 'greenhouse' && greenhouseData && activeZone
-                                      ? (() => {
-                                            const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                                            if (currentPlot && currentPlot.production?.waterCalculation) {
-                                                const waterCalc = currentPlot.production.waterCalculation;
-                                                const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
-                                                return `${t('ค่าจาก greenhouse plot:')} ${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                            }
-                                            return `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                        })()
-                                      : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
+                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
                             </p>
                         </div>
                         {selectedSprinkler && (
@@ -885,39 +874,88 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             ⚡ {t('อัตราการไหลแต่ละท่อ')}
                         </h3>
                         <div className="text-sm">
-                            <p>
-                                {t('ท่อย่อย:')}{' '}
-                                <span className="font-bold text-purple-300">
-                                    {results.flows.branch.toLocaleString(undefined, {
-                                        minimumFractionDigits: 0,
-                                        maximumFractionDigits: 2,
-                                    })}{' '}
-                                    {t('LPM')}
-                                </span>
-                            </p>
-                            {results.hasValidSecondaryPipe && (
-                                <p>
-                                    {t('ท่อรอง:')}{' '}
-                                    <span className="font-bold text-orange-300">
-                                        {results.flows.secondary.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                        })}{' '}
-                                        {t('LPM')}
-                                    </span>
-                                </p>
-                            )}
-                            {results.hasValidMainPipe && (
-                                <p>
-                                    {t('ท่อหลัก:')}{' '}
-                                    <span className="font-bold text-cyan-300">
-                                        {results.flows.main.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                        })}{' '}
-                                        {t('LPM')}
-                                    </span>
-                                </p>
+                            {projectMode === 'field-crop' && fieldCropData && activeZone ? (
+                                (() => {
+                                    const currentZone = fieldCropData.zones.info.find((z: any) => z.id === activeZone.id);
+                                    if (currentZone?.flowRates) {
+                                        return (
+                                            <>
+                                                <p>
+                                                    {t('ท่อย่อย:')}{' '}
+                                                    <span className="font-bold text-purple-300">
+                                                        {currentZone.flowRates.lateral.toLocaleString(undefined, {
+                                                            minimumFractionDigits: 0,
+                                                            maximumFractionDigits: 2,
+                                                        })}{' '}
+                                                        {t('LPM')}
+                                                    </span>
+                                                </p>
+                                                {currentZone.flowRates.submain > 0 && (
+                                                    <p>
+                                                        {t('ท่อรอง:')}{' '}
+                                                        <span className="font-bold text-orange-300">
+                                                            {currentZone.flowRates.submain.toLocaleString(undefined, {
+                                                                minimumFractionDigits: 0,
+                                                                maximumFractionDigits: 2,
+                                                            })}{' '}
+                                                            {t('LPM')}
+                                                        </span>
+                                                    </p>
+                                                )}
+                                                {currentZone.flowRates.main > 0 && (
+                                                    <p>
+                                                        {t('ท่อหลัก:')}{' '}
+                                                        <span className="font-bold text-cyan-300">
+                                                            {currentZone.flowRates.main.toLocaleString(undefined, {
+                                                                minimumFractionDigits: 0,
+                                                                maximumFractionDigits: 2,
+                                                            })}{' '}
+                                                            {t('LPM')}
+                                                        </span>
+                                                    </p>
+                                                )}
+                                            </>
+                                        );
+                                    }
+                                    return null;
+                                })()
+                            ) : (
+                                <>
+                                    <p>
+                                        {t('ท่อย่อย:')}{' '}
+                                        <span className="font-bold text-purple-300">
+                                            {results.flows.branch.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            })}{' '}
+                                            {t('LPM')}
+                                        </span>
+                                    </p>
+                                    {results.hasValidSecondaryPipe && (
+                                        <p>
+                                            {t('ท่อรอง:')}{' '}
+                                            <span className="font-bold text-orange-300">
+                                                {results.flows.secondary.toLocaleString(undefined, {
+                                                    minimumFractionDigits: 0,
+                                                    maximumFractionDigits: 2,
+                                                })}{' '}
+                                                {t('LPM')}
+                                            </span>
+                                        </p>
+                                    )}
+                                    {results.hasValidMainPipe && (
+                                        <p>
+                                            {t('ท่อหลัก:')}{' '}
+                                            <span className="font-bold text-cyan-300">
+                                                {results.flows.main.toLocaleString(undefined, {
+                                                    minimumFractionDigits: 0,
+                                                    maximumFractionDigits: 2,
+                                                })}{' '}
+                                                {t('LPM')}
+                                            </span>
+                                        </p>
+                                    )}
+                                </>
                             )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">{t('ตามการออกแบบระบบ')}</p>
@@ -949,7 +987,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                 </span>
                             </div>
 
-                            {results.hasValidSecondaryPipe && actualHeadLoss.secondary > 0 && (
+                            {results.hasValidSecondaryPipe && actualHeadLoss.secondary > 0 && projectMode !== 'greenhouse' && (
                                 <div className="flex justify-between">
                                     <span>{t('ท่อรอง:')}</span>
                                     <span className="font-bold text-gray-50">
@@ -961,7 +999,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     </span>
                                 </div>
                             )}
-                            {results.hasValidMainPipe && actualHeadLoss.main > 0 && (
+                            {((results.hasValidMainPipe && actualHeadLoss.main > 0) || (projectMode === 'greenhouse' && actualHeadLoss.main > 0)) && (
                                 <div className="flex justify-between">
                                     <span>{t('ท่อหลัก:')}</span>
                                     <span className="font-bold text-gray-50">
@@ -973,7 +1011,7 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     </span>
                                 </div>
                             )}
-                            {results.hasValidEmitterPipe && actualHeadLoss.emitter > 0 && (
+                            {results.hasValidEmitterPipe && actualHeadLoss.emitter > 0 && projectMode !== 'greenhouse' && (
                                 <div className="flex justify-between">
                                     <span>{t('ท่อย่อยแยก:')}</span>
                                     <span className="font-bold text-gray-50">
@@ -991,10 +1029,21 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     <span
                                         className={`font-bold ${getStatusColor(systemPerformance.headLossStatus)}`}
                                     >
-                                        {(actualHeadLoss.total + sprinklerHeadLoss).toLocaleString(
-                                            undefined,
-                                            { minimumFractionDigits: 0, maximumFractionDigits: 2 }
-                                        )}{' '}
+                                        {(() => {
+                                            // สำหรับ greenhouse mode ใช้เฉพาะท่อเมนหลัก + ท่อย่อย + หัวฉีด
+                                            if (projectMode === 'greenhouse') {
+                                                const greenhouseTotalHeadLoss = (actualHeadLoss.main || 0) + (actualHeadLoss.branch || 0);
+                                                return (greenhouseTotalHeadLoss + sprinklerHeadLoss).toLocaleString(
+                                                    undefined,
+                                                    { minimumFractionDigits: 0, maximumFractionDigits: 2 }
+                                                );
+                                            }
+                                            // สำหรับ mode อื่นๆ ใช้ค่าเดิม
+                                            return (actualHeadLoss.total + sprinklerHeadLoss).toLocaleString(
+                                                undefined,
+                                                { minimumFractionDigits: 0, maximumFractionDigits: 2 }
+                                            );
+                                        })()}{' '}
                                         m
                                     </span>
                                 </div>

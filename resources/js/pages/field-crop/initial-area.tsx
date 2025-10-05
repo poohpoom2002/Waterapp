@@ -1146,12 +1146,13 @@ export default function InitialArea({
                 fillColor: obstacleColors.fill,
                 strokeColor: obstacleColors.stroke,
                 fillOpacity: 0.4,
-                strokeOpacity: 1,
                 strokeWeight: 2,
+                strokeOpacity: 1,
                 editable: false,
                 draggable: false,
                 clickable: true,
-                map: map
+                map: map,
+                zIndex: 1600
             });
 
             newObstacleOverlays.push(polygon);
@@ -2333,6 +2334,17 @@ export default function InitialArea({
 
     const handleStepClick = (step: StepData) => {
         if (step.id === activeStep) return;
+        
+        // Check if all 4 steps are completed
+        const allStepsCompleted = completed.length >= 4 && completed.includes(1) && completed.includes(2) && completed.includes(3) && completed.includes(4);
+        
+        // If all steps are completed, allow free navigation
+        if (allStepsCompleted) {
+            navigateToStep(step);
+            return;
+        }
+        
+        // Original logic for incomplete steps
         if (completed.includes(step.id)) { navigateToStep(step); return; }
         if (step.id > activeStep && completed.includes(step.id - 1)) { navigateToStep(step); return; }
         if (step.id === 1) navigateToStep(step);

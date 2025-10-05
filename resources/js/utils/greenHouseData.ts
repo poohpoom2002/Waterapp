@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // @/pages/utils/greenHouseData.ts - Enhanced with comprehensive water calculation support
 
-import { getCropByValue } from '@/pages/utils/cropData';
+import { getCropByValue } from '@/pages/components/Greenhouse/CropData';
 import {
     calculatePlotBasedWaterRequirements,
     PlotBasedWaterSummary,
@@ -17,6 +17,18 @@ export const PIXELS_PER_METER = 25;
 
 // --- Enhanced Interfaces and Type Definitions ---
 
+// Fittings breakdown interface (reused pattern from field-crop)
+export interface FittingsBreakdown {
+    twoWay: number;
+    threeWay: number;
+    fourWay: number;
+    breakdown: {
+        main: { twoWay: number; threeWay: number; fourWay: number };
+        submain: { twoWay: number; threeWay: number; fourWay: number };
+        lateral: { twoWay: number; threeWay: number; fourWay: number };
+    };
+}
+
 export interface Point {
     x: number;
     y: number;
@@ -24,11 +36,12 @@ export interface Point {
 
 export interface Shape {
     id: string;
-    type: 'greenhouse' | 'plot' | 'walkway' | 'water-source' | 'measurement';
+    type: 'greenhouse' | 'plot' | 'walkway' | 'water-source' | 'measurement' | 'fertilizer-area';
     points: Point[];
     color: string;
     fillColor: string;
     name: string;
+    measurement?: { distance: number; unit: string };
     cropType?: string;
     area?: number; // in square meters
 }
@@ -42,12 +55,58 @@ export interface IrrigationElement {
         | 'solenoid-valve'
         | 'ball-valve'
         | 'sprinkler'
-        | 'drip-line';
+        | 'drip-line'
+        | 'water-tank'
+        | 'fertilizer-machine';
     points: Point[];
     color: string;
     width?: number;
     radius?: number; // in pixels
+    angle?: number;
     spacing?: number; // in meters
+    capacityLiters?: number;
+}
+
+/**
+ * Greenhouse Summary Data interface for compatibility with summary page
+ */
+export interface GreenhouseSummaryData {
+    // From crop selection
+    selectedCrops: string[];
+
+    // From area input
+    planningMethod: 'draw' | 'import';
+
+    // From planner
+    shapes: Shape[];
+    canvasData?: string; // Base64 image of the canvas
+
+    // From irrigation selection
+    irrigationMethod: 'mini-sprinkler' | 'drip' | 'mixed';
+
+    // From irrigation map
+    irrigationElements?: IrrigationElement[];
+    irrigationCanvasData?: string; // Base64 image of irrigation design
+
+    // Flow rate settings from map
+    sprinklerFlowRate?: number; // L/min per sprinkler
+    dripEmitterFlowRate?: number; // L/min per drip emitter
+    
+    // Pressure settings
+    sprinklerPressure?: number; // Bar for sprinklers
+    dripPressure?: number; // Bar for drip emitters
+    
+    // Sprinkler settings
+    sprinklerRadius?: number; // Radius in meters for sprinklers
+
+    // Calculated data
+    greenhouseArea?: number;
+    plotCount?: number;
+    totalPlantingArea?: number;
+
+    // Timestamps
+    createdAt?: string;
+    updatedAt?: string;
 }
 
 /**
@@ -648,6 +707,47 @@ export const calculateAllGreenhouseStats = (rawData: any): EnhancedGreenhousePla
     };
 };
 
+// --- Data Conversion Functions ---
+
+/**
+ * Convert GreenhouseSummaryData to raw data format for calculateAllGreenhouseStats
+ */
+export const convertSummaryDataToRawData = (summaryData: GreenhouseSummaryData): any => {
+    return {
+        shapes: summaryData.shapes || [],
+        irrigationElements: summaryData.irrigationElements || [],
+        selectedCrops: summaryData.selectedCrops || [],
+        irrigationMethod: summaryData.irrigationMethod || 'mini-sprinkler',
+        planningMethod: summaryData.planningMethod || 'draw',
+        createdAt: summaryData.createdAt,
+        updatedAt: summaryData.updatedAt || new Date().toISOString(),
+        // Additional settings from summary
+        sprinklerFlowRate: summaryData.sprinklerFlowRate,
+        dripEmitterFlowRate: summaryData.dripEmitterFlowRate,
+        sprinklerPressure: summaryData.sprinklerPressure,
+        dripPressure: summaryData.dripPressure,
+        sprinklerRadius: summaryData.sprinklerRadius,
+    };
+};
+
+/**
+ * Convert EnhancedGreenhousePlanningData to GreenhouseSummaryData format
+ */
+export const convertEnhancedDataToSummaryData = (enhancedData: EnhancedGreenhousePlanningData): GreenhouseSummaryData => {
+    return {
+        selectedCrops: enhancedData.rawData.selectedCrops || [],
+        planningMethod: enhancedData.projectInfo.planningMethod,
+        shapes: enhancedData.rawData.shapes || [],
+        irrigationMethod: enhancedData.projectInfo.irrigationMethod,
+        irrigationElements: enhancedData.rawData.irrigationElements || [],
+        greenhouseArea: enhancedData.summary.totalGreenhouseArea,
+        plotCount: enhancedData.summary.plotStats.length,
+        totalPlantingArea: enhancedData.summary.totalEffectivePlantingArea,
+        createdAt: enhancedData.projectInfo.createdAt,
+        updatedAt: enhancedData.projectInfo.updatedAt,
+    };
+};
+
 // --- Enhanced Local Storage Handlers ---
 
 const ENHANCED_GREENHOUSE_STORAGE_KEY = 'enhancedGreenhouseData_v2';
@@ -801,4 +901,6 @@ export default {
     formatWaterVolume,
     generateWaterRecommendations,
     getWaterEfficiencyRating,
+    convertSummaryDataToRawData,
+    convertEnhancedDataToSummaryData,
 };

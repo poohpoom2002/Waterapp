@@ -485,12 +485,23 @@ export default function Product() {
 
         // Use the actual sprinkler count from the field crop data
         const totalSprinklers = zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10));
+        
+        console.log(`🔍 Zone ${zone.id} sprinkler count calculation:`, {
+            zoneSprinklerCount: zone.sprinklerCount,
+            totalPlantingPoints: zone.totalPlantingPoints,
+            calculatedTotalSprinklers: totalSprinklers,
+            fallbackCalculation: Math.max(1, Math.ceil(zone.totalPlantingPoints / 10))
+        });
 
-        // Calculate water per sprinkler based on irrigation settings (flow rate per sprinkler)
+        // Calculate water per sprinkler based on calculated flow rates from field crop summary
         let waterPerSprinklerLPM = 2.0; // Default fallback
         
-        // Try to get the actual flow rate per sprinkler from irrigation settings
-        if (fieldData.irrigation?.settings) {
+        // First priority: Use calculated flow rates from field crop summary
+        if (zone.flowRates && zone.flowRates.lateral > 0 && zone.flowRates.sprinklerCount > 0) {
+            waterPerSprinklerLPM = zone.flowRates.lateral / zone.flowRates.sprinklerCount;
+            console.log(`🔍 Using calculated flow rate for zone ${zone.id}: ${zone.flowRates.lateral} L/min ÷ ${zone.flowRates.sprinklerCount} sprinklers = ${waterPerSprinklerLPM} L/min per sprinkler`);
+        } else if (fieldData.irrigation?.settings) {
+            // Fallback: Try to get the actual flow rate per sprinkler from irrigation settings
             const irrigationSettings = fieldData.irrigation.settings;
             // Look for sprinkler flow rate in irrigation settings
             if (irrigationSettings.sprinkler_system?.flow) {
@@ -500,7 +511,7 @@ export default function Product() {
             }
         }
         
-        // Fallback: if no irrigation settings, try to calculate from total flow and sprinkler count
+        // Final fallback: if no irrigation settings, try to calculate from total flow and sprinkler count
         if (waterPerSprinklerLPM === 2.0 && zone.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
             // This is a fallback calculation - should not be the primary method
             const avgIrrigationTimeHours = 0.5;
@@ -516,7 +527,8 @@ export default function Product() {
             waterPerSprinklerLPM,
             areaInRai,
             irrigationSettings: fieldData.irrigation?.settings,
-            hasIrrigationSettings: !!fieldData.irrigation?.settings
+            hasIrrigationSettings: !!fieldData.irrigation?.settings,
+            pipeStats: zone.pipeStats
         });
 
         const zonePipeStats = zone.pipeStats;

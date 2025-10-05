@@ -42,6 +42,12 @@ export interface FieldCropData {
                     totalCount: number;
                 };
             };
+            flowRates?: {
+                main: number;
+                submain: number;
+                lateral: number;
+                sprinklerCount: number;
+            } | null;
         }>;
     };
     pipes: {
@@ -364,7 +370,7 @@ export const isPointInPolygonEnhanced = (point: [number, number], polygon: any[]
     return inside;
 };
 
-export const calculateEnhancedFieldStats = (summaryData: any, calculatedZoneSummaries?: Record<string, any>, zonePipeStatsMap?: Map<string, any>): FieldCropData => {
+export const calculateEnhancedFieldStats = (summaryData: any, calculatedZoneSummaries?: Record<string, any>, zonePipeStatsMap?: Map<string, any>, zoneFlowRates?: Record<string, any>): FieldCropData => {
     const zones = Array.isArray(summaryData.zones) ? summaryData.zones : [];
     const pipes = Array.isArray(summaryData.pipes) ? summaryData.pipes : [];
     const irrigationPoints = Array.isArray(summaryData.irrigationPoints)
@@ -422,6 +428,24 @@ export const calculateEnhancedFieldStats = (summaryData: any, calculatedZoneSumm
         } else {
             // Fallback to enhanced calculation if no calculated pipe stats available
             zonePipeStats = calculateEnhancedZonePipeStats(pipes, zone.id.toString(), zones);
+        }
+        
+        // Use calculated flow rates if available (more accurate)
+        let zoneFlowData: {
+            main: number;
+            submain: number;
+            lateral: number;
+            sprinklerCount: number;
+        } | null = null;
+        if (zoneFlowRates && zoneFlowRates[zone.id.toString()]) {
+            const flowData = zoneFlowRates[zone.id.toString()];
+            zoneFlowData = {
+                main: flowData.main.flowLMin || 0,
+                submain: flowData.submain.flowLMin || 0,
+                lateral: flowData.lateral.flowLMin || 0,
+                sprinklerCount: flowData.lateral.sprinklers || 0
+            };
+            console.log(`🔍 Using calculated flow rates for zone ${zone.id}:`, zoneFlowData);
         }
         
         let totalPlantingPoints = 0;
@@ -483,6 +507,7 @@ export const calculateEnhancedFieldStats = (summaryData: any, calculatedZoneSumm
             totalPlantingPoints: totalPlantingPoints,
             totalWaterRequirementPerDay: waterRequirementPerDay,
             pipeStats: zonePipeStats,
+            flowRates: zoneFlowData,
         };
     });
 
@@ -521,6 +546,14 @@ export const calculateEnhancedFieldStats = (summaryData: any, calculatedZoneSumm
         0
     );
     const totalArea = summaryData.fieldAreaSize || 0;
+
+    console.log('🔍 Enhanced field crop data calculation completed:', {
+        totalArea,
+        zonesCount: enhancedZones.length,
+        irrigationSettings: summaryData.irrigationSettings,
+        pipeStatsAvailable: !!zonePipeStatsMap,
+        pipeStatsMapSize: zonePipeStatsMap?.size || 0
+    });
 
     const result = {
         area: {

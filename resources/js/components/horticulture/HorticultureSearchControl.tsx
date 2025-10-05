@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
     FaSearch,
@@ -107,6 +109,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                 const parsed = JSON.parse(stored);
                 setRecentSearches(parsed.slice(0, 5));
             } catch (e) {
+                console.error('Error parsing recent map searches:', e);
             }
         }
     }, []);
@@ -489,7 +492,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                     geometry: place.geometry,
                                     types: place.types,
                                     rating: place.rating,
-                                    photos: place.photos,
+                                    photos: place.photos as google.maps.places.PlacePhoto[],
                                     vicinity: place.vicinity,
                                     business_status: place.business_status,
                                 })
@@ -528,7 +531,7 @@ const EnhancedHorticultureSearchControl: React.FC<EnhancedHorticultureSearchCont
                                     geometry: place.geometry,
                                     types: place.types,
                                     rating: place.rating,
-                                    photos: place.photos,
+                                    photos: place.photos as google.maps.places.PlacePhoto[],
                                     vicinity: place.vicinity,
                                     business_status: place.business_status,
                                 })

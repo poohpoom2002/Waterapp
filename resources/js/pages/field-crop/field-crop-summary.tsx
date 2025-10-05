@@ -643,21 +643,37 @@ const captureMapImage = async (
     projectType: string = 'field-crop'
 ): Promise<string | null> => {
     try {
-        // Starting map image capture
+        console.log('🔍 Starting map image capture...');
+        console.log('🔍 Map element:', mapElement);
+        console.log('🔍 Map element dimensions:', {
+            width: mapElement.offsetWidth,
+            height: mapElement.offsetHeight
+        });
+        
+        // Check localStorage usage before capture
+        const storageUsage = checkLocalStorageUsage();
+        console.log('🔍 localStorage usage:', {
+            used: `${Math.round(storageUsage.used / 1024)} KB`,
+            total: `${Math.round(storageUsage.total / 1024)} KB`,
+            percentage: `${storageUsage.percentage.toFixed(1)}%`
+        });
 
         // Check for html2canvas availability
         let html2canvas;
         try {
             html2canvas = (await import('html2canvas')).default;
-        } catch {
+            console.log('✅ html2canvas loaded successfully');
+        } catch (error) {
             // html2canvas not available
-            console.error('❌ html2canvas not available');
+            console.error('❌ html2canvas not available:', error);
             return null;
         }
 
         // Wait a bit more to ensure Google Maps is fully rendered
+        console.log('🔍 Waiting for Google Maps to fully render...');
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
+        console.log('🔍 Starting html2canvas conversion...');
         const canvas = await html2canvas(mapElement, {
             useCORS: true,
             allowTaint: true,
@@ -665,7 +681,7 @@ const captureMapImage = async (
             width: mapElement.offsetWidth,
             height: mapElement.offsetHeight,
             backgroundColor: '#1f2937',
-            logging: false, // Reduce console noise
+            logging: true, // Enable logging for debugging
             ignoreElements: (element) => {
                 // Ignore certain elements that might cause issues
                 return (
@@ -675,7 +691,47 @@ const captureMapImage = async (
             },
         });
 
-        const imageDataUrl = canvas.toDataURL('image/png', 0.9);
+        console.log('🔍 Canvas created, converting to data URL...');
+        
+        // Try different compression levels to fit within localStorage quota
+        let imageDataUrl = canvas.toDataURL('image/jpeg', 0.7); // Start with JPEG at 70% quality
+        console.log('🔍 Image data URL created (JPEG 70%), length:', imageDataUrl.length);
+        
+        // If still too large, try more compression
+        if (imageDataUrl.length > 1000000) { // If larger than 1MB
+            console.log('🔍 Image too large, trying higher compression...');
+            imageDataUrl = canvas.toDataURL('image/jpeg', 0.5); // 50% quality
+            console.log('🔍 Image data URL created (JPEG 50%), length:', imageDataUrl.length);
+        }
+        
+        // If still too large, try even more compression
+        if (imageDataUrl.length > 1000000) { // If still larger than 1MB
+            console.log('🔍 Image still too large, trying maximum compression...');
+            imageDataUrl = canvas.toDataURL('image/jpeg', 0.3); // 30% quality
+            console.log('🔍 Image data URL created (JPEG 30%), length:', imageDataUrl.length);
+        }
+
+        // Clean up old images to free up localStorage space
+        const oldImageKeys = [
+            'projectMapImage',
+            'fieldCropPlanImage', 
+            'field-cropPlanImage',
+            'mapCaptureImage',
+            'gardenPlanImage',
+            'homeGardenPlanImage',
+            'greenhousePlanImage',
+            'horticulturePlanImage'
+        ];
+        
+        console.log('🔍 Cleaning up old images to free localStorage space...');
+        for (const key of oldImageKeys) {
+            try {
+                localStorage.removeItem(key);
+                console.log(`🗑️ Removed old image: ${key}`);
+            } catch (error) {
+                console.warn(`⚠️ Failed to remove old image ${key}:`, error);
+            }
+        }
 
         // Enhanced saving with multiple keys and validation
         const saveKeys = [
@@ -693,6 +749,25 @@ const captureMapImage = async (
                 saveSuccess = true;
             } catch (error) {
                 console.warn(`⚠️ Failed to save image with key ${key}:`, error);
+                
+                // If still failing due to quota, try to clear more localStorage
+                if (error instanceof Error && error.name === 'QuotaExceededError') {
+                    console.log('🔍 Quota exceeded, trying to clear more localStorage...');
+                    try {
+                        // Clear some other non-essential data
+                        const keysToRemove = ['projectMapMetadata', 'tempData', 'cache'];
+                        for (const keyToRemove of keysToRemove) {
+                            localStorage.removeItem(keyToRemove);
+                        }
+                        
+                        // Try saving again
+                        localStorage.setItem(key, imageDataUrl);
+                        dbg(`✅ Image saved with key: ${key} (after cleanup)`);
+                        saveSuccess = true;
+                    } catch (retryError) {
+                        console.error(`❌ Still failed to save after cleanup:`, retryError);
+                    }
+                }
             }
         }
 
@@ -726,6 +801,22 @@ const captureMapImage = async (
         console.error('❌ Error capturing map image:', error);
         return null;
     }
+};
+
+// Function to check localStorage usage
+const checkLocalStorageUsage = (): { used: number; total: number; percentage: number } => {
+    let used = 0;
+    for (const key in localStorage) {
+        if (localStorage.hasOwnProperty(key)) {
+            used += localStorage[key].length;
+        }
+    }
+    
+    // Estimate total available (usually 5-10MB)
+    const total = 5 * 1024 * 1024; // 5MB estimate
+    const percentage = (used / total) * 100;
+    
+    return { used, total, percentage };
 };
 
 // Enhanced function to verify image was saved correctly
@@ -3216,13 +3307,13 @@ const buildZoneConnectivityLongestFlows = (
     const perSprinkler = flowSettings?.sprinkler_system?.flow ?? 0;
     
     // Debug logging for flow settings
-    if (perSprinkler === 0) {
-        console.log(`🔍 Flow settings debug:`, {
-            flowSettings,
-            perSprinkler,
-            sprinklerSystemFlow: flowSettings?.sprinkler_system?.flow
-        });
-    }
+    console.log(`🔍 Zone ${zone.id} flow settings debug:`, {
+        flowSettings,
+        perSprinkler,
+        sprinklerSystemFlow: flowSettings?.sprinkler_system?.flow,
+        hasFlowSettings: !!flowSettings,
+        flowSettingsKeys: flowSettings ? Object.keys(flowSettings) : []
+    });
     
     // ฟังก์ชันสำหรับหาสปริงเกลอร์ที่เชื่อมต่อกับท่อย่อยแบบโหมดระหว่างแถว
     const findNearbyConnectedSprinklersBetweenRows = (
@@ -4168,6 +4259,7 @@ export default function FieldCropSummary() {
     const handleCaptureMapImage = useCallback(async () => {
         if (mapImageCaptured || isCapturingImage) return;
 
+        console.log('🔍 Starting image capture process...');
         setIsCapturingImage(true);
         setCaptureStatus(t('Capturing...'));
 
@@ -4177,38 +4269,68 @@ export default function FieldCropSummary() {
             // Try different methods to get the map element
             if (googleMapRef.current) {
                 mapElement = googleMapRef.current.getDiv();
+                console.log('🔍 Found map element via googleMapRef');
             } else if (mapContainerRef.current) {
                 mapElement = mapContainerRef.current;
+                console.log('🔍 Found map element via mapContainerRef');
             } else {
                 // Fallback: try to find map element by class or ID
                 mapElement =
                     (document.querySelector('.google-maps-container') as HTMLElement) ||
                     (document.querySelector('[id*="map"]') as HTMLElement) ||
-                    (document.querySelector('[class*="map"]') as HTMLElement);
+                    (document.querySelector('[class*="map"]') as HTMLElement) ||
+                    (document.querySelector('.google-map-container') as HTMLElement) ||
+                    (document.querySelector('#map') as HTMLElement) ||
+                    (document.querySelector('.map') as HTMLElement);
+                console.log('🔍 Found map element via querySelector:', !!mapElement);
+                
+                // If still not found, try to find any div with Google Maps content
+                if (!mapElement) {
+                    const allDivs = document.querySelectorAll('div');
+                    for (const div of allDivs) {
+                        if (div.innerHTML.includes('google') || div.innerHTML.includes('maps')) {
+                            mapElement = div as HTMLElement;
+                            console.log('🔍 Found map element via content search');
+                            break;
+                        }
+                    }
+                }
             }
 
             if (mapElement) {
+                console.log('🔍 Map element found, starting capture...');
                 setCaptureStatus(t('Processing...'));
                 const imageUrl = await captureMapImage(mapElement, 'field-crop');
 
                 if (imageUrl) {
+                    console.log('🔍 Image captured successfully, verifying save...');
                     const isVerified = verifyImageSave();
                     if (isVerified) {
                         setMapImageCaptured(true);
                         setCaptureStatus(t('Successfully saved'));
+                        console.log('✅ Image capture and save completed successfully');
 
                         // Clear status after delay
                         setTimeout(() => setCaptureStatus(''), 3000);
                     } else {
+                        console.error('❌ Image verification failed');
                         setCaptureStatus(t('Error'));
                         setTimeout(() => setCaptureStatus(''), 3000);
                     }
                 } else {
+                    console.error('❌ Image capture failed - no image URL returned');
                     setCaptureStatus(t('Error'));
                     setTimeout(() => setCaptureStatus(''), 3000);
                 }
             } else {
-                setCaptureStatus(t('Error'));
+                console.error('❌ No map element found');
+                console.error('❌ Available elements:', {
+                    googleMapRef: !!googleMapRef.current,
+                    mapContainerRef: !!mapContainerRef.current,
+                    querySelector: !!document.querySelector('.google-maps-container'),
+                    allDivs: document.querySelectorAll('div').length
+                });
+                setCaptureStatus(t('Error: Map not found'));
                 setTimeout(() => setCaptureStatus(''), 3000);
             }
         } catch (error) {
@@ -4795,8 +4917,30 @@ export default function FieldCropSummary() {
             // Save enhanced field crop data for product page
             if (summaryData) {
                 try {
-                    // Pass the calculated zone summaries and pipe statistics to get accurate data
-                    const enhancedData = calculateEnhancedFieldStats(summaryData, newZoneSummaries, zonePipeStatsMap);
+                    // Calculate flow rates for each zone to pass to enhanced data
+                    const zoneFlowRates: Record<string, any> = {};
+                    zones.forEach((zone: Zone) => {
+                        try {
+                            // Debug: Log the irrigation settings being passed
+                            console.log(`🔍 Zone ${zone.id} irrigation settings:`, summaryData.irrigationSettings);
+                            
+                            // Use the irrigation settings from the summary data, with fallback to the irrigationSettingsData
+                            const flowSettings = (summaryData.irrigationSettings as Record<string, { flow?: number }>) || irrigationSettingsData || {};
+                            
+                            const zFlows = buildZoneConnectivityLongestFlows(
+                                zone,
+                                actualPipes,
+                                actualIrrigationPoints,
+                                flowSettings
+                            );
+                            zoneFlowRates[zone.id.toString()] = zFlows;
+                        } catch (error) {
+                            console.warn(`Failed to calculate flow rates for zone ${zone.id}:`, error);
+                        }
+                    });
+                    
+                    // Pass the calculated zone summaries, pipe statistics, and flow rates to get accurate data
+                    const enhancedData = calculateEnhancedFieldStats(summaryData, newZoneSummaries, zonePipeStatsMap, zoneFlowRates);
                     console.log('🔍 Saving enhanced field crop data:', enhancedData);
                     saveEnhancedFieldCropData(enhancedData);
                     dbg('✅ Enhanced field crop data saved for product page');
