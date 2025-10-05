@@ -130,6 +130,8 @@ const calculateSprinklerBasedFlow = (
         console.log('- totalSprinklers:', totalSprinklers);
         console.log('- flowPerSprinkler:', flowPerSprinkler);
         console.log('- totalWaterPerMinute:', totalWaterPerMinute);
+        console.log('- input object keys:', Object.keys(input));
+        console.log('- full input object:', input);
         
         // Additional debug for sprinkler count
         if (totalSprinklers === 1) {
@@ -748,11 +750,11 @@ const getFieldCropCalculationData = (): {
             waterPerTreeLiters: fieldCropData.summary.totalWaterRequirementPerDay / fieldCropData.summary.totalPlantingPoints / 60, // Convert to LPM per plant
             numberOfZones: fieldCropData.zones.count,
             sprinklersPerTree: 1, // Default for field-crop
-            longestBranchPipeM: fieldCropData.pipes.stats.lateral.longestLength,
+            longestBranchPipeM: fieldCropData.pipes.stats.lateral.longest,
             totalBranchPipeM: fieldCropData.pipes.stats.lateral.totalLength,
-            longestSecondaryPipeM: fieldCropData.pipes.stats.submain.longestLength,
+            longestSecondaryPipeM: fieldCropData.pipes.stats.submain.longest,
             totalSecondaryPipeM: fieldCropData.pipes.stats.submain.totalLength,
-            longestMainPipeM: fieldCropData.pipes.stats.main.longestLength,
+            longestMainPipeM: fieldCropData.pipes.stats.main.longest,
             totalMainPipeM: fieldCropData.pipes.stats.main.totalLength,
             irrigationTimeMinutes: 30, // Default irrigation time
             staticHeadM: 5, // Default static head

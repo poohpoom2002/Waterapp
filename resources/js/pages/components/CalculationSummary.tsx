@@ -103,26 +103,60 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                 }
             }
 
+            // ลองดึงข้อมูลจาก field_crop_pipe_calculations
+            if (projectMode === 'field-crop') {
+                const fieldCropPipeCalculationsStr = localStorage.getItem('field_crop_pipe_calculations');
+                if (fieldCropPipeCalculationsStr) {
+                    const pipeCalculations = JSON.parse(fieldCropPipeCalculationsStr);
+
+                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
+
+                    const totalHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+
+                    console.log(`🔍 CalculationSummary field-crop Head Loss:`, {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss
+                    });
+
+                    return {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss,
+                    };
+                }
+            }
+
             // ลองดึงข้อมูลจาก garden_pipe_calculations
-            const gardenPipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
-            if (gardenPipeCalculationsStr) {
-                const pipeCalculations = JSON.parse(gardenPipeCalculationsStr);
+            if (projectMode === 'garden') {
+                const gardenPipeCalculationsStr = localStorage.getItem('garden_pipe_calculations');
+                if (gardenPipeCalculationsStr) {
+                    const pipeCalculations = JSON.parse(gardenPipeCalculationsStr);
 
-                const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
-                const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
-                const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
-                const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
+                    const branchHeadLoss = pipeCalculations.branch?.headLoss || 0;
+                    const secondaryHeadLoss = pipeCalculations.secondary?.headLoss || 0;
+                    const mainHeadLoss = pipeCalculations.main?.headLoss || 0;
+                    const emitterHeadLoss = pipeCalculations.emitter?.headLoss || 0;
 
-                const totalHeadLoss =
-                    branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+                    const totalHeadLoss =
+                        branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
 
-                return {
-                    branch: branchHeadLoss,
-                    secondary: secondaryHeadLoss,
-                    main: mainHeadLoss,
-                    emitter: emitterHeadLoss,
-                    total: totalHeadLoss,
-                };
+                    return {
+                        branch: branchHeadLoss,
+                        secondary: secondaryHeadLoss,
+                        main: mainHeadLoss,
+                        emitter: emitterHeadLoss,
+                        total: totalHeadLoss,
+                    };
+                }
             }
         } catch (error) {
             console.error('Error loading pipe calculations from localStorage:', error);
@@ -162,7 +196,22 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
         const mainHeadLoss = actualMainPipe?.headLoss || 0;
         const emitterHeadLoss = actualEmitterPipe?.headLoss || 0;
 
-        const totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+        let totalHeadLoss;
+        if (projectMode === 'greenhouse') {
+            // สำหรับ greenhouse mode: ท่อเมนหลัก + ท่อย่อย
+            totalHeadLoss = mainHeadLoss + branchHeadLoss;
+        } else {
+            // สำหรับ mode อื่นๆ: รวมทุกประเภทท่อ
+            totalHeadLoss = branchHeadLoss + secondaryHeadLoss + mainHeadLoss + emitterHeadLoss;
+        }
+
+        console.log(`🔍 CalculationSummary Head Loss Fallback (${projectMode}):`, {
+            branch: branchHeadLoss,
+            secondary: secondaryHeadLoss,
+            main: mainHeadLoss,
+            emitter: emitterHeadLoss,
+            total: totalHeadLoss
+        });
 
         return {
             branch: branchHeadLoss,
@@ -660,7 +709,13 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                                     }));
                                     
                                 } else if (projectMode === 'field-crop') {
-                                    // สำหรับ field-crop mode ใช้ข้อมูลจาก input
+                                    // สำหรับ field-crop mode ใช้ข้อมูลจาก field crop data flow rates
+                                    if (fieldCropData && activeZone) {
+                                        const currentZone = fieldCropData.zones.info.find((z: any) => z.id === activeZone.id);
+                                        if (currentZone?.flowRates?.lateral) {
+                                            return currentZone.flowRates.lateral.toFixed(1);
+                                        }
+                                    }
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);
                                 } else {
                                     return (results.totalWaterRequiredLPM || 0).toFixed(1);
@@ -756,21 +811,25 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             💧 {t('ความต้องการน้ำทั้งโซน')}
                         </h3>
                         <p className="text-lg font-bold">
-                        {input.waterPerTreeLiters.toLocaleString(undefined, {
+                            {(() => {
+                                // Always use the correct calculation: sprinkler count × water per sprinkler
+                                const totalWaterRequirement = input.totalTrees * input.waterPerTreeLiters;
+                                return `${totalWaterRequirement.toLocaleString(undefined, {
                                     minimumFractionDigits: 0,
                                     maximumFractionDigits: 2,
-                                })}{' '}
-                            {t('ลิตร/นาที')}
+                                })} ${t('ลิตร/นาที')}`;
+                            })()}
                         </p>
                         <div className="mt-1 space-y-1 text-sm text-gray-300">
                             <p>{t('ความต้องการน้ำทั้งโซน:')}</p>
                             <p className="text-xs text-blue-300">
-                                {t('ค่าจาก input โดยตรง:')}{' '}
-                                {input.waterPerTreeLiters.toLocaleString(undefined, {
+                                {t('คำนวณจาก:')} {input.totalTrees} {t('หัวฉีด')} × {input.waterPerTreeLiters.toLocaleString(undefined, {
                                     minimumFractionDigits: 0,
                                     maximumFractionDigits: 2,
-                                })}{' '}
-                                {t('ลิตร/นาที')}
+                                })} {t('ลิตร/นาที/หัว')} = {(input.totalTrees * input.waterPerTreeLiters).toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 2,
+                                })} {t('ลิตร/นาที')}
                             </p>
                         </div>
                     </div>
@@ -782,46 +841,13 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                         </h3>
                         <p className="text-lg font-bold">
                             {(() => {
-                                if (projectMode === 'garden' && gardenStats && activeZone) {
-                                    const currentZone = gardenStats.zones.find(
-                                        (z: any) => z.zoneId === activeZone.id
-                                    );
-                                    if (currentZone) {
-                                        return `${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                    }
-                                } else if (projectMode === 'greenhouse' && greenhouseData && activeZone) {
-                                    const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                                    if (currentPlot && currentPlot.production?.waterCalculation) {
-                                        const waterCalc = currentPlot.production.waterCalculation;
-                                        const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
-                                        return `${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                    }
-                                }
-                                return `${results.waterPerSprinklerLPM.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
+                                // Always use the input value for consistency
+                                return `${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
                             })()}
                         </p>
                         <div className="mt-2 space-y-1 text-sm text-gray-300">
                             <p className="text-xs text-blue-300">
-                                {projectMode === 'garden' && gardenStats && activeZone
-                                    ? (() => {
-                                          const currentZone = gardenStats.zones.find(
-                                              (z: any) => z.zoneId === activeZone.id
-                                          );
-                                          return currentZone
-                                              ? `${t('ค่าจาก garden zone:')} ${currentZone.sprinklerFlowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`
-                                              : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                      })()
-                                    : projectMode === 'greenhouse' && greenhouseData && activeZone
-                                      ? (() => {
-                                            const currentPlot = greenhouseData.summary.plotStats.find((p: any) => p.plotId === activeZone.id);
-                                            if (currentPlot && currentPlot.production?.waterCalculation) {
-                                                const waterCalc = currentPlot.production.waterCalculation;
-                                                const flowRate = waterCalc?.waterPerPlant?.litersPerMinute || 6.0;
-                                                return `${t('ค่าจาก greenhouse plot:')} ${flowRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                            }
-                                            return `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`;
-                                        })()
-                                      : `${t('ค่าจาก input โดยตรง:')} ${input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${t('ลิตร/นาที')}`}
+                                {t('ค่าจาก input โดยตรง:')} {input.waterPerTreeLiters.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} {t('ลิตร/นาที')}
                             </p>
                         </div>
                         {selectedSprinkler && (
@@ -848,39 +874,88 @@ const CalculationSummary: React.FC<CalculationSummaryProps> = ({
                             ⚡ {t('อัตราการไหลแต่ละท่อ')}
                         </h3>
                         <div className="text-sm">
-                            <p>
-                                {t('ท่อย่อย:')}{' '}
-                                <span className="font-bold text-purple-300">
-                                    {results.flows.branch.toLocaleString(undefined, {
-                                        minimumFractionDigits: 0,
-                                        maximumFractionDigits: 2,
-                                    })}{' '}
-                                    {t('LPM')}
-                                </span>
-                            </p>
-                            {results.hasValidSecondaryPipe && (
-                                <p>
-                                    {t('ท่อรอง:')}{' '}
-                                    <span className="font-bold text-orange-300">
-                                        {results.flows.secondary.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                        })}{' '}
-                                        {t('LPM')}
-                                    </span>
-                                </p>
-                            )}
-                            {results.hasValidMainPipe && (
-                                <p>
-                                    {t('ท่อหลัก:')}{' '}
-                                    <span className="font-bold text-cyan-300">
-                                        {results.flows.main.toLocaleString(undefined, {
-                                            minimumFractionDigits: 0,
-                                            maximumFractionDigits: 2,
-                                        })}{' '}
-                                        {t('LPM')}
-                                    </span>
-                                </p>
+                            {projectMode === 'field-crop' && fieldCropData && activeZone ? (
+                                (() => {
+                                    const currentZone = fieldCropData.zones.info.find((z: any) => z.id === activeZone.id);
+                                    if (currentZone?.flowRates) {
+                                        return (
+                                            <>
+                                                <p>
+                                                    {t('ท่อย่อย:')}{' '}
+                                                    <span className="font-bold text-purple-300">
+                                                        {currentZone.flowRates.lateral.toLocaleString(undefined, {
+                                                            minimumFractionDigits: 0,
+                                                            maximumFractionDigits: 2,
+                                                        })}{' '}
+                                                        {t('LPM')}
+                                                    </span>
+                                                </p>
+                                                {currentZone.flowRates.submain > 0 && (
+                                                    <p>
+                                                        {t('ท่อรอง:')}{' '}
+                                                        <span className="font-bold text-orange-300">
+                                                            {currentZone.flowRates.submain.toLocaleString(undefined, {
+                                                                minimumFractionDigits: 0,
+                                                                maximumFractionDigits: 2,
+                                                            })}{' '}
+                                                            {t('LPM')}
+                                                        </span>
+                                                    </p>
+                                                )}
+                                                {currentZone.flowRates.main > 0 && (
+                                                    <p>
+                                                        {t('ท่อหลัก:')}{' '}
+                                                        <span className="font-bold text-cyan-300">
+                                                            {currentZone.flowRates.main.toLocaleString(undefined, {
+                                                                minimumFractionDigits: 0,
+                                                                maximumFractionDigits: 2,
+                                                            })}{' '}
+                                                            {t('LPM')}
+                                                        </span>
+                                                    </p>
+                                                )}
+                                            </>
+                                        );
+                                    }
+                                    return null;
+                                })()
+                            ) : (
+                                <>
+                                    <p>
+                                        {t('ท่อย่อย:')}{' '}
+                                        <span className="font-bold text-purple-300">
+                                            {results.flows.branch.toLocaleString(undefined, {
+                                                minimumFractionDigits: 0,
+                                                maximumFractionDigits: 2,
+                                            })}{' '}
+                                            {t('LPM')}
+                                        </span>
+                                    </p>
+                                    {results.hasValidSecondaryPipe && (
+                                        <p>
+                                            {t('ท่อรอง:')}{' '}
+                                            <span className="font-bold text-orange-300">
+                                                {results.flows.secondary.toLocaleString(undefined, {
+                                                    minimumFractionDigits: 0,
+                                                    maximumFractionDigits: 2,
+                                                })}{' '}
+                                                {t('LPM')}
+                                            </span>
+                                        </p>
+                                    )}
+                                    {results.hasValidMainPipe && (
+                                        <p>
+                                            {t('ท่อหลัก:')}{' '}
+                                            <span className="font-bold text-cyan-300">
+                                                {results.flows.main.toLocaleString(undefined, {
+                                                    minimumFractionDigits: 0,
+                                                    maximumFractionDigits: 2,
+                                                })}{' '}
+                                                {t('LPM')}
+                                            </span>
+                                        </p>
+                                    )}
+                                </>
                             )}
                         </div>
                         <p className="mt-1 text-xs text-gray-400">{t('ตามการออกแบบระบบ')}</p>

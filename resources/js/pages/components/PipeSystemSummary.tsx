@@ -77,6 +77,8 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
 
         const storedCalculations = getStoredCalculations();
         
+        console.log(`🔍 PipeSystemSummary stored calculations (${projectMode}):`, storedCalculations);
+        
         // สำหรับ greenhouse mode ให้กรองเฉพาะท่อที่ใช้จริง (ท่อเมนหลักและท่อย่อย)
         const filteredCalculations = projectMode === 'greenhouse' ? {
             branch: storedCalculations.branch || {},
@@ -139,6 +141,15 @@ const PipeSystemSummary: React.FC<PipeSystemSummaryProps> = ({
         
         const head20Percent = sprinklerPressure.head20PercentM;
         
+        console.log(`🔍 PipeSystemSummary calculated values (${projectMode}):`, {
+            branchCalc,
+            subMainCalc,
+            mainCalc,
+            emitterCalc,
+            branchSubMainCombined,
+            totalHeadLoss,
+            head20Percent
+        });
 
         return {
             branchCalc,

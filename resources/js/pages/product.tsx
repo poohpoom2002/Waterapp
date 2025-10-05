@@ -61,8 +61,7 @@ import {
     migrateToEnhancedFieldCropData,
     FieldCropData,
     calculateEnhancedFieldStats,
-    getFieldCropSystemData,
-    FieldCropSystemData,
+    saveEnhancedFieldCropData,
 } from '../utils/fieldCropData';
 
 import {
@@ -71,11 +70,6 @@ import {
     GreenhousePlanningData,
     EnhancedPlotStats,
     PIXELS_PER_METER,
-    GreenhouseSummaryData,
-    convertSummaryDataToRawData,
-    convertEnhancedDataToSummaryData,
-    EnhancedGreenhousePlanningData,
-    calculateAllGreenhouseStats,
 } from '../utils/greenHouseData';
 
 import { getCropByValue } from './utils/cropData';
@@ -100,21 +94,6 @@ interface ZoneOperationGroup {
     order: number;
     label: string;
 }
-
-// Function to load greenhouse summary data from localStorage
-const loadGreenhouseSummaryData = (): GreenhouseSummaryData | null => {
-    try {
-        const storedData = localStorage.getItem('greenhouseSummaryData');
-        if (storedData) {
-            const data = JSON.parse(storedData);
-            return data;
-        }
-        return null;
-    } catch (error) {
-        console.error('❌ Error loading greenhouse summary data:', error);
-        return null;
-    }
-};
 
 const getStoredProjectImage = (projectMode: ProjectMode): string | null => {
     const imageKeys = ['projectMapImage', `${projectMode}PlanImage`, 'mapCaptureImage'];
@@ -190,10 +169,8 @@ export default function Product() {
     const [gardenStats, setGardenStats] = useState<GardenStatistics | null>(null);
 
     const [fieldCropData, setFieldCropData] = useState<FieldCropData | null>(null);
-    const [fieldCropSystemData, setFieldCropSystemData] = useState<FieldCropSystemData | null>(null);
 
     const [greenhouseData, setGreenhouseData] = useState<GreenhousePlanningData | null>(null);
-    const [greenhouseSummaryData, setGreenhouseSummaryData] = useState<GreenhouseSummaryData | null>(null);
 
     const [projectData, setProjectData] = useState<HorticultureProject | null>(null);
     const [projectStats, setProjectStats] = useState<any>(null);
@@ -356,44 +333,14 @@ export default function Product() {
         }
     }, [projectImage, projectMode]);
 
-    // Load greenhouse data when project mode changes
-    useEffect(() => {
-        if (projectMode === 'greenhouse') {
-            // Try to load summary data first
-            const summaryData = loadGreenhouseSummaryData();
-            if (summaryData) {
-                setGreenhouseSummaryData(summaryData);
-                // Convert summary data to enhanced data format
-                const rawData = convertSummaryDataToRawData(summaryData);
-                const enhancedData = calculateAllGreenhouseStats(rawData);
-                setGreenhouseData(enhancedData);
-            } else {
-                // Fallback to existing enhanced data
-                const data = getGreenhouseData();
-                if (data) {
-                    setGreenhouseData(data);
-                    // Convert enhanced data to summary format for consistency
-                    const summaryFormat = convertEnhancedDataToSummaryData(data);
-                    setGreenhouseSummaryData(summaryFormat);
-                }
-            }
-        }
-    }, [projectMode]);
-
     const getZoneName = (zoneId: string): string => {
         if (projectMode === 'garden' && gardenStats) {
             const zone = gardenStats.zones.find((z) => z.zoneId === zoneId);
             return zone?.zoneName || zoneId;
         }
-        if (projectMode === 'field-crop') {
-            // Use fieldCropSystemData if available, otherwise fallback to fieldCropData
-            if (fieldCropSystemData && fieldCropSystemData.zones) {
-                const zone = fieldCropSystemData.zones.find((z: any) => z.id === zoneId);
-                return zone?.name || zoneId;
-            } else if (fieldCropData) {
-                const zone = fieldCropData.zones.info.find((z) => z.id === zoneId);
-                return zone?.name || zoneId;
-            }
+        if (projectMode === 'field-crop' && fieldCropData) {
+            const zone = fieldCropData.zones.info.find((z) => z.id === zoneId);
+            return zone?.name || zoneId;
         }
         if (projectMode === 'greenhouse' && greenhouseData) {
             const plot = greenhouseData.summary.plotStats.find((p) => p.plotId === zoneId);
@@ -536,24 +483,65 @@ export default function Product() {
         const assignedCropValue = fieldData.crops.zoneAssignments[zone.id];
         const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
 
-        const totalSprinklers =
-            zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10));
+        // Use the actual sprinkler count from the field crop data
+        const totalSprinklers = zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10));
+        
+        console.log(`🔍 Zone ${zone.id} sprinkler count calculation:`, {
+            zoneSprinklerCount: zone.sprinklerCount,
+            totalPlantingPoints: zone.totalPlantingPoints,
+            calculatedTotalSprinklers: totalSprinklers,
+            fallbackCalculation: Math.max(1, Math.ceil(zone.totalPlantingPoints / 10))
+        });
 
-        // ใช้ค่าเริ่มต้นสำหรับอัตราการไหล (ลิตร/นาที) ต่อหัวฉีด
-        // ไม่ต้องคำนวณจากข้อมูลพืชหรือปริมาณน้ำต่อวัน
-        const waterPerSprinklerLPM = 2.5; // ลิตร/นาที ต่อหัวฉีด (ค่าเริ่มต้น)
+        // Calculate water per sprinkler based on calculated flow rates from field crop summary
+        let waterPerSprinklerLPM = 2.0; // Default fallback
+        
+        // First priority: Use calculated flow rates from field crop summary
+        if (zone.flowRates && zone.flowRates.lateral > 0 && zone.flowRates.sprinklerCount > 0) {
+            waterPerSprinklerLPM = zone.flowRates.lateral / zone.flowRates.sprinklerCount;
+            console.log(`🔍 Using calculated flow rate for zone ${zone.id}: ${zone.flowRates.lateral} L/min ÷ ${zone.flowRates.sprinklerCount} sprinklers = ${waterPerSprinklerLPM} L/min per sprinkler`);
+        } else if (fieldData.irrigation?.settings) {
+            // Fallback: Try to get the actual flow rate per sprinkler from irrigation settings
+            const irrigationSettings = fieldData.irrigation.settings;
+            // Look for sprinkler flow rate in irrigation settings
+            if (irrigationSettings.sprinkler_system?.flow) {
+                waterPerSprinklerLPM = irrigationSettings.sprinkler_system.flow;
+            } else if (irrigationSettings.sprinkler?.flow) {
+                waterPerSprinklerLPM = irrigationSettings.sprinkler.flow;
+            }
+        }
+        
+        // Final fallback: if no irrigation settings, try to calculate from total flow and sprinkler count
+        if (waterPerSprinklerLPM === 2.0 && zone.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
+            // This is a fallback calculation - should not be the primary method
+            const avgIrrigationTimeHours = 0.5;
+            waterPerSprinklerLPM = zone.totalWaterRequirementPerDay / totalSprinklers / (avgIrrigationTimeHours * 60);
+        } else if (waterPerSprinklerLPM === 2.0 && crop && crop.waterRequirement) {
+            // Final fallback to crop water requirement
+            waterPerSprinklerLPM = crop.waterRequirement;
+        }
+
+        console.log(`🔍 Field crop zone input for zone ${zone.id}:`, {
+            totalSprinklers,
+            totalWaterRequirementPerDay: zone.totalWaterRequirementPerDay,
+            waterPerSprinklerLPM,
+            areaInRai,
+            irrigationSettings: fieldData.irrigation?.settings,
+            hasIrrigationSettings: !!fieldData.irrigation?.settings,
+            pipeStats: zone.pipeStats
+        });
 
         const zonePipeStats = zone.pipeStats;
-        const longestBranch = zonePipeStats.lateral.longestLength || 30;
+        const longestBranch = zonePipeStats.lateral.longest || 30;
         const totalBranchLength = zonePipeStats.lateral.totalLength || 100;
-        const longestSubmain = zonePipeStats.submain.longestLength || 0;
+        const longestSubmain = zonePipeStats.submain.longest || 0;
         const totalSubmainLength = zonePipeStats.submain.totalLength || 0;
-        const longestMain = zonePipeStats.main.longestLength || 0;
+        const longestMain = zonePipeStats.main.longest || 0;
         const totalMainLength = zonePipeStats.main.totalLength || 0;
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
+            totalTrees: totalSprinklers,
             waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
             numberOfZones: totalZones,
             sprinklersPerTree: 1,
@@ -623,13 +611,18 @@ export default function Product() {
             fieldData.summary.totalPlantingPoints ||
             Math.max(1, Math.ceil(fieldData.summary.totalPlantingPoints / 10));
 
-        // ใช้ค่าเริ่มต้นสำหรับอัตราการไหล (ลิตร/นาที) ต่อหัวฉีด
-        // ไม่ต้องคำนวณจากข้อมูลพืชหรือปริมาณน้ำต่อวัน
-        const waterPerSprinklerLPM = 2.5; // ลิตร/นาที ต่อหัวฉีด (ค่าเริ่มต้น)
+        let waterPerSprinklerLPM = 2.0;
+        if (fieldData.summary.totalWaterRequirementPerDay > 0 && totalSprinklers > 0) {
+            const avgIrrigationTimeHours = 0.5;
+            waterPerSprinklerLPM =
+                fieldData.summary.totalWaterRequirementPerDay /
+                totalSprinklers /
+                (avgIrrigationTimeHours * 60);
+        }
 
         return {
             farmSizeRai: formatNumber(areaInRai, 3),
-            totalTrees: totalSprinklers, // ในโหมดพืชไร่ totalTrees หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
+            totalTrees: totalSprinklers,
             waterPerTreeLiters: formatNumber(waterPerSprinklerLPM, 3),
             numberOfZones: 1,
             sprinklersPerTree: 1,
@@ -646,11 +639,11 @@ export default function Product() {
             branchesPerLongestSecondary: 1,
             secondariesPerLongestMain: 1,
 
-            longestBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.longestLength || 30, 3),
+            longestBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.longest || 30, 3),
             totalBranchPipeM: formatNumber(fieldData.pipes.stats.lateral.totalLength || 100, 3),
-            longestSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.longestLength || 0, 3),
+            longestSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.longest || 0, 3),
             totalSecondaryPipeM: formatNumber(fieldData.pipes.stats.submain.totalLength || 0, 3),
-            longestMainPipeM: formatNumber(fieldData.pipes.stats.main.longestLength || 0, 3),
+            longestMainPipeM: formatNumber(fieldData.pipes.stats.main.longest || 0, 3),
             totalMainPipeM: formatNumber(fieldData.pipes.stats.main.totalLength || 0, 3),
         };
     };
@@ -1039,46 +1032,26 @@ export default function Product() {
             localStorage.removeItem('horticulture_defaultSprinkler');
             localStorage.removeItem('garden_defaultSprinkler');
 
-            // First try to load summary data from green-house-summary page
-            const summaryData = loadGreenhouseSummaryData();
-            let currentData: GreenhousePlanningData | null = null;
-            
-            if (summaryData) {
-                setGreenhouseSummaryData(summaryData);
-                // Convert summary data to enhanced data format
-                const rawData = convertSummaryDataToRawData(summaryData);
-                const enhancedData = calculateAllGreenhouseStats(rawData);
-                setGreenhouseData(enhancedData);
-                currentData = enhancedData;
-            } else {
-                // Fallback to existing enhanced data
-                let data = getGreenhouseData();
+            let data = getGreenhouseData();
 
-                if (!data) {
-                    data = migrateLegacyGreenhouseData();
-                }
-
-                if (data) {
-                    setGreenhouseData(data);
-                    // Convert enhanced data to summary format for consistency
-                    const summaryFormat = convertEnhancedDataToSummaryData(data);
-                    setGreenhouseSummaryData(summaryFormat);
-                    currentData = data;
-                }
+            if (!data) {
+                data = migrateLegacyGreenhouseData();
             }
 
-            if (currentData) {
+            if (data) {
+                setGreenhouseData(data);
+
                 const initialZoneInputs: { [zoneId: string]: IrrigationInput } = {};
                 const initialSelectedPipes: {
                     [zoneId: string]: { branch?: any; secondary?: any; main?: any };
                 } = {};
 
-                if (currentData.summary.plotStats.length > 1) {
-                    currentData.summary.plotStats.forEach((plot) => {
+                if (data.summary.plotStats.length > 1) {
+                    data.summary.plotStats.forEach((plot) => {
                         initialZoneInputs[plot.plotId] = createGreenhouseZoneInput(
                             plot,
-                            currentData!,
-                            currentData!.summary.plotStats.length
+                            data,
+                            data.summary.plotStats.length
                         );
                         initialSelectedPipes[plot.plotId] = {
                             branch: undefined,
@@ -1089,18 +1062,18 @@ export default function Product() {
 
                     setZoneInputs(initialZoneInputs);
                     setSelectedPipes(initialSelectedPipes);
-                    setActiveZoneId(currentData.summary.plotStats[0].plotId);
+                    setActiveZoneId(data.summary.plotStats[0].plotId);
                     handleZoneOperationModeChange('sequential');
-                } else if (currentData.summary.plotStats.length === 1) {
-                    const plot = currentData.summary.plotStats[0];
-                    const singleInput = createGreenhouseZoneInput(plot, currentData, 1);
+                } else if (data.summary.plotStats.length === 1) {
+                    const plot = data.summary.plotStats[0];
+                    const singleInput = createGreenhouseZoneInput(plot, data, 1);
                     setZoneInputs({ [plot.plotId]: singleInput });
                     setSelectedPipes({
                         [plot.plotId]: { branch: undefined, secondary: undefined, main: undefined },
                     });
                     setActiveZoneId(plot.plotId);
                 } else {
-                    const singleInput = createSingleGreenhouseInput(currentData);
+                    const singleInput = createSingleGreenhouseInput(data);
                     setZoneInputs({ 'main-area': singleInput });
                     setSelectedPipes({
                         'main-area': { branch: undefined, secondary: undefined, main: undefined },
@@ -1118,12 +1091,12 @@ export default function Product() {
             localStorage.removeItem('garden_defaultSprinkler');
 
             // Load field crop system data from localStorage (similar to horticulture and greenhouse)
-            let systemData: FieldCropSystemData | null = null;
+            let systemData: FieldCropData | null = null;
             const systemDataStr = localStorage.getItem('fieldCropSystemData');
             if (systemDataStr) {
                 try {
                     systemData = JSON.parse(systemDataStr);
-                    setFieldCropSystemData(systemData);
+                    setFieldCropData(systemData);
                 } catch (error) {
                     console.error('❌ Error parsing fieldCropSystemData from localStorage:', error);
                 }
@@ -1144,9 +1117,28 @@ export default function Product() {
 
             // Fallback to utility functions if localStorage data is not available
             if (!fieldData) {
-                fieldData = getEnhancedFieldCropData();
-                if (!fieldData) {
-                    fieldData = migrateToEnhancedFieldCropData();
+                console.log('🔍 No enhanced data found, trying migration...');
+                fieldData = migrateToEnhancedFieldCropData();
+                console.log('🔍 Migrated field crop data:', fieldData);
+            }
+
+            // Additional fallback: try to load from fieldMapData directly
+            if (!fieldData) {
+                console.log('🔍 Trying to load from fieldMapData...');
+                try {
+                    const fieldMapDataStr = localStorage.getItem('fieldMapData');
+                    if (fieldMapDataStr) {
+                        const fieldMapData = JSON.parse(fieldMapDataStr);
+                        console.log('🔍 Found fieldMapData:', fieldMapData);
+                        // Convert to enhanced format
+                        fieldData = calculateEnhancedFieldStats(fieldMapData);
+                        if (fieldData) {
+                            saveEnhancedFieldCropData(fieldData);
+                            console.log('🔍 Converted and saved fieldMapData to enhanced format');
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Error loading from fieldMapData:', error);
                 }
             }
 
@@ -1158,30 +1150,14 @@ export default function Product() {
                     [zoneId: string]: { branch?: any; secondary?: any; main?: any };
                 } = {};
 
-                // Use system data zones if available, otherwise use field data zones
-                const zonesInfo = systemData?.zones || fieldData.zones.info;
-
-                if (zonesInfo.length > 1) {
-                    zonesInfo.forEach((zone: any) => {
-                        // Use zone data from system data if available
-                        const zoneId = zone.id;
-                        const fieldZone = fieldData.zones.info.find((z) => z.id === zoneId);
-                        
-                        if (fieldZone) {
-                            initialZoneInputs[zoneId] = createFieldCropZoneInput(
-                                fieldZone,
-                                fieldData,
-                                zonesInfo.length
-                            );
-                        } else {
-                            // Create input from system data
-                            initialZoneInputs[zoneId] = createFieldCropZoneInputFromSystemData(
-                                zone,
-                                zonesInfo.length
-                            );
-                        }
-                        
-                        initialSelectedPipes[zoneId] = {
+                if (fieldData.zones.info.length > 1) {
+                    fieldData.zones.info.forEach((zone) => {
+                        initialZoneInputs[zone.id] = createFieldCropZoneInput(
+                            zone,
+                            fieldData,
+                            fieldData.zones.info.length
+                        );
+                        initialSelectedPipes[zone.id] = {
                             branch: undefined,
                             secondary: undefined,
                             main: undefined,
@@ -1190,19 +1166,11 @@ export default function Product() {
 
                     setZoneInputs(initialZoneInputs);
                     setSelectedPipes(initialSelectedPipes);
-                    setActiveZoneId(zonesInfo[0].id);
+                    setActiveZoneId(fieldData.zones.info[0].id);
                     handleZoneOperationModeChange('sequential');
-                } else if (zonesInfo.length === 1) {
-                    const zone = zonesInfo[0];
-                    const fieldZone = fieldData.zones.info.find((z) => z.id === zone.id);
-                    
-                    let singleInput: IrrigationInput;
-                    if (fieldZone) {
-                        singleInput = createFieldCropZoneInput(fieldZone, fieldData, 1);
-                    } else {
-                        singleInput = createFieldCropZoneInputFromSystemData(zone, 1);
-                    }
-                    
+                } else if (fieldData.zones.info.length === 1) {
+                    const zone = fieldData.zones.info[0];
+                    const singleInput = createFieldCropZoneInput(zone, fieldData, 1);
                     setZoneInputs({ [zone.id]: singleInput });
                     setSelectedPipes({
                         [zone.id]: { branch: undefined, secondary: undefined, main: undefined },
@@ -1682,12 +1650,12 @@ export default function Product() {
         console.log('📦 [PRODUCT] Garden Data:', gardenData);
         console.log('📦 [PRODUCT] Garden Stats:', gardenStats);
         console.log('📦 [PRODUCT] Field Crop Data:', fieldCropData);
-        console.log('📦 [PRODUCT] Field Crop System Data:', fieldCropSystemData);
+        console.log('📦 [PRODUCT] Field Crop System Data:', fieldCropData);
         if (fieldCropData?.crops?.zoneAssignments) {
             console.log('📦 [PRODUCT] Field Crop Zone Assignments:', fieldCropData.crops.zoneAssignments);
         }
-        if (fieldCropSystemData?.zones) {
-            console.log('📦 [PRODUCT] Field Crop System Zones:', fieldCropSystemData.zones);
+        if (fieldCropData?.zones) {
+            console.log('📦 [PRODUCT] Field Crop System Zones:', fieldCropData.zones);
         }
         console.log('📦 [PRODUCT] Greenhouse Data:', greenhouseData);
         console.log('📦 [PRODUCT] Project Data:', projectData);
@@ -1712,9 +1680,9 @@ export default function Product() {
             return zones;
         }
         if (projectMode === 'field-crop') {
-            // Use fieldCropSystemData if available, otherwise fallback to fieldCropData
-            if (fieldCropSystemData && fieldCropSystemData.zones) {
-                const zones = fieldCropSystemData.zones.map((z: any) => ({
+            // Use fieldCropData if available, otherwise fallback to fieldCropData
+            if (fieldCropData && fieldCropData.zones && fieldCropData.zones.info) {
+                const zones = fieldCropData.zones.info.map((z: any) => ({
                     id: z.id,
                     name: z.name,
                     area: z.area,
@@ -1768,16 +1736,6 @@ export default function Product() {
                               category: crop.category,
                           }
                         : null,
-                    // Enhanced greenhouse data
-                    effectivePlantingArea: p.effectivePlantingArea,
-                    cropType: p.cropType,
-                    cropIcon: p.cropIcon,
-                    pipeStats: p.pipeStats,
-                    equipmentCount: p.equipmentCount,
-                    waterCalculation: p.production.waterCalculation,
-                    plantingDensity: p.plantingDensity,
-                    estimatedYield: p.production.estimatedYield,
-                    estimatedIncome: p.production.estimatedIncome,
                 };
             });
             console.log('🏠 [PRODUCT] Greenhouse Zones Data:', zones);
@@ -1821,41 +1779,26 @@ export default function Product() {
                 } as any;
             }
         }
-        if (projectMode === 'field-crop') {
-            // Use fieldCropSystemData if available, otherwise fallback to fieldCropData
-            if (fieldCropSystemData && fieldCropSystemData.zones) {
-                const zone = fieldCropSystemData.zones.find((z: any) => z.id === activeZoneId);
-                if (zone) {
-                    return {
-                        id: zone.id,
-                        name: zone.name,
-                        area: zone.area,
-                        plantCount: zone.plantCount, // ในโหมดพืชไร่ plantCount หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
-                        totalWaterNeed: zone.totalWaterNeed,
-                        plantData: null, // Could be enhanced later with crop data
-                    } as any;
-                }
-            } else if (fieldCropData) {
-                const zone = fieldCropData.zones.info.find((z) => z.id === activeZoneId);
-                if (zone) {
-                    const assignedCropValue = fieldCropData.crops.zoneAssignments[zone.id];
-                    const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
+        if (projectMode === 'field-crop' && fieldCropData) {
+            const zone = fieldCropData.zones.info.find((z) => z.id === activeZoneId);
+            if (zone) {
+                const assignedCropValue = fieldCropData.crops.zoneAssignments[zone.id];
+                const crop = assignedCropValue ? getCropByValue(assignedCropValue) : null;
 
-                    return {
-                        id: zone.id,
-                        name: zone.name,
-                        area: zone.area,
-                        plantCount: zone.sprinklerCount || Math.max(1, Math.ceil(zone.totalPlantingPoints / 10)), // ในโหมดพืชไร่ plantCount หมายถึงจำนวนหัวฉีด (สปริงเกลอร์)
-                        totalWaterNeed: zone.totalWaterRequirementPerDay,
-                        plantData: crop
-                            ? {
-                                  name: crop.name,
-                                  waterNeed: crop.waterRequirement || 50,
-                                  category: crop.category,
-                              }
-                            : null,
-                    } as any;
-                }
+                return {
+                    id: zone.id,
+                    name: zone.name,
+                    area: zone.area,
+                    plantCount: zone.totalPlantingPoints,
+                    totalWaterNeed: zone.totalWaterRequirementPerDay,
+                    plantData: crop
+                        ? {
+                              name: crop.name,
+                              waterNeed: crop.waterRequirement || 50,
+                              category: crop.category,
+                          }
+                        : null,
+                } as any;
             }
         }
         if (projectMode === 'greenhouse' && greenhouseData) {
@@ -1876,16 +1819,6 @@ export default function Product() {
                               category: crop.category,
                           }
                         : null,
-                    // Enhanced greenhouse data
-                    effectivePlantingArea: plot.effectivePlantingArea,
-                    cropType: plot.cropType,
-                    cropIcon: plot.cropIcon,
-                    pipeStats: plot.pipeStats,
-                    equipmentCount: plot.equipmentCount,
-                    waterCalculation: plot.production.waterCalculation,
-                    plantingDensity: plot.plantingDensity,
-                    estimatedYield: plot.production.estimatedYield,
-                    estimatedIncome: plot.production.estimatedIncome,
                 } as any;
             }
         }
@@ -1960,7 +1893,7 @@ export default function Product() {
     const hasEssentialData =
         (projectMode === 'horticulture' && projectData && projectStats) ||
         (projectMode === 'garden' && gardenData && gardenStats) ||
-        (projectMode === 'field-crop' && (fieldCropData || fieldCropSystemData)) ||
+        (projectMode === 'field-crop' && fieldCropData) ||
         (projectMode === 'greenhouse' && greenhouseData);
 
     if (!hasEssentialData) {
@@ -2184,14 +2117,9 @@ export default function Product() {
                                         const isActive = activeZoneId === zone.id;
                                         const hasSprinkler = !!zoneSprinklers[zone.id];
 
-                                        // หาสีของโซนจาก system data
-                                        let zoneColor: string | null = null;
-                                        if (projectMode === 'field-crop' && fieldCropSystemData?.zones) {
-                                            const systemZone = fieldCropSystemData.zones.find(
-                                                (fz: any) => fz.id === zone.id
-                                            );
-                                            zoneColor = systemZone?.color || null;
-                                        } else if (
+                                        // หาสีของโซนจาก horticultureSystemData
+                                        let zoneColor = null;
+                                        if (
                                             horticultureSystemData &&
                                             horticultureSystemData.zones
                                         ) {
@@ -2544,7 +2472,6 @@ export default function Product() {
                                 <PipeSystemSummary
                                     horticultureSystemData={horticultureSystemData}
                                     gardenSystemData={gardenSystemData}
-                                    greenhouseData={greenhouseData}
                                     activeZoneId={activeZoneId}
                                     selectedPipes={{
                                         branch: effectiveEquipment.branchPipe,
@@ -2566,21 +2493,33 @@ export default function Product() {
                                                       10 *
                                                       0.2,
                                               }
-                                            : horticultureSystemData?.sprinklerConfig?.pressureBar
+                                            : projectMode === 'field-crop'
                                               ? {
-                                                    pressureBar:
-                                                        horticultureSystemData.sprinklerConfig
-                                                            .pressureBar,
-                                                    headM:
-                                                        horticultureSystemData.sprinklerConfig
-                                                            .pressureBar * 10,
-                                                    head20PercentM:
-                                                        horticultureSystemData.sprinklerConfig
-                                                            .pressureBar *
-                                                        10 *
-                                                        0.2,
+                                                    pressureBar: 2.5, // Default pressure for field-crop
+                                                    headM: 25,
+                                                    head20PercentM: 5,
                                                 }
-                                              : undefined
+                                              : projectMode === 'greenhouse'
+                                                ? {
+                                                      pressureBar: 2.0, // Default pressure for greenhouse
+                                                      headM: 20,
+                                                      head20PercentM: 4,
+                                                  }
+                                                : horticultureSystemData?.sprinklerConfig?.pressureBar
+                                                ? {
+                                                      pressureBar:
+                                                          horticultureSystemData.sprinklerConfig
+                                                              .pressureBar,
+                                                      headM:
+                                                          horticultureSystemData.sprinklerConfig
+                                                              .pressureBar * 10,
+                                                      head20PercentM:
+                                                          horticultureSystemData.sprinklerConfig
+                                                              .pressureBar *
+                                                          10 *
+                                                          0.2,
+                                                  }
+                                                : undefined
                                     }
                                     projectMode={projectMode}
                                 />
